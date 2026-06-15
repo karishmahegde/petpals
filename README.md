@@ -1,19 +1,19 @@
-# 🐾 PetPals — Animal Adoption Management System
+# 🐾 PetPals - Animal Adoption Management System
 
-A multi-shelter pet adoption platform built as a full-stack learning project following real software engineering practices. PetPals goes beyond existing solutions by serving as an internal operations backbone for shelter networks, with features like inter-shelter animal transfers, a universal health passport, and an AI-powered pet-adopter compatibility matcher.
+A multi-shelter pet adoption platform built as a full-stack project following real software engineering practices. PetPals goes beyond existing solutions by serving as an internal operations backbone for shelter networks, with features like inter-shelter animal transfers, a universal health passport, and an AI-powered pet-adopter compatibility matcher.
 
 ---
 
 ## ✨ Key Features
 
-| Feature | Description |
-|---|---|
-| **Multi-shelter network** | Unified animal listings and workflows across all branches of an organisation |
-| **Inter-shelter transfers** | Capacity-aware transfer requests with full transfer history |
-| **Universal health passport** | Medical records that travel with an animal across shelter relocations |
-| **AI compatibility matcher** | Claude-powered pet-adopter matching to improve adoption success rates |
-| **Role-based access control** | Six distinct roles: Admin, Shelter Staff, Adopter, Vet, Volunteer, Donor |
-| **Donation management** | Stripe-integrated donor flow with impact tracking |
+| Feature                       | Description                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| **Multi-shelter network**     | Unified animal listings and workflows across all branches of an organisation |
+| **Inter-shelter transfers**   | Capacity-aware transfer requests with full transfer history                  |
+| **Universal health passport** | Medical records that travel with an animal across shelter relocations        |
+| **AI compatibility matcher**  | Claude-powered pet-adopter matching to improve adoption success rates        |
+| **Role-based access control** | Six distinct roles: Admin, Shelter Staff, Adopter, Vet, Volunteer, Donor     |
+| **Donation management**       | Stripe-integrated donor flow with impact tracking                            |
 
 ---
 
@@ -40,9 +40,11 @@ petpals/
 │   │   ├── services/        # Axios API calls
 │   │   ├── utils/           # Helpers and constants
 │   │   └── styles/
-│   ├── index.html
+│   │   ├── main.jsx	# The JavaScript entry point. React starts here
+│   │   ├── App.jsx	# The root component. Defines all the routes — which URL path renders which page component.
+│   ├── index.html	# The single HTML file for the entire React app. Uses Single Page Application (SPA)
 │   ├── vite.config.js
-│   └── tailwind.config.js
+│   └── tailwind.config.js	# Configures Tailwind CSS
 │
 ├── server/                  # Node.js + Express REST API
 │   ├── src/
@@ -53,15 +55,23 @@ petpals/
 │   │   ├── utils/           # Shared helpers
 │   │   ├── config/          # DB and env config
 │   │   ├── prisma/
-│   │   │   └── schema.prisma
+│   │   │   └── schema.prisma	# Prisma reads this file and uses it to create the PostgreSQL tables and generate the TypeScript/JavaScript client used to query the database.
 │   │   └── index.js         # Entry point
 │   └── tests/
 │       ├── unit/
 │       └── integration/
+│   ├── package.json		# Describes your server as a Node.js project. Lists every library it depends on and defines the commands you can run.
+│   ├── Dockerfile		# Instructions for building the server's Docker container. Read top to bottom like a recipe.
 │
-├── docker-compose.yml
-├── .env.example
-└── .gitignore
+├── docs/
+│   │   ├── 01_Project_Overview.pdf
+│   │   ├── 02_Requirements.pdf
+│   │   ├── 03_Personas.pdf
+│   │   ├── 04_Database_Design.pdf
+│   │   ├── 05_API_Design.pdf
+├── docker-compose.yml	# Defines three "containers”: PostgreSQL, Express server, and React app. Tells Docker how to run them all together with one command: docker-compose up.
+├── .env.example	# A template that lists every environment variable the project needs, with placeholder values instead of real ones. This one is committed to GitHub.
+└── .gitignore	# Tells Git which files and folders to completely ignore — they will never be committed or pushed to GitHub, no matter what.
 ```
 
 ---
@@ -69,6 +79,7 @@ petpals/
 ## 🛠️ Tech Stack
 
 **Frontend**
+
 - React 18 + Vite
 - Tailwind CSS
 - React Router v6
@@ -76,26 +87,31 @@ petpals/
 - TanStack Query (server state & caching)
 
 **Backend**
+
 - Node.js 18 + Express
 - Prisma ORM
 - PostgreSQL 15 + PostGIS
 - Supabase (media storage)
 
 **Auth**
+
 - JWT (stateless authentication)
 - bcrypt (password hashing)
 
 **Infrastructure**
+
 - Docker + Docker Compose (local dev)
 - Vercel (frontend deployment)
 - Railway (backend deployment)
 
 **Testing**
+
 - Jest + Supertest (unit & integration)
-- Cypress (E2E — critical flows only)
+- Cypress (E2E - critical flows only)
 
 **AI Feature**
-- Anthropic Claude API (pet-adopter compatibility matcher, Sprint 6)
+
+- OpenAI API (pet-adopter compatibility matcher, Sprint 6)
 
 ---
 
@@ -118,7 +134,7 @@ cd petpals
 
 ```bash
 cp .env.example .env
-# Fill in values in .env — see comments in the file
+# Fill in values in .env - see comments in the file
 ```
 
 ### 3a. Run with Docker (recommended)
@@ -134,6 +150,7 @@ docker-compose up --build
 ### 3b. Run manually (without Docker)
 
 **Server**
+
 ```bash
 cd server
 npm install
@@ -143,6 +160,7 @@ npm run dev
 ```
 
 **Client**
+
 ```bash
 cd client
 npm install
@@ -159,35 +177,20 @@ Full API documentation is available via Swagger at `/api/docs` once the server i
 
 ### Resource domains
 
-| Domain | Base path |
-|---|---|
-| Auth | `/auth` |
-| Pets | `/pets` |
-| Adopters | `/adopters` |
-| Adoption Applications | `/adoption-applications` |
-| Shelters | `/shelters` |
-| Staff | `/staff` |
-| Appointments | `/appointments` |
-| Vaccinations | `/appointments/:id/vaccinations` |
-| Tasks | `/tasks` |
-| Events | `/events` |
-| Donors & Donations | `/donors`, `/donations` |
-| Shelter Transfers | `/transfers` |
-
----
-
-## 🗓️ Sprint Plan
-
-| Sprint | Focus |
-|---|---|
-| 1 | Auth + project setup |
-| 2 | Pet management (CRUD, photos, search) |
-| 3 | Adoption flow (applications, visits, notifications) |
-| 4 | Shelter staff & admin operations |
-| 5 | Vet, volunteer, donor flows |
-| 6 | AI compatibility matcher (Claude API) |
-| 7 | Testing + coverage to 70% |
-| 8 | Deployment, polish, final report |
+| Domain                | Base path                        |
+| --------------------- | -------------------------------- |
+| Auth                  | `/auth`                          |
+| Pets                  | `/pets`                          |
+| Adopters              | `/adopters`                      |
+| Adoption Applications | `/adoption-applications`         |
+| Shelters              | `/shelters`                      |
+| Staff                 | `/staff`                         |
+| Appointments          | `/appointments`                  |
+| Vaccinations          | `/appointments/:id/vaccinations` |
+| Tasks                 | `/tasks`                         |
+| Events                | `/events`                        |
+| Donors & Donations    | `/donors`, `/donations`          |
+| Shelter Transfers     | `/transfers`                     |
 
 ---
 
@@ -203,6 +206,10 @@ Target: 70% coverage across unit and integration tests. Cypress E2E is scoped to
 
 ---
 
+## ✏️ Prototype
+
+## Figma High Fidelity prototype: https://www.figma.com/design/dtiJqWSoBhaMrgrs12fXYK/PetPals
+
 ## 🗄️ Database
 
 The schema is defined in `server/src/prisma/schema.prisma` and covers 26 tables across all six user roles.
@@ -213,15 +220,16 @@ ER Diagram: https://dbdiagram.io/d/PetPals-69bf5ca6fb2db18e3bd4b303
 
 ## 📄 Documentation
 
-All project documentation lives in the `docs/` folder (not committed to version control — maintained locally):
+All project documentation lives in the `docs/` folder:
 
-- `01_Project_Overview.docx`
-- `02_Requirements.docx`
-- `03_API_Design.docx`
-- `04_Database_Design.docx`
+- `01_Project_Overview.pdf`
+- `02_Requirements.pdf`
+- `03_Personas.pdf`
+- `04_Database_Design.pdf`
+- `05_API_Design.pdf`
 
 ---
 
 ## 👤 Author
 
-Built by Karishma as a solo full-stack learning project.
+Built by [Karishma Hegde ✨](https://karishmahegde.netlify.app)

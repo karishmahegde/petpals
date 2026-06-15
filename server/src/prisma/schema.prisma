@@ -1,10 +1,12 @@
 // PetPals — Prisma Schema
 // Mirrors the 26-table PostgreSQL schema defined in 04_Database_Design.docx
 
+//tells Prisma to generate a JavaScript client.
 generator client {
   provider = "prisma-client-js"
 }
 
+//tells Prisma it's talking to PostgreSQL, and where to find it i.e. the URL
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

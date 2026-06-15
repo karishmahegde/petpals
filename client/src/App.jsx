@@ -1,5 +1,6 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route } from "react-router-dom";
 
+//what it does: The root component. Defines all the routes — which URL path renders which page component.
 // Routes are uncommented as each sprint is implemented
 function App() {
   return (
@@ -29,7 +30,10 @@ function App() {
       {/* Admin */}
       {/* <Route path="/admin/*" element={<AdminRoutes />} /> */}
 
-      <Route path="*" element={<div style={{ padding: 40 }}>PetPals — coming soon 🐾</div>} />
+      <Route
+        path="*"
+        element={<div style={{ padding: 40 }}>PetPals — coming soon 🐾</div>}
+      />
     </Routes>
   );
 }

@@ -1,7 +1,7 @@
-version: '3.9'
+#What it does: Defines three "containers" — PostgreSQL, the Express server, and the React app. Tells Docker how to run them all together with one command: docker-compose up.
+version: "3.9"
 
 services:
-
   # ── PostgreSQL ───────────────────────────────────────────────
   db:
     image: postgres:15-alpine
@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: petpals
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -26,7 +26,7 @@ services:
     depends_on:
       - db
     ports:
-      - '5000:5000'
+      - "5000:5000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/petpals
       NODE_ENV: development
@@ -37,7 +37,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     volumes:
-      - ./server/src:/app/src  # hot-reload in dev
+      - ./server/src:/app/src # hot-reload in dev
 
   # ── React Client ─────────────────────────────────────────────
   client:
@@ -49,7 +49,7 @@ services:
     depends_on:
       - server
     ports:
-      - '3000:80'
+      - "3000:80"
 
 volumes:
   pgdata:

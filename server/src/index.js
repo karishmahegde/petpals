@@ -1,21 +1,23 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
+//Loads libraries and reads the .env file so all environment variables are available.
+const express = require("express");
+const cors = require("cors");
+const dotenv = require("dotenv");
 
 dotenv.config();
 
+//Creates the Express app
 const app = express();
 
 // ── Middleware ─────────────────────────────────────────────────
-app.use(cors());
+app.use(cors()); //Allows Cross-origin requests. Since our client and server will be on different ports, the browser would block it as per Same-Origin policy. This line will tell the browser to allow cross-origin requests.
 app.use(express.json());
 
 // ── Health check ───────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', version: 'v1' });
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", version: "v1" });
 });
 
-// ── API Routes (mounted as sprints are implemented) ────────────
+// ── API Routes ────────────
 // app.use('/api/v1/auth',                 require('./routes/auth'));
 // app.use('/api/v1/pets',                 require('./routes/pets'));
 // app.use('/api/v1/adopters',             require('./routes/adopters'));
@@ -34,18 +36,22 @@ app.get('/health', (req, res) => {
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found',
-    error: { code: 'NOT_FOUND', details: `${req.method} ${req.path} does not exist` }
+    message: "Route not found",
+    error: {
+      code: "NOT_FOUND",
+      details: `${req.method} ${req.path} does not exist`,
+    },
   });
 });
 
 // ── Global error handler ───────────────────────────────────────
 app.use((err, req, res, next) => {
+  //The 4 parameters err,req,res,next indicate that it's an error handler, not a regular route (which has 3 parameters)
   console.error(err.stack);
   res.status(500).json({
     success: false,
-    message: 'Internal server error',
-    error: { code: 'INTERNAL_SERVER_ERROR', details: err.message }
+    message: "Internal server error",
+    error: { code: "INTERNAL_SERVER_ERROR", details: err.message },
   });
 });
 
