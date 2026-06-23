@@ -44,6 +44,15 @@ async function main() {
     },
   });
 
+  // shelterLocation is a PostGIS geography column — Prisma can't set this via
+  // the normal create()/update() data object, since the type isn't modeled in
+  // schema.prisma. Set it with a raw query instead, right after the row exists.
+  await prisma.$executeRaw`
+    UPDATE "Shelter"
+    SET "shelterLocation" = ST_SetSRID(ST_MakePoint(-73.9965, 40.7505), 4326)
+    WHERE "shelterID" = ${shelter1.shelterID}
+  `;
+
   const shelter2 = await prisma.shelter.upsert({
     where: { shelterID: 2 },
     update: {},
@@ -57,6 +66,12 @@ async function main() {
       shelterStatus: "Open",
     },
   });
+
+  await prisma.$executeRaw`
+    UPDATE "Shelter"
+    SET "shelterLocation" = ST_SetSRID(ST_MakePoint(-73.9903, 40.6943), 4326)
+    WHERE "shelterID" = ${shelter2.shelterID}
+  `;
 
   // ── STAFF ────────────────────────────────────────────────────
   console.log("Creating staff...");

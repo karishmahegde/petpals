@@ -80,6 +80,8 @@ model Staff {
   volunteerApps   VolunteerApplication[]
   fromTransfers   TransferHistory[]     @relation("FromShelterStaff")
   toTransfers     TransferHistory[]     @relation("ToShelterStaff")
+
+  @@index([shelterID])
 }
 
 enum StaffDesignation {
@@ -163,6 +165,13 @@ model Pet {
   vaccinationRecords VaccinationRecord[]
   transferHistory    TransferHistory[]
   appointments       Appointment[]
+
+  @@index([shelterID])
+  @@index([adoptionStatus])
+  @@index([breedID])
+  // Tier 3 — composite index: most common query shape is "available pets at this shelter."
+  // shelterID listed first since it's the more universally-applied filter.
+  // @@index([shelterID, adoptionStatus])
 }
 
 enum PetSize {
@@ -334,6 +343,10 @@ model AdoptionApplication {
   adopter Adopter @relation(fields: [adopterID], references: [adopterID])
   staff   Staff?  @relation(fields: [staffID], references: [staffID])
   shelter Shelter @relation(fields: [shelterID], references: [shelterID])
+
+  @@index([adopterID])
+  @@index([petID])
+  @@index([shelterID])
 }
 
 enum ApplicationStatus {
@@ -357,6 +370,10 @@ model Visit {
   pet     Pet?     @relation(fields: [petID], references: [petID])
   staff   Staff?   @relation(fields: [staffID], references: [staffID])
   shelter Shelter  @relation(fields: [shelterID], references: [shelterID])
+
+  // Tier 2 — adopters viewing their scheduled visits (A-07), staff managing visits by shelter.
+  // @@index([adopterID])
+  // @@index([shelterID])
 }
 
 // ── NOTIFICATIONS ─────────────────────────────────────────────
@@ -369,6 +386,10 @@ model Notification {
   sendTime           DateTime
   textBody           String             @db.VarChar(300)
 
+  // recipientID is polymorphic (Adopter, Staff, Volunteer, or Veterinarian) — no @relation possible,
+  // so Prisma won't auto-index it the way it does for real foreign keys. Indexed manually instead.
+  // Tier 2 — every notification lookup for a given user filters on this pair.
+  // @@index([recipientID, recipientType])
 }
 
 enum NotificationType {
@@ -401,6 +422,9 @@ model HealthRecord {
 
   pet Pet          @relation(fields: [petID], references: [petID])
   vet Veterinarian? @relation(fields: [vetID], references: [vetID])
+
+  // Tier 2 — health passport lookup (V-03), queried whenever a pet's medical history is viewed.
+  // @@index([petID])
 }
 
 // ── VACCINE ───────────────────────────────────────────────────
@@ -427,6 +451,9 @@ model VaccinationRecord {
   vaccine Vaccine       @relation(fields: [vaccineID], references: [vaccineID])
   vet     Veterinarian? @relation(fields: [administeredBy], references: [vetID])
   shelter Shelter?      @relation(fields: [administeredAt], references: [shelterID])
+
+  // Tier 2 — health passport lookup (V-03), same reasoning as HealthRecord.
+  // @@index([petID])
 }
 
 // ── TRANSFER_HISTORY ──────────────────────────────────────────
@@ -446,6 +473,11 @@ model TransferHistory {
   toShelter   Shelter @relation("ToShelter", fields: [toShelterID], references: [shelterID])
   fromStaff   Staff?  @relation("FromShelterStaff", fields: [fromShelterStaff], references: [staffID])
   toStaff     Staff?  @relation("ToShelterStaff", fields: [toShelterStaff], references: [staffID])
+
+  // Tier 2 — viewing a shelter's incoming/outgoing transfer activity (S-11), or a pet's transfer history.
+  // @@index([fromShelterID])
+  // @@index([toShelterID])
+  // @@index([petID])
 }
 
 // ── APPOINTMENTS ──────────────────────────────────────────────
@@ -460,6 +492,10 @@ model Appointment {
   pet     Pet          @relation(fields: [petID], references: [petID])
   vet     Veterinarian @relation(fields: [vetID], references: [vetID])
   shelter Shelter      @relation(fields: [shelterID], references: [shelterID])
+
+  // Tier 2 — vets viewing their schedule (V-01), shelters viewing appointments at their branch.
+  // @@index([vetID])
+  // @@index([shelterID])
 }
 
 // ── VOLUNTEER_APPLICATION ─────────────────────────────────────
