@@ -3,23 +3,11 @@
 //What it returns: A function that can be used as a middleware function in the Express app.
 //How to use it: It can be used as a middleware function in the Express app.
 
-const jwt = require("jsonwebtoken"); //importing the jsonwebtoken library
+const jwt = require("jsonwebtoken");
 
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization; //authorization header from incoming request
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required",
-      error: { code: "UNAUTHORIZED", details: "Invalid token format" },
-    });
-  }
-
-  //Checking if the token is provided
-  const token = authHeader && authHeader.split(" ")[1]; //token is the second part of the authorization header
+const authenticate = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1]; // Check if acessToken is available
   if (!token) {
-    //if no token is provided, return a 401 Unauthorized error
     return res.status(401).json({
       success: false,
       message: "Authentication required",
@@ -27,17 +15,17 @@ const authenticate = (req, res, next) => {
     });
   }
 
-  //Verifying the token
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); //verifying the token
-    req.user = { userID: decoded.userID, role: decoded.role }; //attaching the decoded token to the request object
-    next(); //proceeding to the next middleware
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verfify accessToken
+
+    req.user = { userID: decoded.userID, role: decoded.role };
+    next(); // This moves it to the next function in line at the parent level, which would be the controller
   } catch (error) {
     const details =
       error.name === "TokenExpiredError" ? "Token expired" : "Invalid token";
     return res.status(401).json({
       success: false,
-      message: "Authentication Falied",
+      message: "Authentication failed",
       error: { code: "UNAUTHORIZED", details },
     });
   }

@@ -1,12 +1,13 @@
 //Loads libraries and reads the .env file so all environment variables are available.
+const dotenv = require("dotenv");
+dotenv.config();
+
 const express = require("express");
 const cors = require("cors");
-const dotenv = require("dotenv");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swagger");
-
-dotenv.config();
+const prisma = require("./config/prisma");
 
 //Creates the Express app
 const app = express();
@@ -14,7 +15,11 @@ const app = express();
 // ── Middleware ─────────────────────────────────────────────────
 app.use(cors()); //Allows Cross-origin requests. Since our client and server will be on different ports, the browser would block it as per Same-Origin policy. This line will tell the browser to allow cross-origin requests.
 app.use(express.json());
-app.use(helmet());
+app.use(helmet()); // sets various HTTP response headers to protect your app from common web vulnerabilities
+
+// ── HttpOnly Cookie ─────────────────────────────────────────────────
+const cookieParser = require("cookie-parser"); // For reading the refresh-token
+app.use(cookieParser());
 
 // ── API Docs ───────────────────────────────────────────────────
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
