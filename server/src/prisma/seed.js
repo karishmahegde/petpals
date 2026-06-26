@@ -18,13 +18,21 @@ async function main() {
 
   // ── ADMIN ────────────────────────────────────────────────────
   console.log("Creating admin...");
-  const admin = await prisma.admin.upsert({
-    where: { adminEmail: "admin@petpals.com" },
+  const adminUser = await prisma.users.upsert({
+    where: { userEmail: "admin@petpals.com" },
     update: {},
     create: {
+      userEmail: "admin@petpals.com",
+      userPassword: await bcrypt.hash("Admin@123", 10),
+      role: "Admin",
+    },
+  });
+  const admin = await prisma.admin.upsert({
+    where: { userID: adminUser.userID },
+    update: {},
+    create: {
+      userID: adminUser.userID,
       adminName: "Isabella Martinez",
-      adminEmail: "admin@petpals.com",
-      adminPassword: await bcrypt.hash("Admin@123", 10),
     },
   });
 
@@ -44,9 +52,6 @@ async function main() {
     },
   });
 
-  // shelterLocation is a PostGIS geography column — Prisma can't set this via
-  // the normal create()/update() data object, since the type isn't modeled in
-  // schema.prisma. Set it with a raw query instead, right after the row exists.
   await prisma.$executeRaw`
     UPDATE "Shelter"
     SET "shelterLocation" = ST_SetSRID(ST_MakePoint(-73.9965, 40.7505), 4326)
@@ -75,13 +80,21 @@ async function main() {
 
   // ── STAFF ────────────────────────────────────────────────────
   console.log("Creating staff...");
-  const staff = await prisma.staff.upsert({
-    where: { staffEmail: "staff@petpals.com" },
+  const staffUser = await prisma.users.upsert({
+    where: { userEmail: "staff@petpals.com" },
     update: {},
     create: {
+      userEmail: "staff@petpals.com",
+      userPassword: await bcrypt.hash("Staff@123", 10),
+      role: "Staff",
+    },
+  });
+  const staff = await prisma.staff.upsert({
+    where: { userID: staffUser.userID },
+    update: {},
+    create: {
+      userID: staffUser.userID,
       staffName: "Sasha Grey",
-      staffEmail: "staff@petpals.com",
-      staffPassword: await bcrypt.hash("Staff@123", 10),
       staffPhone: "2125550103",
       shelterID: shelter1.shelterID,
       staffDOB: new Date("1988-03-15"),
@@ -95,18 +108,26 @@ async function main() {
   // Update shelter1 manager
   await prisma.shelter.update({
     where: { shelterID: shelter1.shelterID },
-    data: { managerStaffID: staff.staffID },
+    data: { managerStaffID: staff.userID },
   });
 
   // ── VETERINARIAN ─────────────────────────────────────────────
   console.log("Creating vet...");
-  const vet = await prisma.veterinarian.upsert({
-    where: { vetEmail: "vet@petpals.com" },
+  const vetUser = await prisma.users.upsert({
+    where: { userEmail: "vet@petpals.com" },
     update: {},
     create: {
+      userEmail: "vet@petpals.com",
+      userPassword: await bcrypt.hash("Vet@123", 10),
+      role: "Veterinarian",
+    },
+  });
+  const vet = await prisma.veterinarian.upsert({
+    where: { userID: vetUser.userID },
+    update: {},
+    create: {
+      userID: vetUser.userID,
       vetName: "Jay Asarathi",
-      vetEmail: "vet@petpals.com",
-      vetPassword: await bcrypt.hash("Vet@123", 10),
       vetPhone: "2125550104",
       vetAddress: "789 Oak Lane, New York, NY 10002",
       vetDOB: new Date("1980-07-22"),
@@ -119,13 +140,21 @@ async function main() {
 
   // ── ADOPTER ──────────────────────────────────────────────────
   console.log("Creating adopter...");
-  await prisma.adopter.upsert({
-    where: { adopterEmail: "adopter@petpals.com" },
+  const adopterUser = await prisma.users.upsert({
+    where: { userEmail: "adopter@petpals.com" },
     update: {},
     create: {
+      userEmail: "adopter@petpals.com",
+      userPassword: await bcrypt.hash("Adopter@123", 10),
+      role: "Adopter",
+    },
+  });
+  await prisma.adopter.upsert({
+    where: { userID: adopterUser.userID },
+    update: {},
+    create: {
+      userID: adopterUser.userID,
       adopterName: "Emelie Archer",
-      adopterEmail: "adopter@petpals.com",
-      adopterPassword: await bcrypt.hash("Adopter@123", 10),
       adopterPhone: "2125550105",
       adopterDOB: new Date("1998-11-05"),
       adopterSex: "F",
@@ -147,6 +176,16 @@ async function main() {
 
   // ── VOLUNTEER ────────────────────────────────────────────────
   console.log("Creating volunteer...");
+  const volunteerUser = await prisma.users.upsert({
+    where: { userEmail: "volunteer@petpals.com" },
+    update: {},
+    create: {
+      userEmail: "volunteer@petpals.com",
+      userPassword: await bcrypt.hash("Volunteer@123", 10),
+      role: "Volunteer",
+    },
+  });
+
   const volunteerApp = await prisma.volunteerApplication.create({
     data: {
       shelterID: shelter1.shelterID,
@@ -155,12 +194,11 @@ async function main() {
   });
 
   const volunteer = await prisma.volunteer.upsert({
-    where: { volunteerEmail: "volunteer@petpals.com" },
+    where: { userID: volunteerUser.userID },
     update: {},
     create: {
+      userID: volunteerUser.userID,
       volunteerName: "Bryan Smith",
-      volunteerEmail: "volunteer@petpals.com",
-      volunteerPassword: await bcrypt.hash("Volunteer@123", 10),
       volunteerPhone: "2125550106",
       volunteerAddress: "321 Elm Street, Chicago, IL 60601",
       volunteerDOB: new Date("2005-09-18"),
@@ -173,18 +211,26 @@ async function main() {
 
   await prisma.volunteerApplication.update({
     where: { applicationID: volunteerApp.applicationID },
-    data: { volunteerID: volunteer.volunteerID },
+    data: { volunteerID: volunteer.userID },
   });
 
   // ── DONOR ────────────────────────────────────────────────────
   console.log("Creating donor...");
-  await prisma.donor.upsert({
-    where: { donorEmail: "donor@petpals.com" },
+  const donorUser = await prisma.users.upsert({
+    where: { userEmail: "donor@petpals.com" },
     update: {},
     create: {
+      userEmail: "donor@petpals.com",
+      userPassword: await bcrypt.hash("Donor@123", 10),
+      role: "Donor",
+    },
+  });
+  await prisma.donor.upsert({
+    where: { userID: donorUser.userID },
+    update: {},
+    create: {
+      userID: donorUser.userID,
       donorName: "Charlotte Salazar",
-      donorEmail: "donor@petpals.com",
-      donorPassword: await bcrypt.hash("Donor@123", 10),
       donorPhone: "2125550107",
       donorAddress: "654 Pine Road, California, CA 90001",
       donorDOB: new Date("1958-04-30"),
@@ -288,7 +334,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: false,
       compatibleWithPets: false,
       specialNeeds: false,
@@ -310,7 +356,7 @@ async function main() {
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -332,7 +378,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: false,
       specialNeeds: false,
@@ -354,7 +400,7 @@ async function main() {
       intakeType: "stray",
       adoptionStatus: "pending",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -376,7 +422,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: false,
       compatibleWithPets: false,
       specialNeeds: true,
@@ -398,7 +444,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: false,
       compatibleWithPets: false,
       specialNeeds: false,
@@ -420,7 +466,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -442,7 +488,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: false,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -464,7 +510,7 @@ async function main() {
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -486,7 +532,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "adopted",
       shelterID: shelter2.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: false,
       specialNeeds: false,
@@ -508,7 +554,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -530,7 +576,7 @@ async function main() {
       intakeType: "stray",
       adoptionStatus: "pending",
       shelterID: shelter2.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -552,7 +598,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: false,
       compatibleWithPets: false,
       specialNeeds: false,
@@ -574,7 +620,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: false,
       compatibleWithPets: false,
       specialNeeds: false,
@@ -596,7 +642,7 @@ async function main() {
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -618,7 +664,7 @@ async function main() {
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,
@@ -640,7 +686,7 @@ async function main() {
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
-      staffID: staff.staffID,
+      staffID: staff.userID,
       compatibleWithChildren: true,
       compatibleWithPets: true,
       specialNeeds: false,

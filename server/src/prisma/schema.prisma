@@ -9,12 +9,35 @@ datasource db {
   provider = "postgresql"
 }
 
+enum role {
+  Adopter
+  Volunteer
+  Donor
+  Admin
+  Staff
+  Veterinarian
+}
+
+
+// ── USERS ─────────────────────────────────────────────────────
+model Users {
+  userID     Int      @id @default(autoincrement())
+  userEmail     String   @db.VarChar(45) @unique
+  userPassword String   @db.VarChar(255)
+  role       role
+  admin        Admin?
+  staff        Staff?
+  veterinarian Veterinarian?
+  adopter      Adopter?
+  volunteer    Volunteer?
+  donor        Donor?
+}
+
 // ── ADMIN ─────────────────────────────────────────────────────
 model Admin {
-  adminID       Int      @id @default(autoincrement())
+  userID    Int      @id
+  user      Users    @relation(fields: [userID], references: [userID])
   adminName     String   @db.VarChar(45)
-  adminEmail    String   @unique @db.VarChar(45)
-  adminPassword String   @db.VarChar(255)
   createdAt     DateTime @default(now())
 
 }
@@ -30,8 +53,7 @@ model Shelter {
   shelterSize    Int
   shelterStatus  ShelterStatus @default(Open)
   managerStaffID Int?
-
-  manager            Staff?                 @relation("ShelterManager", fields: [managerStaffID], references: [staffID])
+  manager    Staff?    @relation("ShelterManager", fields: [managerStaffID], references: [userID])
   staff              Staff[]                @relation("ShelterStaff")
   pets               Pet[]
   adopters           Adopter[]
@@ -57,20 +79,19 @@ enum ShelterStatus {
 
 // ── STAFF ─────────────────────────────────────────────────────
 model Staff {
-  staffID          Int               @id @default(autoincrement())
+  userID    Int      @id
+  user      Users    @relation(fields: [userID], references: [userID])
   staffName        String            @db.VarChar(45)
-  staffEmail       String            @unique @db.VarChar(45)
-  staffPassword    String            @db.VarChar(255)
-  staffPhone       String            @db.VarChar(20)
-  shelterID        Int
-  staffDOB         DateTime          @db.Date
-  staffSex         String            @db.Char(1)
-  staffDOJ         DateTime
+  staffPhone       String?           @db.VarChar(20)
+  shelterID        Int?
+  staffDOB         DateTime?         @db.Date
+  staffSex         String?           @db.Char(1)
+  staffDOJ         DateTime?
   staffDOS         DateTime?
   staffDesignation StaffDesignation?
   accountStatus    StaffAccountStatus?
 
-  shelter         Shelter               @relation("ShelterStaff", fields: [shelterID], references: [shelterID])
+  shelter         Shelter?              @relation("ShelterStaff", fields: [shelterID], references: [shelterID])
   managedShelters Shelter[]             @relation("ShelterManager")
   pets            Pet[]
   adoptionApps    AdoptionApplication[]
@@ -92,20 +113,19 @@ enum StaffDesignation {
 
 // ── VETERINARIAN ──────────────────────────────────────────────
 model Veterinarian {
-  vetID         Int      @id @default(autoincrement())
+  userID    Int      @id
+  user      Users    @relation(fields: [userID], references: [userID])
   vetName       String   @db.VarChar(45)
-  vetAddress    String   @db.VarChar(45)
-  vetEmail      String   @unique @db.VarChar(45)
-  vetPassword   String   @db.VarChar(255)
-  vetPhone      String   @db.VarChar(20)
-  vetDOB        DateTime @db.Date
-  vetSex        String   @db.Char(1)
+  vetAddress    String?  @db.VarChar(45)
+  vetPhone      String?  @db.VarChar(20)
+  vetDOB        DateTime? @db.Date
+  vetSex        String?  @db.Char(1)
   createdAt     DateTime @default(now())
-  shelterID     Int
+  shelterID     Int?
   isActive      Boolean  @default(true)
   accountStatus VetAccountStatus?
 
-  shelter            Shelter             @relation(fields: [shelterID], references: [shelterID])
+  shelter            Shelter?            @relation(fields: [shelterID], references: [shelterID])
   appointments       Appointment[]
   healthRecords      HealthRecord[]
   vaccinationRecords VaccinationRecord[]
@@ -156,7 +176,7 @@ model Pet {
 
   breed              Breed                 @relation(fields: [breedID], references: [breedID])
   shelter            Shelter               @relation(fields: [shelterID], references: [shelterID])
-  staff              Staff?                @relation(fields: [staffID], references: [staffID])
+  staff              Staff?                @relation(fields: [staffID], references: [userID])
   photos             PetPhoto[]
   favorites          Favorite[]
   adoptionApps       AdoptionApplication[]
@@ -208,17 +228,16 @@ model PetPhoto {
 
 // ── ADOPTER ───────────────────────────────────────────────────
 model Adopter {
-  adopterID          Int                @id @default(autoincrement())
+  userID    Int      @id
+  user      Users    @relation(fields: [userID], references: [userID])
   adopterName        String             @db.VarChar(45)
-  adopterEmail       String             @unique @db.VarChar(45)
-  adopterPassword    String             @db.VarChar(255)
   shelterID          Int?
-  adopterDOB         DateTime           @db.Date
-  adopterSex         String             @db.Char(1)
+  adopterDOB         DateTime?           @db.Date
+  adopterSex         String?             @db.Char(1)
   createdAt          DateTime           @default(now())
   adopterRiskFlag    Boolean            @default(false)
   preQualifyFlag     Boolean            @default(false)
-  adopterPhone       String             @db.VarChar(20)
+  adopterPhone       String?             @db.VarChar(20)
   housingType        HousingType?
   ownsOrRents        OwnsOrRents?
   landlordContact    String?            @db.VarChar(20)
@@ -323,7 +342,7 @@ model Favorite {
   adopterID Int
   petID     Int
 
-  adopter Adopter @relation(fields: [adopterID], references: [adopterID])
+  adopter Adopter @relation(fields: [adopterID], references: [userID])
   pet     Pet     @relation(fields: [petID], references: [petID])
 
   @@id([adopterID, petID])
@@ -340,8 +359,8 @@ model AdoptionApplication {
   applicationStatus ApplicationStatus @default(Pending)
 
   pet     Pet     @relation(fields: [petID], references: [petID])
-  adopter Adopter @relation(fields: [adopterID], references: [adopterID])
-  staff   Staff?  @relation(fields: [staffID], references: [staffID])
+  adopter Adopter @relation(fields: [adopterID], references: [userID])
+  staff   Staff?  @relation(fields: [staffID], references: [userID])
   shelter Shelter @relation(fields: [shelterID], references: [shelterID])
 
   @@index([adopterID])
@@ -366,9 +385,9 @@ model Visit {
   remarks     String?     @db.VarChar(300)
   visitStatus VisitStatus?
 
-  adopter Adopter  @relation(fields: [adopterID], references: [adopterID])
+  adopter Adopter  @relation(fields: [adopterID], references: [userID])
   pet     Pet?     @relation(fields: [petID], references: [petID])
-  staff   Staff?   @relation(fields: [staffID], references: [staffID])
+  staff   Staff?   @relation(fields: [staffID], references: [userID])
   shelter Shelter  @relation(fields: [shelterID], references: [shelterID])
 
   // Tier 2 — adopters viewing their scheduled visits (A-07), staff managing visits by shelter.
@@ -421,7 +440,7 @@ model HealthRecord {
   recordDesc  String   @db.VarChar(500)
 
   pet Pet          @relation(fields: [petID], references: [petID])
-  vet Veterinarian? @relation(fields: [vetID], references: [vetID])
+  vet Veterinarian? @relation(fields: [vetID], references: [userID])
 
   // Tier 2 — health passport lookup (V-03), queried whenever a pet's medical history is viewed.
   // @@index([petID])
@@ -449,7 +468,7 @@ model VaccinationRecord {
 
   pet     Pet           @relation(fields: [petID], references: [petID])
   vaccine Vaccine       @relation(fields: [vaccineID], references: [vaccineID])
-  vet     Veterinarian? @relation(fields: [administeredBy], references: [vetID])
+  vet     Veterinarian? @relation(fields: [administeredBy], references: [userID])
   shelter Shelter?      @relation(fields: [administeredAt], references: [shelterID])
 
   // Tier 2 — health passport lookup (V-03), same reasoning as HealthRecord.
@@ -471,8 +490,8 @@ model TransferHistory {
   pet         Pet     @relation(fields: [petID], references: [petID])
   fromShelter Shelter @relation("FromShelter", fields: [fromShelterID], references: [shelterID])
   toShelter   Shelter @relation("ToShelter", fields: [toShelterID], references: [shelterID])
-  fromStaff   Staff?  @relation("FromShelterStaff", fields: [fromShelterStaff], references: [staffID])
-  toStaff     Staff?  @relation("ToShelterStaff", fields: [toShelterStaff], references: [staffID])
+  fromStaff   Staff?  @relation("FromShelterStaff", fields: [fromShelterStaff], references: [userID])
+  toStaff     Staff?  @relation("ToShelterStaff", fields: [toShelterStaff], references: [userID])
 
   // Tier 2 — viewing a shelter's incoming/outgoing transfer activity (S-11), or a pet's transfer history.
   // @@index([fromShelterID])
@@ -490,7 +509,7 @@ model Appointment {
   appointmentReason String   @db.VarChar(300)
 
   pet     Pet          @relation(fields: [petID], references: [petID])
-  vet     Veterinarian @relation(fields: [vetID], references: [vetID])
+  vet     Veterinarian @relation(fields: [vetID], references: [userID])
   shelter Shelter      @relation(fields: [shelterID], references: [shelterID])
 
   // Tier 2 — vets viewing their schedule (V-01), shelters viewing appointments at their branch.
@@ -508,8 +527,8 @@ model VolunteerApplication {
   applicationStatus VolunteerAppStatus @default(Created)
   applicationRemark String?            @db.VarChar(100)
 
-  volunteer Volunteer? @relation(fields: [volunteerID], references: [volunteerID])
-  staff     Staff?     @relation(fields: [staffID], references: [staffID])
+  volunteer Volunteer? @relation(fields: [volunteerID], references: [userID])
+  staff     Staff?     @relation(fields: [staffID], references: [userID])
   shelter   Shelter    @relation(fields: [shelterID], references: [shelterID])
 }
 
@@ -521,20 +540,19 @@ enum VolunteerAppStatus {
 
 // ── VOLUNTEER ─────────────────────────────────────────────────
 model Volunteer {
-  volunteerID       Int      @id @default(autoincrement())
+  userID    Int      @id
+  user      Users    @relation(fields: [userID], references: [userID])
   volunteerName     String   @db.VarChar(45)
-  volunteerAddress  String   @db.VarChar(45)
-  volunteerEmail    String   @unique @db.VarChar(45)
-  volunteerPassword String   @db.VarChar(255)
-  volunteerPhone    String   @db.VarChar(20)
-  volunteerDOB      DateTime @db.Date
-  volunteerSex      String   @db.Char(1)
-  volunteerSchedule String   @db.VarChar(100)
-  shelterID         Int
+  volunteerAddress  String?  @db.VarChar(45)
+  volunteerPhone    String?  @db.VarChar(20)
+  volunteerDOB      DateTime? @db.Date
+  volunteerSex      String?  @db.Char(1)
+  volunteerSchedule String?  @db.VarChar(100)
+  shelterID         Int?
   createdAt         DateTime @default(now())
   volunteerStatus   Boolean  @default(false)
 
-  shelter      Shelter                @relation(fields: [shelterID], references: [shelterID])
+  shelter      Shelter?               @relation(fields: [shelterID], references: [shelterID])
   applications VolunteerApplication[]
   tasks        VolunteerTask[]
   events       VolunteerEvent[]
@@ -578,7 +596,7 @@ model Task {
   staffID    Int?
 
   shelter    Shelter         @relation(fields: [shelterID], references: [shelterID])
-  staff      Staff?          @relation(fields: [staffID], references: [staffID])
+  staff      Staff?          @relation(fields: [staffID], references: [userID])
   volunteers VolunteerTask[]
 }
 
@@ -594,7 +612,7 @@ model VolunteerTask {
   volunteerID Int
 
   task      Task      @relation(fields: [taskID], references: [taskID])
-  volunteer Volunteer @relation(fields: [volunteerID], references: [volunteerID])
+  volunteer Volunteer @relation(fields: [volunteerID], references: [userID])
 
   @@id([taskID, volunteerID])
 }
@@ -609,7 +627,7 @@ model Event {
   staffID   Int?
 
   shelter    Shelter          @relation(fields: [shelterID], references: [shelterID])
-  staff      Staff?           @relation(fields: [staffID], references: [staffID])
+  staff      Staff?           @relation(fields: [staffID], references: [userID])
   volunteers VolunteerEvent[]
 }
 
@@ -619,21 +637,20 @@ model VolunteerEvent {
   volunteerID Int
 
   event     Event     @relation(fields: [eventID], references: [eventID])
-  volunteer Volunteer @relation(fields: [volunteerID], references: [volunteerID])
+  volunteer Volunteer @relation(fields: [volunteerID], references: [userID])
 
   @@id([eventID, volunteerID])
 }
 
 // ── DONOR ─────────────────────────────────────────────────────
 model Donor {
-  donorID          Int      @id @default(autoincrement())
+  userID    Int      @id
+  user      Users    @relation(fields: [userID], references: [userID])
   donorName        String   @db.VarChar(45)
-  donorAddress     String   @db.VarChar(45)
-  donorEmail       String   @unique @db.VarChar(45)
-  donorPassword    String   @db.VarChar(255)
-  donorPhone       String   @db.VarChar(20)
-  donorDOB         DateTime @db.Date
-  donorSex         String   @db.Char(1)
+  donorAddress     String?  @db.VarChar(45)
+  donorPhone       String?  @db.VarChar(20)
+  donorDOB         DateTime? @db.Date
+  donorSex         String?  @db.Char(1)
   createdAt        DateTime @default(now())
   stripeCustomerID String?  @db.VarChar(255)
 
@@ -649,6 +666,6 @@ model Donation {
   donationAmt  Float
   donationDesc String?  @db.VarChar(300)
 
-  donor   Donor   @relation(fields: [donorID], references: [donorID])
+  donor   Donor   @relation(fields: [donorID], references: [userID])
   shelter Shelter @relation(fields: [shelterID], references: [shelterID])
 }

@@ -25,7 +25,8 @@ app.get("/health", (req, res) => {
 });
 
 // ── API Routes ────────────
-// app.use('/api/v1/auth',                 require('./routes/auth'));
+const authRouter = require("./routes/auth.routes");
+app.use("/api/v1/auth", authRouter);
 // app.use('/api/v1/pets',                 require('./routes/pets'));
 // app.use('/api/v1/adopters',             require('./routes/adopters'));
 // app.use('/api/v1/adoption-applications',require('./routes/adoptionApplications'));
@@ -52,15 +53,8 @@ app.use((req, res) => {
 });
 
 // ── Global error handler ───────────────────────────────────────
-app.use((err, req, res, next) => {
-  //The 4 parameters err,req,res,next indicate that it's an error handler, not a regular route (which has 3 parameters)
-  console.error(err.stack);
-  res.status(500).json({
-    success: false,
-    message: "Internal server error",
-    error: { code: "INTERNAL_SERVER_ERROR", details: err.message },
-  });
-});
+const errorHandler = require("./middleware/errorHandler");
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

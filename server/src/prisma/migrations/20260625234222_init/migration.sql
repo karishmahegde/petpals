@@ -1,5 +1,5 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
+-- CreateEnum
+CREATE TYPE "role" AS ENUM ('Adopter', 'Volunteer', 'Donor', 'Admin', 'Staff', 'Veterinarian');
 
 -- CreateEnum
 CREATE TYPE "ShelterStatus" AS ENUM ('Open', 'Full', 'Closed');
@@ -77,14 +77,22 @@ CREATE TYPE "VerificationStatus" AS ENUM ('Pending', 'Verified', 'Rejected');
 CREATE TYPE "TaskStatus" AS ENUM ('In_progress', 'Completed', 'Cancelled');
 
 -- CreateTable
+CREATE TABLE "Users" (
+    "userID" SERIAL NOT NULL,
+    "userEmail" VARCHAR(45) NOT NULL,
+    "userPassword" VARCHAR(255) NOT NULL,
+    "role" "role" NOT NULL,
+
+    CONSTRAINT "Users_pkey" PRIMARY KEY ("userID")
+);
+
+-- CreateTable
 CREATE TABLE "Admin" (
-    "adminID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
     "adminName" VARCHAR(45) NOT NULL,
-    "adminEmail" VARCHAR(45) NOT NULL,
-    "adminPassword" VARCHAR(255) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "Admin_pkey" PRIMARY KEY ("adminID")
+    CONSTRAINT "Admin_pkey" PRIMARY KEY ("userID")
 );
 
 -- CreateTable
@@ -104,38 +112,34 @@ CREATE TABLE "Shelter" (
 
 -- CreateTable
 CREATE TABLE "Staff" (
-    "staffID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
     "staffName" VARCHAR(45) NOT NULL,
-    "staffEmail" VARCHAR(45) NOT NULL,
-    "staffPassword" VARCHAR(255) NOT NULL,
-    "staffPhone" VARCHAR(20) NOT NULL,
-    "shelterID" INTEGER NOT NULL,
-    "staffDOB" DATE NOT NULL,
-    "staffSex" CHAR(1) NOT NULL,
-    "staffDOJ" TIMESTAMP(3) NOT NULL,
+    "staffPhone" VARCHAR(20),
+    "shelterID" INTEGER,
+    "staffDOB" DATE,
+    "staffSex" CHAR(1),
+    "staffDOJ" TIMESTAMP(3),
     "staffDOS" TIMESTAMP(3),
     "staffDesignation" "StaffDesignation",
     "accountStatus" "StaffAccountStatus",
 
-    CONSTRAINT "Staff_pkey" PRIMARY KEY ("staffID")
+    CONSTRAINT "Staff_pkey" PRIMARY KEY ("userID")
 );
 
 -- CreateTable
 CREATE TABLE "Veterinarian" (
-    "vetID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
     "vetName" VARCHAR(45) NOT NULL,
-    "vetAddress" VARCHAR(45) NOT NULL,
-    "vetEmail" VARCHAR(45) NOT NULL,
-    "vetPassword" VARCHAR(255) NOT NULL,
-    "vetPhone" VARCHAR(20) NOT NULL,
-    "vetDOB" DATE NOT NULL,
-    "vetSex" CHAR(1) NOT NULL,
+    "vetAddress" VARCHAR(45),
+    "vetPhone" VARCHAR(20),
+    "vetDOB" DATE,
+    "vetSex" CHAR(1),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "shelterID" INTEGER NOT NULL,
+    "shelterID" INTEGER,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "accountStatus" "VetAccountStatus",
 
-    CONSTRAINT "Veterinarian_pkey" PRIMARY KEY ("vetID")
+    CONSTRAINT "Veterinarian_pkey" PRIMARY KEY ("userID")
 );
 
 -- CreateTable
@@ -194,17 +198,15 @@ CREATE TABLE "PetPhoto" (
 
 -- CreateTable
 CREATE TABLE "Adopter" (
-    "adopterID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
     "adopterName" VARCHAR(45) NOT NULL,
-    "adopterEmail" VARCHAR(45) NOT NULL,
-    "adopterPassword" VARCHAR(255) NOT NULL,
     "shelterID" INTEGER,
-    "adopterDOB" DATE NOT NULL,
-    "adopterSex" CHAR(1) NOT NULL,
+    "adopterDOB" DATE,
+    "adopterSex" CHAR(1),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "adopterRiskFlag" BOOLEAN NOT NULL DEFAULT false,
     "preQualifyFlag" BOOLEAN NOT NULL DEFAULT false,
-    "adopterPhone" VARCHAR(20) NOT NULL,
+    "adopterPhone" VARCHAR(20),
     "housingType" "HousingType",
     "ownsOrRents" "OwnsOrRents",
     "landlordContact" VARCHAR(20),
@@ -225,7 +227,7 @@ CREATE TABLE "Adopter" (
     "stripeCustomerID" VARCHAR(255),
     "accountStatus" "AccountStatus",
 
-    CONSTRAINT "Adopter_pkey" PRIMARY KEY ("adopterID")
+    CONSTRAINT "Adopter_pkey" PRIMARY KEY ("userID")
 );
 
 -- CreateTable
@@ -353,20 +355,18 @@ CREATE TABLE "VolunteerApplication" (
 
 -- CreateTable
 CREATE TABLE "Volunteer" (
-    "volunteerID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
     "volunteerName" VARCHAR(45) NOT NULL,
-    "volunteerAddress" VARCHAR(45) NOT NULL,
-    "volunteerEmail" VARCHAR(45) NOT NULL,
-    "volunteerPassword" VARCHAR(255) NOT NULL,
-    "volunteerPhone" VARCHAR(20) NOT NULL,
-    "volunteerDOB" DATE NOT NULL,
-    "volunteerSex" CHAR(1) NOT NULL,
-    "volunteerSchedule" VARCHAR(100) NOT NULL,
-    "shelterID" INTEGER NOT NULL,
+    "volunteerAddress" VARCHAR(45),
+    "volunteerPhone" VARCHAR(20),
+    "volunteerDOB" DATE,
+    "volunteerSex" CHAR(1),
+    "volunteerSchedule" VARCHAR(100),
+    "shelterID" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "volunteerStatus" BOOLEAN NOT NULL DEFAULT false,
 
-    CONSTRAINT "Volunteer_pkey" PRIMARY KEY ("volunteerID")
+    CONSTRAINT "Volunteer_pkey" PRIMARY KEY ("userID")
 );
 
 -- CreateTable
@@ -425,18 +425,16 @@ CREATE TABLE "VolunteerEvent" (
 
 -- CreateTable
 CREATE TABLE "Donor" (
-    "donorID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
     "donorName" VARCHAR(45) NOT NULL,
-    "donorAddress" VARCHAR(45) NOT NULL,
-    "donorEmail" VARCHAR(45) NOT NULL,
-    "donorPassword" VARCHAR(255) NOT NULL,
-    "donorPhone" VARCHAR(20) NOT NULL,
-    "donorDOB" DATE NOT NULL,
-    "donorSex" CHAR(1) NOT NULL,
+    "donorAddress" VARCHAR(45),
+    "donorPhone" VARCHAR(20),
+    "donorDOB" DATE,
+    "donorSex" CHAR(1),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "stripeCustomerID" VARCHAR(255),
 
-    CONSTRAINT "Donor_pkey" PRIMARY KEY ("donorID")
+    CONSTRAINT "Donor_pkey" PRIMARY KEY ("userID")
 );
 
 -- CreateTable
@@ -452,16 +450,10 @@ CREATE TABLE "Donation" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Admin_adminEmail_key" ON "Admin"("adminEmail");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Staff_staffEmail_key" ON "Staff"("staffEmail");
+CREATE UNIQUE INDEX "Users_userEmail_key" ON "Users"("userEmail");
 
 -- CreateIndex
 CREATE INDEX "Staff_shelterID_idx" ON "Staff"("shelterID");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Veterinarian_vetEmail_key" ON "Veterinarian"("vetEmail");
 
 -- CreateIndex
 CREATE INDEX "Pet_shelterID_idx" ON "Pet"("shelterID");
@@ -473,9 +465,6 @@ CREATE INDEX "Pet_adoptionStatus_idx" ON "Pet"("adoptionStatus");
 CREATE INDEX "Pet_breedID_idx" ON "Pet"("breedID");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Adopter_adopterEmail_key" ON "Adopter"("adopterEmail");
-
--- CreateIndex
 CREATE INDEX "AdoptionApplication_adopterID_idx" ON "AdoptionApplication"("adopterID");
 
 -- CreateIndex
@@ -484,20 +473,23 @@ CREATE INDEX "AdoptionApplication_petID_idx" ON "AdoptionApplication"("petID");
 -- CreateIndex
 CREATE INDEX "AdoptionApplication_shelterID_idx" ON "AdoptionApplication"("shelterID");
 
--- CreateIndex
-CREATE UNIQUE INDEX "Volunteer_volunteerEmail_key" ON "Volunteer"("volunteerEmail");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Donor_donorEmail_key" ON "Donor"("donorEmail");
+-- AddForeignKey
+ALTER TABLE "Admin" ADD CONSTRAINT "Admin_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Shelter" ADD CONSTRAINT "Shelter_managerStaffID_fkey" FOREIGN KEY ("managerStaffID") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Shelter" ADD CONSTRAINT "Shelter_managerStaffID_fkey" FOREIGN KEY ("managerStaffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Staff" ADD CONSTRAINT "Staff_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Staff" ADD CONSTRAINT "Staff_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Veterinarian" ADD CONSTRAINT "Veterinarian_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Staff" ADD CONSTRAINT "Staff_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Veterinarian" ADD CONSTRAINT "Veterinarian_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Veterinarian" ADD CONSTRAINT "Veterinarian_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Breed" ADD CONSTRAINT "Breed_speciesID_fkey" FOREIGN KEY ("speciesID") REFERENCES "Species"("speciesID") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -509,10 +501,13 @@ ALTER TABLE "Pet" ADD CONSTRAINT "Pet_breedID_fkey" FOREIGN KEY ("breedID") REFE
 ALTER TABLE "Pet" ADD CONSTRAINT "Pet_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Pet" ADD CONSTRAINT "Pet_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Pet" ADD CONSTRAINT "Pet_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PetPhoto" ADD CONSTRAINT "PetPhoto_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Adopter" ADD CONSTRAINT "Adopter_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Adopter" ADD CONSTRAINT "Adopter_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -521,7 +516,7 @@ ALTER TABLE "Adopter" ADD CONSTRAINT "Adopter_shelterID_fkey" FOREIGN KEY ("shel
 ALTER TABLE "Adopter" ADD CONSTRAINT "Adopter_preferredBreedID_fkey" FOREIGN KEY ("preferredBreedID") REFERENCES "Breed"("breedID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Favorite" ADD CONSTRAINT "Favorite_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("adopterID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Favorite" ADD CONSTRAINT "Favorite_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Favorite" ADD CONSTRAINT "Favorite_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -530,22 +525,22 @@ ALTER TABLE "Favorite" ADD CONSTRAINT "Favorite_petID_fkey" FOREIGN KEY ("petID"
 ALTER TABLE "AdoptionApplication" ADD CONSTRAINT "AdoptionApplication_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AdoptionApplication" ADD CONSTRAINT "AdoptionApplication_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("adopterID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "AdoptionApplication" ADD CONSTRAINT "AdoptionApplication_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AdoptionApplication" ADD CONSTRAINT "AdoptionApplication_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "AdoptionApplication" ADD CONSTRAINT "AdoptionApplication_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AdoptionApplication" ADD CONSTRAINT "AdoptionApplication_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Visit" ADD CONSTRAINT "Visit_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("adopterID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Visit" ADD CONSTRAINT "Visit_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Visit" ADD CONSTRAINT "Visit_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Visit" ADD CONSTRAINT "Visit_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Visit" ADD CONSTRAINT "Visit_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Visit" ADD CONSTRAINT "Visit_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -554,7 +549,7 @@ ALTER TABLE "Visit" ADD CONSTRAINT "Visit_shelterID_fkey" FOREIGN KEY ("shelterI
 ALTER TABLE "HealthRecord" ADD CONSTRAINT "HealthRecord_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "HealthRecord" ADD CONSTRAINT "HealthRecord_vetID_fkey" FOREIGN KEY ("vetID") REFERENCES "Veterinarian"("vetID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "HealthRecord" ADD CONSTRAINT "HealthRecord_vetID_fkey" FOREIGN KEY ("vetID") REFERENCES "Veterinarian"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VaccinationRecord" ADD CONSTRAINT "VaccinationRecord_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -563,7 +558,7 @@ ALTER TABLE "VaccinationRecord" ADD CONSTRAINT "VaccinationRecord_petID_fkey" FO
 ALTER TABLE "VaccinationRecord" ADD CONSTRAINT "VaccinationRecord_vaccineID_fkey" FOREIGN KEY ("vaccineID") REFERENCES "Vaccine"("vaccineID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VaccinationRecord" ADD CONSTRAINT "VaccinationRecord_administeredBy_fkey" FOREIGN KEY ("administeredBy") REFERENCES "Veterinarian"("vetID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "VaccinationRecord" ADD CONSTRAINT "VaccinationRecord_administeredBy_fkey" FOREIGN KEY ("administeredBy") REFERENCES "Veterinarian"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VaccinationRecord" ADD CONSTRAINT "VaccinationRecord_administeredAt_fkey" FOREIGN KEY ("administeredAt") REFERENCES "Shelter"("shelterID") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -578,59 +573,64 @@ ALTER TABLE "TransferHistory" ADD CONSTRAINT "TransferHistory_fromShelterID_fkey
 ALTER TABLE "TransferHistory" ADD CONSTRAINT "TransferHistory_toShelterID_fkey" FOREIGN KEY ("toShelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TransferHistory" ADD CONSTRAINT "TransferHistory_fromShelterStaff_fkey" FOREIGN KEY ("fromShelterStaff") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "TransferHistory" ADD CONSTRAINT "TransferHistory_fromShelterStaff_fkey" FOREIGN KEY ("fromShelterStaff") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TransferHistory" ADD CONSTRAINT "TransferHistory_toShelterStaff_fkey" FOREIGN KEY ("toShelterStaff") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "TransferHistory" ADD CONSTRAINT "TransferHistory_toShelterStaff_fkey" FOREIGN KEY ("toShelterStaff") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_vetID_fkey" FOREIGN KEY ("vetID") REFERENCES "Veterinarian"("vetID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_vetID_fkey" FOREIGN KEY ("vetID") REFERENCES "Veterinarian"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VolunteerApplication" ADD CONSTRAINT "VolunteerApplication_volunteerID_fkey" FOREIGN KEY ("volunteerID") REFERENCES "Volunteer"("volunteerID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "VolunteerApplication" ADD CONSTRAINT "VolunteerApplication_volunteerID_fkey" FOREIGN KEY ("volunteerID") REFERENCES "Volunteer"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VolunteerApplication" ADD CONSTRAINT "VolunteerApplication_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "VolunteerApplication" ADD CONSTRAINT "VolunteerApplication_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VolunteerApplication" ADD CONSTRAINT "VolunteerApplication_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Volunteer" ADD CONSTRAINT "Volunteer_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Volunteer" ADD CONSTRAINT "Volunteer_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Volunteer" ADD CONSTRAINT "Volunteer_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Task" ADD CONSTRAINT "Task_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Task" ADD CONSTRAINT "Task_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Task" ADD CONSTRAINT "Task_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VolunteerTask" ADD CONSTRAINT "VolunteerTask_taskID_fkey" FOREIGN KEY ("taskID") REFERENCES "Task"("taskID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VolunteerTask" ADD CONSTRAINT "VolunteerTask_volunteerID_fkey" FOREIGN KEY ("volunteerID") REFERENCES "Volunteer"("volunteerID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "VolunteerTask" ADD CONSTRAINT "VolunteerTask_volunteerID_fkey" FOREIGN KEY ("volunteerID") REFERENCES "Volunteer"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Event" ADD CONSTRAINT "Event_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Event" ADD CONSTRAINT "Event_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("staffID") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Event" ADD CONSTRAINT "Event_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VolunteerEvent" ADD CONSTRAINT "VolunteerEvent_eventID_fkey" FOREIGN KEY ("eventID") REFERENCES "Event"("eventID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VolunteerEvent" ADD CONSTRAINT "VolunteerEvent_volunteerID_fkey" FOREIGN KEY ("volunteerID") REFERENCES "Volunteer"("volunteerID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "VolunteerEvent" ADD CONSTRAINT "VolunteerEvent_volunteerID_fkey" FOREIGN KEY ("volunteerID") REFERENCES "Volunteer"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Donation" ADD CONSTRAINT "Donation_donorID_fkey" FOREIGN KEY ("donorID") REFERENCES "Donor"("donorID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Donor" ADD CONSTRAINT "Donor_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Donation" ADD CONSTRAINT "Donation_donorID_fkey" FOREIGN KEY ("donorID") REFERENCES "Donor"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Donation" ADD CONSTRAINT "Donation_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
-
