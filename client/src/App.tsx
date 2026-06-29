@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
 import NotFound from "./pages/NotFound";
@@ -7,10 +8,21 @@ import VetDashboard from "./pages/vet/VetDashboard";
 import VolunteerDashboard from "./pages/volunteer/VolunteerDashboard";
 import DonorDashboard from "./pages/donor/DonorDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import { refreshToken } from "./api/authApi";
+import useAuthStore from "./store/useAuthStore";
 
 // What it does: The root component. Defines all the routes — which URL path renders which page component.
-// Routes are uncommented as each sprint is implemented
 const App = () => {
+  const login = useAuthStore((state) => state.login); // Pulls the login action out of your Zustand store so you can call it in this component
+
+  useEffect(() => {
+    refreshToken() // Calls authApi.ts function which hits POST /api/v1/auth/refresh-token with
+      .then(({ token, user }) => {
+        login(user, token, user.role); // calls to populate the Zustand store — restoring the auth session in memory
+      })
+      .catch(() => {});
+  }, []); // [] indicates running only on app load, not on rerenders
+
   return (
     <Routes>
       <Route element={<Navbar />}>
