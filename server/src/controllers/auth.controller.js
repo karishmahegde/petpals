@@ -85,15 +85,19 @@ const logout = async (req, res, next) => {
 
 // ——————————————— REFRESH TOKEN ———————————————
 const refreshToken = async (req, res, next) => {
-  const rawOldRT = req.cookies.refreshToken; // Extract refreshToken
+  const rawOldRT = req.cookies.refreshToken;
   if (!rawOldRT) {
     const err = new Error("No refresh token provided");
     err.code = "UNAUTHORIZED";
     return next(err);
   }
 
-  const token = req.headers.authorization.split(" ")[1]; // Extract accessToken
-  const decoded = jwt.decode(token);
+  const decoded = jwt.decode(rawOldRT);
+  if (!decoded?.userID) {
+    const err = new Error("Invalid refresh token");
+    err.code = "UNAUTHORIZED";
+    return next(err);
+  }
 
   const newRefreshToken = jwt.sign(
     //Create new refreshToken
@@ -124,7 +128,7 @@ const refreshToken = async (req, res, next) => {
     return successResponse(res, "Token refreshed successfully", {
       //return the 2 new tokens and the userID and role back
       token: newAccessToken,
-      user: { userID: user.userID, role: user.role },
+      user: { userID: user.userID, role: user.role, name: user.name },
     });
   } catch (err) {
     return next(err);

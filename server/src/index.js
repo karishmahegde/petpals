@@ -13,7 +13,12 @@ const prisma = require("./config/prisma");
 const app = express();
 
 // ── Middleware ─────────────────────────────────────────────────
-app.use(cors()); //Allows Cross-origin requests. Since our client and server will be on different ports, the browser would block it as per Same-Origin policy. This line will tell the browser to allow cross-origin requests.
+app.use(
+  cors({
+    origin: "http://localhost:3000", //Allows Cross-origin requests. Since our client and server will be on different ports, the browser would block it as per Same-Origin policy. This line will tell the browser to allow cross-origin requests.
+    credentials: true, // required for httpOnly cookies to work
+  }),
+);
 app.use(express.json());
 app.use(helmet()); // sets various HTTP response headers to protect your app from common web vulnerabilities
 

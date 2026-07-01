@@ -79,8 +79,18 @@ const login = async ({ email, password }) => {
     throw err;
   }
 
+  const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
+  let name = null;
+  if (config) {
+    const roleRecord = await prisma[config.model].findUnique({
+      where: { userID: user.userID },
+      select: { [config.nameField]: true },
+    });
+    name = roleRecord?.[config.nameField] ?? null;
+  }
+
   const { userPassword, refreshToken, ...safeUser } = user;
-  return safeUser;
+  return { ...safeUser, name };
 };
 
 const storeRefreshToken = async (userID, hashedRefreshToken) => {
@@ -133,8 +143,18 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
     data: { refreshToken: newHash },
   });
 
+  const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
+  let name = null;
+  if (config) {
+    const roleRecord = await prisma[config.model].findUnique({
+      where: { userID: user.userID },
+      select: { [config.nameField]: true },
+    });
+    name = roleRecord?.[config.nameField] ?? null;
+  }
+
   const { refreshToken: _, ...safeUser } = user; // Strip the token to send back the response
-  return safeUser;
+  return { ...safeUser, name };
 };
 
 module.exports = { register, login, storeRefreshToken, logout, refreshToken };

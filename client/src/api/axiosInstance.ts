@@ -20,12 +20,13 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
-    if (status === 401) {
-      // 401 error - not autheticated, redirect to login apge
+    const isAuthCall = error.config?.url?.includes("/auth/");
+    if (status === 401 && !isAuthCall) {
+      // 401 error - not authenticated, redirect to login page
       useAuthStore.getState().logout();
       window.location.href = "/login";
     } else if (status === 403) {
-      // 403 error - not authrorized, redirect to forbidden page
+      // 403 error - not authorized, redirect to forbidden page
       window.location.href = "/forbidden";
     }
     return Promise.reject(error);

@@ -1,16 +1,41 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,jsx}",
-  ] /** content tells Tailwind which files to scan for class names. It purges any unused styles from the final build, keeping your CSS tiny */,
+  content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
-      // PetPals design tokens — sync with Figma
+      // PetPals design tokens — synced with Figma Brand Design Kit
       colors: {
-        pink: { DEFAULT: "#F472B6", light: "#FBCFE8", dark: "#BE185D" },
-        yellow: { DEFAULT: "#FBBF24", light: "#FEF3C7", dark: "#D97706" },
-        teal: { DEFAULT: "#2DD4BF", light: "#CCFBF1", dark: "#0F766E" },
+        rose: {
+          lightest: "#FFF5F5",
+          light: "#F0DFDF",
+          DEFAULT: "#ECC7C7",
+          md: "#DFA8A8",
+          dark: "#CA7D7D",
+        },
+        gold: {
+          light: "#FFE7B9",
+          DEFAULT: "#FFD78A",
+          md: "#FFCA62",
+          dark: "#D9A745",
+        },
+        teal: {
+          light: "#E3EEEF",
+          DEFAULT: "#D6ECEF",
+          md: "#B0E5EC",
+          dark: "#6BA8B0",
+        },
+        neutral: {
+          white: "#FFFFFF",
+          offwhite: "#FAFAFA",
+          gray: "#8A8A8A",
+          charcoal: "#454545",
+          dark: "#1A1A1A",
+          black: "#000000",
+        },
+      },
+      fontFamily: {
+        display: ["Benne", "serif"],
+        body: ["Montserrat", "sans-serif"],
       },
     },
   },
