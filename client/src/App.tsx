@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import PublicLayout from "./layouts/PublicLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
+import RoleRoute from "./components/RoleRoute";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
-import NotFound from "./pages/NotFound";
+import Forbidden from "./pages/errors/Forbidden";
+import NotFound from "./pages/errors/NotFound";
 import AdopterDashboard from "./pages/adopter/AdopterDashboard";
 import StaffDashboard from "./pages/staff/StaffDashboard";
 import VetDashboard from "./pages/vet/VetDashboard";
@@ -36,16 +39,71 @@ const App = () => {
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forbidden" element={<Forbidden />} />
         <Route path="*" element={<NotFound />} />
       </Route>
 
-      {/* Role-based dashboards — will move to protected layout in a later sprint */}
-      <Route path="/adopter" element={<AdopterDashboard />} />
-      <Route path="/staff" element={<StaffDashboard />} />
-      <Route path="/vet" element={<VetDashboard />} />
-      <Route path="/volunteer" element={<VolunteerDashboard />} />
-      <Route path="/donor" element={<DonorDashboard />} />
-      <Route path="/admin" element={<AdminDashboard />} />
+      {/* Role-based dashboards — guarded by ProtectedRoute (authenticated) + RoleRoute (correct role) */}
+      <Route
+        path="/adopter"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["Adopter"]}>
+              <AdopterDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/staff"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["Staff"]}>
+              <StaffDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vet"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["Veterinarian"]}>
+              <VetDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/volunteer"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["Volunteer"]}>
+              <VolunteerDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/donor"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["Donor"]}>
+              <DonorDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["Admin"]}>
+              <AdminDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 };

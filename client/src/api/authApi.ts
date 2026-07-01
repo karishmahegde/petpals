@@ -37,3 +37,15 @@ export const login = async (
 export const logout = async (): Promise<void> => {
   await axiosInstance.post("/auth/logout");
 };
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+}
+
+// ———————————————— REGISTER API ————————————————
+export const register = async (payload: RegisterPayload): Promise<void> => {
+  await axiosInstance.post("/auth/register", payload);
+};
