@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "Pet" ALTER COLUMN "petDesc" SET DATA TYPE VARCHAR(500);
