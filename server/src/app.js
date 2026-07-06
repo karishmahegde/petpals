@@ -36,10 +36,12 @@ app.get("/health", (req, res) => {
 // ── API Routes ────────────
 const authRouter = require("./routes/auth.routes");
 app.use("/api/v1/auth", authRouter);
-// app.use('/api/v1/pets',                 require('./routes/pets'));
+const petsRouter = require("./routes/pets.routes");
+app.use("/api/v1", petsRouter);
+const sheltersRouter = require("./routes/shelters.routes");
+app.use("/api/v1", sheltersRouter);
 // app.use('/api/v1/adopters',             require('./routes/adopters'));
 // app.use('/api/v1/adoption-applications',require('./routes/adoptionApplications'));
-// app.use('/api/v1/shelters',             require('./routes/shelters'));
 // app.use('/api/v1/staff',                require('./routes/staff'));
 // app.use('/api/v1/appointments',         require('./routes/appointments'));
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));

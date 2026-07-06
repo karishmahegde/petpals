@@ -1,0 +1,102 @@
+// What it does: Defines the /pets and /species routes — mounted at /api/v1 in app.js
+const express = require("express");
+const petsController = require("../controllers/pets.controller");
+const speciesController = require("../controllers/species.controller");
+const breedsController = require("../controllers/breeds.controller");
+
+const router = express.Router();
+
+/**
+ * @swagger
+ * /pets:
+ *   get:
+ *     summary: Browse available pets across all shelter branches
+ *     tags: [Pets]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *       - in: query
+ *         name: species
+ *         schema: { type: string }
+ *         description: Exact match on species name
+ *       - in: query
+ *         name: breed
+ *         schema: { type: string }
+ *         description: Exact match on breed name
+ *       - in: query
+ *         name: size
+ *         schema: { type: string, enum: [Small, Medium, Large] }
+ *       - in: query
+ *         name: minAge
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: maxAge
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: shelterID
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Paginated list of pets with adoptionStatus = available
+ *       400:
+ *         description: Invalid query parameter
+ */
+router.get("/pets", petsController.getAvailablePets);
+
+/**
+ * @swagger
+ * /pets/{id}:
+ *   get:
+ *     summary: View full details for a single pet
+ *     tags: [Pets]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer, minimum: 1 }
+ *     responses:
+ *       200:
+ *         description: Pet details, including breed, species, and shelter
+ *       400:
+ *         description: id is not a positive integer
+ *       404:
+ *         description: No pet exists with this ID
+ */
+router.get("/pets/:id", petsController.getPetDetails);
+
+/**
+ * @swagger
+ * /species:
+ *   get:
+ *     summary: List all species, for hydrating the species filter dropdown
+ *     tags: [Pets]
+ *     responses:
+ *       200:
+ *         description: Species ordered alphabetically by name
+ */
+router.get("/species", speciesController.getSpecies);
+
+/**
+ * @swagger
+ * /breeds:
+ *   get:
+ *     summary: List breeds for the given species, for hydrating the breed filter dropdown
+ *     tags: [Pets]
+ *     parameters:
+ *       - in: query
+ *         name: speciesID
+ *         schema: { type: integer, minimum: 1 }
+ *         description: Repeatable — e.g. ?speciesID=1&speciesID=2
+ *     responses:
+ *       200:
+ *         description: Breeds for the given species, ordered by species name then breed name
+ *       400:
+ *         description: speciesID is not a positive integer
+ */
+router.get("/breeds", breedsController.getBreeds);
+
+module.exports = router;
