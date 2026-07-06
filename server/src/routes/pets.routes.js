@@ -3,7 +3,6 @@ const express = require("express");
 const petsController = require("../controllers/pets.controller");
 const speciesController = require("../controllers/species.controller");
 const breedsController = require("../controllers/breeds.controller");
-
 const router = express.Router();
 
 /**
@@ -21,15 +20,28 @@ const router = express.Router();
  *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
  *       - in: query
  *         name: species
- *         schema: { type: string }
- *         description: Exact match on species name
+ *         schema:
+ *           type: array
+ *           items: { type: string }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable — e.g. ?species=Dog&species=Cat (OR'd together)
  *       - in: query
  *         name: breed
- *         schema: { type: string }
- *         description: Exact match on breed name
+ *         schema:
+ *           type: array
+ *           items: { type: string }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable — e.g. ?breed=Bulldog&breed=Poodle (OR'd together)
  *       - in: query
  *         name: size
- *         schema: { type: string, enum: [Small, Medium, Large] }
+ *         schema:
+ *           type: array
+ *           items: { type: string, enum: [Small, Medium, Large] }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable — e.g. ?size=Small&size=Medium (OR'd together)
  *       - in: query
  *         name: minAge
  *         schema: { type: integer }
@@ -38,7 +50,12 @@ const router = express.Router();
  *         schema: { type: integer }
  *       - in: query
  *         name: shelterID
- *         schema: { type: integer }
+ *         schema:
+ *           type: array
+ *           items: { type: integer }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable — e.g. ?shelterID=1&shelterID=2 (OR'd together)
  *     responses:
  *       200:
  *         description: Paginated list of pets with adoptionStatus = available
@@ -89,8 +106,12 @@ router.get("/species", speciesController.getSpecies);
  *     parameters:
  *       - in: query
  *         name: speciesID
- *         schema: { type: integer, minimum: 1 }
- *         description: Repeatable — e.g. ?speciesID=1&speciesID=2
+ *         schema:
+ *           type: array
+ *           items: { type: integer, minimum: 1 }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable — e.g. ?speciesID=1&speciesID=2. If omitted, returns empty array
  *     responses:
  *       200:
  *         description: Breeds for the given species, ordered by species name then breed name
