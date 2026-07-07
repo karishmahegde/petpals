@@ -29,7 +29,7 @@ const PetCatalog = () => {
       : "Failed to load pets.";
 
   return (
-    <div id="pets" className="bg-white py-14 px-6 font-body">
+    <div id="pets" className="bg-neutral-offwhite py-14 px-6 font-body">
       <div className="text-center">
         <h1 className="lg:text-4xl text-3xl font-bold text-black mb-4">
           Pet Catalog 🐶

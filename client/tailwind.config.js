@@ -27,6 +27,7 @@ export default {
         neutral: {
           white: "#FFFFFF",
           offwhite: "#FAFAFA",
+          lightgray: "#F0F0F0",
           gray: "#8A8A8A",
           charcoal: "#454545",
           dark: "#1A1A1A",
