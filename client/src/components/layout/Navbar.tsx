@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaUserCircle } from "react-icons/fa";
-import logoNav from "../../assets/images/branding/logoNav.png";
-import useAuthStore from "../../store/useAuthStore";
-import { logout as logoutApi } from "../../api/authApi";
+import logoNav from "../../static/assets/images/branding/logoNav.png";
+import useAuthStore from "../../logic/store/useAuthStore";
+import { logout as logoutApi } from "../../logic/api/authApi";
 
 const navLinks = [
   { label: "home", to: "/" },
@@ -23,7 +23,7 @@ const ROLE_ROUTES: Record<string, string> = {
 };
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `font-body font-normal text-sm px-5 py-1.5 rounded-lg transition-colors ${
+  `font-body font-light text-md px-5 py-1.5 rounded-lg transition-colors ${
     isActive
       ? "bg-teal text-rose-dark font-bold"
       : "text-neutral-dark hover:text-teal-dark"
@@ -69,7 +69,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-rose-lightest shadow-sm">
+    <nav className="sticky top-0 z-50 bg-rose-lightest shadow-lg">
       <div className="flex items-center justify-between px-6 py-5">
         {/* Brand logo */}
         <NavLink to="/">
@@ -77,7 +77,7 @@ const Navbar = () => {
         </NavLink>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-16">
+        <div className="hidden md:flex items-center gap-10">
           {navLinks.map(({ label, to }) => (
             <NavLink key={to} to={to} end={to === "/"} className={linkClass}>
               {label}

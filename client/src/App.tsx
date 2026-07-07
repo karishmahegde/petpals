@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react";
 import { Routes, Route } from "react-router-dom";
-import PublicLayout from "./layouts/PublicLayout";
-import ProtectedRoute from "./components/ProtectedRoute";
-import RoleRoute from "./components/RoleRoute";
-import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
+import PublicLayout from "./components/layout/PublicLayout";
+import ProtectedRoute from "./logic/route/ProtectedRoute";
+import RoleRoute from "./logic/route/RoleRoute";
+import Login from "./pages/public/auth/Login";
+import Register from "./pages/public/auth/Register";
+import Adopt from "./pages/public/adopt/Adopt";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
-import AdopterDashboard from "./pages/adopter/AdopterDashboard";
-import StaffDashboard from "./pages/staff/StaffDashboard";
-import VetDashboard from "./pages/vet/VetDashboard";
-import VolunteerDashboard from "./pages/volunteer/VolunteerDashboard";
-import DonorDashboard from "./pages/donor/DonorDashboard";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import { refreshToken } from "./api/authApi";
-import useAuthStore from "./store/useAuthStore";
+import AdopterDashboard from "./pages/protected/adopter/AdopterDashboard";
+import StaffDashboard from "./pages/protected/staff/StaffDashboard";
+import VetDashboard from "./pages/protected/vet/VetDashboard";
+import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
+import DonorDashboard from "./pages/protected/donor/DonorDashboard";
+import AdminDashboard from "./pages/protected/admin/AdminDashboard";
+import { refreshToken } from "./logic/api/authApi";
+import useAuthStore from "./logic/store/useAuthStore";
 
 // What it does: The root component. Defines all the routes — which URL path renders which page component.
 const App = () => {
@@ -39,6 +40,7 @@ const App = () => {
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/adopt" element={<Adopt />} />
         <Route path="/forbidden" element={<Forbidden />} />
         <Route path="*" element={<NotFound />} />
       </Route>

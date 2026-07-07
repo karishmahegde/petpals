@@ -20,12 +20,12 @@ const toArray = (value) => {
 const getAvailablePets = async (req, res, next) => {
   const {
     page: pageRaw,
-    limit: limitRaw,
+    limit: limitRaw, // pagination page-size parameter - controls how many pets are returned per page of results
     species,
     breed,
     size,
-    minAge: minAgeRaw,
-    maxAge: maxAgeRaw,
+    minAge: minAgeRaw, // in MONTHS, not years — see pets.service.js buildAgeFilter
+    maxAge: maxAgeRaw, // in MONTHS, not years — see pets.service.js buildAgeFilter
     shelterID: shelterIDRaw,
   } = req.query;
 
@@ -51,11 +51,14 @@ const getAvailablePets = async (req, res, next) => {
     return next(badRequest(`size must be one of: ${VALID_SIZES.join(", ")}`));
   }
 
+  // minAge/maxAge are in MONTHS (e.g. minAge=6 means "at least 6 months old").
+  // Integer validation is unaffected by the months-vs-years change — a whole
+  // number of months is still the correct constraint.
   let minAge;
   if (minAgeRaw !== undefined) {
     minAge = Number(minAgeRaw);
     if (!Number.isInteger(minAge)) {
-      return next(badRequest("minAge must be an integer"));
+      return next(badRequest("minAge must be an integer (in months)"));
     }
   }
 
@@ -63,7 +66,7 @@ const getAvailablePets = async (req, res, next) => {
   if (maxAgeRaw !== undefined) {
     maxAge = Number(maxAgeRaw);
     if (!Number.isInteger(maxAge)) {
-      return next(badRequest("maxAge must be an integer"));
+      return next(badRequest("maxAge must be an integer (in months)"));
     }
   }
 
@@ -78,7 +81,6 @@ const getAvailablePets = async (req, res, next) => {
     return Number.isInteger(parsed) ? parsed : -1;
   });
 
-  // Try to get the available pets
   try {
     const result = await petsService.getAvailablePets(
       {
@@ -105,11 +107,9 @@ const getAvailablePets = async (req, res, next) => {
 // ——————————————— GET /pets/:id ———————————————
 const getPetDetails = async (req, res, next) => {
   const id = Number(req.params.id);
-
   if (!Number.isInteger(id) || id < 1) {
     return next(badRequest("id must be a positive integer"));
   }
-
   try {
     const pet = await petsService.getPetDetails(id);
     return successResponse(res, "Pet retrieved successfully", pet);

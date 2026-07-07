@@ -8,11 +8,11 @@
 // Route: /login
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import Card from "../../components/ui/Card";
+import Card from "../../../components/ui/Card";
 import axios from "axios";
-import { login as loginApi } from "../../api/authApi";
-import useAuthStore from "../../store/useAuthStore";
-import backgroundImg from "../../assets/images/background.png";
+import { login as loginApi } from "../../../logic/api/authApi";
+import useAuthStore from "../../../logic/store/useAuthStore";
+import backgroundImg from "../../../static/assets/images/background.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

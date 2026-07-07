@@ -2,7 +2,7 @@
 // Guards dashboard routes — redirects to /login if there is no authenticated session
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import useAuthStore from "../store/useAuthStore";
+import useAuthStore from "../../logic/store/useAuthStore";
 
 interface ProtectedRouteProps {
   children: ReactNode;

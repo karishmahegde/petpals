@@ -11,7 +11,20 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 const SUPABASE_URL =
-  "https://aulounxhkawyqqzjeeqi.supabase.co/storage/v1/object/public/pet-photos";
+  "https://aulounxhkawyqqzjeeqi.supabase.co/storage/v1/object/public/pet-images";
+
+// Computes a DOB so the pet is (approximately) `years` years and `months`
+// months old as of TODAY — not as of intakeDate. Age is now always derived
+// live from petDOB, so it stays accurate going forward instead of being
+// frozen at whatever it was when the row was first seeded.
+// `refDate` (typically the original intakeDate) only supplies the day-of-month
+// for variety/realism — the actual month offset always comes from `months`,
+// counted back from today's month.
+function dobFromAge(years, months, refDate) {
+  const today = new Date();
+  const day = refDate ? refDate.getDate() : today.getDate();
+  return new Date(today.getFullYear() - years, today.getMonth() - months, day);
+}
 
 async function main() {
   console.log("🌱 Seeding PetPals database...");
@@ -320,7 +333,7 @@ async function main() {
     {
       petName: "Apollo",
       breedID: germanShepherd.breedID,
-      petAge: 4,
+      petDOB: dobFromAge(4, 0, new Date("2024-03-10")),
       petWeight: 32.0,
       petHeight: 62.0,
       petBGroup: "DEA4",
@@ -342,7 +355,7 @@ async function main() {
     {
       petName: "Buddy",
       breedID: goldenRetriever.breedID,
-      petAge: 2,
+      petDOB: dobFromAge(2, 0, new Date("2024-06-01")),
       petWeight: 28.5,
       petHeight: 58.0,
       petBGroup: "DEA1",
@@ -364,7 +377,7 @@ async function main() {
     {
       petName: "Biscuit",
       breedID: beagle.breedID,
-      petAge: 6,
+      petDOB: dobFromAge(6, 0, new Date("2024-01-20")),
       petWeight: 10.5,
       petHeight: 38.0,
       petBGroup: "DEA3",
@@ -386,7 +399,7 @@ async function main() {
     {
       petName: "Daisy",
       breedID: labrador.breedID,
-      petAge: 1,
+      petDOB: dobFromAge(1, 0, new Date("2024-08-15")),
       petWeight: 22.0,
       petHeight: 55.0,
       petBGroup: "DEA1",
@@ -408,7 +421,7 @@ async function main() {
     {
       petName: "Rocky",
       breedID: bulldog.breedID,
-      petAge: 8,
+      petDOB: dobFromAge(8, 0, new Date("2023-11-05")),
       petWeight: 24.0,
       petHeight: 40.0,
       petBGroup: "DEA4",
@@ -430,7 +443,7 @@ async function main() {
     {
       petName: "Zeus",
       breedID: rottweiler.breedID,
-      petAge: 3,
+      petDOB: dobFromAge(3, 0, new Date("2024-04-22")),
       petWeight: 45.0,
       petHeight: 65.0,
       petBGroup: "DEA3",
@@ -452,7 +465,7 @@ async function main() {
     {
       petName: "Teddy",
       breedID: toyPoodle.breedID,
-      petAge: 0,
+      petDOB: dobFromAge(0, 4, null), // matches "4-month-old" in description
       petWeight: 1.2,
       petHeight: 18.0,
       petBGroup: "DEA1",
@@ -474,7 +487,7 @@ async function main() {
     {
       petName: "Cleo",
       breedID: siamese.breedID,
-      petAge: 3,
+      petDOB: dobFromAge(3, 0, new Date("2024-05-10")),
       petWeight: 4.2,
       petHeight: 28.0,
       petBGroup: "AB",
@@ -496,7 +509,7 @@ async function main() {
     {
       petName: "Mittens",
       breedID: domShorthair.breedID,
-      petAge: 5,
+      petDOB: dobFromAge(5, 0, new Date("2023-09-14")),
       petWeight: 4.8,
       petHeight: 25.0,
       petBGroup: "A",
@@ -518,7 +531,7 @@ async function main() {
     {
       petName: "Shadow",
       breedID: britShorthair.breedID,
-      petAge: 7,
+      petDOB: dobFromAge(7, 0, new Date("2023-06-01")),
       petWeight: 5.5,
       petHeight: 30.0,
       petBGroup: "B",
@@ -540,7 +553,7 @@ async function main() {
     {
       petName: "Mochi",
       breedID: persian.breedID,
-      petAge: 0,
+      petDOB: dobFromAge(0, 3, null), // matches "3-month-old" in description
       petWeight: 0.8,
       petHeight: 15.0,
       petBGroup: "A",
@@ -562,7 +575,7 @@ async function main() {
     {
       petName: "Simba",
       breedID: maineCoon.breedID,
-      petAge: 1,
+      petDOB: dobFromAge(1, 0, new Date("2024-10-08")),
       petWeight: 5.0,
       petHeight: 32.0,
       petBGroup: "AB",
@@ -584,7 +597,7 @@ async function main() {
     {
       petName: "Polly",
       breedID: parrot.breedID,
-      petAge: 10,
+      petDOB: dobFromAge(10, 0, new Date("2024-02-14")),
       petWeight: 0.5,
       petHeight: 30.0,
       petBGroup: "N/A",
@@ -606,7 +619,7 @@ async function main() {
     {
       petName: "Bloo",
       breedID: blueMacaw.breedID,
-      petAge: 6,
+      petDOB: dobFromAge(6, 0, new Date("2024-07-30")),
       petWeight: 1.2,
       petHeight: 75.0,
       petBGroup: "N/A",
@@ -628,7 +641,7 @@ async function main() {
     {
       petName: "Nimbus",
       breedID: pigeon.breedID,
-      petAge: 2,
+      petDOB: dobFromAge(2, 0, new Date("2024-09-05")),
       petWeight: 0.4,
       petHeight: 32.0,
       petBGroup: "N/A",
@@ -650,7 +663,7 @@ async function main() {
     {
       petName: "Sky",
       breedID: pigeon.breedID,
-      petAge: 1,
+      petDOB: dobFromAge(1, 0, new Date("2025-01-20")),
       petWeight: 0.35,
       petHeight: 30.0,
       petBGroup: "N/A",
@@ -672,7 +685,7 @@ async function main() {
     {
       petName: "Pebbles",
       breedID: hollowLop.breedID,
-      petAge: 2,
+      petDOB: dobFromAge(2, 0, new Date("2024-11-12")),
       petWeight: 1.8,
       petHeight: 20.0,
       petBGroup: "N/A",

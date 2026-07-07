@@ -10,10 +10,10 @@ import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Card from "../../components/ui/Card";
-import { register as registerApi } from "../../api/authApi";
-import useAuthStore from "../../store/useAuthStore";
-import backgroundImg from "../../assets/images/background.png";
+import Card from "../../../components/ui/Card";
+import { register as registerApi } from "../../../logic/api/authApi";
+import useAuthStore from "../../../logic/store/useAuthStore";
+import backgroundImg from "../../../static/assets/images/background.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const nameRegex = /^[A-Za-z][A-Za-z'-]*(?: [A-Za-z'-]+)*$/;

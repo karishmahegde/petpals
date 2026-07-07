@@ -1,6 +1,6 @@
 // What it does: Zustand global store holding the authenticated user's session, token, and role
 import { create } from "zustand";
-import { AuthUser } from "../api/authApi";
+import { AuthUser } from "../../logic/api/authApi";
 
 interface AuthState {
   // Defines the shape of your Zustand store

@@ -2,7 +2,7 @@
 // Guards dashboard routes — redirects to /forbidden if the authenticated user's role isn't allowed
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import useAuthStore from "../store/useAuthStore";
+import useAuthStore from "../../logic/store/useAuthStore";
 
 interface RoleRouteProps {
   allowedRoles: string[];

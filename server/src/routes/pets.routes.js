@@ -44,10 +44,12 @@ const router = express.Router();
  *         description: Repeatable — e.g. ?size=Small&size=Medium (OR'd together)
  *       - in: query
  *         name: minAge
- *         schema: { type: integer }
+ *         schema: { type: integer, minimum: 0 }
+ *         description: Minimum age in MONTHS (inclusive) — pet must be at least this many months old
  *       - in: query
  *         name: maxAge
- *         schema: { type: integer }
+ *         schema: { type: integer, minimum: 0 }
+ *         description: Maximum age in MONTHS (inclusive) — pet must be at most this many months old
  *       - in: query
  *         name: shelterID
  *         schema:
@@ -58,7 +60,7 @@ const router = express.Router();
  *         description: Repeatable — e.g. ?shelterID=1&shelterID=2 (OR'd together)
  *     responses:
  *       200:
- *         description: Paginated list of pets with adoptionStatus = available
+ *         description: Paginated list of pets with adoptionStatus = available. Each pet includes petAge, a formatted string (e.g. "3 yr, 11 mo") computed live from petDOB at request time — not a stored field.
  *       400:
  *         description: Invalid query parameter
  */
