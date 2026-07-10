@@ -82,9 +82,6 @@ const formatAgeFromDOBYears = (dob) => {
 };
 
 const formatSex = (petSex) => {
-  console.log("petSex");
-  console.log(petSex);
-  console.log(JSON.stringify(petSex));
   if (petSex === "M") return "male";
   if (petSex === "F") return "female";
   return "Unknown";
@@ -107,7 +104,7 @@ const getAvailablePets = async (filters = {}, pagination = {}) => {
     breedWhere.breedName = matchFilter(breedValues);
   }
   if (speciesValues.length > 0) {
-    breedWhere.species = { speciesName: matchFilter(speciesValues) };
+    breedWhere.species = { speciesID: matchFilter(speciesValues) };
   }
   if (Object.keys(breedWhere).length > 0) {
     where.breed = breedWhere;
@@ -129,6 +126,7 @@ const getAvailablePets = async (filters = {}, pagination = {}) => {
 
   const [pets, total] = await Promise.all([
     prisma.pet.findMany({
+      // this query will only return the 20 records based on the page the client is on, it won't return the total number of records for that query
       where,
       skip,
       take: limit,
@@ -146,10 +144,11 @@ const getAvailablePets = async (filters = {}, pagination = {}) => {
         },
       },
     }),
-    prisma.pet.count({ where }),
+    prisma.pet.count({ where }), // this query tells how many results are there in total, so that the client knows the total number of pages to show at the end of the catalog
   ]);
 
   const data = pets.map((pet) => ({
+    //.map() transforms the query output into the json array, where every field is assigned to it's key, and formatted where needed
     petID: pet.petID,
     petName: pet.petName,
     petAge: formatAgeFromDOBYears(pet.petDOB),
@@ -208,6 +207,7 @@ const getPetDetails = async (id) => {
   }
 
   return {
+    // here, we don't need the .map() function because we are dealing with only 1 record, not an array
     petID: pet.petID,
     petName: pet.petName,
     petAge: formatAgeFromDOB(pet.petDOB),

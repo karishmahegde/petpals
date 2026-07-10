@@ -51,6 +51,14 @@ const getAvailablePets = async (req, res, next) => {
     return next(badRequest(`size must be one of: ${VALID_SIZES.join(", ")}`));
   }
 
+  // species is now numeric (speciesID), matching the /breeds convention.
+  // Strict validation, matching minAge/maxAge — a non-numeric value is
+  // rejected outright rather than silently coerced.
+  const speciesValues = toArray(species).map((raw) => Number(raw));
+  if (speciesValues.some((s) => !Number.isInteger(s))) {
+    return next(badRequest("species must be an array of integers (speciesID)"));
+  }
+
   // minAge/maxAge are in MONTHS (e.g. minAge=6 means "at least 6 months old").
   // Integer validation is unaffected by the months-vs-years change — a whole
   // number of months is still the correct constraint.
@@ -84,7 +92,7 @@ const getAvailablePets = async (req, res, next) => {
   try {
     const result = await petsService.getAvailablePets(
       {
-        species: toArray(species),
+        species: speciesValues,
         breed: toArray(breed),
         size: sizeValues,
         minAge,

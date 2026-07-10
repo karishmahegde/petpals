@@ -1,6 +1,7 @@
 // What it does: API functions for the public pet catalog endpoints (species, breeds, shelters, pets)
 import axiosInstance from "./axiosInstance";
 
+// ———————————————— RESPONSE DATA OBJECT SHAPE DEFINITIONS ————————————————
 export interface Species {
   speciesID: number;
   speciesName: string;
@@ -15,6 +16,12 @@ export interface Breed {
 export interface Shelter {
   shelterID: number;
   shelterName: string;
+}
+
+export interface NearbyShelter extends Shelter {
+  shelterAddress: string;
+  shelterZIP: string;
+  distance: number;
 }
 
 export interface PetCard {
@@ -37,12 +44,12 @@ export interface Pagination {
 }
 
 export interface PetFilters {
-  speciesName?: string;
-  breedName?: string;
-  size?: string;
+  speciesID?: number[];
+  breedName?: string[];
+  size?: string[];
   minAge?: string;
   maxAge?: string;
-  shelterID?: number | null;
+  shelterID?: number[];
 }
 
 export interface PaginatedPets {
@@ -57,9 +64,9 @@ export const getSpecies = async (): Promise<Species[]> => {
 };
 
 // ———————————————— BREEDS API ————————————————
-export const getBreeds = async (speciesID: number): Promise<Breed[]> => {
+export const getBreeds = async (speciesIDs: number[]): Promise<Breed[]> => {
   const response = await axiosInstance.get("/breeds", {
-    params: { speciesID },
+    params: { speciesID: speciesIDs },
   });
   return response.data.data;
 };
@@ -70,19 +77,42 @@ export const getShelters = async (): Promise<Shelter[]> => {
   return response.data.data;
 };
 
+export interface NearbySearchLocation {
+  lat?: number;
+  lng?: number;
+  postalCode?: string;
+  radius: number;
+}
+
+export const getNearbyShelters = async ({
+  lat,
+  lng,
+  postalCode,
+  radius,
+}: NearbySearchLocation): Promise<NearbyShelter[]> => {
+  const params =
+    postalCode !== undefined ? { postalCode, radius } : { lat, lng, radius };
+  const response = await axiosInstance.get("/shelters/nearby", { params });
+  return response.data.data;
+};
+
 // ———————————————— PETS API ————————————————
 export const getPets = async (
   filters: PetFilters,
   page: number,
   limit: number,
 ): Promise<PaginatedPets> => {
-  const params: Record<string, string | number> = { page, limit };
-  if (filters.speciesName) params.species = filters.speciesName;
-  if (filters.breedName) params.breed = filters.breedName;
-  if (filters.size) params.size = filters.size;
+  const params: Record<string, string | number | string[] | number[]> = {
+    page,
+    limit,
+  };
+  // checking is filter value is available, or array length is > 0 and assigning it to the key for the request
+  if (filters.speciesID?.length) params.species = filters.speciesID;
+  if (filters.breedName?.length) params.breed = filters.breedName;
+  if (filters.size?.length) params.size = filters.size;
   if (filters.minAge) params.minAge = filters.minAge;
   if (filters.maxAge) params.maxAge = filters.maxAge;
-  if (filters.shelterID != null) params.shelterID = filters.shelterID;
+  if (filters.shelterID?.length) params.shelterID = filters.shelterID;
 
   const response = await axiosInstance.get("/pets", { params });
   return { data: response.data.data, pagination: response.data.pagination };

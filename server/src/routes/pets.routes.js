@@ -22,10 +22,10 @@ const router = express.Router();
  *         name: species
  *         schema:
  *           type: array
- *           items: { type: string }
+ *           items: { type: integer, minimum: 1 }
  *         style: form
  *         explode: true
- *         description: Repeatable — e.g. ?species=Dog&species=Cat (OR'd together)
+ *         description: Repeatable — e.g. ?species=1&species=2 (OR'd together). Filters by speciesID, matching /breeds' convention.
  *       - in: query
  *         name: breed
  *         schema:
