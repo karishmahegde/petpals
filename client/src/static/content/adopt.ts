@@ -5,7 +5,7 @@ export interface AdoptStep {
 }
 
 export interface AdoptContent {
-  hero: { heading: string; body: string };
+  hero: { heading: string; body: string; button: string };
   signupCta: { heading: string; body: string };
   steps: { heading: string; body: AdoptStep[] };
 }
@@ -14,6 +14,7 @@ export const adoptContent: AdoptContent = {
   hero: {
     heading: "Adopt a Pet from PetPals ✨🦮",
     body: "Adopting a pet is a life-changing experience filled with joy, love, and companionship. At PetPals, we're dedicated to matching you with the perfect pet for your family and lifestyle. By adopting, you're not only giving a loving animal a home, but also opening up space for us to help more pets in need.",
+    button: "Adopt a pet",
   },
   signupCta: {
     heading: "Sign Up to Adopt",

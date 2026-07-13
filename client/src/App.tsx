@@ -4,6 +4,7 @@ import PublicLayout from "./components/layout/PublicLayout";
 import ProtectedRoute from "./logic/route/ProtectedRoute";
 import RoleRoute from "./logic/route/RoleRoute";
 import Home from "./pages/public/home/Home";
+import About from "./pages/public/about/About";
 import Login from "./pages/public/auth/Login";
 import Register from "./pages/public/auth/Register";
 import Adopt from "./pages/public/adopt/Adopt";
@@ -40,6 +41,7 @@ const App = () => {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/adopt" element={<Adopt />} />

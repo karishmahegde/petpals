@@ -1,4 +1,3 @@
-// client/src/static/content/home/carousel.ts
 import carousel1 from "../assets/images/home/Carousel1.png";
 import carousel2 from "../assets/images/home/Carousel2.png";
 import carousel3 from "../assets/images/home/Carousel3.png";

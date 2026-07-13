@@ -23,7 +23,7 @@ const Adopt = () => {
               href="#pets"
               className="mt-6 inline-block rounded-md bg-teal-dark px-6 py-2 text-white transition hover:bg-gold-md hover:text-black w-fit"
             >
-              Adopt a Pet
+              {hero.button}
             </a>
           </div>
 
