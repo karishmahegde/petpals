@@ -6,7 +6,7 @@ export interface AdoptStep {
 
 export interface AdoptContent {
   hero: { heading: string; body: string; button: string };
-  signupCta: { heading: string; body: string };
+  signupCta: { heading: string; body: string; button: string };
   steps: { heading: string; body: AdoptStep[] };
 }
 
@@ -19,6 +19,7 @@ export const adoptContent: AdoptContent = {
   signupCta: {
     heading: "Sign Up to Adopt",
     body: "Ready to bring a pet into your life? 🥰🌟 Create an account to start your adoption journey today!",
+    button: "Sign Up",
   },
   steps: {
     heading: "How to Adopt? 🐹",

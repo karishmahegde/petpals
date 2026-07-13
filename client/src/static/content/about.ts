@@ -75,7 +75,7 @@ export const aboutContent: AboutContent = {
         image: team1,
       },
       {
-        name: "Claude A",
+        name: "Claude Code",
         description: "Development Assistant",
         image: team2,
       },

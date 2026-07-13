@@ -1,14 +1,17 @@
-import { Link } from "react-router-dom";
 import { adoptContent } from "../../../static/content/adopt";
 import adoptImage from "../../../static/assets/images/adopt/adopt.png";
 import PetCatalog from "./sections/PetCatalog";
 import SectionContainer from "../../../components/ui/SectionContainer";
 import SectionHeading from "../../../components/ui/SectionHeading";
 import SectionHeadingCenter from "../../../components/ui/SectionHeadingCenter";
+import ButtonElement from "../../../components/ui/ButtonElement";
+import { useScrollToHash } from "../../../logic/hooks/useScrollToHash";
 
 const { hero, signupCta, steps } = adoptContent;
 
 const Adopt = () => {
+  useScrollToHash();
+
   return (
     <div className="font-body">
       {/* Hero */}
@@ -18,13 +21,12 @@ const Adopt = () => {
           <div className="flex flex-col justify-center">
             <SectionHeading>{hero.heading}</SectionHeading>
             <p className="text-justify font-light">{hero.body}</p>
-
-            <a
-              href="#pets"
-              className="mt-6 inline-block rounded-md bg-teal-dark px-6 py-2 text-white transition hover:bg-gold-md hover:text-black w-fit"
+            <ButtonElement
+              to="/adopt#catalog"
+              className="self-start bg-teal-dark hover:bg-gold-dark"
             >
               {hero.button}
-            </a>
+            </ButtonElement>
           </div>
 
           <div className="flex items-center justify-center text-center md:p-5">
@@ -70,17 +72,19 @@ const Adopt = () => {
         <SectionHeadingCenter>{signupCta.heading}</SectionHeadingCenter>
         <div className="text-center">
           <p className="text-md font-light">{signupCta.body}</p>
-          <Link
-            to="/login"
-            className="my-3 inline-block rounded-md bg-gold-md px-6 py-2 font-bold text-white transition hover:bg-teal-dark"
+          <ButtonElement
+            to="/register"
+            className="bg-teal-dark hover:bg-gold-dark"
           >
-            Sign Up
-          </Link>
+            {signupCta.button}
+          </ButtonElement>
         </div>
       </SectionContainer>
 
       {/* Search + Catalog */}
-      <PetCatalog />
+      <div id="catalog">
+        <PetCatalog />
+      </div>
     </div>
   );
 };

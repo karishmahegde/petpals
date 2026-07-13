@@ -149,7 +149,7 @@ const Register = () => {
 
   return (
     <div
-      className="min-h-screen bg-cover bg-center flex items-center justify-center px-4 py-10"
+      className="min-h-screen bg-cover bg-center bg-fixed flex items-center justify-center px-4 py-10"
       style={{ backgroundImage: `url(${backgroundImg})` }}
     >
       <Card className="w-full max-w-lg p-10">

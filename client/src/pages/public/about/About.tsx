@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import CountUp from "react-countup";
 import SectionContainer from "../../../components/ui/SectionContainer";
 import SectionHeading from "../../../components/ui/SectionHeading";
 import SectionHeadingCenter from "../../../components/ui/SectionHeadingCenter";
+import ButtonElement from "../../../components/ui/ButtonElement";
 import { aboutContent } from "../../../static/content/about";
 
 const About = () => {
@@ -38,12 +38,12 @@ const About = () => {
         <SectionHeadingCenter>{believeSection.heading}</SectionHeadingCenter>
         <div className="text-center">
           <p className="text-md font-light">{believeSection.description}</p>
-          <Link
+          <ButtonElement
             to="/adopt"
-            className="my-5 inline-block rounded-md bg-teal-dark px-6 py-2 text-white transition hover:bg-teal-dark"
+            className="bg-teal-dark hover:bg-gold-dark"
           >
             {believeSection.button}
-          </Link>
+          </ButtonElement>
         </div>
       </SectionContainer>
 
@@ -181,16 +181,18 @@ const About = () => {
         <div className="text-center">
           <p className="mt-4">{joinMissionSection.description}</p>
           <div className="flex items-center justify-center gap-2">
-            <Link to="/adopt">
-              <button className="mt-6 px-6 py-2 bg-rose-dark text-white rounded-md w-40 hover:bg-gold-dark transition">
-                {joinMissionSection.button1}
-              </button>
-            </Link>
-            <Link to="/volunteerInfo">
-              <button className="mt-6 px-6 py-2 bg-teal-dark text-white rounded-md w-40 hover:bg-gold-dark transition">
-                {joinMissionSection.button2}
-              </button>
-            </Link>
+            <ButtonElement
+              to="/adopt"
+              className="bg-rose-dark hover:bg-gold-dark"
+            >
+              {joinMissionSection.button1}
+            </ButtonElement>
+            <ButtonElement
+              to="/volunteerinfo"
+              className="bg-teal-dark hover:bg-gold-dark"
+            >
+              {joinMissionSection.button2}
+            </ButtonElement>
           </div>
         </div>
       </SectionContainer>
