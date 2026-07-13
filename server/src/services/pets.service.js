@@ -171,6 +171,38 @@ const getAvailablePets = async (filters = {}, pagination = {}) => {
   };
 };
 
+// ——————————————— GET FEATURED PETS ———————————————
+const getFeaturedPets = async () => {
+  const pets = await prisma.pet.findMany({
+    where: { adoptionStatus: "available", featuredFlag: true },
+    select: {
+      petID: true,
+      petName: true,
+      petDOB: true, // selected for ageMonths calculation only, not returned
+      petPhoto: true,
+      petSex: true,
+      breed: {
+        select: {
+          breedName: true,
+          species: { select: { speciesName: true } },
+        },
+      },
+    },
+  });
+
+  return pets.map((pet) => ({
+    petID: pet.petID,
+    petName: pet.petName,
+    petAge: formatAgeFromDOBYears(pet.petDOB),
+    petSex: formatSex(pet.petSex),
+    petPhoto: pet.petPhoto,
+    breed: {
+      breedName: pet.breed.breedName,
+      speciesName: pet.breed.species.speciesName,
+    },
+  }));
+};
+
 // ——————————————— GET PET DETAILS ———————————————
 const getPetDetails = async (id) => {
   const pet = await prisma.pet.findUnique({
@@ -232,4 +264,4 @@ const getPetDetails = async (id) => {
   };
 };
 
-module.exports = { getAvailablePets, getPetDetails };
+module.exports = { getAvailablePets, getFeaturedPets, getPetDetails };

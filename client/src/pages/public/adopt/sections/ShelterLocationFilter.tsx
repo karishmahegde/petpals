@@ -2,13 +2,14 @@ import { useState } from "react";
 import { FiHome } from "react-icons/fi";
 import { HiOutlineLocationMarker } from "react-icons/hi";
 import { FaCheckCircle } from "react-icons/fa";
-import type { Shelter } from "../../../logic/api/petsApi";
+import type { Shelter } from "../../../../logic/api/petsApi";
+import type { NearbySearchParams } from "./PetCatalog";
 import {
   CheckboxDropdown,
   Dropdown,
   Pill,
   type FilterOption,
-} from "../../../components/ui/FilterControls";
+} from "../../../../components/ui/FilterControls";
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250];
 const DEFAULT_RADIUS = 25;
@@ -27,6 +28,7 @@ interface ShelterLocationFilterProps {
   nearbySearchEmpty: boolean;
   nearbySearchErrorMessage: string | null;
   onResetLocationFilter: () => void;
+  nearbySearch: NearbySearchParams | null;
 }
 
 const ShelterLocationFilter = ({
@@ -39,6 +41,7 @@ const ShelterLocationFilter = ({
   isFindingNearby,
   nearbySearchErrorMessage,
   onResetLocationFilter,
+  nearbySearch,
 }: ShelterLocationFilterProps) => {
   const [isDistanceOpen, setIsDistanceOpen] = useState(false);
   const [pendingRadius, setPendingRadius] = useState(DEFAULT_RADIUS);
@@ -47,17 +50,11 @@ const ShelterLocationFilter = ({
   );
   const [isLocating, setIsLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
-  const [searchedRadius, setSearchedRadius] = useState<number | null>(null);
   const [zipInput, setZipInput] = useState("");
-  const [searchMethod, setSearchMethod] = useState<"location" | "zip" | null>(
-    null,
-  );
-  const [lastSearchedZip, setLastSearchedZip] = useState<string | null>(null);
 
   // Only meaningful once a zip-based search has actually run — a backend
-  // error from a lat/lng search (searchMethod === "location") shouldn't be
-  // misattributed to the zip input.
-  const zipError = searchMethod === "zip" ? nearbySearchErrorMessage : null;
+  // error from a lat/lng search shouldn't be misattributed to the zip input.
+  const zipError = nearbySearch?.postalCode ? nearbySearchErrorMessage : null;
 
   const toggleShelter = (shelterID: number) => {
     const ids = selectedShelterIDs.includes(shelterID)
@@ -80,13 +77,9 @@ const ShelterLocationFilter = ({
   const runSearch = (
     location: { lat: number; lng: number } | { zip: string },
   ) => {
-    setSearchedRadius(pendingRadius);
     if ("zip" in location) {
-      setSearchMethod("zip");
-      setLastSearchedZip(location.zip);
       onFindNearby({ postalCode: location.zip }, pendingRadius);
     } else {
-      setSearchMethod("location");
       onFindNearby(location, pendingRadius);
     }
     setIsDistanceOpen(false);
@@ -115,7 +108,7 @@ const ShelterLocationFilter = ({
       () => {
         setIsLocating(false);
         setGeoError(
-          "Couldn't get your location — check permissions and try again.",
+          "Couldn't get your location. Check permissions and try again.",
         );
       },
     );
@@ -137,18 +130,15 @@ const ShelterLocationFilter = ({
     setZipInput("");
     setPendingRadius(DEFAULT_RADIUS);
     setCoords(null);
-    setSearchMethod(null);
-    setLastSearchedZip(null);
     setGeoError(null);
     onResetLocationFilter();
   };
 
   const isSearching = isLocating || isFindingNearby;
 
-  const nearbyLabel =
-    searchMethod === "location"
-      ? `Based on current location: ${searchedRadius} km`
-      : `Based on Zip ${lastSearchedZip}: ${searchedRadius} km`;
+  const nearbyLabel = nearbySearch?.postalCode
+    ? `Based on Zip ${nearbySearch.postalCode}: ${nearbySearch.radius} km`
+    : `Based on current location: ${nearbySearch?.radius} km`;
 
   return (
     <div className="mt-3">

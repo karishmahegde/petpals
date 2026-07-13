@@ -112,6 +112,16 @@ const getAvailablePets = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /pets/featured ———————————————
+const getFeaturedPets = async (req, res, next) => {
+  try {
+    const result = await petsService.getFeaturedPets();
+    return successResponse(res, "Featured pets retrieved successfully", result);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— GET /pets/:id ———————————————
 const getPetDetails = async (req, res, next) => {
   const id = Number(req.params.id);
@@ -126,4 +136,4 @@ const getPetDetails = async (req, res, next) => {
   }
 };
 
-module.exports = { getAvailablePets, getPetDetails };
+module.exports = { getAvailablePets, getFeaturedPets, getPetDetails };

@@ -117,3 +117,9 @@ export const getPets = async (
   const response = await axiosInstance.get("/pets", { params });
   return { data: response.data.data, pagination: response.data.pagination };
 };
+
+// ———————————————— FEATURED PETS API ————————————————
+export const getFeaturedPets = async (): Promise<PetCard[]> => {
+  const response = await axiosInstance.get("/pets/featured");
+  return response.data.data;
+};

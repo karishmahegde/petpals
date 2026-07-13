@@ -137,6 +137,7 @@ model Pet {
   compatibleWithChildren Boolean               @default(false)
   compatibleWithPets     Boolean               @default(false)
   specialNeeds           Boolean               @default(false)
+  featuredFlag           Boolean               @default(false)
   adoptionApps           AdoptionApplication[]
   appointments           Appointment[]
   favorites              Favorite[]

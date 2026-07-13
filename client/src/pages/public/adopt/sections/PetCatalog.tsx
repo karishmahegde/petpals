@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import axios from "axios";
 import {
@@ -8,8 +9,8 @@ import {
   getShelters,
   getNearbyShelters,
   type PetFilters,
-} from "../../../logic/api/petsApi";
-import CardComponent from "../../../components/ui/PetCatalogCard";
+} from "../../../../logic/api/petsApi";
+import CardComponent from "../../../../components/ui/PetCatalogCard";
 import PetFilterBar from "./PetFilterBar";
 
 const LIMIT = 20;
@@ -44,7 +45,7 @@ const INITIAL_FILTERS: Filters = {
 // Only one of (lat+lng) or postalCode is ever populated per search, matching
 // the mutually-exclusive resolution already happening in
 // ShelterLocationFilter.
-interface NearbySearchParams {
+export interface NearbySearchParams {
   lat?: number;
   lng?: number;
   postalCode?: string;
@@ -58,6 +59,7 @@ interface NearbySearchParams {
 }
 
 const PetCatalog = () => {
+  const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [nearbySearch, setNearbySearch] = useState<NearbySearchParams | null>(
@@ -90,6 +92,30 @@ const PetCatalog = () => {
     setNearbySearch(null);
     updateFilters({ nearbyShelterIDs: [] });
   };
+
+  useEffect(() => {
+    const speciesID = searchParams.get("speciesID");
+    const lat = searchParams.get("lat");
+    const lng = searchParams.get("lng");
+    const postalCode = searchParams.get("postalCode");
+
+    if (speciesID) {
+      updateFilters({ speciesIDs: [Number(speciesID)] });
+    } else if (lat && lng) {
+      setNearbySearch({
+        lat: Number(lat),
+        lng: Number(lng),
+        radius: 25,
+        seq: 1,
+      });
+    } else if (postalCode) {
+      setNearbySearch({ postalCode, radius: 25, seq: 1 });
+    }
+    // Intentionally run once, on mount only — this seeds initial state
+    // from a Home-page handoff, not something that should re-run on
+    // every filters/nearbySearch change afterward.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Independent data, no prerequisites — fetches immediately on page load.
   const { data: species = [] } = useQuery({
@@ -252,6 +278,7 @@ const PetCatalog = () => {
           nearbySearchErrorMessage={nearbySearchErrorMessage}
           onResetLocationFilter={resetLocationFilter}
           isAgeRangeInvalid={isAgeRangeInvalid}
+          nearbySearch={nearbySearch}
         />
 
         <div>

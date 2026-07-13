@@ -68,6 +68,18 @@ router.get("/pets", petsController.getAvailablePets);
 
 /**
  * @swagger
+ * /pets/featured:
+ *   get:
+ *     summary: List featured pets for the Home page's Featured Pets section
+ *     tags: [Pets]
+ *     responses:
+ *       200:
+ *         description: Pets with adoptionStatus = available and featuredFlag = true, unpaginated. Each pet includes petAge, a formatted string (e.g. "3 yr, 11 mo") computed live from petDOB at request time — not a stored field.
+ */
+router.get("/pets/featured", petsController.getFeaturedPets);
+
+/**
+ * @swagger
  * /pets/{id}:
  *   get:
  *     summary: View full details for a single pet
