@@ -11,7 +11,20 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 const SUPABASE_URL =
-  "https://aulounxhkawyqqzjeeqi.supabase.co/storage/v1/object/public/pet-photos";
+  "https://aulounxhkawyqqzjeeqi.supabase.co/storage/v1/object/public/pet-images";
+
+// Computes a DOB so the pet is (approximately) `years` years and `months`
+// months old as of TODAY — not as of intakeDate. Age is now always derived
+// live from petDOB, so it stays accurate going forward instead of being
+// frozen at whatever it was when the row was first seeded.
+// `refDate` (typically the original intakeDate) only supplies the day-of-month
+// for variety/realism — the actual month offset always comes from `months`,
+// counted back from today's month.
+function dobFromAge(years, months, refDate) {
+  const today = new Date();
+  const day = refDate ? refDate.getDate() : today.getDate();
+  return new Date(today.getFullYear() - years, today.getMonth() - months, day);
+}
 
 async function main() {
   console.log("🌱 Seeding PetPals database...");
@@ -320,13 +333,13 @@ async function main() {
     {
       petName: "Apollo",
       breedID: germanShepherd.breedID,
-      petAge: 4,
+      petDOB: dobFromAge(4, 0, new Date("2024-03-10")),
       petWeight: 32.0,
       petHeight: 62.0,
       petBGroup: "DEA4",
       petColor: "Black and Tan",
       petSize: "Large",
-      petPhoto: `${SUPABASE_URL}/Apollo.png`,
+      petPhoto: `${SUPABASE_URL}/1.png`,
       petSex: "M",
       petDesc:
         "Apollo is a confident and loyal German Shepherd who takes his role as protector seriously. He thrives with experienced owners who can match his intelligence and energy. Best suited as the only pet in the home.",
@@ -342,13 +355,13 @@ async function main() {
     {
       petName: "Buddy",
       breedID: goldenRetriever.breedID,
-      petAge: 2,
+      petDOB: dobFromAge(2, 0, new Date("2024-06-01")),
       petWeight: 28.5,
       petHeight: 58.0,
       petBGroup: "DEA1",
       petColor: "Golden",
       petSize: "Large",
-      petPhoto: `${SUPABASE_URL}/Buddy.png`,
+      petPhoto: `${SUPABASE_URL}/2.png`,
       petSex: "M",
       petDesc:
         "Buddy is the definition of a family dog — endlessly cheerful, gentle with kids, and a best friend to every dog he meets. He loves fetch, swimming, and curling up on the couch after a long walk.",
@@ -364,13 +377,13 @@ async function main() {
     {
       petName: "Biscuit",
       breedID: beagle.breedID,
-      petAge: 6,
+      petDOB: dobFromAge(6, 0, new Date("2024-01-20")),
       petWeight: 10.5,
       petHeight: 38.0,
       petBGroup: "DEA3",
       petColor: "Tricolor",
       petSize: "Medium",
-      petPhoto: `${SUPABASE_URL}/Biscuit.png`,
+      petPhoto: `${SUPABASE_URL}/3.png`,
       petSex: "M",
       petDesc:
         "Biscuit is a nose-to-the-ground explorer who never meets a smell he doesn't investigate. Calm and affectionate at home, he loves children and is happiest on long morning walks.",
@@ -386,13 +399,13 @@ async function main() {
     {
       petName: "Daisy",
       breedID: labrador.breedID,
-      petAge: 1,
+      petDOB: dobFromAge(1, 0, new Date("2024-08-15")),
       petWeight: 22.0,
       petHeight: 55.0,
       petBGroup: "DEA1",
       petColor: "Yellow",
       petSize: "Medium",
-      petPhoto: `${SUPABASE_URL}/Daisy.png`,
+      petPhoto: `${SUPABASE_URL}/4.png`,
       petSex: "F",
       petDesc:
         "Daisy is a bouncy young Lab who is still learning the ropes. She is eager to please and picks up new commands quickly. She adores children and other dogs — the more the merrier.",
@@ -408,13 +421,13 @@ async function main() {
     {
       petName: "Rocky",
       breedID: bulldog.breedID,
-      petAge: 8,
+      petDOB: dobFromAge(8, 0, new Date("2023-11-05")),
       petWeight: 24.0,
       petHeight: 40.0,
       petBGroup: "DEA4",
       petColor: "Brindle",
       petSize: "Medium",
-      petPhoto: `${SUPABASE_URL}/Rocky.png`,
+      petPhoto: `${SUPABASE_URL}/5.png`,
       petSex: "M",
       petDesc:
         "Rocky is a laid-back senior Bulldog who asks for little more than a comfy sofa and a patient owner. He has a mild heart condition that requires monthly vet visits but is otherwise healthy and full of personality.",
@@ -430,13 +443,13 @@ async function main() {
     {
       petName: "Zeus",
       breedID: rottweiler.breedID,
-      petAge: 3,
+      petDOB: dobFromAge(3, 0, new Date("2024-04-22")),
       petWeight: 45.0,
       petHeight: 65.0,
       petBGroup: "DEA3",
       petColor: "Black and Mahogany",
       petSize: "Large",
-      petPhoto: `${SUPABASE_URL}/Zeus.PNG`,
+      petPhoto: `${SUPABASE_URL}/6.png`,
       petSex: "M",
       petDesc:
         "Zeus is a powerful and disciplined Rottweiler who is deeply loyal to those he trusts. He requires an experienced handler and a home without other animals. With the right owner, he is an incredibly devoted companion.",
@@ -452,13 +465,13 @@ async function main() {
     {
       petName: "Teddy",
       breedID: toyPoodle.breedID,
-      petAge: 0,
+      petDOB: dobFromAge(0, 4, null), // matches "4-month-old" in description
       petWeight: 1.2,
       petHeight: 18.0,
       petBGroup: "DEA1",
       petColor: "Apricot",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Teddy.png`,
+      petPhoto: `${SUPABASE_URL}/7.png`,
       petSex: "M",
       petDesc:
         "Teddy is a fluffy 4-month-old Toy Poodle puppy who is curious about everything and afraid of nothing. He is still learning basic commands and would thrive with a patient first-time owner. Gets along wonderfully with kids and other pets.",
@@ -474,13 +487,13 @@ async function main() {
     {
       petName: "Cleo",
       breedID: siamese.breedID,
-      petAge: 3,
+      petDOB: dobFromAge(3, 0, new Date("2024-05-10")),
       petWeight: 4.2,
       petHeight: 28.0,
       petBGroup: "AB",
       petColor: "Seal Point",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Cleo.png`,
+      petPhoto: `${SUPABASE_URL}/8.png`,
       petSex: "F",
       petDesc:
         "Cleo is a vocal and opinionated Siamese who knows exactly what she wants. She forms deep bonds with her person but prefers to be the only animal in the home. Perfect for someone who wants a cat with real personality.",
@@ -496,13 +509,13 @@ async function main() {
     {
       petName: "Mittens",
       breedID: domShorthair.breedID,
-      petAge: 5,
+      petDOB: dobFromAge(5, 0, new Date("2023-09-14")),
       petWeight: 4.8,
       petHeight: 25.0,
       petBGroup: "A",
       petColor: "White and Grey",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Mittens.png`,
+      petPhoto: `${SUPABASE_URL}/9.png`,
       petSex: "F",
       petDesc:
         "Mittens is a gentle and easygoing cat who gets along with everyone — children, dogs, other cats. She loves sunny windowsills and will happily sit on a lap for hours. A wonderful first cat for any household.",
@@ -518,13 +531,13 @@ async function main() {
     {
       petName: "Shadow",
       breedID: britShorthair.breedID,
-      petAge: 7,
+      petDOB: dobFromAge(7, 0, new Date("2023-06-01")),
       petWeight: 5.5,
       petHeight: 30.0,
       petBGroup: "B",
       petColor: "Blue Grey",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Shadow.png`,
+      petPhoto: `${SUPABASE_URL}/10.png`,
       petSex: "M",
       petDesc:
         "Shadow found his forever home and is now thriving with his new family. A calm and dignified British Shorthair who won everyone over with his quiet affection.",
@@ -540,13 +553,13 @@ async function main() {
     {
       petName: "Mochi",
       breedID: persian.breedID,
-      petAge: 0,
+      petDOB: dobFromAge(0, 3, null), // matches "3-month-old" in description
       petWeight: 0.8,
       petHeight: 15.0,
       petBGroup: "A",
       petColor: "Cream",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Mochi.png`,
+      petPhoto: `${SUPABASE_URL}/11.png`,
       petSex: "F",
       petDesc:
         "Mochi is a 3-month-old Persian kitten with a cloud-like coat and the most expressive eyes. She is playful and sociable, already comfortable around children and other pets. She will need regular grooming.",
@@ -562,13 +575,13 @@ async function main() {
     {
       petName: "Simba",
       breedID: maineCoon.breedID,
-      petAge: 1,
+      petDOB: dobFromAge(1, 0, new Date("2024-10-08")),
       petWeight: 5.0,
       petHeight: 32.0,
       petBGroup: "AB",
       petColor: "Brown Tabby",
       petSize: "Medium",
-      petPhoto: `${SUPABASE_URL}/Simba.png`,
+      petPhoto: `${SUPABASE_URL}/12.png`,
       petSex: "M",
       petDesc:
         "Simba is a playful young Maine Coon who thinks he is much bigger than he is. He is endlessly curious, loves to climb, and chirps at birds through the window. Great with kids and other cats.",
@@ -584,11 +597,11 @@ async function main() {
     {
       petName: "Polly",
       breedID: parrot.breedID,
-      petAge: 10,
+      petDOB: dobFromAge(10, 0, new Date("2024-02-14")),
       petWeight: 0.5,
       petHeight: 30.0,
       petBGroup: "N/A",
-      petPhoto: `${SUPABASE_URL}/Polly.png`,
+      petPhoto: `${SUPABASE_URL}/13.png`,
       petColor: "Green and Red",
       petSize: "Small",
       petSex: "F",
@@ -606,13 +619,13 @@ async function main() {
     {
       petName: "Bloo",
       breedID: blueMacaw.breedID,
-      petAge: 6,
+      petDOB: dobFromAge(6, 0, new Date("2024-07-30")),
       petWeight: 1.2,
       petHeight: 75.0,
       petBGroup: "N/A",
       petColor: "Blue",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Bloo.png`,
+      petPhoto: `${SUPABASE_URL}/14.png`,
       petSex: "M",
       petDesc:
         "Bloo is a stunning Blue Macaw with a bold personality to match his striking plumage. He is social and vocal, and bonds deeply with his owner. Requires an experienced bird owner and a large enclosure.",
@@ -628,13 +641,13 @@ async function main() {
     {
       petName: "Nimbus",
       breedID: pigeon.breedID,
-      petAge: 2,
+      petDOB: dobFromAge(2, 0, new Date("2024-09-05")),
       petWeight: 0.4,
       petHeight: 32.0,
       petBGroup: "N/A",
       petColor: "Grey and White",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Nimbus.png`,
+      petPhoto: `${SUPABASE_URL}/15.png`,
       petSex: "M",
       petDesc:
         "Nimbus is a rescue pigeon who was found injured and nursed back to health. He is calm, gentle and surprisingly affectionate. He gets along well with other birds and is a wonderful low-maintenance companion.",
@@ -650,13 +663,13 @@ async function main() {
     {
       petName: "Sky",
       breedID: pigeon.breedID,
-      petAge: 1,
+      petDOB: dobFromAge(1, 0, new Date("2025-01-20")),
       petWeight: 0.35,
       petHeight: 30.0,
       petBGroup: "N/A",
       petColor: "White",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Sky.png`,
+      petPhoto: `${SUPABASE_URL}/16.png`,
       petSex: "F",
       petDesc:
         "Sky is a young white pigeon with a calm and trusting nature. She was rescued from a city rooftop and has since become very comfortable around people. A peaceful and easy companion for the right home.",
@@ -672,13 +685,13 @@ async function main() {
     {
       petName: "Pebbles",
       breedID: hollowLop.breedID,
-      petAge: 2,
+      petDOB: dobFromAge(2, 0, new Date("2024-11-12")),
       petWeight: 1.8,
       petHeight: 20.0,
       petBGroup: "N/A",
       petColor: "Grey and White",
       petSize: "Small",
-      petPhoto: `${SUPABASE_URL}/Pebbles.png`,
+      petPhoto: `${SUPABASE_URL}/17.png`,
       petSex: "F",
       petDesc:
         "Pebbles is a sweet Holland Lop rabbit who loves to binky around the room and then flop dramatically by your feet. She is litter trained, gentle with children, and gets along well with other small animals.",

@@ -177,6 +177,73 @@ petpals/
 ```
 ---
 
+## 🗂️ Project Structure
+
+```
+petpals/
+├── client/                  # React frontend (Vite + TypeScript)
+│   ├── public/
+│   │   └── favicon.png
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── layout/      # Navbar, page shells
+│   │   │   └── ui/          # Reusable primitives — Card.tsx, ButtonElement.tsx, etc.
+│   │   ├── logic/
+│   │   │   ├── api/         # Axios API calls — axiosInstance.ts, authApi.ts, petsApi.ts
+│   │   │   ├── hooks/       # Shared hooks — useScrollToHash.ts, useScrollToTop.ts
+│   │   │   ├── route/       # ProtectedRoute.tsx, RoleRoute.tsx
+│   │   │   └── store/       # Zustand global state — useAuthStore.ts
+│   │   ├── pages/
+│   │   │   ├── errors/      # Forbidden.tsx, NotFound.tsx
+│   │   │   ├── protected/   # Role-based dashboards — adopter, staff, vet, volunteer, donor, admin
+│   │   │   └── public/      # Public marketing, auth, and catalog pages
+│   │   ├── static/
+│   │   │   ├── assets/      # images/ — backgrounds, branding, page imagery
+│   │   │   └── content/     # Page copy/content data
+│   │   ├── App.tsx          # Root component — defines all the routes
+│   │   ├── index.css        # Tailwind directives
+│   │   ├── main.tsx         # React entry point
+│   │   └── vite-env.d.ts    # Vite/TypeScript ambient type declarations
+│   ├── .env.local
+│   ├── .eslintrc.cjs
+│   ├── Dockerfile
+│   ├── index.html
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── tailwind.config.js	  # Configures Tailwind CSS
+│   ├── tsconfig.json
+│   └── vite.config.ts
+│
+├── server/                  # Node.js + Express REST API
+│   ├── src/
+│   │   ├── config/          # DB and env config — prisma.js
+│   │   ├── controllers/     # Route handler logic
+│   │   ├── middleware/      # Auth (JWT), RBAC, error handling
+│   │   ├── prisma/          # schema.prisma, migrations/, seed.js
+│   │   ├── routes/          # Express routers (one per resource)
+│   │   ├── services/        # Business logic layer
+│   │   ├── tests/
+│   │   │   ├── integration/ # Full request-response cycle against a real DB
+│   │   │   └── unit/        # Mocked dependencies — controller/service logic in isolation
+│   │   ├── utils/           # Shared helpers — errors.js, response.js
+│   │   ├── app.js           # Builds the Express app — exported for both index.js and Supertest
+│   │   └── index.js         # Entry point — starts the server on PORT
+│   ├── .env
+│   ├── .env.example	      # Template listing every environment variable the project needs — committed to GitHub
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── prisma.config.ts
+│   └── swagger.js
+│
+├── docs/                    # Project documentation PDFs
+│
+├── CLAUDE.md                # The permanent context file
+├── docker-compose.yml	      # Orchestrates PostgreSQL, Express server, and React app — one command: docker-compose up
+└── .gitignore
+```
+
+---
+
 ## 📡 API
 
 Base URL: `http://localhost:5000/api/v1`

@@ -24,7 +24,8 @@
     "jsonwebtoken": "^9.0.2",
     "stripe": "^15.0.0",
     "swagger-jsdoc": "^6.3.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "zipcodes": "^8.0.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",

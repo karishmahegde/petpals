@@ -4,7 +4,7 @@
 // Route: /forbidden
 import { useNavigate } from "react-router-dom";
 import Card from "../../components/ui/Card";
-import backgroundImg from "../../assets/images/background.png";
+import backgroundImg from "../../static/assets/images/background.png";
 
 const Forbidden = () => {
   const navigate = useNavigate();
@@ -20,8 +20,8 @@ const Forbidden = () => {
           Oops, no entry!
         </h1>
         <p className="font-body text-sm text-neutral-gray mb-8">
-          Looks like you sniffed out a page that isn&apos;t meant for you.
-          You don&apos;t have permission to view this one.
+          Looks like you sniffed out a page that isn&apos;t meant for you. You
+          don&apos;t have permission to view this one.
         </p>
         <button
           type="button"
