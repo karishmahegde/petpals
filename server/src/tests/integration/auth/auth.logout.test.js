@@ -1,7 +1,7 @@
 const request = require("supertest"); //to make http requests to the server
 
-const app = require("../../app"); // loads dotenv
-const prisma = require("../../config/prisma"); //to interact with the database
+const app = require("../../../app"); // loads dotenv
+const prisma = require("../../../config/prisma"); //to interact with the database
 
 // Runs against the DATABASE_URL configured in server/.env — the seed user
 // created for this suite is removed in afterAll so no test data accumulates.

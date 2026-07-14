@@ -57,6 +57,33 @@ export interface PaginatedPets {
   pagination: Pagination;
 }
 
+export interface PetDetail {
+  petID: number;
+  petName: string;
+  petAge: string;
+  petSex: string;
+  petColor: string;
+  petHeight: number;
+  petWeight: number;
+  petDesc: string | null;
+  // Not yet returned by GET /pets/:id on the backend — falls back to a
+  // placeholder in the UI until the service selects/returns this field.
+  petPhoto: string | null;
+  breed: {
+    breedID: number;
+    breedName: string;
+    speciesName: string;
+  };
+  shelter: {
+    shelterID: number;
+    shelterName: string;
+    shelterAddress: string;
+  };
+  compatibleWithChildren: boolean;
+  compatibleWithPets: boolean;
+  specialNeeds: boolean;
+}
+
 // ———————————————— SPECIES API ————————————————
 export const getSpecies = async (): Promise<Species[]> => {
   const response = await axiosInstance.get("/species");
@@ -116,6 +143,12 @@ export const getPets = async (
 
   const response = await axiosInstance.get("/pets", { params });
   return { data: response.data.data, pagination: response.data.pagination };
+};
+
+// ———————————————— PET DETAILS API ————————————————
+export const getPetById = async (petID: number): Promise<PetDetail> => {
+  const response = await axiosInstance.get(`/pets/${petID}`);
+  return response.data.data;
 };
 
 // ———————————————— FEATURED PETS API ————————————————

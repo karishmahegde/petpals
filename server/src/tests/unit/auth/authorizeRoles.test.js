@@ -1,7 +1,7 @@
 const express = require("express"); //to create an express app
 const request = require("supertest"); //to make http requests to the server
 
-const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
+const { authorizeRoles, ROLES } = require("../../../middleware/authorizeRoles");
 
 const buildApp = (...allowedRoles) => {
   //to build the express app

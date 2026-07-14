@@ -1,8 +1,8 @@
 const request = require("supertest"); //to make http requests to the server
 const jwt = require("jsonwebtoken"); //to verify the JWT token
 
-const app = require("../../app"); // loads dotenv, so process.env.JWT_SECRET is populated below
-const prisma = require("../../config/prisma"); //to interact with the database
+const app = require("../../../app"); // loads dotenv, so process.env.JWT_SECRET is populated below
+const prisma = require("../../../config/prisma"); //to interact with the database
 
 // Runs against the DATABASE_URL configured in server/.env — the seed user
 // created for this suite is removed in afterAll so no test data accumulates.

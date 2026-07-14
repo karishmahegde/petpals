@@ -2,7 +2,7 @@ const express = require("express"); //to create an express app
 const request = require("supertest");
 const jwt = require("jsonwebtoken"); //to verify the JWT token
 
-const authenticate = require("../../middleware/authenticate");
+const authenticate = require("../../../middleware/authenticate");
 
 const JWT_SECRET = "test-secret"; //to store the JWT secret
 

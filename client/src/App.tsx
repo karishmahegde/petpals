@@ -37,6 +37,9 @@ const App = () => {
       .finally(() => {
         setAuthReady(true); // add this
       });
+    // login is a stable Zustand action reference (identity never changes
+    // across renders), and this effect is intentionally mount-only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // [] indicates running only on app load, not on rerenders
 
   if (!authReady) return <div className="min-h-screen bg-rose-light" />; //in between load

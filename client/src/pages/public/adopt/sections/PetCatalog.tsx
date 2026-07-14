@@ -11,6 +11,7 @@ import {
   type PetFilters,
 } from "../../../../logic/api/petsApi";
 import CardComponent from "../../../../components/ui/PetCatalogCard";
+import PetDetailsModal from "../../../../components/ui/PetDetailsModal";
 import PetFilterBar from "./PetFilterBar";
 
 const LIMIT = 20;
@@ -65,6 +66,9 @@ const PetCatalog = () => {
   const [nearbySearch, setNearbySearch] = useState<NearbySearchParams | null>(
     null,
   );
+  // Owns which pet's modal is open — shared across every CardComponent in
+  // the grid, so only one PetDetailsModal needs to be rendered page-wide.
+  const [openId, setOpenId] = useState<number | null>(null);
 
   // Any filter change resets to page 1 — a filtered result set shouldn't
   // stay on, say, page 4 if that page no longer exists for the new filters.
@@ -98,6 +102,7 @@ const PetCatalog = () => {
     const lat = searchParams.get("lat");
     const lng = searchParams.get("lng");
     const postalCode = searchParams.get("postalCode");
+    const petID = searchParams.get("petID"); // auto-open via ?petID=...
 
     if (speciesID) {
       updateFilters({ speciesIDs: [Number(speciesID)] });
@@ -110,6 +115,10 @@ const PetCatalog = () => {
       });
     } else if (postalCode) {
       setNearbySearch({ postalCode, radius: 25, seq: 1 });
+    }
+
+    if (petID) {
+      setOpenId(Number(petID));
     }
     // Intentionally run once, on mount only — this seeds initial state
     // from a Home-page handoff, not something that should re-run on
@@ -320,7 +329,12 @@ const PetCatalog = () => {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-9">
                 {pets.map((pet) => (
-                  <CardComponent key={pet.petID} pet={pet} />
+                  <CardComponent
+                    key={pet.petID}
+                    pet={pet}
+                    openId={openId}
+                    onKnowMore={(petID) => setOpenId(petID)}
+                  />
                 ))}
               </div>
 
@@ -351,6 +365,8 @@ const PetCatalog = () => {
           )}
         </div>
       </div>
+
+      <PetDetailsModal petID={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 };

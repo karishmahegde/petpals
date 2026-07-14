@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import useEmblaCarousel from "embla-carousel-react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { getFeaturedPets } from "../../../../logic/api/petsApi";
@@ -7,6 +8,7 @@ import SectionContainer from "../../../../components/ui/SectionContainer";
 import SectionHeading from "../../../../components/ui/SectionHeading";
 
 const FeaturedPets = () => {
+  const navigate = useNavigate();
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     dragFree: true,
@@ -33,7 +35,13 @@ const FeaturedPets = () => {
                   ))
                 : pets.map((pet) => (
                     <div key={pet.petID} className="basis-[202px] shrink-0">
-                      <CardComponent pet={pet} />
+                      <CardComponent
+                        pet={pet}
+                        openId={null}
+                        onKnowMore={(petID) =>
+                          navigate(`/adopt?petID=${petID}#catalog`)
+                        }
+                      />
                     </div>
                   ))}
             </div>

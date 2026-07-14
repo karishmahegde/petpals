@@ -159,7 +159,7 @@ export const CheckboxDropdown = ({
   );
 };
 
-export const PILL_STYLES = {
+const PILL_STYLES = {
   species: "border-teal-md bg-teal-light text-teal-dark",
   breed: "border-rose-md bg-rose-light text-rose-dark",
   size: "border-gold-md bg-gold-light text-neutral-charcoal",

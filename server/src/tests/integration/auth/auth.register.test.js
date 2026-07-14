@@ -1,8 +1,8 @@
 const request = require("supertest"); //to make http requests to the server
 const bcrypt = require("bcrypt");
 
-const app = require("../../app"); //to access the express app
-const prisma = require("../../config/prisma"); //to interact with the database
+const app = require("../../../app"); //to access the express app
+const prisma = require("../../../config/prisma"); //to interact with the database
 
 // Runs against the DATABASE_URL configured in server/.env — every user this
 // suite creates is removed in afterEach/afterAll so no test data accumulates.

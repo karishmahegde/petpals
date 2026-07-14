@@ -1,20 +1,15 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { FaPaw } from "react-icons/fa";
 import type { PetCard } from "../../logic/api/petsApi";
 
-const CardComponent = ({ pet }: { pet: PetCard }) => {
-  const [searchParams] = useSearchParams();
-  const qPetId = searchParams.get("petID"); // auto-open via ?petID=...
-  const [openId, setOpenId] = useState<number | null>(null);
+interface CardComponentProps {
+  pet: PetCard;
+  openId: number | null;
+  onKnowMore: (petID: number) => void;
+}
 
+const CardComponent = ({ pet, openId, onKnowMore }: CardComponentProps) => {
   const pillStyle =
     "flex-1 rounded-3xl border-2 border-neutral-lightgray p-1 text-center text-xs font-light text-black";
-
-  // Auto-open this card's modal if the URL matches this pet
-  useEffect(() => {
-    if (qPetId && Number(qPetId) === pet.petID) setOpenId(pet.petID);
-  }, [qPetId, pet.petID]);
 
   const isDeepLinked = openId === pet.petID;
 
@@ -56,13 +51,11 @@ const CardComponent = ({ pet }: { pet: PetCard }) => {
 
         <button
           className="my-2 rounded-xl bg-black px-2 py-3 text-xs text-white"
-          onClick={() => setOpenId(pet.petID)}
+          onClick={() => onKnowMore(pet.petID)}
         >
           Know More
         </button>
       </div>
-
-      {/* TODO: render <PetDetailsModal petId={openId} onClose={() => setOpenId(null)} /> once it's built next sprint */}
     </div>
   );
 };

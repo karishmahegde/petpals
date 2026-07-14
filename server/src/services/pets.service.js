@@ -82,8 +82,8 @@ const formatAgeFromDOBYears = (dob) => {
 };
 
 const formatSex = (petSex) => {
-  if (petSex === "M") return "male";
-  if (petSex === "F") return "female";
+  if (petSex === "M") return "Male";
+  if (petSex === "F") return "Female";
   return "Unknown";
 };
 
@@ -213,6 +213,7 @@ const getPetDetails = async (id) => {
       petDOB: true, // selected for ageMonths calculation only, not returned
       petSex: true,
       petColor: true,
+      petPhoto: true,
       petHeight: true,
       petWeight: true,
       petDesc: true,
@@ -244,6 +245,7 @@ const getPetDetails = async (id) => {
     petName: pet.petName,
     petAge: formatAgeFromDOB(pet.petDOB),
     petSex: formatSex(pet.petSex),
+    petPhoto: pet.petPhoto,
     petColor: pet.petColor,
     petHeight: pet.petHeight,
     petWeight: pet.petWeight,
