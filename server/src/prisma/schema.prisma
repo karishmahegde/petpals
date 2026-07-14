@@ -119,7 +119,7 @@ model Pet {
   petID                  Int                   @id @default(autoincrement())
   petName                String                @db.VarChar(45)
   breedID                Int
-  petAge                 Int
+  petDOB                 DateTime
   petWeight              Float
   petHeight              Float
   petBGroup              String                @db.VarChar(5)
@@ -137,6 +137,7 @@ model Pet {
   compatibleWithChildren Boolean               @default(false)
   compatibleWithPets     Boolean               @default(false)
   specialNeeds           Boolean               @default(false)
+  featuredFlag           Boolean               @default(false)
   adoptionApps           AdoptionApplication[]
   appointments           Appointment[]
   favorites              Favorite[]
