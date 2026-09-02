@@ -140,4 +140,35 @@ router.get(
   adoptersController.getMyApplications,
 );
 
+/**
+ * @swagger
+ * /adopters/me/visits:
+ *   get:
+ *     summary: List the logged-in adopter's scheduled visits
+ *     description: >
+ *       Returns the adopter's visits ordered by visitTime ascending. Each record
+ *       includes the shelter name and, when a pet is attached, the pet name.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: upcoming
+ *         schema: { type: boolean }
+ *         description: When "true", returns only visits with visitTime in the future
+ *     responses:
+ *       200:
+ *         description: List of visits (bare array, not paginated)
+ *       401:
+ *         description: No token or token invalid/expired
+ *       403:
+ *         description: Valid token but role is not Adopter
+ */
+router.get(
+  "/me/visits",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getMyVisits,
+);
+
 module.exports = router;

@@ -58,4 +58,24 @@ const createVisit = async ({
   });
 };
 
-module.exports = { createVisit };
+// ——————————————— LIST VISITS FOR AN ADOPTER (GET /adopters/me/visits) ———————————————
+const LIST_SELECT = {
+  ...VISIT_SELECT,
+  shelter: { select: { shelterName: true } },
+  pet: { select: { petName: true } }, // null when petID is not set
+};
+
+const listVisitsByAdopter = async (adopterID, { upcomingOnly = false } = {}) => {
+  const where = { adopterID };
+  if (upcomingOnly) {
+    where.visitTime = { gt: new Date() };
+  }
+
+  return prisma.visit.findMany({
+    where,
+    select: LIST_SELECT,
+    orderBy: { visitTime: "asc" },
+  });
+};
+
+module.exports = { createVisit, listVisitsByAdopter };

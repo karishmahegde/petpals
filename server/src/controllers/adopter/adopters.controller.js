@@ -1,5 +1,6 @@
 const adoptersService = require("../../services/adopter/adopters.service");
 const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
+const visitsService = require("../../services/adopter/visits.service");
 const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
@@ -270,4 +271,26 @@ const getMyApplications = async (req, res, next) => {
   }
 };
 
-module.exports = { getMe, updateMe, uploadGovernmentId, getMyApplications };
+// ——————————————— GET /adopters/me/visits ———————————————
+const getMyVisits = async (req, res, next) => {
+  // Convenience flag — only the exact string "true" enables it; absent or any
+  // other value returns all visits.
+  const upcomingOnly = req.query.upcoming === "true";
+
+  try {
+    const visits = await visitsService.listVisitsByAdopter(req.user.userID, {
+      upcomingOnly,
+    });
+    return successResponse(res, "Visits retrieved successfully", visits);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  getMe,
+  updateMe,
+  uploadGovernmentId,
+  getMyApplications,
+  getMyVisits,
+};
