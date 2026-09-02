@@ -204,33 +204,63 @@ const getFeaturedPets = async () => {
 };
 
 // ——————————————— GET PET DETAILS ———————————————
+// Shared so other endpoints (e.g. the favorites list in
+// services/adopter/favorites.service.js) return the exact same pet shape.
+const PET_DETAIL_SELECT = {
+  petID: true,
+  petName: true,
+  petDOB: true, // selected for age calculation only, not returned
+  petSex: true,
+  petColor: true,
+  petPhoto: true,
+  petHeight: true,
+  petWeight: true,
+  petDesc: true,
+  compatibleWithChildren: true,
+  compatibleWithPets: true,
+  specialNeeds: true,
+  breed: {
+    select: {
+      breedID: true,
+      breedName: true,
+      species: { select: { speciesName: true } },
+    },
+  },
+  shelter: {
+    select: { shelterID: true, shelterName: true, shelterAddress: true },
+  },
+};
+
+// Turns a row selected with PET_DETAIL_SELECT into the public pet-detail shape.
+const formatPetDetail = (pet) => ({
+  petID: pet.petID,
+  petName: pet.petName,
+  petAge: formatAgeFromDOB(pet.petDOB),
+  petSex: formatSex(pet.petSex),
+  petPhoto: pet.petPhoto,
+  petColor: pet.petColor,
+  petHeight: pet.petHeight,
+  petWeight: pet.petWeight,
+  petDesc: pet.petDesc,
+  breed: {
+    breedID: pet.breed.breedID,
+    breedName: pet.breed.breedName,
+    speciesName: pet.breed.species.speciesName,
+  },
+  shelter: {
+    shelterID: pet.shelter.shelterID,
+    shelterName: pet.shelter.shelterName,
+    shelterAddress: pet.shelter.shelterAddress,
+  },
+  compatibleWithChildren: pet.compatibleWithChildren,
+  compatibleWithPets: pet.compatibleWithPets,
+  specialNeeds: pet.specialNeeds,
+});
+
 const getPetDetails = async (id) => {
   const pet = await prisma.pet.findUnique({
     where: { petID: id },
-    select: {
-      petID: true,
-      petName: true,
-      petDOB: true, // selected for ageMonths calculation only, not returned
-      petSex: true,
-      petColor: true,
-      petPhoto: true,
-      petHeight: true,
-      petWeight: true,
-      petDesc: true,
-      compatibleWithChildren: true,
-      compatibleWithPets: true,
-      specialNeeds: true,
-      breed: {
-        select: {
-          breedID: true,
-          breedName: true,
-          species: { select: { speciesName: true } },
-        },
-      },
-      shelter: {
-        select: { shelterID: true, shelterName: true, shelterAddress: true },
-      },
-    },
+    select: PET_DETAIL_SELECT,
   });
 
   if (!pet) {
@@ -239,31 +269,13 @@ const getPetDetails = async (id) => {
     throw err;
   }
 
-  return {
-    // here, we don't need the .map() function because we are dealing with only 1 record, not an array
-    petID: pet.petID,
-    petName: pet.petName,
-    petAge: formatAgeFromDOB(pet.petDOB),
-    petSex: formatSex(pet.petSex),
-    petPhoto: pet.petPhoto,
-    petColor: pet.petColor,
-    petHeight: pet.petHeight,
-    petWeight: pet.petWeight,
-    petDesc: pet.petDesc,
-    breed: {
-      breedID: pet.breed.breedID,
-      breedName: pet.breed.breedName,
-      speciesName: pet.breed.species.speciesName,
-    },
-    shelter: {
-      shelterID: pet.shelter.shelterID,
-      shelterName: pet.shelter.shelterName,
-      shelterAddress: pet.shelter.shelterAddress,
-    },
-    compatibleWithChildren: pet.compatibleWithChildren,
-    compatibleWithPets: pet.compatibleWithPets,
-    specialNeeds: pet.specialNeeds,
-  };
+  return formatPetDetail(pet);
 };
 
-module.exports = { getAvailablePets, getFeaturedPets, getPetDetails };
+module.exports = {
+  getAvailablePets,
+  getFeaturedPets,
+  getPetDetails,
+  PET_DETAIL_SELECT,
+  formatPetDetail,
+};

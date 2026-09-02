@@ -46,6 +46,8 @@ const adoptionApplicationsRouter = require("./routes/adopter/adoptionApplication
 app.use("/api/v1/adoption-applications", adoptionApplicationsRouter);
 const visitsRouter = require("./routes/adopter/visits.routes");
 app.use("/api/v1/visits", visitsRouter);
+const favoritesRouter = require("./routes/adopter/favorites.routes");
+app.use("/api/v1", favoritesRouter);
 // app.use('/api/v1/staff',                require('./routes/staff'));
 // app.use('/api/v1/appointments',         require('./routes/appointments'));
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));
