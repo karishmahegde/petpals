@@ -11,38 +11,53 @@ const router = express.Router();
  * /adopters/me:
  *   get:
  *     summary: Get the full profile of the currently logged-in adopter
+ *     description: Housing, household, lifestyle, and preference fields. stripeCustomerID is never included.
  *     tags: [Adopters]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Adopter profile, including housing, household, lifestyle, and preference fields. Sensitive fields (stripeCustomerID) are never included.
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
- *       404:
- *         description: No adopter record exists for the current user
+ *         description: The adopter profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdopterProfile' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *   put:
  *     summary: Update the profile of the currently logged-in adopter
  *     description: >
- *       Partial update — only the fields present in the request body are changed.
- *       Password and email changes are out of scope. Admin-only fields
- *       (adopterRiskFlag, preQualifyFlag, accountStatus) are rejected.
+ *       Partial update — only the fields present in the body are changed.
+ *       adopterEmail, adopterPassword, adopterRiskFlag, preQualifyFlag and
+ *       accountStatus are rejected with 400.
  *     tags: [Adopters]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/AdopterProfileUpdate' }
  *     responses:
  *       200:
- *         description: The updated adopter profile, in the same shape as GET /adopters/me.
- *       400:
- *         description: Invalid enum value, malformed field, or an attempt to update an admin-only field
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
- *       404:
- *         description: No adopter record exists for the current user
+ *         description: The updated adopter profile (same shape as GET /adopters/me)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdopterProfile' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.get("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersController.getMe);
 router.put("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersController.updateMe);
@@ -50,6 +65,26 @@ router.put("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersControlle
 /**
  * @swagger
  * /adopters/me/government-id:
+ *   get:
+ *     summary: Get the logged-in adopter's submitted government ID
+ *     description: Metadata only — idNumber is masked, the document itself is not returned.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The government ID record, including verificationStatus
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/GovernmentIdRecord' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *   post:
  *     summary: Submit a government ID document for identity verification
  *     description: >
@@ -81,16 +116,34 @@ router.put("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersControlle
  *                 description: JPEG, PNG, WebP, HEIC, or PDF — max 5 MB
  *     responses:
  *       201:
- *         description: The created GOVERNMENT_ID record (idNumber masked)
+ *         description: The created government ID record (idNumber masked, verificationStatus = Pending)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/GovernmentIdRecord' }
  *       400:
  *         description: Missing/oversized idType or idNumber, missing file, unsupported file type, or file over 5 MB
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  *       409:
  *         description: A government ID already exists for this adopter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
+router.get(
+  "/me/government-id",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getGovernmentId,
+);
 router.post(
   "/me/government-id",
   authenticate,
@@ -125,13 +178,21 @@ router.post(
  *         description: Optional filter by application status
  *     responses:
  *       200:
- *         description: Paginated list of applications (data + pagination object)
- *       400:
- *         description: Invalid page, limit, or status value
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
+ *         description: Paginated list of the adopter's applications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/AdoptionApplicationListItem' }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  */
 router.get(
   "/me/applications",
@@ -155,20 +216,106 @@ router.get(
  *       - in: query
  *         name: upcoming
  *         schema: { type: boolean }
- *         description: When "true", returns only visits with visitTime in the future
+ *         description: When exactly "true", returns only visits with visitTime in the future
  *     responses:
  *       200:
- *         description: List of visits (bare array, not paginated)
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
+ *         description: The adopter's visits, ordered by visitTime ascending (not paginated)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/VisitListItem' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  */
 router.get(
   "/me/visits",
   authenticate,
   authorizeRoles(ROLES.ADOPTER),
   adoptersController.getMyVisits,
+);
+
+/**
+ * @swagger
+ * /adopters/me/adopted-pets:
+ *   get:
+ *     summary: List pets the logged-in adopter has successfully adopted
+ *     description: >
+ *       Pets whose adoption application by this adopter is Accepted and whose
+ *       own adoptionStatus is 'adopted'. Ordered most recently adopted first.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Adopted pets, most recently adopted first (not paginated)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/AdoptedPet' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get(
+  "/me/adopted-pets",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getMyAdoptedPets,
+);
+
+/**
+ * @swagger
+ * /adopters/me/adopted-pets/{petId}/vaccinations:
+ *   get:
+ *     summary: Vaccination history for a pet the adopter has adopted (read-only)
+ *     description: >
+ *       Requires an Accepted adoption application by this adopter for the pet —
+ *       otherwise 403. Records are ordered by administeredDate descending.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: petId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Vaccination records, ordered by administeredDate descending
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/VaccinationRecord' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Role not permitted, or the adopter has no Accepted application for this pet
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.get(
+  "/me/adopted-pets/:petId/vaccinations",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getMyAdoptedPetVaccinations,
 );
 
 module.exports = router;

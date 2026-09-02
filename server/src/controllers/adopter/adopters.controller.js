@@ -1,6 +1,7 @@
 const adoptersService = require("../../services/adopter/adopters.service");
 const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
 const visitsService = require("../../services/adopter/visits.service");
+const vaccinationsService = require("../../services/adopter/vaccinations.service");
 const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
@@ -217,6 +218,20 @@ const uploadGovernmentId = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /adopters/me/government-id ———————————————
+const getGovernmentId = async (req, res, next) => {
+  try {
+    const record = await adoptersService.getGovernmentId(req.user.userID);
+    return successResponse(
+      res,
+      "Government ID retrieved successfully",
+      record,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— GET /adopters/me/applications ———————————————
 const VALID_APPLICATION_STATUSES = [
   "Pending",
@@ -287,10 +302,47 @@ const getMyVisits = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /adopters/me/adopted-pets ———————————————
+const getMyAdoptedPets = async (req, res, next) => {
+  try {
+    const pets = await adoptionApplicationsService.listAdoptedPetsByAdopter(
+      req.user.userID,
+    );
+    return successResponse(res, "Adopted pets retrieved successfully", pets);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/adopted-pets/:petId/vaccinations ———————————————
+const getMyAdoptedPetVaccinations = async (req, res, next) => {
+  const petID = Number(req.params.petId);
+  if (!Number.isInteger(petID) || petID < 1) {
+    return next(badRequest("petId must be a positive integer"));
+  }
+
+  try {
+    const records = await vaccinationsService.listPetVaccinationsForAdopter(
+      req.user.userID,
+      petID,
+    );
+    return successResponse(
+      res,
+      "Vaccination history retrieved successfully",
+      records,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   getMe,
   updateMe,
   uploadGovernmentId,
+  getGovernmentId,
   getMyApplications,
   getMyVisits,
+  getMyAdoptedPets,
+  getMyAdoptedPetVaccinations,
 };

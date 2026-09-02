@@ -143,8 +143,51 @@ const listApplicationsByAdopter = async (
   };
 };
 
+// ——————————————— LIST ADOPTED PETS (GET /adopters/me/adopted-pets) ———————————————
+// Pets the adopter successfully adopted: their application was Accepted AND the
+// pet's own status is now 'adopted'. There's no explicit adoption-completed
+// timestamp, so "most recently adopted first" is approximated by the accepted
+// application's createdAt.
+const listAdoptedPetsByAdopter = async (adopterID) => {
+  const rows = await prisma.adoptionApplication.findMany({
+    where: {
+      adopterID,
+      applicationStatus: "Accepted",
+      pet: { adoptionStatus: "adopted" },
+    },
+    select: {
+      createdAt: true,
+      pet: {
+        select: {
+          petID: true,
+          petName: true,
+          petPhoto: true,
+          intakeDate: true,
+          breed: {
+            select: {
+              breedName: true,
+              species: { select: { speciesName: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return rows.map((row) => ({
+    petID: row.pet.petID,
+    petName: row.pet.petName,
+    petPhoto: row.pet.petPhoto,
+    breed: row.pet.breed.breedName,
+    species: row.pet.breed.species.speciesName,
+    intakeDate: row.pet.intakeDate,
+  }));
+};
+
 module.exports = {
   createApplication,
   getApplicationById,
   listApplicationsByAdopter,
+  listAdoptedPetsByAdopter,
 };

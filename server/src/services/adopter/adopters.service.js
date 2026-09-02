@@ -166,8 +166,25 @@ const createGovernmentId = async (userID, { idType, idNumber, file }) => {
   return { ...record, idNumber: maskIdNumber(record.idNumber) };
 };
 
+// ——————————————— GET GOVERNMENT ID (GET /adopters/me/government-id) ———————————————
+const getGovernmentId = async (userID) => {
+  const record = await prisma.governmentID.findFirst({
+    where: { userID, userType: "Adopter" },
+    select: GOVERNMENT_ID_SELECT,
+  });
+
+  if (!record) {
+    const err = new Error("No government ID has been submitted for this adopter");
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+
+  return { ...record, idNumber: maskIdNumber(record.idNumber) };
+};
+
 module.exports = {
   getAdopterProfile,
   updateAdopterProfile,
   createGovernmentId,
+  getGovernmentId,
 };
