@@ -34,16 +34,27 @@ const router = express.Router();
  *     responses:
  *       201:
  *         description: The created application record (applicationStatus = Pending)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdoptionApplication' }
  *       400:
  *         description: Missing/invalid petID or shelterID, or shelterID does not match the pet's shelter
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
- *       404:
- *         description: No pet exists with the given ID
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
  *         description: Pet is not available, or the adopter already has an active application for it
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.post(
   "/",
@@ -72,14 +83,22 @@ router.post(
  *     responses:
  *       200:
  *         description: The application record, with nested pet.petName and shelter.shelterName
- *       400:
- *         description: id is not a positive integer
- *       401:
- *         description: No token or token invalid/expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdoptionApplicationDetail' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403:
  *         description: Role not permitted, or an adopter requesting another adopter's application
- *       404:
- *         description: No application exists with the given ID
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.get(
   "/:id",

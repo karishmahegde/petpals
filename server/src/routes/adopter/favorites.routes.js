@@ -21,17 +21,24 @@ const router = express.Router();
  *         schema: { type: integer }
  *     responses:
  *       201:
- *         description: The created favorite (adopterID + petID)
- *       400:
- *         description: id is not a positive integer
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
- *       404:
- *         description: No pet exists with the given ID
+ *         description: The created favorite
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/Favorite' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
  *         description: Pet is already in the adopter's favorites
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  *   delete:
  *     summary: Remove a pet from the logged-in adopter's favorites
  *     tags: [Favorites]
@@ -44,15 +51,23 @@ const router = express.Router();
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Pet removed from favorites
- *       400:
- *         description: id is not a positive integer
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
+ *         description: Pet removed from favorites (data is null)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { nullable: true, example: null }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  *       404:
  *         description: Pet was not in the adopter's favorites
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.post(
   "/pets/:id/favorites",
@@ -85,13 +100,21 @@ router.delete(
  *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
  *     responses:
  *       200:
- *         description: Paginated list of favorited pets (data + pagination)
- *       400:
- *         description: Invalid page or limit
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
+ *         description: Paginated list of favorited pets, sorted by pet name
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/PetDetail' }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
  */
 router.get(
   "/adopters/me/favorites",

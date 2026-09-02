@@ -38,15 +38,19 @@ const router = express.Router();
  *                 maxLength: 300
  *     responses:
  *       201:
- *         description: The created visit record
- *       400:
- *         description: Missing/invalid shelterID or petID, invalid visitTime, or visitTime in the past
- *       401:
- *         description: No token or token invalid/expired
- *       403:
- *         description: Valid token but role is not Adopter
- *       404:
- *         description: No shelter (or referenced pet) exists with the given ID
+ *         description: The created visit record (visitStatus is null until a staff member confirms it)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/Visit' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.post(
   "/",
