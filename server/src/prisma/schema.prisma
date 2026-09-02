@@ -225,6 +225,14 @@ model AdoptionApplication {
   @@index([adopterID])
   @@index([petID])
   @@index([shelterID])
+  // Partial unique index enforced in the DB only — not expressible in Prisma:
+  //   CREATE UNIQUE INDEX "AdoptionApplication_active_adopter_pet_key"
+  //   ON "AdoptionApplication" ("adopterID", "petID")
+  //   WHERE "applicationStatus" IN ('Pending', 'Accepted');
+  // Added via raw SQL in the Supabase editor (same manual-migration workaround
+  // as the PostGIS shelterLocation column). Blocks a second active application
+  // for the same adopter+pet; Rejected/Withdrawn rows are excluded so
+  // resubmission stays possible.
 }
 
 model Visit {
@@ -353,6 +361,8 @@ model GovernmentID {
   idNumber           String             @db.VarChar(45)
   verificationStatus VerificationStatus @default(Pending)
   documentURL        String?            @db.VarChar(500) // object path within the private government-ids bucket; read via signed URL
+
+  @@unique([userID, userType]) // one government ID per user; DB-level guarantee behind the service's duplicate check
 }
 
 model Task {
@@ -541,6 +551,7 @@ enum ApplicationStatus {
   Pending
   Accepted
   Rejected
+  Withdrawn
 }
 
 enum NotificationType {

@@ -1,9 +1,9 @@
 // What it does: Defines the /adopters routes — mounted at /api/v1/adopters in app.js
 const express = require("express");
-const adoptersController = require("../controllers/adopters.controller");
-const authenticate = require("../middleware/authenticate");
-const { authorizeRoles, ROLES } = require("../middleware/authorizeRoles");
-const { singleFile } = require("../middleware/upload");
+const adoptersController = require("../../controllers/adopter/adopters.controller");
+const authenticate = require("../../middleware/authenticate");
+const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
+const { singleFile } = require("../../middleware/upload");
 const router = express.Router();
 
 /**
@@ -97,6 +97,47 @@ router.post(
   authorizeRoles(ROLES.ADOPTER),
   singleFile("file"),
   adoptersController.uploadGovernmentId,
+);
+
+/**
+ * @swagger
+ * /adopters/me/applications:
+ *   get:
+ *     summary: List the logged-in adopter's adoption applications (paginated)
+ *     description: >
+ *       Returns the adopter's own applications, newest first. Each record
+ *       includes the pet name and photo, the shelter name, and applicationStatus.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Pending, Accepted, Rejected, Withdrawn]
+ *         description: Optional filter by application status
+ *     responses:
+ *       200:
+ *         description: Paginated list of applications (data + pagination object)
+ *       400:
+ *         description: Invalid page, limit, or status value
+ *       401:
+ *         description: No token or token invalid/expired
+ *       403:
+ *         description: Valid token but role is not Adopter
+ */
+router.get(
+  "/me/applications",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getMyApplications,
 );
 
 module.exports = router;

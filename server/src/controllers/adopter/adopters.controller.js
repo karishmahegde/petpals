@@ -1,5 +1,6 @@
-const adoptersService = require("../services/adopters.service");
-const { successResponse } = require("../utils/response");
+const adoptersService = require("../../services/adopter/adopters.service");
+const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
+const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
   const err = new Error(message);
@@ -215,4 +216,58 @@ const uploadGovernmentId = async (req, res, next) => {
   }
 };
 
-module.exports = { getMe, updateMe, uploadGovernmentId };
+// ——————————————— GET /adopters/me/applications ———————————————
+const VALID_APPLICATION_STATUSES = [
+  "Pending",
+  "Accepted",
+  "Rejected",
+  "Withdrawn",
+];
+
+const getMyApplications = async (req, res, next) => {
+  const { page: pageRaw, limit: limitRaw, status } = req.query;
+
+  let page = 1;
+  if (pageRaw !== undefined) {
+    page = Number(pageRaw);
+    if (!Number.isInteger(page) || page < 1) {
+      return next(badRequest("page must be an integer >= 1"));
+    }
+  }
+
+  let limit = 20;
+  if (limitRaw !== undefined) {
+    limit = Number(limitRaw);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return next(badRequest("limit must be an integer between 1 and 100"));
+    }
+  }
+
+  if (
+    status !== undefined &&
+    !VALID_APPLICATION_STATUSES.includes(status)
+  ) {
+    return next(
+      badRequest(
+        `status must be one of: ${VALID_APPLICATION_STATUSES.join(", ")}`,
+      ),
+    );
+  }
+
+  try {
+    const result = await adoptionApplicationsService.listApplicationsByAdopter(
+      req.user.userID,
+      { status, page, limit },
+    );
+    return successListResponse(
+      res,
+      "Adoption applications retrieved successfully",
+      result.data,
+      result.pagination,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getMe, updateMe, uploadGovernmentId, getMyApplications };

@@ -1,5 +1,6 @@
-const prisma = require("../config/prisma");
-const storage = require("./storage");
+const prisma = require("../../config/prisma");
+const storage = require("../storage");
+const { isUniqueViolation } = require("../../utils/prismaErrors");
 
 // The public shape of an adopter profile — shared by GET and PUT /adopters/me so
 // both responses stay identical. stripeCustomerID is intentionally omitted —
@@ -109,18 +110,24 @@ const maskIdNumber = (idNumber) => {
   return `${"*".repeat(Math.max(idNumber.length - tail.length, 0))}${tail}`;
 };
 
+const alreadySubmitted = () => {
+  const err = new Error(
+    "A government ID has already been submitted for this adopter",
+  );
+  err.code = "CONFLICT";
+  return err;
+};
+
 const createGovernmentId = async (userID, { idType, idNumber, file }) => {
-  // One government ID per adopter.
+  // Fast path only — avoids an unnecessary file upload in the common case.
+  // The real guarantee is the @@unique([userID, userType]) constraint, caught
+  // as a unique violation after create() below.
   const existing = await prisma.governmentID.findFirst({
     where: { userID, userType: "Adopter" },
     select: { governmentIDID: true },
   });
   if (existing) {
-    const err = new Error(
-      "A government ID has already been submitted for this adopter",
-    );
-    err.code = "CONFLICT";
-    throw err;
+    throw alreadySubmitted();
   }
 
   const ext = EXT_BY_MIME[file.mimetype] || "bin";
@@ -149,6 +156,10 @@ const createGovernmentId = async (userID, { idType, idNumber, file }) => {
   } catch (err) {
     // DB write failed after the file landed — remove the orphaned object.
     await storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, objectPath);
+    // Lost a race with a concurrent submission — the unique constraint fired.
+    if (isUniqueViolation(err)) {
+      throw alreadySubmitted();
+    }
     throw err;
   }
 

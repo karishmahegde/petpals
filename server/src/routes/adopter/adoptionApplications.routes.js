@@ -1,8 +1,8 @@
 // Defines the /adoption-applications routes — mounted at /api/v1/adoption-applications in app.js
 const express = require("express");
-const controller = require("../controllers/adoptionApplications.controller");
-const authenticate = require("../middleware/authenticate");
-const { authorizeRoles, ROLES } = require("../middleware/authorizeRoles");
+const controller = require("../../controllers/adopter/adoptionApplications.controller");
+const authenticate = require("../../middleware/authenticate");
+const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
 const router = express.Router();
 
 /**
@@ -50,6 +50,42 @@ router.post(
   authenticate,
   authorizeRoles(ROLES.ADOPTER),
   controller.createApplication,
+);
+
+/**
+ * @swagger
+ * /adoption-applications/{id}:
+ *   get:
+ *     summary: Get a single adoption application by ID
+ *     description: >
+ *       Adopters may only retrieve their own applications; staff may retrieve
+ *       any. The response includes the pet name and shelter name.
+ *     tags: [Adoption Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: The application record, with nested pet.petName and shelter.shelterName
+ *       400:
+ *         description: id is not a positive integer
+ *       401:
+ *         description: No token or token invalid/expired
+ *       403:
+ *         description: Role not permitted, or an adopter requesting another adopter's application
+ *       404:
+ *         description: No application exists with the given ID
+ */
+router.get(
+  "/:id",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER, ROLES.STAFF),
+  controller.getApplication,
 );
 
 module.exports = router;

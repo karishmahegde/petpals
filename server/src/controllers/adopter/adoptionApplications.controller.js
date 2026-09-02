@@ -1,5 +1,5 @@
-const adoptionApplicationsService = require("../services/adoptionApplications.service");
-const { successResponse } = require("../utils/response");
+const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
+const { successResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
   const err = new Error(message);
@@ -43,4 +43,28 @@ const createApplication = async (req, res, next) => {
   }
 };
 
-module.exports = { createApplication };
+// ——————————————— GET /adoption-applications/:id ———————————————
+const getApplication = async (req, res, next) => {
+  let applicationID;
+  try {
+    applicationID = parseId(req.params.id, "id");
+  } catch (err) {
+    return next(err);
+  }
+
+  try {
+    const application = await adoptionApplicationsService.getApplicationById(
+      applicationID,
+      req.user,
+    );
+    return successResponse(
+      res,
+      "Adoption application retrieved successfully",
+      application,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { createApplication, getApplication };
