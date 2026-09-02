@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const storage = require("./storage");
 
 // The public shape of an adopter profile — shared by GET and PUT /adopters/me so
 // both responses stay identical. stripeCustomerID is intentionally omitted —
@@ -80,4 +81,82 @@ const updateAdopterProfile = async (userID, data) => {
   }
 };
 
-module.exports = { getAdopterProfile, updateAdopterProfile };
+// ——————————————— CREATE GOVERNMENT ID (POST /adopters/me/government-id) ———————————————
+
+// File extension by accepted MIME type — keeps stored object names sensible.
+const EXT_BY_MIME = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "application/pdf": "pdf",
+};
+
+// Shape returned to the client. idNumber is masked before it leaves the service.
+const GOVERNMENT_ID_SELECT = {
+  governmentIDID: true,
+  userID: true,
+  userType: true,
+  idType: true,
+  idNumber: true,
+  verificationStatus: true,
+  documentURL: true,
+};
+
+// Show only the last 4 characters of an ID number in responses.
+const maskIdNumber = (idNumber) => {
+  const tail = idNumber.slice(-4);
+  return `${"*".repeat(Math.max(idNumber.length - tail.length, 0))}${tail}`;
+};
+
+const createGovernmentId = async (userID, { idType, idNumber, file }) => {
+  // One government ID per adopter.
+  const existing = await prisma.governmentID.findFirst({
+    where: { userID, userType: "Adopter" },
+    select: { governmentIDID: true },
+  });
+  if (existing) {
+    const err = new Error(
+      "A government ID has already been submitted for this adopter",
+    );
+    err.code = "CONFLICT";
+    throw err;
+  }
+
+  const ext = EXT_BY_MIME[file.mimetype] || "bin";
+  const objectPath = `adopter/${userID}/id-${Date.now()}.${ext}`;
+
+  await storage.uploadPrivateFile(
+    storage.GOVERNMENT_IDS_BUCKET,
+    objectPath,
+    file.buffer,
+    file.mimetype,
+  );
+
+  let record;
+  try {
+    record = await prisma.governmentID.create({
+      data: {
+        userID,
+        userType: "Adopter",
+        idType,
+        idNumber,
+        verificationStatus: "Pending",
+        documentURL: objectPath,
+      },
+      select: GOVERNMENT_ID_SELECT,
+    });
+  } catch (err) {
+    // DB write failed after the file landed — remove the orphaned object.
+    await storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, objectPath);
+    throw err;
+  }
+
+  return { ...record, idNumber: maskIdNumber(record.idNumber) };
+};
+
+module.exports = {
+  getAdopterProfile,
+  updateAdopterProfile,
+  createGovernmentId,
+};

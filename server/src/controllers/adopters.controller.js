@@ -167,4 +167,52 @@ const updateMe = async (req, res, next) => {
   }
 };
 
-module.exports = { getMe, updateMe };
+// ——————————————— POST /adopters/me/government-id ———————————————
+const MAX_ID_FIELD_LEN = 45; // schema.prisma: idType / idNumber are VarChar(45)
+
+const uploadGovernmentId = async (req, res, next) => {
+  const idType =
+    typeof req.body.idType === "string" ? req.body.idType.trim() : "";
+  const idNumber =
+    typeof req.body.idNumber === "string" ? req.body.idNumber.trim() : "";
+
+  if (!idType || idType.length > MAX_ID_FIELD_LEN) {
+    return next(
+      badRequest(
+        `idType is required and must be at most ${MAX_ID_FIELD_LEN} characters`,
+      ),
+    );
+  }
+  if (!idNumber || idNumber.length > MAX_ID_FIELD_LEN) {
+    return next(
+      badRequest(
+        `idNumber is required and must be at most ${MAX_ID_FIELD_LEN} characters`,
+      ),
+    );
+  }
+  if (!req.file) {
+    return next(badRequest("A document file is required in the 'file' field"));
+  }
+
+  try {
+    const record = await adoptersService.createGovernmentId(req.user.userID, {
+      idType,
+      idNumber,
+      file: {
+        buffer: req.file.buffer,
+        mimetype: req.file.mimetype,
+        originalname: req.file.originalname,
+      },
+    });
+    return successResponse(
+      res,
+      "Government ID submitted successfully",
+      record,
+      201,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getMe, updateMe, uploadGovernmentId };

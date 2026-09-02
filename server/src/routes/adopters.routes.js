@@ -3,6 +3,7 @@ const express = require("express");
 const adoptersController = require("../controllers/adopters.controller");
 const authenticate = require("../middleware/authenticate");
 const { authorizeRoles, ROLES } = require("../middleware/authorizeRoles");
+const { singleFile } = require("../middleware/upload");
 const router = express.Router();
 
 /**
@@ -45,5 +46,57 @@ const router = express.Router();
  */
 router.get("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersController.getMe);
 router.put("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersController.updateMe);
+
+/**
+ * @swagger
+ * /adopters/me/government-id:
+ *   post:
+ *     summary: Submit a government ID document for identity verification
+ *     description: >
+ *       multipart/form-data upload. The document is stored in a private Supabase
+ *       Storage bucket; only metadata is kept in the database, with
+ *       verificationStatus defaulting to Pending. One government ID per adopter.
+ *       idNumber is masked in the response.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [idType, idNumber, file]
+ *             properties:
+ *               idType:
+ *                 type: string
+ *                 maxLength: 45
+ *                 example: Passport
+ *               idNumber:
+ *                 type: string
+ *                 maxLength: 45
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: JPEG, PNG, WebP, HEIC, or PDF — max 5 MB
+ *     responses:
+ *       201:
+ *         description: The created GOVERNMENT_ID record (idNumber masked)
+ *       400:
+ *         description: Missing/oversized idType or idNumber, missing file, unsupported file type, or file over 5 MB
+ *       401:
+ *         description: No token or token invalid/expired
+ *       403:
+ *         description: Valid token but role is not Adopter
+ *       409:
+ *         description: A government ID already exists for this adopter
+ */
+router.post(
+  "/me/government-id",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  singleFile("file"),
+  adoptersController.uploadGovernmentId,
+);
 
 module.exports = router;

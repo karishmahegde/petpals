@@ -352,6 +352,7 @@ model GovernmentID {
   idType             String             @db.VarChar(45)
   idNumber           String             @db.VarChar(45)
   verificationStatus VerificationStatus @default(Pending)
+  documentURL        String?            @db.VarChar(500) // object path within the private government-ids bucket; read via signed URL
 }
 
 model Task {
