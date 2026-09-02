@@ -1,8 +1,8 @@
 // What it does: Defines the /pets and /species routes — mounted at /api/v1 in app.js
 const express = require("express");
-const petsController = require("../controllers/pets.controller");
-const speciesController = require("../controllers/species.controller");
-const breedsController = require("../controllers/breeds.controller");
+const petsController = require("../../controllers/public/pets.controller");
+const speciesController = require("../../controllers/public/species.controller");
+const breedsController = require("../../controllers/public/breeds.controller");
 const router = express.Router();
 
 /**

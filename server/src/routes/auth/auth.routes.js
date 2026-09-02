@@ -1,7 +1,7 @@
 // What it does: Defines the API routes
 const express = require("express");
-const authController = require("../controllers/auth.controller");
-const authenticate = require("../middleware/authenticate");
+const authController = require("../../controllers/auth/auth.controller");
+const authenticate = require("../../middleware/authenticate");
 
 const router = express.Router();
 

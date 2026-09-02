@@ -1,5 +1,5 @@
-const breedsService = require("../services/breeds.service");
-const { successResponse } = require("../utils/response");
+const breedsService = require("../../services/public/breeds.service");
+const { successResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
   const err = new Error(message);

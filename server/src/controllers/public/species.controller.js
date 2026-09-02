@@ -1,5 +1,5 @@
-const speciesService = require("../services/species.service");
-const { successResponse } = require("../utils/response");
+const speciesService = require("../../services/public/species.service");
+const { successResponse } = require("../../utils/response");
 
 // ——————————————— GET /species ———————————————
 const getSpecies = async (req, res, next) => {

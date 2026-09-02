@@ -1,6 +1,6 @@
 // What it does: Defines the /shelters routes — mounted at /api/v1 in app.js
 const express = require("express");
-const sheltersController = require("../controllers/shelters.controller");
+const sheltersController = require("../../controllers/public/shelters.controller");
 const router = express.Router();
 
 /**

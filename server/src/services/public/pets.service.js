@@ -1,4 +1,4 @@
-const prisma = require("../config/prisma");
+const prisma = require("../../config/prisma");
 
 // Normalizes a filter value coming from req.query to array form: undefined -> [],
 // a single value -> [value], an already-repeated query param -> passed through as-is.

@@ -1,6 +1,6 @@
-const sheltersService = require("../services/shelters.service");
-const { successResponse, errorResponse } = require("../utils/response");
-const { resolveCoordsFromPostalCode } = require("../services/geocoding");
+const sheltersService = require("../../services/public/shelters.service");
+const { successResponse, errorResponse } = require("../../utils/response");
+const { resolveCoordsFromPostalCode } = require("../../services/geocoding");
 
 // ——————————————— GET /shelters ———————————————
 const getShelters = async (req, res, next) => {

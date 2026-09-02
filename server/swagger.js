@@ -32,7 +32,7 @@ const options = {
     },
     security: [{ bearerAuth: [] }], //security schemes that are used in the API
   },
-  apis: ["./src/routes/*.js"], //the routes that are used in the API
+  apis: ["./src/routes/**/*.js"], //the routes that are used in the API (recursively, incl. auth/ public/ adopter/ subfolders)
 };
 
 module.exports = swaggerJsdoc(options);

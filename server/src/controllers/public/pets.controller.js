@@ -1,5 +1,5 @@
-const petsService = require("../services/pets.service");
-const { successResponse, successListResponse } = require("../utils/response");
+const petsService = require("../../services/public/pets.service");
+const { successResponse, successListResponse } = require("../../utils/response");
 
 const VALID_SIZES = ["Small", "Medium", "Large"];
 

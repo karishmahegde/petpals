@@ -1,4 +1,4 @@
-const prisma = require("../config/prisma");
+const prisma = require("../../config/prisma");
 
 // ——————————————— GET BREEDS ———————————————
 // speciesIDs is expected pre-validated (positive integers) by the controller.

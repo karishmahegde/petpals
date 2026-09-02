@@ -177,16 +177,18 @@ petpals/
 │
 ├── server/
 │   ├── src/
-│   │   ├── routes/                    # auth.routes.js, pets.routes.js, shelters.routes.js
-│   │   ├── controllers/               # auth.controller.js, pets.controller.js, shelters.controller.js
-│   │   ├── middleware/                # authenticate.js, authorizeRoles.js, errorHandler.js
+│   │   ├── routes/                    # grouped by access: auth/ public/ adopter/ — one <domain>.routes.js per file
+│   │   ├── controllers/               # same auth/ public/ adopter/ grouping as routes/
+│   │   ├── middleware/                # authenticate.js, authorizeRoles.js, errorHandler.js, upload.js (multer)
 │   │   ├── services/
-│   │   │   ├── auth.service.js
-│   │   │   ├── pets.service.js
-│   │   │   ├── shelters.service.js
-│   │   │   └── geocoding/             # Isolated geocoding module (see below)
-│   │   │       ├── index.js           # The ONLY file anything else should import from
-│   │   │       └── usPostalCodeGeocoder.js  # The ONLY file allowed to mention "zipcodes" or "US"
+│   │   │   ├── auth/                  # auth.service.js
+│   │   │   ├── public/               # pets, species, breeds, shelters .service.js
+│   │   │   ├── adopter/              # adopters, adoptionApplications, visits .service.js
+│   │   │   ├── geocoding/             # Isolated, shared — stays at services/ root, not a domain group (see below)
+│   │   │   │   ├── index.js           # The ONLY file anything else should import from
+│   │   │   │   └── usPostalCodeGeocoder.js  # The ONLY file allowed to mention "zipcodes" or "US"
+│   │   │   └── storage/               # Isolated Supabase Storage module, shared — also stays at services/ root
+│   │   │       └── index.js           # The ONLY file anything else should import from
 │   │   ├── utils/                     # errors.js (ERROR_CODES map), response.js (successResponse/errorResponse)
 │   │   ├── config/
 │   │   │   └── prisma.js              # Singleton Prisma client with PrismaPg adapter

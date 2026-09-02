@@ -1,4 +1,4 @@
-const prisma = require("../config/prisma");
+const prisma = require("../../config/prisma");
 
 // ——————————————— GET SHELTERS ———————————————
 const getShelters = async () => {

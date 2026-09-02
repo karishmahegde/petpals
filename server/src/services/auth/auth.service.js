@@ -1,5 +1,5 @@
 const bcrypt = require("bcrypt");
-const prisma = require("../config/prisma");
+const prisma = require("../../config/prisma");
 
 // Maps the incoming role string to the Prisma enum value, model accessor, and name field
 const ROLE_CONFIG = {

@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const authService = require("../services/auth.service");
-const { successResponse } = require("../utils/response");
+const authService = require("../../services/auth/auth.service");
+const { successResponse } = require("../../utils/response");
 
 const VALID_ROLES = ["admin", "adopter", "staff", "vet", "volunteer", "donor"];
 

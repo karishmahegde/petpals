@@ -34,16 +34,18 @@ app.get("/health", (req, res) => {
 });
 
 // ── API Routes ────────────
-const authRouter = require("./routes/auth.routes");
+const authRouter = require("./routes/auth/auth.routes");
 app.use("/api/v1/auth", authRouter);
-const petsRouter = require("./routes/pets.routes");
+const petsRouter = require("./routes/public/pets.routes");
 app.use("/api/v1", petsRouter);
-const sheltersRouter = require("./routes/shelters.routes");
+const sheltersRouter = require("./routes/public/shelters.routes");
 app.use("/api/v1", sheltersRouter);
-const adoptersRouter = require("./routes/adopters.routes");
+const adoptersRouter = require("./routes/adopter/adopters.routes");
 app.use("/api/v1/adopters", adoptersRouter);
-const adoptionApplicationsRouter = require("./routes/adoptionApplications.routes");
+const adoptionApplicationsRouter = require("./routes/adopter/adoptionApplications.routes");
 app.use("/api/v1/adoption-applications", adoptionApplicationsRouter);
+const visitsRouter = require("./routes/adopter/visits.routes");
+app.use("/api/v1/visits", visitsRouter);
 // app.use('/api/v1/staff',                require('./routes/staff'));
 // app.use('/api/v1/appointments',         require('./routes/appointments'));
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));
