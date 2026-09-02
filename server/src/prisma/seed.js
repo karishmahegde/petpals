@@ -10,8 +10,12 @@ const bcrypt = require("bcrypt");
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const SUPABASE_URL =
-  "https://aulounxhkawyqqzjeeqi.supabase.co/storage/v1/object/public/pet-images";
+const SUPABASE_PROJECT_URL = process.env.SUPABASE_URL;
+if (!SUPABASE_PROJECT_URL) {
+  throw new Error("SUPABASE_URL must be set in .env to seed pet photo URLs");
+}
+// Public base URL for the pet-images bucket — pet photos are served directly from here.
+const SUPABASE_URL = `${SUPABASE_PROJECT_URL}/storage/v1/object/public/pet-images`;
 
 // Computes a DOB so the pet is (approximately) `years` years and `months`
 // months old as of TODAY — not as of intakeDate. Age is now always derived
