@@ -1,6 +1,7 @@
 import { useState } from "react";
 import DashboardNavbar from "../../../components/layout/DashboardNavbar";
 import DashboardSidebar from "../../../components/layout/DashboardSidebar";
+import AdopterDashboardMain from "./AdopterDashboardMain";
 
 const AdopterDashboard = () => {
   // Sidebar drawer state (mobile). Moves to a shared DashboardLayout once the
@@ -25,12 +26,7 @@ const AdopterDashboard = () => {
         />
 
         <main className="min-w-0 flex-1 p-6 md:p-8">
-          <h1 className="font-display text-2xl text-neutral-dark md:text-3xl">
-            Adopter Dashboard
-          </h1>
-          <p className="mt-2 font-body text-sm text-neutral-gray">
-            Dashboard content coming soon.
-          </p>
+          <AdopterDashboardMain />
         </main>
       </div>
     </div>

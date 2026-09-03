@@ -59,7 +59,7 @@ const App = () => {
 
       {/* Role-based dashboards — guarded by ProtectedRoute (authenticated) + RoleRoute (correct role) */}
       <Route
-        path="/adopter"
+        path="/adopter/*"
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={["Adopter"]}>

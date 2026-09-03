@@ -37,7 +37,7 @@ const ROLE_HOME: Record<string, string> = {
 // every role in renderNav — it is always the last item.
 const ROLE_NAV: Record<string, NavItem[]> = {
   Adopter: [
-    { label: "Home", to: "/adopter", icon: PiHouse, end: true },
+    { label: "Overview", to: "/adopter", icon: PiHouse, end: true },
     { label: "My Pets", to: "/adopter/pets", icon: PiDog },
     { label: "Appointments", to: "/adopter/appointments", icon: PiStethoscope },
     { label: "Favorites", to: "/adopter/favorites", icon: PiHeart },
@@ -144,7 +144,7 @@ const DashboardSidebar = ({
         className="flex items-center gap-4 px-6 py-3.5 font-body text-[15px] text-white transition-colors hover:bg-white/10"
       >
         <PiArrowUpRight className="h-5 w-5 shrink-0" aria-hidden />
-        <span>Main website</span>
+        <span>Home</span>
       </Link>
     </>
   );
