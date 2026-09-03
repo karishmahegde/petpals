@@ -88,6 +88,8 @@ const DashboardSidebar = ({
         ];
 
   const firstName = user?.name?.split(" ")[0] ?? "";
+  const profilePath =
+    role && ROLE_HOME[role] ? `${ROLE_HOME[role]}/profile` : "/";
 
   // Lock body scroll while the mobile drawer is open.
   useEffect(() => {
@@ -177,9 +179,19 @@ const DashboardSidebar = ({
 
       {acctOpen && (
         <div className="absolute inset-x-5 bottom-full mb-2 overflow-hidden rounded-xl bg-white shadow-lg">
+          <Link
+            to={profilePath}
+            onClick={() => {
+              setAcctOpen(false);
+              onClose?.();
+            }}
+            className="block w-full px-4 py-3 text-left font-body text-sm text-neutral-dark transition-colors hover:bg-gold-light"
+          >
+            Profile
+          </Link>
           <button
             onClick={handleLogout}
-            className="block w-full px-4 py-3 text-left font-body text-sm text-rose-dark transition-colors hover:bg-gold-light"
+            className="block w-full border-t border-neutral-offwhite px-4 py-3 text-left font-body text-sm text-rose-dark transition-colors hover:bg-gold-light"
           >
             Log out
           </button>

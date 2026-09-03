@@ -16,3 +16,11 @@ export const formatLongDate = (date = new Date()): string =>
     day: "numeric",
     year: "numeric",
   });
+
+/** Compact date, e.g. "Jun 25, 2026". */
+export const formatShortDate = (date = new Date()): string =>
+  date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });

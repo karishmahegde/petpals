@@ -5,6 +5,7 @@ import AdopterAppointments from "./sections/AdopterAppointments";
 import AdopterFavorites from "./sections/AdopterFavorites";
 import AdopterApplications from "./sections/AdopterApplications";
 import AdopterVisits from "./sections/AdopterVisits";
+import AdopterProfile from "./sections/AdopterProfile";
 
 // Renders the adopter dashboard section that matches the current /adopter/*
 // route (driven by the sidebar nav).
@@ -16,6 +17,7 @@ const AdopterDashboardMain = () => (
     <Route path="favorites" element={<AdopterFavorites />} />
     <Route path="applications" element={<AdopterApplications />} />
     <Route path="visits" element={<AdopterVisits />} />
+    <Route path="profile" element={<AdopterProfile />} />
     <Route path="*" element={<Navigate to="/adopter" replace />} />
   </Routes>
 );
