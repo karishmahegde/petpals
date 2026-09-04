@@ -22,6 +22,7 @@
     "express": "^4.19.2",
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.2",
+    "libphonenumber-js": "^1.13.12",
     "multer": "^2.3.0",
     "stripe": "^15.0.0",
     "swagger-jsdoc": "^6.3.0",

@@ -9,7 +9,6 @@ const { nullifyRefreshToken } = require("../auth/auth.service");
 const ADOPTER_PROFILE_SELECT = {
   userID: true,
   adopterName: true,
-  shelterID: true,
   adopterDOB: true,
   adopterSex: true,
   createdAt: true,
@@ -72,9 +71,9 @@ const updateAdopterProfile = async (userID, data) => {
     }
     if (err.code === "P2003") {
       // error codes sent by prisma
-      // FK violation — shelterID or preferredBreedID points at a missing row
+      // FK violation — preferredBreedID points at a missing row
       const e = new Error(
-        "shelterID or preferredBreedID does not reference an existing record",
+        "preferredBreedID does not reference an existing record",
       );
       e.code = "BAD_REQUEST";
       throw e;

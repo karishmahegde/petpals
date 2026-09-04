@@ -6,7 +6,6 @@ import axiosInstance from "./axiosInstance";
 export interface AdopterProfile {
   userID: number;
   adopterName: string;
-  shelterID: number | null;
   adopterDOB: string | null;
   adopterSex: string | null;
   createdAt: string;

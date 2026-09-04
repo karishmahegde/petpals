@@ -39,7 +39,6 @@ model Shelter {
   shelterStatus      ShelterStatus             @default(Open)
   managerStaffID     Int?
   shelterLocation    Unsupported("geography")?
-  adopters           Adopter[]
   adoptionApps       AdoptionApplication[]
   appointments       Appointment[]
   donations          Donation[]
@@ -166,7 +165,6 @@ model PetPhoto {
 model Adopter {
   userID             Int                   @id
   adopterName        String                @db.VarChar(45)
-  shelterID          Int?
   adopterDOB         DateTime?             @db.Date
   adopterSex         String?               @db.Char(1)
   createdAt          DateTime              @default(now())
@@ -193,7 +191,6 @@ model Adopter {
   stripeCustomerID   String?               @db.VarChar(255)
   accountStatus      AdopterAccountStatus? @default(Active)
   preferredBreed     Breed?                @relation(fields: [preferredBreedID], references: [breedID])
-  shelter            Shelter?              @relation(fields: [shelterID], references: [shelterID])
   user               Users                 @relation(fields: [userID], references: [userID])
   applications       AdoptionApplication[]
   favorites          Favorite[]

@@ -53,7 +53,6 @@ const schemas = {
     properties: {
       userID: { type: "integer" },
       adopterName: { type: "string" },
-      shelterID: { type: "integer", nullable: true },
       adopterDOB: { type: "string", format: "date", nullable: true },
       adopterSex: { type: "string", nullable: true },
       createdAt: { type: "string", format: "date-time" },
@@ -111,7 +110,7 @@ const schemas = {
       lastLoginAt: { type: "string", format: "date-time", nullable: true },
       accountStatus: {
         type: "string",
-        enum: ["Active", "Suspended", "Banned"],
+        enum: ["Active", "Banned", "Deactivated"],
         nullable: true,
       },
     },
@@ -122,7 +121,6 @@ const schemas = {
       "Partial update — send only the fields to change. adopterEmail, adopterPassword, adopterRiskFlag, preQualifyFlag and accountStatus are rejected with 400. NOT-NULL columns cannot be set to null.",
     properties: {
       adopterName: { type: "string", maxLength: 45 },
-      shelterID: { type: "integer", nullable: true },
       adopterDOB: { type: "string", format: "date", nullable: true },
       adopterSex: { type: "string", maxLength: 1, nullable: true },
       adopterPhone: { type: "string", maxLength: 20, nullable: true },

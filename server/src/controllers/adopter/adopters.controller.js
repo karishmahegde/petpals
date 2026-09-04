@@ -7,6 +7,7 @@ const {
   closeAccountMessage,
 } = require("../../services/auth/auth.service");
 const { successResponse, successListResponse } = require("../../utils/response");
+const { normalizePhone } = require("../../utils/phone");
 
 const badRequest = (message) => {
   const err = new Error(message);
@@ -28,7 +29,6 @@ const getMe = async (req, res, next) => {
 // is ignored; the admin-only fields below are actively rejected.
 const UPDATABLE_FIELDS = [
   "adopterName",
-  "shelterID",
   "adopterDOB",
   "adopterSex",
   "adopterPhone",
@@ -71,7 +71,6 @@ const ENUM_VALUES = {
 };
 
 const INTEGER_FIELDS = [
-  "shelterID",
   "householdSize",
   "numChildren",
   "preferredBreedID",
@@ -81,7 +80,6 @@ const BOOLEAN_FIELDS = ["yardAvailable", "openToSpecialNeeds"];
 // Max lengths from schema.prisma (VarChar/Char widths).
 const STRING_MAX = {
   adopterName: 45,
-  adopterPhone: 20,
   landlordContact: 20,
   adopterSex: 1,
 };
@@ -153,6 +151,17 @@ const updateMe = async (req, res, next) => {
         return next(badRequest("adopterDOB must be a valid date"));
       }
       data[field] = parsed;
+      continue;
+    }
+
+    // Stores the parsed E.164 form — never what the client sent raw, even if
+    // it looks correct.
+    if (field === "adopterPhone") {
+      try {
+        data[field] = normalizePhone(value);
+      } catch (err) {
+        return next(err);
+      }
       continue;
     }
 

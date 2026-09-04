@@ -125,6 +125,16 @@ const login = async ({ email, password }) => {
     }
   }
 
+  // Only Adopter tracks lastLoginAt today. Runs after every blocking check
+  // above, so a rejected login (wrong password, Banned/Deactivated/Pending
+  // account) never counts as one.
+  if (user.role === "Adopter") {
+    await prisma.adopter.update({
+      where: { userID: user.userID },
+      data: { lastLoginAt: new Date() },
+    });
+  }
+
   const { userPassword, refreshToken, ...safeUser } = user;
   return { ...safeUser, name };
 };

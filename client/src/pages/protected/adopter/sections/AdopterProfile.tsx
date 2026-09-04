@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { PiSealCheck } from "react-icons/pi";
+import { PiLightningFill, PiSealCheck } from "react-icons/pi";
 import DashboardHeading from "../../../../components/ui/DashboardHeading";
+import PhoneInputField from "../../../../components/ui/PhoneInputField";
+import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import CloseAccountModal from "./CloseAccountModal";
 import {
   getAdopterProfile,
@@ -44,7 +46,14 @@ interface EditableProfile {
 }
 
 type EditableKey = keyof EditableProfile;
-type FieldType = "text" | "date" | "number" | "select" | "boolean" | "breed";
+type FieldType =
+  | "text"
+  | "date"
+  | "number"
+  | "select"
+  | "boolean"
+  | "breed"
+  | "phone";
 
 interface FieldDef {
   key: EditableKey;
@@ -75,9 +84,8 @@ const SECTIONS: { title: string; fields: FieldDef[] }[] = [
       {
         key: "adopterPhone",
         label: "Phone",
-        type: "text",
+        type: "phone",
         nullable: true,
-        maxLength: 20,
       },
       {
         key: "adopterType",
@@ -121,6 +129,12 @@ const SECTIONS: { title: string; fields: FieldDef[] }[] = [
         type: "number",
         nullable: true,
       },
+      {
+        key: "yardAvailable",
+        label: "Yard available",
+        type: "boolean",
+        nullable: false,
+      },
     ],
   },
   {
@@ -137,12 +151,6 @@ const SECTIONS: { title: string; fields: FieldDef[] }[] = [
         label: "Activity level",
         type: "select",
         nullable: true,
-      },
-      {
-        key: "yardAvailable",
-        label: "Yard available",
-        type: "boolean",
-        nullable: false,
       },
       {
         key: "petExperience",
@@ -293,7 +301,7 @@ const AdopterProfile = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const fieldRefs = useRef<
-    Record<string, HTMLInputElement | HTMLSelectElement | null>
+    Record<string, HTMLInputElement | HTMLSelectElement | HTMLDivElement | null>
   >({});
 
   const patch = (part: Partial<EditableProfile>) =>
@@ -389,6 +397,7 @@ const AdopterProfile = () => {
       return formatShortDate(new Date(`${String(raw).slice(0, 10)}T00:00:00`));
     }
     if (field.type === "select") return optionLabel(field.key, String(raw));
+    if (field.type === "phone") return <PhoneDisplay value={String(raw)} />;
     return String(raw);
   };
 
@@ -471,6 +480,25 @@ const AdopterProfile = () => {
       );
     }
 
+    if (field.type === "phone") {
+      const value = formState[field.key] as string | null;
+      return (
+        <div
+          ref={(el) => {
+            fieldRefs.current[field.key] = el;
+          }}
+          tabIndex={-1}
+        >
+          <PhoneInputField
+            value={value}
+            onChange={(next) =>
+              patch({ [field.key]: next ?? null } as Partial<EditableProfile>)
+            }
+          />
+        </div>
+      );
+    }
+
     if (field.type === "number") {
       const value = formState[field.key] as number | null;
       return (
@@ -546,22 +574,36 @@ const AdopterProfile = () => {
               </p>
               <p className="mt-1 font-body text-xs text-neutral-gray">
                 Joined on {formatShortDate(new Date(profile.createdAt))}
+                {profile.lastLoginAt && (
+                  <> · Last login {formatShortDate(new Date(profile.lastLoginAt))}</>
+                )}
               </p>
             </div>
-            {profile.emailVerified ? (
-              <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-teal-dark">
-                <PiSealCheck className="h-4 w-4" aria-hidden />
-                Email verified
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleVerifyEmail}
-                className="rounded-xl border border-rose-dark px-4 py-1.5 font-body text-sm font-medium text-rose-dark transition-colors hover:bg-rose-dark hover:text-white"
-              >
-                Verify email
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {profile.preQualifyFlag && (
+                <span
+                  className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-gold-dark"
+                  title="Pre-qualified based on experience and history — applications are fast-tracked"
+                >
+                  <PiLightningFill className="h-4 w-4" aria-hidden />
+                  Pre-qualified
+                </span>
+              )}
+              {profile.emailVerified ? (
+                <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-teal-dark">
+                  <PiSealCheck className="h-4 w-4" aria-hidden />
+                  Email verified
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleVerifyEmail}
+                  className="rounded-xl border border-rose-dark px-4 py-1.5 font-body text-sm font-medium text-rose-dark transition-colors hover:bg-rose-dark hover:text-white"
+                >
+                  Verify email
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Sections */}
