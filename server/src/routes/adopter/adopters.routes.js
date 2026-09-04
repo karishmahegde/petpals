@@ -64,6 +64,59 @@ router.put("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersControlle
 
 /**
  * @swagger
+ * /adopters/me:
+ *   delete:
+ *     summary: Deactivate or permanently delete the logged-in adopter's account
+ *     description: >
+ *       Adopter-initiated account closure — distinct from an admin setting
+ *       Banned. Blocked with 409 if the adopter has an Accepted
+ *       adoption application on record, for either mode. 'deactivate' sets
+ *       accountStatus to Deactivated (data retained, no self-service
+ *       reactivation). 'delete' permanently removes the adopter's favorites,
+ *       visits, adoption applications, government ID, and the Adopter/Users
+ *       rows themselves. Both modes clear the refresh token, forcing logout.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [mode]
+ *             properties:
+ *               mode:
+ *                 type: string
+ *                 enum: [deactivate, delete]
+ *     responses:
+ *       200:
+ *         description: Account deactivated or deleted (data is null)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { nullable: true, example: null }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       409:
+ *         description: Adopter has an Accepted adoption application on record
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       422:
+ *         description: mode is missing or not one of 'deactivate'/'delete'
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.delete("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersController.closeAccount);
+
+/**
+ * @swagger
  * /adopters/me/government-id:
  *   get:
  *     summary: Get the logged-in adopter's submitted government ID

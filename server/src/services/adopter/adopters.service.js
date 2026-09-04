@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
+const { nullifyRefreshToken } = require("../auth/auth.service");
 
 // The public shape of an adopter profile — shared by GET and PUT /adopters/me so
 // both responses stay identical. stripeCustomerID is intentionally omitted —
@@ -182,9 +183,71 @@ const getGovernmentId = async (userID) => {
   return { ...record, idNumber: maskIdNumber(record.idNumber) };
 };
 
+// ——————————————— CLOSE ACCOUNT (DELETE /adopters/me) ———————————————
+
+const activeAdoptionConflict = () => {
+  const err = new Error(
+    "You have an active adoption on record and can't deactivate or delete your account. Contact support if you believe this is an error.",
+  );
+  err.code = "CONFLICT";
+  return err;
+};
+
+// Adopters who are the caretaker of record for a pet must stay reachable —
+// this guard applies to both deactivate and delete.
+const assertNoActiveAdoption = async (userID) => {
+  const accepted = await prisma.adoptionApplication.findFirst({
+    where: { adopterID: userID, applicationStatus: "Accepted" },
+    select: { applicationID: true },
+  });
+  if (accepted) {
+    throw activeAdoptionConflict();
+  }
+};
+
+const closeAccount = async (userID, mode) => {
+  await assertNoActiveAdoption(userID);
+
+  if (mode === "deactivate") {
+    await prisma.$transaction([
+      prisma.adopter.update({
+        where: { userID },
+        data: { accountStatus: "Deactivated" },
+      }),
+      nullifyRefreshToken(prisma, userID),
+    ]);
+    return;
+  }
+
+  // mode === "delete" — capture the government ID's stored file path (if any)
+  // before the transaction so the Storage cleanup can happen afterward; a
+  // network call has no place inside a DB transaction.
+  const governmentId = await prisma.governmentID.findFirst({
+    where: { userID, userType: "Adopter" },
+    select: { documentURL: true },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.governmentID.deleteMany({ where: { userID, userType: "Adopter" } });
+    await tx.favorite.deleteMany({ where: { adopterID: userID } });
+    await tx.visit.deleteMany({ where: { adopterID: userID } });
+    await tx.adoptionApplication.deleteMany({ where: { adopterID: userID } });
+    await tx.adopter.delete({ where: { userID } });
+    await tx.users.delete({ where: { userID } });
+  });
+
+  if (governmentId?.documentURL) {
+    await storage.deletePrivateFile(
+      storage.GOVERNMENT_IDS_BUCKET,
+      governmentId.documentURL,
+    );
+  }
+};
+
 module.exports = {
   getAdopterProfile,
   updateAdopterProfile,
   createGovernmentId,
   getGovernmentId,
+  closeAccount,
 };

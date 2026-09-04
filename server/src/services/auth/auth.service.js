@@ -82,11 +82,47 @@ const login = async ({ email, password }) => {
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
   let name = null;
   if (config) {
+    // Every role table now carries its own accountStatus field (Active/
+    // Deactivated for Admin/Staff/Vet; Active/Banned/Deactivated for Adopter/
+    // Donor; Pending/Active/Banned/Deactivated for Volunteer, which also
+    // gates on staff approval). Fetching it unconditionally lets the block
+    // below stay role-agnostic — "Banned" or "Pending" simply never occurs
+    // for a role whose enum doesn't define it.
     const roleRecord = await prisma[config.model].findUnique({
       where: { userID: user.userID },
-      select: { [config.nameField]: true },
+      select: { [config.nameField]: true, accountStatus: true },
     });
     name = roleRecord?.[config.nameField] ?? null;
+
+    // Blocked account states — checked here (not in a request middleware) since
+    // this is the only point a fresh login can be refused; an already-issued
+    // access token is short-lived (15m) and expires on its own regardless.
+    // 401, not 403: the frontend's axios interceptor hard-redirects to
+    // /forbidden on any 403 with no exemption for auth calls, which would hide
+    // this message from the user on the login page.
+    if (roleRecord?.accountStatus === "Deactivated") {
+      // Only Adopter has a self-service closure flow today — the message says
+      // so where it's true, and stays neutral for roles an admin deactivates.
+      const message =
+        user.role === "Adopter"
+          ? "This account was deactivated by its owner. Contact support to reactivate it."
+          : "This account has been deactivated. Contact support if you believe this is an error.";
+      const err = new Error(message);
+      err.code = "UNAUTHORIZED";
+      throw err;
+    }
+    if (roleRecord?.accountStatus === "Banned") {
+      const err = new Error("This account has been banned.");
+      err.code = "UNAUTHORIZED";
+      throw err;
+    }
+    if (roleRecord?.accountStatus === "Pending") {
+      const err = new Error(
+        "This account is pending staff approval and can't log in yet.",
+      );
+      err.code = "UNAUTHORIZED";
+      throw err;
+    }
   }
 
   const { userPassword, refreshToken, ...safeUser } = user;
@@ -109,6 +145,34 @@ const logout = async (userID) => {
     data: { refreshToken: null },
   });
 };
+
+// ——————————————— ACCOUNT CLOSURE (shared across roles) ———————————————
+// The 'deactivate' vs 'delete' guard and cascade logic is genuinely different
+// per role (an Adopter's favorites/visits/applications don't exist for
+// Staff/Donor/Vet/Volunteer), so each role keeps its own closeAccount()
+// service (e.g. adopters.service.js). This is just the shared tail end —
+// mode validation, the response message, and forcing logout — reused by
+// every role's flow instead of being copy-pasted six times.
+const CLOSE_ACCOUNT_MODES = ["deactivate", "delete"];
+
+const assertValidCloseAccountMode = (mode) => {
+  if (!CLOSE_ACCOUNT_MODES.includes(mode)) {
+    const err = new Error("mode must be 'deactivate' or 'delete'");
+    err.code = "VALIDATION_ERROR";
+    throw err;
+  }
+};
+
+// Nulls the refresh token as part of a role's own closeAccount() transaction —
+// pass either the plain prisma client (array-form $transaction) or a tx
+// client (interactive $transaction), since both expose the same delegate
+// shape. Only needed for 'deactivate' — 'delete' removes the Users row
+// itself, which already takes the refresh token with it.
+const nullifyRefreshToken = (client, userID) =>
+  client.users.update({ where: { userID }, data: { refreshToken: null } });
+
+const closeAccountMessage = (mode) =>
+  mode === "delete" ? "Account deleted" : "Account deactivated";
 
 // ——————————————— REFRESH TOKEN ———————————————
 const refreshToken = async (userID, rawOldRT, rawNewRT) => {
@@ -157,4 +221,13 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
   return { ...safeUser, name };
 };
 
-module.exports = { register, login, storeRefreshToken, logout, refreshToken };
+module.exports = {
+  register,
+  login,
+  storeRefreshToken,
+  logout,
+  refreshToken,
+  assertValidCloseAccountMode,
+  nullifyRefreshToken,
+  closeAccountMessage,
+};

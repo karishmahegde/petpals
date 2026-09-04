@@ -2,6 +2,10 @@ const adoptersService = require("../../services/adopter/adopters.service");
 const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
 const visitsService = require("../../services/adopter/visits.service");
 const vaccinationsService = require("../../services/adopter/vaccinations.service");
+const {
+  assertValidCloseAccountMode,
+  closeAccountMessage,
+} = require("../../services/auth/auth.service");
 const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
@@ -336,6 +340,19 @@ const getMyAdoptedPetVaccinations = async (req, res, next) => {
   }
 };
 
+// ——————————————— DELETE /adopters/me ———————————————
+const closeAccount = async (req, res, next) => {
+  const { mode } = req.body ?? {};
+
+  try {
+    assertValidCloseAccountMode(mode);
+    await adoptersService.closeAccount(req.user.userID, mode);
+    return successResponse(res, closeAccountMessage(mode), null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   getMe,
   updateMe,
@@ -345,4 +362,5 @@ module.exports = {
   getMyVisits,
   getMyAdoptedPets,
   getMyAdoptedPetVaccinations,
+  closeAccount,
 };

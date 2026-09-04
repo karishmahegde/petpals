@@ -4,6 +4,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { PiSealCheck } from "react-icons/pi";
 import DashboardHeading from "../../../../components/ui/DashboardHeading";
+import CloseAccountModal from "./CloseAccountModal";
 import {
   getAdopterProfile,
   updateAdopterProfile,
@@ -351,9 +352,10 @@ const AdopterProfile = () => {
     mutation.mutate(payload);
   };
 
-  // Stubs — real flows are separate tasks.
+  // Stub — real flow is a separate task.
   const handleVerifyEmail = () => toast("Email verification is coming soon.");
-  const handleCloseAccount = () => toast("Account closure is coming soon.");
+
+  const [isCloseAccountOpen, setIsCloseAccountOpen] = useState(false);
 
   // ————————————————————————————————————————————————————————————
 
@@ -636,7 +638,7 @@ const AdopterProfile = () => {
             </p>
             <button
               type="button"
-              onClick={handleCloseAccount}
+              onClick={() => setIsCloseAccountOpen(true)}
               className="mt-4 rounded-xl border border-rose-dark px-4 py-2 font-body text-sm font-medium text-rose-dark transition-colors hover:bg-rose-dark hover:text-white"
             >
               Close account
@@ -644,6 +646,11 @@ const AdopterProfile = () => {
           </div>
         </>
       )}
+
+      <CloseAccountModal
+        isOpen={isCloseAccountOpen}
+        onClose={() => setIsCloseAccountOpen(false)}
+      />
     </div>
   );
 };

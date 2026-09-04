@@ -50,6 +50,7 @@ async function main() {
     create: {
       userID: adminUser.userID,
       adminName: "Isabella Martinez",
+      accountStatus: "Active",
     },
   });
 
@@ -150,7 +151,6 @@ async function main() {
       vetDOB: new Date("1980-07-22"),
       vetSex: "M",
       shelterID: shelter1.shelterID,
-      isActive: true,
       accountStatus: "Active",
     },
   });
@@ -222,7 +222,7 @@ async function main() {
       volunteerSex: "M",
       volunteerSchedule: "Weekends 9am-5pm",
       shelterID: shelter1.shelterID,
-      volunteerStatus: true,
+      accountStatus: "Active",
     },
   });
 
@@ -252,6 +252,7 @@ async function main() {
       donorAddress: "654 Pine Road, California, CA 90001",
       donorDOB: new Date("1958-04-30"),
       donorSex: "F",
+      accountStatus: "Active",
     },
   });
 

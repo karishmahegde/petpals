@@ -10,7 +10,7 @@ model Users {
   userID       Int           @id @default(autoincrement())
   userEmail    String        @unique @db.VarChar(45)
   userPassword String        @db.VarChar(255)
-  refreshToken  String? @db.Text
+  refreshToken String?       @db.Text
   role         role
   admin        Admin?
   adopter      Adopter?
@@ -21,10 +21,11 @@ model Users {
 }
 
 model Admin {
-  userID    Int      @id
-  adminName String   @db.VarChar(45)
-  createdAt DateTime @default(now())
-  user      Users    @relation(fields: [userID], references: [userID])
+  userID        Int                 @id
+  adminName     String              @db.VarChar(45)
+  createdAt     DateTime            @default(now())
+  accountStatus AdminAccountStatus? @default(Active)
+  user          Users               @relation(fields: [userID], references: [userID])
 }
 
 model Shelter {
@@ -66,7 +67,7 @@ model Staff {
   staffDOJ         DateTime?
   staffDOS         DateTime?
   staffDesignation StaffDesignation?
-  accountStatus    StaffAccountStatus?
+  accountStatus    StaffAccountStatus?    @default(Active)
   adoptionApps     AdoptionApplication[]
   events           Event[]
   pets             Pet[]
@@ -91,8 +92,7 @@ model Veterinarian {
   vetSex             String?             @db.Char(1)
   createdAt          DateTime            @default(now())
   shelterID          Int?
-  isActive           Boolean             @default(true)
-  accountStatus      VetAccountStatus?
+  accountStatus      VetAccountStatus?   @default(Active)
   appointments       Appointment[]
   healthRecords      HealthRecord[]
   vaccinationRecords VaccinationRecord[]
@@ -191,7 +191,7 @@ model Adopter {
   emailVerified      Boolean               @default(false)
   lastLoginAt        DateTime?
   stripeCustomerID   String?               @db.VarChar(255)
-  accountStatus      AccountStatus?
+  accountStatus      AdopterAccountStatus? @default(Active)
   preferredBreed     Breed?                @relation(fields: [preferredBreedID], references: [breedID])
   shelter            Shelter?              @relation(fields: [shelterID], references: [shelterID])
   user               Users                 @relation(fields: [userID], references: [userID])
@@ -221,10 +221,6 @@ model AdoptionApplication {
   pet               Pet               @relation(fields: [petID], references: [petID])
   shelter           Shelter           @relation(fields: [shelterID], references: [shelterID])
   staff             Staff?            @relation(fields: [staffID], references: [userID])
-
-  @@index([adopterID])
-  @@index([petID])
-  @@index([shelterID])
   // Partial unique index enforced in the DB only — not expressible in Prisma:
   //   CREATE UNIQUE INDEX "AdoptionApplication_active_adopter_pet_key"
   //   ON "AdoptionApplication" ("adopterID", "petID")
@@ -233,6 +229,10 @@ model AdoptionApplication {
   // as the PostGIS shelterLocation column). Blocks a second active application
   // for the same adopter+pet; Rejected/Withdrawn rows are excluded so
   // resubmission stays possible.
+
+  @@index([adopterID])
+  @@index([petID])
+  @@index([shelterID])
 }
 
 model Visit {
@@ -336,18 +336,18 @@ model VolunteerApplication {
 }
 
 model Volunteer {
-  userID            Int                    @id
-  volunteerName     String                 @db.VarChar(45)
-  volunteerAddress  String?                @db.VarChar(45)
-  volunteerPhone    String?                @db.VarChar(20)
-  volunteerDOB      DateTime?              @db.Date
-  volunteerSex      String?                @db.Char(1)
-  volunteerSchedule String?                @db.VarChar(100)
+  userID            Int                     @id
+  volunteerName     String                  @db.VarChar(45)
+  volunteerAddress  String?                 @db.VarChar(45)
+  volunteerPhone    String?                 @db.VarChar(20)
+  volunteerDOB      DateTime?               @db.Date
+  volunteerSex      String?                 @db.Char(1)
+  volunteerSchedule String?                 @db.VarChar(100)
   shelterID         Int?
-  createdAt         DateTime               @default(now())
-  volunteerStatus   Boolean                @default(false)
-  shelter           Shelter?               @relation(fields: [shelterID], references: [shelterID])
-  user              Users                  @relation(fields: [userID], references: [userID])
+  createdAt         DateTime                @default(now())
+  accountStatus     VolunteerAccountStatus? @default(Pending)
+  shelter           Shelter?                @relation(fields: [shelterID], references: [shelterID])
+  user              Users                   @relation(fields: [userID], references: [userID])
   applications      VolunteerApplication[]
   events            VolunteerEvent[]
   tasks             VolunteerTask[]
@@ -410,16 +410,17 @@ model VolunteerEvent {
 }
 
 model Donor {
-  userID           Int        @id
-  donorName        String     @db.VarChar(45)
-  donorAddress     String?    @db.VarChar(45)
-  donorPhone       String?    @db.VarChar(20)
-  donorDOB         DateTime?  @db.Date
-  donorSex         String?    @db.Char(1)
-  createdAt        DateTime   @default(now())
-  stripeCustomerID String?    @db.VarChar(255)
+  userID           Int                 @id
+  donorName        String              @db.VarChar(45)
+  donorAddress     String?             @db.VarChar(45)
+  donorPhone       String?             @db.VarChar(20)
+  donorDOB         DateTime?           @db.Date
+  donorSex         String?             @db.Char(1)
+  createdAt        DateTime            @default(now())
+  stripeCustomerID String?             @db.VarChar(255)
+  accountStatus    DonorAccountStatus? @default(Active)
   donations        Donation[]
-  user             Users      @relation(fields: [userID], references: [userID])
+  user             Users               @relation(fields: [userID], references: [userID])
 }
 
 model Donation {
@@ -518,22 +519,41 @@ enum AdopterType {
   Owner
 }
 
-enum AccountStatus {
+enum AdopterAccountStatus {
   Active
-  Suspended
   Banned
+  Deactivated
+}
+
+enum DonorAccountStatus {
+  Active
+  Banned
+  Deactivated
 }
 
 enum StaffAccountStatus {
-  Pending
   Active
-  Suspended
+  Deactivated
 }
 
 enum VetAccountStatus {
+  Active
+  Deactivated
+}
+
+enum AdminAccountStatus {
+  Active
+  Deactivated
+}
+
+// Volunteer applications go through staff approval — new volunteers start
+// Pending until a staff member activates them, then follow the same
+// Active/Banned/Deactivated lifecycle as everyone else.
+enum VolunteerAccountStatus {
   Pending
   Active
-  Suspended
+  Banned
+  Deactivated
 }
 
 enum VisitStatus {

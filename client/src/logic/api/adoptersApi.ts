@@ -48,3 +48,13 @@ export const updateAdopterProfile = async (
   const response = await axiosInstance.put("/adopters/me", payload);
   return response.data.data;
 };
+
+// ———————————————— CLOSE ACCOUNT API ————————————————
+// 'deactivate' keeps data (no self-service reactivation yet); 'delete' is
+// permanent. Both are blocked server-side (409) if an Accepted adoption
+// application exists for this adopter.
+export type CloseAccountMode = "deactivate" | "delete";
+
+export const closeAccount = async (mode: CloseAccountMode): Promise<void> => {
+  await axiosInstance.delete("/adopters/me", { data: { mode } });
+};
