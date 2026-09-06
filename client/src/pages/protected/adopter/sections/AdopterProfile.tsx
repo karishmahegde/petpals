@@ -12,6 +12,7 @@ import Avatar from "../../../../components/ui/Avatar";
 import PhoneInputField from "../../../../components/ui/PhoneInputField";
 import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import CloseAccountModal from "./CloseAccountModal";
+import GovernmentIdSection from "./GovernmentIdSection";
 import {
   getAdopterProfile,
   updateAdopterProfile,
@@ -622,7 +623,7 @@ const AdopterProfile = () => {
                 </span>
               )}
               {profile.emailVerified ? (
-                <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-teal-dark">
+                <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-green">
                   <PiSealCheck className="h-4 w-4" aria-hidden />
                   Email verified
                 </span>
@@ -660,6 +661,9 @@ const AdopterProfile = () => {
                     </div>
                   ))}
                 </dl>
+                {section.title === "Personal" && (
+                  <GovernmentIdSection isEditing={isEditing} />
+                )}
               </section>
             ))}
           </div>

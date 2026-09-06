@@ -24,6 +24,9 @@ export default {
           md: "#B0E5EC",
           dark: "#6BA8B0",
         },
+        green: {
+          DEFAULT: "#91B381",
+        },
         neutral: {
           white: "#FFFFFF",
           offwhite: "#FAFAFA",

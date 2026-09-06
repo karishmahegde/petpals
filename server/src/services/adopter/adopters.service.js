@@ -120,14 +120,15 @@ const alreadySubmitted = () => {
 };
 
 const createGovernmentId = async (userID, { idType, idNumber, file }) => {
-  // Fast path only — avoids an unnecessary file upload in the common case.
-  // The real guarantee is the @@unique([userID, userType]) constraint, caught
-  // as a unique violation after create() below.
+  // Fast path only — the real guarantee is the @@unique([userID, userType])
+  // constraint, caught as a unique violation after create() below. A
+  // Rejected record is the one exception: the adopter can resubmit, which
+  // overwrites that same row (and resets it to Pending) instead of blocking.
   const existing = await prisma.governmentID.findFirst({
     where: { userID, userType: "Adopter" },
-    select: { governmentIDID: true },
+    select: { governmentIDID: true, verificationStatus: true, documentURL: true },
   });
-  if (existing) {
+  if (existing && existing.verificationStatus !== "Rejected") {
     throw alreadySubmitted();
   }
 
@@ -143,17 +144,28 @@ const createGovernmentId = async (userID, { idType, idNumber, file }) => {
 
   let record;
   try {
-    record = await prisma.governmentID.create({
-      data: {
-        userID,
-        userType: "Adopter",
-        idType,
-        idNumber,
-        verificationStatus: "Pending",
-        documentURL: objectPath,
-      },
-      select: GOVERNMENT_ID_SELECT,
-    });
+    record = existing
+      ? await prisma.governmentID.update({
+          where: { governmentIDID: existing.governmentIDID },
+          data: {
+            idType,
+            idNumber,
+            verificationStatus: "Pending",
+            documentURL: objectPath,
+          },
+          select: GOVERNMENT_ID_SELECT,
+        })
+      : await prisma.governmentID.create({
+          data: {
+            userID,
+            userType: "Adopter",
+            idType,
+            idNumber,
+            verificationStatus: "Pending",
+            documentURL: objectPath,
+          },
+          select: GOVERNMENT_ID_SELECT,
+        });
   } catch (err) {
     // DB write failed after the file landed — remove the orphaned object.
     await storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, objectPath);
@@ -162,6 +174,12 @@ const createGovernmentId = async (userID, { idType, idNumber, file }) => {
       throw alreadySubmitted();
     }
     throw err;
+  }
+
+  // Resubmission replaced the stored file — the previous one is now
+  // orphaned. Best-effort, same as the failure-path cleanup above.
+  if (existing?.documentURL) {
+    await storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, existing.documentURL);
   }
 
   return { ...record, idNumber: maskIdNumber(record.idNumber) };

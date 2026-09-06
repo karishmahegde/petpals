@@ -49,6 +49,46 @@ export const updateAdopterProfile = async (
   return response.data.data;
 };
 
+// ———————————————— GOVERNMENT ID API ————————————————
+export interface GovernmentIdRecord {
+  governmentIDID: number;
+  userID: number;
+  userType: string;
+  idType: string;
+  idNumber: string; // masked — only the last 4 characters, e.g. "*****6789"
+  verificationStatus: "Pending" | "Verified" | "Rejected";
+  documentURL: string | null;
+}
+
+// 404 means no ID has been submitted yet — callers should treat that as a
+// normal "not submitted" state, not an error to surface.
+export const getGovernmentId = async (): Promise<GovernmentIdRecord> => {
+  const response = await axiosInstance.get("/adopters/me/government-id");
+  return response.data.data;
+};
+
+export interface UploadGovernmentIdPayload {
+  idType: string;
+  idNumber: string;
+  file: File;
+}
+
+// multipart/form-data — one government ID per adopter; a second submission
+// is rejected server-side with 409.
+export const uploadGovernmentId = async (
+  payload: UploadGovernmentIdPayload,
+): Promise<GovernmentIdRecord> => {
+  const formData = new FormData();
+  formData.append("idType", payload.idType);
+  formData.append("idNumber", payload.idNumber);
+  formData.append("file", payload.file);
+  const response = await axiosInstance.post(
+    "/adopters/me/government-id",
+    formData,
+  );
+  return response.data.data;
+};
+
 // ———————————————— CLOSE ACCOUNT API ————————————————
 // 'deactivate' keeps data (no self-service reactivation yet); 'delete' is
 // permanent. Both are blocked server-side (409) if an Accepted adoption
