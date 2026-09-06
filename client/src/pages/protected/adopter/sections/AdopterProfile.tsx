@@ -2,8 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { PiLightningFill, PiSealCheck } from "react-icons/pi";
+import {
+  PiArrowsClockwiseBold,
+  PiLightningFill,
+  PiSealCheck,
+} from "react-icons/pi";
 import DashboardHeading from "../../../../components/ui/DashboardHeading";
+import Avatar from "../../../../components/ui/Avatar";
 import PhoneInputField from "../../../../components/ui/PhoneInputField";
 import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import CloseAccountModal from "./CloseAccountModal";
@@ -24,6 +29,7 @@ import { formatShortDate } from "../../../../logic/utils/datetime";
 // ——————————————————————————————————————————————————————————————
 
 interface EditableProfile {
+  avatarSeed: string;
   adopterName: string;
   adopterDOB: string | null; // "YYYY-MM-DD"
   adopterSex: string | null;
@@ -222,6 +228,7 @@ const optionLabel = (key: EditableKey, value: string) =>
   key === "adopterSex" ? (SEX_LABELS[value] ?? value) : humanizeEnum(value);
 
 const toEditable = (p: AdopterProfileData): EditableProfile => ({
+  avatarSeed: p.avatarSeed,
   adopterName: p.adopterName ?? "",
   adopterDOB: p.adopterDOB ? p.adopterDOB.slice(0, 10) : null,
   adopterSex: p.adopterSex ?? null,
@@ -566,18 +573,43 @@ const AdopterProfile = () => {
 
       {profile && (
         <>
-          {/* Identity strip — account metadata, never editable */}
+          {/* Identity strip — account metadata, never editable (except the
+              avatar, which re-rolls via formState like any other field) */}
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-rose-light pb-5">
-            <div>
-              <p className="font-display text-2xl text-rose-md md:text-3xl">
-                {profile.adopterName}
-              </p>
-              <p className="mt-1 font-body text-xs text-neutral-gray">
-                Joined on {formatShortDate(new Date(profile.createdAt))}
-                {profile.lastLoginAt && (
-                  <> · Last login {formatShortDate(new Date(profile.lastLoginAt))}</>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Avatar
+                  seed={
+                    isEditing && formState
+                      ? formState.avatarSeed
+                      : profile.avatarSeed
+                  }
+                  size={72}
+                  className="h-16 w-16 rounded-full border border-rose-light bg-white md:h-[72px] md:w-[72px]"
+                />
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => patch({ avatarSeed: crypto.randomUUID() })}
+                    aria-label="Randomize avatar"
+                    title="Randomize avatar"
+                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm transition-colors hover:brightness-90"
+                  >
+                    <PiArrowsClockwiseBold className="h-3.5 w-3.5" aria-hidden />
+                  </button>
                 )}
-              </p>
+              </div>
+              <div>
+                <p className="font-display text-2xl text-rose-md md:text-3xl">
+                  {profile.adopterName}
+                </p>
+                <p className="mt-1 font-body text-xs text-neutral-gray">
+                  Joined on {formatShortDate(new Date(profile.createdAt))}
+                  {profile.lastLoginAt && (
+                    <> · Last login {formatShortDate(new Date(profile.lastLoginAt))}</>
+                  )}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               {profile.preQualifyFlag && (

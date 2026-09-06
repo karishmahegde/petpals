@@ -28,6 +28,7 @@ const getMe = async (req, res, next) => {
 // Fields an adopter may change on their own profile. Anything outside this list
 // is ignored; the admin-only fields below are actively rejected.
 const UPDATABLE_FIELDS = [
+  "avatarSeed",
   "adopterName",
   "adopterDOB",
   "adopterSex",
@@ -79,12 +80,14 @@ const INTEGER_FIELDS = [
 const BOOLEAN_FIELDS = ["yardAvailable", "openToSpecialNeeds"];
 // Max lengths from schema.prisma (VarChar/Char widths).
 const STRING_MAX = {
+  avatarSeed: 64,
   adopterName: 45,
   landlordContact: 20,
   adopterSex: 1,
 };
 // Columns that are NOT NULL in the schema — cannot be cleared via update.
 const NON_NULLABLE = [
+  "avatarSeed",
   "adopterName",
   "yardAvailable",
   "currentPets",

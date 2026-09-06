@@ -1,4 +1,5 @@
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const prisma = require("../../config/prisma");
 
 // Maps the incoming role string to the Prisma enum value, model accessor, and name field
@@ -50,6 +51,7 @@ const register = async ({ name, email, password, role }) => {
       data: {
         userID: user.userID,
         [nameField]: name,
+        avatarSeed: crypto.randomUUID(),
       },
     });
 
@@ -81,6 +83,7 @@ const login = async ({ email, password }) => {
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
   let name = null;
+  let avatarSeed = null;
   if (config) {
     // Every role table now carries its own accountStatus field (Active/
     // Deactivated for Admin/Staff/Vet; Active/Banned/Deactivated for Adopter/
@@ -90,9 +93,10 @@ const login = async ({ email, password }) => {
     // for a role whose enum doesn't define it.
     const roleRecord = await prisma[config.model].findUnique({
       where: { userID: user.userID },
-      select: { [config.nameField]: true, accountStatus: true },
+      select: { [config.nameField]: true, accountStatus: true, avatarSeed: true },
     });
     name = roleRecord?.[config.nameField] ?? null;
+    avatarSeed = roleRecord?.avatarSeed ?? null;
 
     // Blocked account states — checked here (not in a request middleware) since
     // this is the only point a fresh login can be refused; an already-issued
@@ -136,7 +140,7 @@ const login = async ({ email, password }) => {
   }
 
   const { userPassword, refreshToken, ...safeUser } = user;
-  return { ...safeUser, name };
+  return { ...safeUser, name, avatarSeed };
 };
 
 const storeRefreshToken = async (userID, hashedRefreshToken) => {
@@ -219,16 +223,18 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
   let name = null;
+  let avatarSeed = null;
   if (config) {
     const roleRecord = await prisma[config.model].findUnique({
       where: { userID: user.userID },
-      select: { [config.nameField]: true },
+      select: { [config.nameField]: true, avatarSeed: true },
     });
     name = roleRecord?.[config.nameField] ?? null;
+    avatarSeed = roleRecord?.avatarSeed ?? null;
   }
 
   const { refreshToken: _, ...safeUser } = user; // Strip the token to send back the response
-  return { ...safeUser, name };
+  return { ...safeUser, name, avatarSeed };
 };
 
 module.exports = {

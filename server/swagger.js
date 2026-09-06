@@ -52,6 +52,7 @@ const schemas = {
     type: "object",
     properties: {
       userID: { type: "integer" },
+      avatarSeed: { type: "string", maxLength: 64 },
       adopterName: { type: "string" },
       adopterDOB: { type: "string", format: "date", nullable: true },
       adopterSex: { type: "string", nullable: true },
@@ -120,6 +121,7 @@ const schemas = {
     description:
       "Partial update — send only the fields to change. adopterEmail, adopterPassword, adopterRiskFlag, preQualifyFlag and accountStatus are rejected with 400. NOT-NULL columns cannot be set to null.",
     properties: {
+      avatarSeed: { type: "string", maxLength: 64 },
       adopterName: { type: "string", maxLength: 45 },
       adopterDOB: { type: "string", format: "date", nullable: true },
       adopterSex: { type: "string", maxLength: 1, nullable: true },

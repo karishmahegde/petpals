@@ -12,6 +12,7 @@ import {
   PiDotsThreeVertical,
 } from "react-icons/pi";
 import { FaUserCircle } from "react-icons/fa";
+import Avatar from "../ui/Avatar";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
 
@@ -157,7 +158,15 @@ const DashboardSidebar = ({
       className="relative border-t border-neutral-gray/40 px-5 py-4"
     >
       <div className="flex items-center gap-3">
-        <FaUserCircle className="h-9 w-9 shrink-0 text-rose-light" />
+        {user?.avatarSeed ? (
+          <Avatar
+            seed={user.avatarSeed}
+            size={36}
+            className="h-9 w-9 shrink-0 rounded-full border border-white/20"
+          />
+        ) : (
+          <FaUserCircle className="h-9 w-9 shrink-0 text-rose-light" />
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate font-body text-sm font-semibold text-white">
             {firstName || "Account"}

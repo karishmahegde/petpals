@@ -8,6 +8,7 @@ const { nullifyRefreshToken } = require("../auth/auth.service");
 // never exposed in API responses.
 const ADOPTER_PROFILE_SELECT = {
   userID: true,
+  avatarSeed: true,
   adopterName: true,
   adopterDOB: true,
   adopterSex: true,

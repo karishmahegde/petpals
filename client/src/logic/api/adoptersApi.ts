@@ -5,6 +5,7 @@ import axiosInstance from "./axiosInstance";
 
 export interface AdopterProfile {
   userID: number;
+  avatarSeed: string;
   adopterName: string;
   adopterDOB: string | null;
   adopterSex: string | null;

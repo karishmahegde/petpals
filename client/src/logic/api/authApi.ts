@@ -6,6 +6,7 @@ export interface AuthUser {
   userEmail?: string; // present on login, absent on refresh-token response
   role: string;
   name?: string; // present on login, absent on refresh-token response
+  avatarSeed?: string; // present on both login and refresh-token responses
 }
 
 export interface RefreshTokenResponse {

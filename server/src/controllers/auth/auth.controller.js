@@ -128,7 +128,12 @@ const refreshToken = async (req, res, next) => {
     return successResponse(res, "Token refreshed successfully", {
       //return the 2 new tokens and the userID and role back
       token: newAccessToken,
-      user: { userID: user.userID, role: user.role, name: user.name },
+      user: {
+        userID: user.userID,
+        role: user.role,
+        name: user.name,
+        avatarSeed: user.avatarSeed,
+      },
     });
   } catch (err) {
     return next(err);

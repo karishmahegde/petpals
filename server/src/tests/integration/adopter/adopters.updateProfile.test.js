@@ -26,7 +26,7 @@ const registerAndLoginAdopter = async () => {
   return { userID, token: loginRes.body.data.token };
 };
 
-describe("PUT /api/v1/adopters/me — adopterPhone validation", () => {
+describe("PUT /api/v1/adopters/me", () => {
   test("a bare national number with no country code is rejected — ambiguous without a country", async () => {
     const { userID, token } = await registerAndLoginAdopter();
 
@@ -88,6 +88,25 @@ describe("PUT /api/v1/adopters/me — adopterPhone validation", () => {
 
     const adopter = await prisma.adopter.findUnique({ where: { userID } });
     expect(adopter.adopterPhone).toBeNull();
+
+    await prisma.adopter.deleteMany({ where: { userID } });
+    await prisma.users.deleteMany({ where: { userID } });
+  });
+
+  // —————————————————— AVATAR SEED ——————————————————
+  test("a new avatarSeed is accepted, not silently stripped, and persists", async () => {
+    const { userID, token } = await registerAndLoginAdopter();
+
+    const res = await request(app)
+      .put("/api/v1/adopters/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ avatarSeed: "a-brand-new-seed-123" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.avatarSeed).toBe("a-brand-new-seed-123");
+
+    const adopter = await prisma.adopter.findUnique({ where: { userID } });
+    expect(adopter.avatarSeed).toBe("a-brand-new-seed-123");
 
     await prisma.adopter.deleteMany({ where: { userID } });
     await prisma.users.deleteMany({ where: { userID } });

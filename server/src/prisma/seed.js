@@ -6,6 +6,7 @@ require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -50,6 +51,7 @@ async function main() {
     create: {
       userID: adminUser.userID,
       adminName: "Isabella Martinez",
+      avatarSeed: crypto.randomUUID(),
       accountStatus: "Active",
     },
   });
@@ -113,6 +115,7 @@ async function main() {
     create: {
       userID: staffUser.userID,
       staffName: "Sasha Grey",
+      avatarSeed: crypto.randomUUID(),
       staffPhone: "+12125550103",
       shelterID: shelter1.shelterID,
       staffDOB: new Date("1988-03-15"),
@@ -146,6 +149,7 @@ async function main() {
     create: {
       userID: vetUser.userID,
       vetName: "Jay Asarathi",
+      avatarSeed: crypto.randomUUID(),
       vetPhone: "+12125550104",
       vetAddress: "789 Oak Lane, New York, NY 10002",
       vetDOB: new Date("1980-07-22"),
@@ -172,6 +176,7 @@ async function main() {
     create: {
       userID: adopterUser.userID,
       adopterName: "Emelie Archer",
+      avatarSeed: crypto.randomUUID(),
       adopterPhone: "+12125550105",
       adopterDOB: new Date("1998-11-05"),
       adopterSex: "F",
@@ -216,6 +221,7 @@ async function main() {
     create: {
       userID: volunteerUser.userID,
       volunteerName: "Bryan Smith",
+      avatarSeed: crypto.randomUUID(),
       volunteerPhone: "+12125550106",
       volunteerAddress: "321 Elm Street, Chicago, IL 60601",
       volunteerDOB: new Date("2005-09-18"),
@@ -248,6 +254,7 @@ async function main() {
     create: {
       userID: donorUser.userID,
       donorName: "Charlotte Salazar",
+      avatarSeed: crypto.randomUUID(),
       donorPhone: "+12125550107",
       donorAddress: "654 Pine Road, California, CA 90001",
       donorDOB: new Date("1958-04-30"),
