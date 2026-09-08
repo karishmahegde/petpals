@@ -6,11 +6,12 @@
 //   - On success: stores session in Zustand and redirects to role-based dashboard
 //   - On failure: displays server error message inline
 // Route: /login
-import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import Card from "../../../components/ui/Card";
 import axios from "axios";
 import { login as loginApi } from "../../../logic/api/authApi";
+import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
 
@@ -18,6 +19,10 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const Login = () => {
   const { token, role } = useAuthStore();
+  const [searchParams] = useSearchParams();
+  // Query param, not location.state — survives a page refresh mid-login,
+  // which state would not.
+  const redirect = searchParams.get("redirect");
 
   const navigate = useNavigate(); // for programmatic navigation — redirecting the user to a different route from inside the code rather than from a link click
   const storeLogin = useAuthStore((state) => state.login); // zustand global state management with token
@@ -27,8 +32,25 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Same destination/toast logic whether the role check happens right after
+  // login or on an already-authenticated user hitting /login directly — both
+  // cases render this component with token+role already set, so this one
+  // branch covers both.
+  const needsAdopterAccount = !!(token && role && redirect && role !== "Adopter");
+
+  useEffect(() => {
+    if (needsAdopterAccount) {
+      showAdopterAccountToast(navigate);
+    }
+  }, [needsAdopterAccount, navigate]);
+
   if (token && role) {
-    return <Navigate to={`/${role.toLowerCase()}`} replace />;
+    const destination = redirect
+      ? role === "Adopter"
+        ? redirect
+        : "/adopt"
+      : `/${role.toLowerCase()}`;
+    return <Navigate to={destination} replace />;
   }
 
   const validate = (): string => {
@@ -53,7 +75,9 @@ const Login = () => {
       // sending the credentials to the login API
       const { token, user } = await loginApi({ email, password });
       storeLogin(user, token, user.role);
-      navigate(`/${user.role.toLowerCase()}`, { replace: true });
+      // No explicit navigate here — token/role updating in the store
+      // re-renders this component into the `if (token && role)` branch
+      // above, which resolves the destination (including `redirect`).
     } catch (err: unknown) {
       // error runs when no server
       const message =

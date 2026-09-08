@@ -119,11 +119,14 @@ const LIST_SELECT = {
 
 const listApplicationsByAdopter = async (
   adopterID,
-  { status, page = 1, limit = 20 } = {},
+  { status, petID, page = 1, limit = 20 } = {},
 ) => {
   const where = { adopterID };
   if (status) {
     where.applicationStatus = status;
+  }
+  if (petID !== undefined) {
+    where.petID = petID;
   }
 
   const [data, total] = await Promise.all([

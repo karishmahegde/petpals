@@ -146,9 +146,9 @@ All six role-specific tables (Admin, Staff, Veterinarian, Adopter, Volunteer, Do
 - `authenticate.js` — verifies Bearer token, attaches `req.user`
 - `authorizeRoles.js` — factory middleware, e.g. `authorizeRoles('Staff', 'Admin')`
 
-### Pending (Sprint 3 dependency)
+### Post-login redirect (Sprint 3)
 
-`/login` needs to read `location.state?.redirectTo` after login and navigate there (required by `PetDetailsModal`'s "Adopt" button redirect flow), falling back to default behavior if unset.
+`/login` reads a `redirect` query param (e.g. `/login?redirect=/adopt/apply/5`) — a query param rather than `location.state`, so a page refresh mid-login doesn't lose it. After login, an Adopter is sent to `redirect`; any other role is sent to `/adopt` with a toast (see PetDetailsModal below). No `redirect` param falls back to the default role-dashboard redirect. Both the post-login path and an already-authenticated user hitting `/login` directly resolve through the same branch, so behavior is identical either way.
 
 ---
 
@@ -308,7 +308,7 @@ Related: conditional rendering (`{isOpen && <X/>}`) fully unmounts/resets state;
 | --------------------- | -------------------------------- |
 | Auth                  | `/auth`                          |
 | Adopters              | `/adopters`                      |
-| Adoption Applications | `/adoption-applications`         |
+| Adoption Applications | `/adoption-applications` — `POST /` and `GET /:id` built; remaining CRUD/status transitions still to come |
 | Staff                 | `/staff`                         |
 | Appointments          | `/appointments`                  |
 | Vaccinations          | `/appointments/:id/vaccinations` |
@@ -336,7 +336,11 @@ Public pet catalog (`/adopt`), six independent filters. Full reference: `docs/09
 
 Opens over `/adopt` via card click or deep link (`?petID=X`). `openId` state and URL-reading logic live in `PetCatalog.tsx`, not `PetCatalogCard.tsx` — the card receives `openId` + `onKnowMore(petID)` as props and never decides its own behavior (needed since the card is reused on `/adopt`, opening the modal, and on Home's Featured Pets, which navigates to `/adopt?petID=X` first).
 
-"Adopt" button: logged in → `/adopt/apply/:petID` (placeholder route). Logged out → `/login` with `{ state: { redirectTo: '/adopt/apply/:petID' } }` (see Auth pending items).
+"Adopt" button (Sprint 3 — routing/guard layer complete, form itself still to come): not logged in → `/login?redirect=/adopt/apply/:petID` (see Post-login redirect above). Logged in as Adopter → `/adopt/apply/:petID`, if the pet is still `available` (fast-fail check against the modal's already-loaded data; the authoritative re-check happens again on mount of `/adopt/apply/:petID`). Logged in as any other role, or the pet is no longer available → modal closes (not a route change — the modal only ever renders while already on `/adopt`) with a toast; same toast copy either way, and identical to what `/login` shows a non-Adopter redirected there.
+
+### AdoptApply guard page (Sprint 3)
+
+`/adopt/apply/:petID` (`pages/protected/adopter/AdoptApply.tsx`) re-runs every guard on mount, independent of how it was reached: not logged in → `/login?redirect=...`; not an Adopter → `/adopt` + toast; pet re-fetched and not `available` → `/adopt` + toast; an existing `Pending`/`Accepted` application for this pet (via `GET /adopters/me/applications?petID=`) → `/adopter/applications` + toast. It does not use `ProtectedRoute`/`RoleRoute` — their fixed `/login` (no param) and `/forbidden` targets don't match this flow's redirect targets and toasts, so the checks are self-contained in the page instead.
 
 ---
 

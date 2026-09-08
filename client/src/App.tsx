@@ -12,6 +12,7 @@ import Adopt from "./pages/public/adopt/Adopt";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
 import AdopterDashboard from "./pages/protected/adopter/AdopterDashboard";
+import AdoptApply from "./pages/protected/adopter/AdoptApply";
 import StaffDashboard from "./pages/protected/staff/StaffDashboard";
 import VetDashboard from "./pages/protected/vet/VetDashboard";
 import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
@@ -56,6 +57,11 @@ const App = () => {
         <Route path="/forbidden" element={<Forbidden />} />
         <Route path="*" element={<NotFound />} />
       </Route>
+
+      {/* Adoption application entry — guards itself (auth, role, pet
+          availability, duplicate application) with spec-specific redirect
+          targets/toasts, so it doesn't use ProtectedRoute/RoleRoute. */}
+      <Route path="/adopt/apply/:petID" element={<AdoptApply />} />
 
       {/* Role-based dashboards — guarded by ProtectedRoute (authenticated) + RoleRoute (correct role) */}
       <Route

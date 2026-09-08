@@ -257,7 +257,7 @@ const VALID_APPLICATION_STATUSES = [
 ];
 
 const getMyApplications = async (req, res, next) => {
-  const { page: pageRaw, limit: limitRaw, status } = req.query;
+  const { page: pageRaw, limit: limitRaw, status, petID: petIDRaw } = req.query;
 
   let page = 1;
   if (pageRaw !== undefined) {
@@ -286,10 +286,18 @@ const getMyApplications = async (req, res, next) => {
     );
   }
 
+  let petID;
+  if (petIDRaw !== undefined) {
+    petID = Number(petIDRaw);
+    if (!Number.isInteger(petID) || petID < 1) {
+      return next(badRequest("petID must be a positive integer"));
+    }
+  }
+
   try {
     const result = await adoptionApplicationsService.listApplicationsByAdopter(
       req.user.userID,
-      { status, page, limit },
+      { status, petID, page, limit },
     );
     return successListResponse(
       res,

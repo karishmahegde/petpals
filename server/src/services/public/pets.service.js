@@ -216,6 +216,7 @@ const PET_DETAIL_SELECT = {
   petHeight: true,
   petWeight: true,
   petDesc: true,
+  adoptionStatus: true,
   compatibleWithChildren: true,
   compatibleWithPets: true,
   specialNeeds: true,
@@ -242,6 +243,7 @@ const formatPetDetail = (pet) => ({
   petHeight: pet.petHeight,
   petWeight: pet.petWeight,
   petDesc: pet.petDesc,
+  adoptionStatus: pet.adoptionStatus,
   breed: {
     breedID: pet.breed.breedID,
     breedName: pet.breed.breedName,

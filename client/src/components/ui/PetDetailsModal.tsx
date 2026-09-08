@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { FaPaw, FaTimes } from "react-icons/fa";
 import { getPetById } from "../../logic/api/petsApi";
+import { showAdopterAccountToast } from "../../logic/toast/adopterAccountToast";
 import useAuthStore from "../../logic/store/useAuthStore";
 import ButtonElement from "./ButtonElement";
 
@@ -51,21 +52,29 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
       data.compatibleWithPets ||
       data.specialNeeds);
 
-  // Adoption applications aren't built yet (next sprint) — logged-in
-  // Adopters get a placeholder toast instead of a dead route. Every other
-  // role is intentionally blocked here too: accounts are single-role by
-  // design (a Volunteer/Staff/etc. account can't also adopt), so this is a
-  // real distinction, not a stand-in for the not-logged-in case. Logged-out
-  // users are sent to sign in first, same as ProtectedRoute does for
-  // dashboards.
+  // Every role but Adopter is intentionally blocked here: accounts are
+  // single-role by design (a Volunteer/Staff/etc. account can't also
+  // adopt), so this is a real distinction, not a stand-in for the
+  // not-logged-in case. `onClose()` (not a navigate to /adopt) is enough
+  // for the blocked cases below since this modal only ever renders while
+  // already on /adopt. The adoptionStatus check is a fast-fail nicety —
+  // the authoritative re-check happens again on /adopt/apply/:petID.
   const handleAdoptClick = () => {
     if (!token) {
-      navigate("/login");
-    } else if (role !== "Adopter") {
-      toast("You need an adopter account to adopt pets");
-    } else {
-      toast("Coming Soon");
+      navigate(`/login?redirect=/adopt/apply/${petID}`);
+      return;
     }
+    if (role !== "Adopter") {
+      onClose();
+      showAdopterAccountToast(navigate);
+      return;
+    }
+    if (data?.adoptionStatus !== "available") {
+      onClose();
+      toast("This pet is no longer available for adoption.");
+      return;
+    }
+    navigate(`/adopt/apply/${petID}`);
   };
 
   return (

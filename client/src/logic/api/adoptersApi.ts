@@ -89,6 +89,27 @@ export const uploadGovernmentId = async (
   return response.data.data;
 };
 
+// ———————————————— APPLICATIONS API ————————————————
+export interface AdoptionApplicationListItem {
+  applicationID: number;
+  petID: number;
+  shelterID: number;
+  applicationStatus: "Pending" | "Accepted" | "Rejected" | "Withdrawn";
+  createdAt: string;
+  pet: { petName: string; petPhoto: string | null };
+  shelter: { shelterName: string };
+}
+
+export const getMyApplications = async (params?: {
+  petID?: number;
+  status?: "Pending" | "Accepted" | "Rejected" | "Withdrawn";
+}): Promise<AdoptionApplicationListItem[]> => {
+  const response = await axiosInstance.get("/adopters/me/applications", {
+    params,
+  });
+  return response.data.data;
+};
+
 // ———————————————— CLOSE ACCOUNT API ————————————————
 // 'deactivate' keeps data (no self-service reactivation yet); 'delete' is
 // permanent. Both are blocked server-side (409) if an Accepted adoption

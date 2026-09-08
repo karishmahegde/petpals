@@ -229,6 +229,10 @@ router.post(
  *           type: string
  *           enum: [Pending, Accepted, Rejected, Withdrawn]
  *         description: Optional filter by application status
+ *       - in: query
+ *         name: petID
+ *         schema: { type: integer }
+ *         description: Optional filter to this adopter's applications for a single pet
  *     responses:
  *       200:
  *         description: Paginated list of the adopter's applications

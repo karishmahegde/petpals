@@ -69,6 +69,14 @@ export interface PetDetail {
   // Not yet returned by GET /pets/:id on the backend — falls back to a
   // placeholder in the UI until the service selects/returns this field.
   petPhoto: string | null;
+  adoptionStatus:
+    | "incoming"
+    | "available"
+    | "pending"
+    | "adopted"
+    | "fostered"
+    | "transferred"
+    | "deceased";
   breed: {
     breedID: number;
     breedName: string;
