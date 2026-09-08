@@ -9,6 +9,8 @@ const APPLICATION_SELECT = {
   shelterID: true,
   staffID: true,
   applicationStatus: true,
+  applicationType: true,
+  shelterMessage: true,
   createdAt: true,
 };
 
@@ -24,7 +26,13 @@ const conflict = (message) => {
 };
 
 // ——————————————— CREATE APPLICATION (POST /adoption-applications) ———————————————
-const createApplication = async ({ adopterID, petID, shelterID }) => {
+const createApplication = async ({
+  adopterID,
+  petID,
+  shelterID,
+  applicationType,
+  shelterMessage,
+}) => {
   const pet = await prisma.pet.findUnique({
     where: { petID },
     select: { petID: true, adoptionStatus: true, shelterID: true },
@@ -59,7 +67,14 @@ const createApplication = async ({ adopterID, petID, shelterID }) => {
 
   try {
     return await prisma.adoptionApplication.create({
-      data: { petID, shelterID, adopterID, applicationStatus: "Pending" },
+      data: {
+        petID,
+        shelterID,
+        adopterID,
+        applicationStatus: "Pending",
+        applicationType,
+        shelterMessage,
+      },
       select: APPLICATION_SELECT,
     });
   } catch (err) {

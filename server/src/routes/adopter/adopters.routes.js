@@ -64,6 +64,83 @@ router.put("/me", authenticate, authorizeRoles(ROLES.ADOPTER), adoptersControlle
 
 /**
  * @swagger
+ * /adopters/me/onboarding-step:
+ *   patch:
+ *     summary: Advance the logged-in adopter's onboarding progress
+ *     description: >
+ *       Called after a wizard step's own data has been saved. Body `step` is
+ *       the step number just completed (2-6). The server sets
+ *       onboardingStep = min(max(current, step + 1), 7) — it only ever
+ *       advances, regardless of what's sent.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [step]
+ *             properties:
+ *               step:
+ *                 type: integer
+ *                 minimum: 2
+ *                 maximum: 7
+ *     responses:
+ *       200:
+ *         description: The updated adopter profile (same shape as GET /adopters/me)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdopterProfile' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.patch(
+  "/me/onboarding-step",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.advanceOnboardingStep,
+);
+
+/**
+ * @swagger
+ * /adopters/me/onboarding-complete:
+ *   patch:
+ *     summary: Mark the logged-in adopter's onboarding as complete
+ *     description: Called on final submit of the onboarding wizard's Review step (Step 7).
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The updated adopter profile (same shape as GET /adopters/me)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdopterProfile' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.patch(
+  "/me/onboarding-complete",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.completeOnboarding,
+);
+
+/**
+ * @swagger
  * /adopters/me:
  *   delete:
  *     summary: Deactivate or permanently delete the logged-in adopter's account

@@ -30,10 +30,17 @@ const ADOPTER_PROFILE_SELECT = {
   preferredAgeRange: true,
   preferredSize: true,
   openToSpecialNeeds: true,
-  adopterType: true,
   emailVerified: true,
   lastLoginAt: true,
   accountStatus: true,
+  addressLine1: true,
+  addressLine2: true,
+  city: true,
+  state: true,
+  zip: true,
+  country: true,
+  onboardingComplete: true,
+  onboardingStep: true,
 };
 
 const notFound = (userID) => {
@@ -78,6 +85,105 @@ const updateAdopterProfile = async (userID, data) => {
       );
       e.code = "BAD_REQUEST";
       throw e;
+    }
+    throw err;
+  }
+};
+
+// ——————————————— ADVANCE ONBOARDING STEP (PATCH /adopters/me/onboarding-step) ———————————————
+// `step` is the wizard step the adopter just completed (2-6, validated by
+// the controller). Never moves onboardingStep backward, regardless of what
+// the client sends — the persisted value only ever advances.
+const advanceOnboardingStep = async (userID, step) => {
+  const adopter = await prisma.adopter.findUnique({
+    where: { userID },
+    select: { onboardingStep: true },
+  });
+  if (!adopter) {
+    throw notFound(userID);
+  }
+
+  const nextStep = Math.min(Math.max(adopter.onboardingStep, step + 1), 7);
+
+  return prisma.adopter.update({
+    where: { userID },
+    data: { onboardingStep: nextStep },
+    select: ADOPTER_PROFILE_SELECT,
+  });
+};
+
+// ——————————————— COMPLETE ONBOARDING (PATCH /adopters/me/onboarding-complete) ———————————————
+// Fields collected across Steps 2, 4 and 5 that must actually be filled in —
+// checked server-side, not just trusted from the wizard's own client-side
+// required-field checks, since this endpoint could otherwise be hit directly
+// with none of them ever having been set. Step 6 (Preferences) is
+// intentionally excluded — every field there is a soft preference, not
+// required data (see PreferencesStep.tsx).
+const REQUIRED_FOR_COMPLETION = {
+  adopterDOB: "Date of birth",
+  adopterSex: "Sex",
+  adopterPhone: "Phone",
+  addressLine1: "Address line 1",
+  city: "City",
+  state: "State",
+  zip: "ZIP",
+  country: "Country",
+  housingType: "Housing type",
+  ownsOrRents: "Owns or rents",
+  householdSize: "Household size",
+  numChildren: "Number of children",
+  employmentStatus: "Employment status",
+  activityLevel: "Activity level",
+  petExperience: "Pet experience",
+};
+
+const incompleteOnboarding = (missingLabels) => {
+  const err = new Error(
+    `Onboarding is incomplete — missing: ${missingLabels.join(", ")}`,
+  );
+  err.code = "CONFLICT";
+  return err;
+};
+
+const completeOnboarding = async (userID) => {
+  const adopter = await prisma.adopter.findUnique({
+    where: { userID },
+    select: Object.fromEntries(
+      Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
+    ),
+  });
+  if (!adopter) {
+    throw notFound(userID);
+  }
+
+  const missingLabels = Object.entries(REQUIRED_FOR_COMPLETION)
+    .filter(([field]) => {
+      const value = adopter[field];
+      return value === null || value === undefined || value === "";
+    })
+    .map(([, label]) => label);
+
+  const governmentId = await prisma.governmentID.findFirst({
+    where: { userID, userType: "Adopter" },
+    select: { governmentIDID: true },
+  });
+  if (!governmentId) {
+    missingLabels.push("Government ID");
+  }
+
+  if (missingLabels.length > 0) {
+    throw incompleteOnboarding(missingLabels);
+  }
+
+  try {
+    return await prisma.adopter.update({
+      where: { userID },
+      data: { onboardingComplete: true, onboardingStep: 7 },
+      select: ADOPTER_PROFILE_SELECT,
+    });
+  } catch (err) {
+    if (err.code === "P2025") {
+      throw notFound(userID);
     }
     throw err;
   }
@@ -265,6 +371,8 @@ const closeAccount = async (userID, mode) => {
 module.exports = {
   getAdopterProfile,
   updateAdopterProfile,
+  advanceOnboardingStep,
+  completeOnboarding,
   createGovernmentId,
   getGovernmentId,
   closeAccount,

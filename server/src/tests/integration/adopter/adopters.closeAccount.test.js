@@ -139,7 +139,7 @@ describe("DELETE /api/v1/adopters/me", () => {
     const appRes = await request(app)
       .post("/api/v1/adoption-applications")
       .set("Authorization", `Bearer ${token}`)
-      .send({ petID, shelterID });
+      .send({ petID, shelterID, applicationType: "Adopt" });
     expect(appRes.status).toBe(201);
 
     // Simulates a submitted government ID without a real Storage upload —
@@ -188,7 +188,7 @@ describe("DELETE /api/v1/adopters/me", () => {
       const appRes = await request(app)
         .post("/api/v1/adoption-applications")
         .set("Authorization", `Bearer ${token}`)
-        .send({ petID, shelterID });
+        .send({ petID, shelterID, applicationType: "Adopt" });
       expect(appRes.status).toBe(201);
       const applicationID = appRes.body.data.applicationID;
 

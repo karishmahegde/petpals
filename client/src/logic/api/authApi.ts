@@ -7,6 +7,10 @@ export interface AuthUser {
   role: string;
   name?: string; // present on login, absent on refresh-token response
   avatarSeed?: string; // present on both login and refresh-token responses
+  // Adopter-only — present on both login and refresh-token responses when
+  // role === "Adopter", absent for every other role.
+  onboardingComplete?: boolean;
+  onboardingStep?: number;
 }
 
 export interface RefreshTokenResponse {

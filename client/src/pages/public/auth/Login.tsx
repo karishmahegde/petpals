@@ -7,18 +7,26 @@
 //   - On failure: displays server error message inline
 // Route: /login
 import { useEffect, useState } from "react";
+import { unstable_batchedUpdates } from "react-dom";
 import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import Card from "../../../components/ui/Card";
 import axios from "axios";
 import { login as loginApi } from "../../../logic/api/authApi";
 import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
+import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Shared by both destinations that land here: right after a fresh login, and
+// an already-authenticated user hitting /login directly.
+const resolveDestination = (userRole: string, redirectParam: string | null) => {
+  if (!redirectParam) return `/${userRole.toLowerCase()}`;
+  return userRole === "Adopter" ? redirectParam : "/adopt";
+};
+
 const Login = () => {
-  const { token, role } = useAuthStore();
   const [searchParams] = useSearchParams();
   // Query param, not location.state — survives a page refresh mid-login,
   // which state would not.
@@ -32,25 +40,41 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Same destination/toast logic whether the role check happens right after
-  // login or on an already-authenticated user hitting /login directly — both
-  // cases render this component with token+role already set, so this one
-  // branch covers both.
-  const needsAdopterAccount = !!(token && role && redirect && role !== "Adopter");
+  // Captured once, on mount — true only if a session already existed when
+  // this page was first reached (e.g. visiting /login directly while
+  // already logged in). Deliberately NOT reactive to later token/role
+  // changes: handleSubmit navigates explicitly on a fresh login, and
+  // staying reactive here would re-run this same redirect during that same
+  // store update, racing with the explicit navigate() and producing a
+  // stray render where this component returns nothing — a visible flash
+  // of blank space inside PublicLayout's Navbar/Footer before the real
+  // destination appears.
+  const [alreadyAuthenticated] = useState(() => {
+    const { token, role } = useAuthStore.getState();
+    return token && role ? { role } : null;
+  });
 
   useEffect(() => {
-    if (needsAdopterAccount) {
+    if (
+      alreadyAuthenticated &&
+      redirect &&
+      alreadyAuthenticated.role !== "Adopter"
+    ) {
       showAdopterAccountToast(navigate);
     }
-  }, [needsAdopterAccount, navigate]);
+    // Intentionally mount-only — alreadyAuthenticated is itself frozen at
+    // mount, so re-running this on navigate/redirect identity changes would
+    // add nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (token && role) {
-    const destination = redirect
-      ? role === "Adopter"
-        ? redirect
-        : "/adopt"
-      : `/${role.toLowerCase()}`;
-    return <Navigate to={destination} replace />;
+  if (alreadyAuthenticated) {
+    return (
+      <Navigate
+        to={resolveDestination(alreadyAuthenticated.role, redirect)}
+        replace
+      />
+    );
   }
 
   const validate = (): string => {
@@ -74,10 +98,21 @@ const Login = () => {
     try {
       // sending the credentials to the login API
       const { token, user } = await loginApi({ email, password });
-      storeLogin(user, token, user.role);
-      // No explicit navigate here — token/role updating in the store
-      // re-renders this component into the `if (token && role)` branch
-      // above, which resolves the destination (including `redirect`).
+      // A real credential login — not the silent session-restore bootstrap
+      // in App.tsx — is the one point that should undo a prior "Skip for
+      // now" (see onboardingSkip.ts): next login shows the onboarding form
+      // again if it's still incomplete.
+      clearOnboardingSkipped();
+      // storeLogin (Zustand) and navigate (React Router) are two unrelated
+      // subscriptions — without forcing them into one batch, Navbar (which
+      // reads the store directly) can commit and paint the "logged in" chip
+      // a frame before the route actually changes away from /login, which
+      // reads as the navbar updating while the login form is still on
+      // screen. batchedUpdates forces both into a single commit.
+      unstable_batchedUpdates(() => {
+        storeLogin(user, token, user.role);
+        navigate(resolveDestination(user.role, redirect), { replace: true });
+      });
     } catch (err: unknown) {
       // error runs when no server
       const message =

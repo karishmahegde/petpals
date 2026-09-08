@@ -223,7 +223,7 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
                 onClick={handleAdoptClick}
                 className="w-full bg-teal-dark text-center"
               >
-                Adopt {data.petName}
+                Adopt or Foster
               </ButtonElement>
             </div>
           </>

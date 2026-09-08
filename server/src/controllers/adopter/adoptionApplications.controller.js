@@ -15,6 +15,9 @@ const parseId = (value, field) => {
   return n;
 };
 
+const VALID_APPLICATION_TYPES = ["Adopt", "Foster"];
+const MAX_SHELTER_MESSAGE_LEN = 500; // schema.prisma: shelterMessage is VarChar(500)
+
 // ——————————————— POST /adoption-applications ———————————————
 const createApplication = async (req, res, next) => {
   let petID;
@@ -26,11 +29,37 @@ const createApplication = async (req, res, next) => {
     return next(err);
   }
 
+  const { applicationType, shelterMessage: shelterMessageRaw } = req.body ?? {};
+  if (!VALID_APPLICATION_TYPES.includes(applicationType)) {
+    return next(
+      badRequest(
+        `applicationType is required and must be one of: ${VALID_APPLICATION_TYPES.join(", ")}`,
+      ),
+    );
+  }
+
+  let shelterMessage = null;
+  if (shelterMessageRaw !== undefined && shelterMessageRaw !== null) {
+    if (
+      typeof shelterMessageRaw !== "string" ||
+      shelterMessageRaw.length > MAX_SHELTER_MESSAGE_LEN
+    ) {
+      return next(
+        badRequest(
+          `shelterMessage must be a string of at most ${MAX_SHELTER_MESSAGE_LEN} characters`,
+        ),
+      );
+    }
+    shelterMessage = shelterMessageRaw.trim() || null;
+  }
+
   try {
     const application = await adoptionApplicationsService.createApplication({
       adopterID: req.user.userID,
       petID,
       shelterID,
+      applicationType,
+      shelterMessage,
     });
     return successResponse(
       res,

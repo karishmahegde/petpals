@@ -27,10 +27,17 @@ export interface AdopterProfile {
   preferredAgeRange: string | null;
   preferredSize: string | null;
   openToSpecialNeeds: boolean;
-  adopterType: string | null;
   emailVerified: boolean;
   lastLoginAt: string | null;
   accountStatus: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  onboardingComplete: boolean;
+  onboardingStep: number;
 }
 
 // ———————————————— ADOPTER PROFILE API ————————————————
@@ -41,11 +48,32 @@ export const getAdopterProfile = async (): Promise<AdopterProfile> => {
 
 // Partial update — the backend accepts any subset of the editable fields and
 // validates enums / lengths server-side. adopterEmail, adopterPassword,
-// adopterRiskFlag, preQualifyFlag and accountStatus are rejected with 400.
+// adopterRiskFlag, preQualifyFlag, accountStatus, onboardingComplete and
+// onboardingStep are rejected with 400 — the last two are only advanced via
+// advanceOnboardingStep()/completeOnboarding() below.
 export const updateAdopterProfile = async (
   payload: Record<string, unknown>,
 ): Promise<AdopterProfile> => {
   const response = await axiosInstance.put("/adopters/me", payload);
+  return response.data.data;
+};
+
+// Called after a wizard step's own data has been saved — `step` is the step
+// # just completed (2-6). Server-side, onboardingStep only ever advances.
+export const advanceOnboardingStep = async (
+  step: number,
+): Promise<AdopterProfile> => {
+  const response = await axiosInstance.patch("/adopters/me/onboarding-step", {
+    step,
+  });
+  return response.data.data;
+};
+
+// Called on final submit of the onboarding wizard's Review step.
+export const completeOnboarding = async (): Promise<AdopterProfile> => {
+  const response = await axiosInstance.patch(
+    "/adopters/me/onboarding-complete",
+  );
   return response.data.data;
 };
 

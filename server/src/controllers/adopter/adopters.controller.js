@@ -47,7 +47,12 @@ const UPDATABLE_FIELDS = [
   "preferredAgeRange",
   "preferredSize",
   "openToSpecialNeeds",
-  "adopterType",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "state",
+  "zip",
+  "country",
 ];
 
 // Set by admins or the system only. A self-service update naming any of these is
@@ -60,6 +65,11 @@ const ADMIN_ONLY_FIELDS = [
   "accountStatus",
 ];
 
+// Onboarding progression state — only advanced via the dedicated
+// onboarding-step/onboarding-complete endpoints below, never set directly
+// through the general profile update.
+const PROGRESSION_ONLY_FIELDS = ["onboardingComplete", "onboardingStep"];
+
 const ENUM_VALUES = {
   housingType: ["Apartment", "House", "Other"],
   ownsOrRents: ["Owns", "Rents"],
@@ -68,7 +78,6 @@ const ENUM_VALUES = {
   petExperience: ["No", "Little", "Some", "Very"],
   preferredAgeRange: ["Young", "Adult", "Old"],
   preferredSize: ["Small", "Medium", "Large"],
-  adopterType: ["Fosterer", "Owner"],
 };
 
 const INTEGER_FIELDS = [
@@ -84,6 +93,12 @@ const STRING_MAX = {
   adopterName: 45,
   landlordContact: 20,
   adopterSex: 1,
+  addressLine1: 100,
+  addressLine2: 100,
+  city: 45,
+  state: 45,
+  zip: 10,
+  country: 45,
 };
 // Columns that are NOT NULL in the schema — cannot be cleared via update.
 const NON_NULLABLE = [
@@ -92,13 +107,20 @@ const NON_NULLABLE = [
   "yardAvailable",
   "currentPets",
   "openToSpecialNeeds",
+  "addressLine1",
+  "city",
+  "state",
+  "zip",
+  "country",
 ];
 
 // ——————————————— PUT /adopters/me ———————————————
 const updateMe = async (req, res, next) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
 
-  const rejected = ADMIN_ONLY_FIELDS.filter((f) => f in body);
+  const rejected = [...ADMIN_ONLY_FIELDS, ...PROGRESSION_ONLY_FIELDS].filter(
+    (f) => f in body,
+  );
   if (rejected.length > 0) {
     return next(
       badRequest(`These fields cannot be updated here: ${rejected.join(", ")}`),
@@ -181,6 +203,34 @@ const updateMe = async (req, res, next) => {
       data,
     );
     return successResponse(res, "Adopter profile updated successfully", adopter);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PATCH /adopters/me/onboarding-step ———————————————
+const advanceOnboardingStep = async (req, res, next) => {
+  const step = Number(req.body?.step);
+  if (!Number.isInteger(step) || step < 2 || step > 7) {
+    return next(badRequest("step must be an integer between 2 and 7"));
+  }
+
+  try {
+    const adopter = await adoptersService.advanceOnboardingStep(
+      req.user.userID,
+      step,
+    );
+    return successResponse(res, "Onboarding step updated successfully", adopter);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PATCH /adopters/me/onboarding-complete ———————————————
+const completeOnboarding = async (req, res, next) => {
+  try {
+    const adopter = await adoptersService.completeOnboarding(req.user.userID);
+    return successResponse(res, "Onboarding completed successfully", adopter);
   } catch (err) {
     return next(err);
   }
@@ -376,6 +426,8 @@ const closeAccount = async (req, res, next) => {
 module.exports = {
   getMe,
   updateMe,
+  advanceOnboardingStep,
+  completeOnboarding,
   uploadGovernmentId,
   getGovernmentId,
   getMyApplications,

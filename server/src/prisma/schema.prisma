@@ -189,11 +189,18 @@ model Adopter {
   preferredAgeRange  PreferredAgeRange?
   preferredSize      PetSize?
   openToSpecialNeeds Boolean               @default(false)
-  adopterType        AdopterType?
   emailVerified      Boolean               @default(false)
   lastLoginAt        DateTime?
   stripeCustomerID   String?               @db.VarChar(255)
   accountStatus      AdopterAccountStatus? @default(Active)
+  addressLine1       String                @default("") @db.VarChar(100)
+  addressLine2       String?               @db.VarChar(100)
+  city               String                @default("") @db.VarChar(45)
+  state              String                @default("") @db.VarChar(45)
+  zip                String                @default("") @db.VarChar(10)
+  country            String                @default("") @db.VarChar(45)
+  onboardingComplete Boolean               @default(false)
+  onboardingStep     Int                   @default(2)
   preferredBreed     Breed?                @relation(fields: [preferredBreedID], references: [breedID])
   user               Users                 @relation(fields: [userID], references: [userID])
   applications       AdoptionApplication[]
@@ -218,6 +225,8 @@ model AdoptionApplication {
   staffID           Int?
   shelterID         Int
   applicationStatus ApplicationStatus @default(Pending)
+  applicationType   ApplicationType   @default(Adopt)
+  shelterMessage    String?           @db.VarChar(500)
   adopter           Adopter           @relation(fields: [adopterID], references: [userID])
   pet               Pet               @relation(fields: [petID], references: [petID])
   shelter           Shelter           @relation(fields: [shelterID], references: [shelterID])
@@ -517,9 +526,9 @@ enum PreferredAgeRange {
   Old
 }
 
-enum AdopterType {
-  Fosterer
-  Owner
+enum ApplicationType {
+  Adopt
+  Foster
 }
 
 enum AdopterAccountStatus {

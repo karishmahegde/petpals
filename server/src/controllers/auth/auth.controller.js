@@ -133,6 +133,8 @@ const refreshToken = async (req, res, next) => {
         role: user.role,
         name: user.name,
         avatarSeed: user.avatarSeed,
+        onboardingComplete: user.onboardingComplete,
+        onboardingStep: user.onboardingStep,
       },
     });
   } catch (err) {

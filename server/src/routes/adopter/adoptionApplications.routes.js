@@ -24,13 +24,20 @@ const router = express.Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required: [petID, shelterID]
+ *             required: [petID, shelterID, applicationType]
  *             properties:
  *               petID:
  *                 type: integer
  *               shelterID:
  *                 type: integer
  *                 description: Must match the pet's shelter
+ *               applicationType:
+ *                 type: string
+ *                 enum: [Adopt, Foster]
+ *               shelterMessage:
+ *                 type: string
+ *                 maxLength: 500
+ *                 nullable: true
  *     responses:
  *       201:
  *         description: The created application record (applicationStatus = Pending)

@@ -82,8 +82,11 @@ const login = async ({ email, password }) => {
   }
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
+  const isAdopter = user.role === "Adopter";
   let name = null;
   let avatarSeed = null;
+  let onboardingComplete;
+  let onboardingStep;
   if (config) {
     // Every role table now carries its own accountStatus field (Active/
     // Deactivated for Admin/Staff/Vet; Active/Banned/Deactivated for Adopter/
@@ -93,10 +96,19 @@ const login = async ({ email, password }) => {
     // for a role whose enum doesn't define it.
     const roleRecord = await prisma[config.model].findUnique({
       where: { userID: user.userID },
-      select: { [config.nameField]: true, accountStatus: true, avatarSeed: true },
+      select: {
+        [config.nameField]: true,
+        accountStatus: true,
+        avatarSeed: true,
+        ...(isAdopter ? { onboardingComplete: true, onboardingStep: true } : {}),
+      },
     });
     name = roleRecord?.[config.nameField] ?? null;
     avatarSeed = roleRecord?.avatarSeed ?? null;
+    if (isAdopter) {
+      onboardingComplete = roleRecord?.onboardingComplete ?? false;
+      onboardingStep = roleRecord?.onboardingStep ?? 2;
+    }
 
     // Blocked account states — checked here (not in a request middleware) since
     // this is the only point a fresh login can be refused; an already-issued
@@ -140,7 +152,12 @@ const login = async ({ email, password }) => {
   }
 
   const { userPassword, refreshToken, ...safeUser } = user;
-  return { ...safeUser, name, avatarSeed };
+  return {
+    ...safeUser,
+    name,
+    avatarSeed,
+    ...(isAdopter ? { onboardingComplete, onboardingStep } : {}),
+  };
 };
 
 const storeRefreshToken = async (userID, hashedRefreshToken) => {
@@ -222,19 +239,35 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
   });
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
+  const isAdopter = user.role === "Adopter";
   let name = null;
   let avatarSeed = null;
+  let onboardingComplete;
+  let onboardingStep;
   if (config) {
     const roleRecord = await prisma[config.model].findUnique({
       where: { userID: user.userID },
-      select: { [config.nameField]: true, avatarSeed: true },
+      select: {
+        [config.nameField]: true,
+        avatarSeed: true,
+        ...(isAdopter ? { onboardingComplete: true, onboardingStep: true } : {}),
+      },
     });
     name = roleRecord?.[config.nameField] ?? null;
     avatarSeed = roleRecord?.avatarSeed ?? null;
+    if (isAdopter) {
+      onboardingComplete = roleRecord?.onboardingComplete ?? false;
+      onboardingStep = roleRecord?.onboardingStep ?? 2;
+    }
   }
 
   const { refreshToken: _, ...safeUser } = user; // Strip the token to send back the response
-  return { ...safeUser, name, avatarSeed };
+  return {
+    ...safeUser,
+    name,
+    avatarSeed,
+    ...(isAdopter ? { onboardingComplete, onboardingStep } : {}),
+  };
 };
 
 module.exports = {

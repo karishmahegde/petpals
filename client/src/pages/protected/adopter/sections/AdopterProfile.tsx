@@ -35,7 +35,6 @@ interface EditableProfile {
   adopterDOB: string | null; // "YYYY-MM-DD"
   adopterSex: string | null;
   adopterPhone: string | null;
-  adopterType: string | null;
   housingType: string | null;
   ownsOrRents: string | null;
   landlordContact: string | null;
@@ -92,12 +91,6 @@ const SECTIONS: { title: string; fields: FieldDef[] }[] = [
         key: "adopterPhone",
         label: "Phone",
         type: "phone",
-        nullable: true,
-      },
-      {
-        key: "adopterType",
-        label: "Adopter type",
-        type: "select",
         nullable: true,
       },
     ],
@@ -207,7 +200,6 @@ const SECTIONS: { title: string; fields: FieldDef[] }[] = [
 // Enum values mirror server-side validation (adopters.controller.js).
 const ENUM_VALUES: Partial<Record<EditableKey, string[]>> = {
   adopterSex: ["M", "F", "O"],
-  adopterType: ["Fosterer", "Owner"],
   housingType: ["Apartment", "House", "Other"],
   ownsOrRents: ["Owns", "Rents"],
   employmentStatus: ["Unemployed", "Student", "Self_employed", "Employed"],
@@ -234,7 +226,6 @@ const toEditable = (p: AdopterProfileData): EditableProfile => ({
   adopterDOB: p.adopterDOB ? p.adopterDOB.slice(0, 10) : null,
   adopterSex: p.adopterSex ?? null,
   adopterPhone: p.adopterPhone ?? null,
-  adopterType: p.adopterType ?? null,
   housingType: p.housingType ?? null,
   ownsOrRents: p.ownsOrRents ?? null,
   landlordContact: p.landlordContact ?? null,
@@ -578,7 +569,7 @@ const AdopterProfile = () => {
               avatar, which re-rolls via formState like any other field) */}
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-rose-light pb-5">
             <div className="flex items-center gap-4">
-              <div className="relative">
+              <div className="relative shrink-0">
                 <Avatar
                   seed={
                     isEditing && formState
@@ -586,7 +577,7 @@ const AdopterProfile = () => {
                       : profile.avatarSeed
                   }
                   size={72}
-                  className="h-16 w-16 rounded-full border border-rose-light bg-white md:h-[72px] md:w-[72px]"
+                  className="h-16 w-16 shrink-0 rounded-full border border-rose-light bg-white md:h-[72px] md:w-[72px]"
                 />
                 {isEditing && (
                   <button
