@@ -301,6 +301,11 @@ const getGovernmentId = async (userID) => {
   if (!record) {
     const err = new Error("No government ID has been submitted for this adopter");
     err.code = "NOT_FOUND";
+    // Expected on every load before an adopter has submitted one — the
+    // client already treats this 404 as a normal "not submitted yet" state
+    // (see GovernmentIdSection.tsx/IdentityStep.tsx), not a real error, so
+    // it shouldn't spam a stack trace to the server console every time.
+    err.quiet = true;
     throw err;
   }
 

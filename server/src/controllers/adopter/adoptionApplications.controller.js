@@ -54,7 +54,10 @@ const createApplication = async (req, res, next) => {
   }
 
   try {
-    const application = await adoptionApplicationsService.createApplication({
+    // Creates a Stripe Checkout Session — the AdoptionApplication row
+    // itself is only ever created by the webhook once payment is confirmed
+    // (see adoptionApplications.service.js finalizeApplication).
+    const { checkoutUrl } = await adoptionApplicationsService.createCheckoutSession({
       adopterID: req.user.userID,
       petID,
       shelterID,
@@ -63,9 +66,35 @@ const createApplication = async (req, res, next) => {
     });
     return successResponse(
       res,
-      "Adoption application submitted successfully",
-      application,
+      "Checkout session created successfully",
+      { checkoutUrl },
       201,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adoption-applications?checkoutSessionId= (confirmation-page polling) ———————————————
+const getByCheckoutSession = async (req, res, next) => {
+  const sessionId = req.query?.checkoutSessionId;
+  if (typeof sessionId !== "string" || !sessionId) {
+    return next(badRequest("checkoutSessionId is required"));
+  }
+
+  try {
+    const application = await adoptionApplicationsService.getApplicationByCheckoutSession(
+      req.user.userID,
+      sessionId,
+    );
+    // application is null while the webhook hasn't landed yet — that's the
+    // expected common case for a poll, not an error.
+    return successResponse(
+      res,
+      application
+        ? "Adoption application found"
+        : "No adoption application found for this checkout session yet",
+      application,
     );
   } catch (err) {
     return next(err);
@@ -96,4 +125,4 @@ const getApplication = async (req, res, next) => {
   }
 };
 
-module.exports = { createApplication, getApplication };
+module.exports = { createApplication, getByCheckoutSession, getApplication };

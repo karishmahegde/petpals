@@ -218,19 +218,27 @@ model Favorite {
 }
 
 model AdoptionApplication {
-  applicationID     Int               @id @default(autoincrement())
-  petID             Int
-  adopterID         Int
-  createdAt         DateTime          @default(now())
-  staffID           Int?
-  shelterID         Int
-  applicationStatus ApplicationStatus @default(Pending)
-  applicationType   ApplicationType   @default(Adopt)
-  shelterMessage    String?           @db.VarChar(500)
-  adopter           Adopter           @relation(fields: [adopterID], references: [userID])
-  pet               Pet               @relation(fields: [petID], references: [petID])
-  shelter           Shelter           @relation(fields: [shelterID], references: [shelterID])
-  staff             Staff?            @relation(fields: [staffID], references: [userID])
+  applicationID           Int               @id @default(autoincrement())
+  petID                   Int
+  adopterID               Int
+  createdAt               DateTime          @default(now())
+  staffID                 Int?
+  shelterID               Int
+  applicationStatus       ApplicationStatus @default(Pending)
+  applicationType         ApplicationType   @default(Adopt)
+  shelterMessage          String?           @db.VarChar(500)
+  // Payment fields — this row is only ever created by the Stripe webhook
+  // after payment is confirmed (see adoptionApplications.service.js
+  // finalizeApplication), so every create() call sets all four explicitly.
+  // No missing-Prisma-default gap like the Part 3 address-field incident.
+  stripeCheckoutSessionID String            @db.VarChar(255)
+  stripePaymentIntentID   String?           @db.VarChar(255)
+  paymentStatus           PaymentStatus     @default(Paid)
+  amountPaid              Decimal           @default(15.00) @db.Decimal(6, 2)
+  adopter                 Adopter           @relation(fields: [adopterID], references: [userID])
+  pet                     Pet               @relation(fields: [petID], references: [petID])
+  shelter                 Shelter           @relation(fields: [shelterID], references: [shelterID])
+  staff                   Staff?            @relation(fields: [staffID], references: [userID])
   // Partial unique index enforced in the DB only — not expressible in Prisma:
   //   CREATE UNIQUE INDEX "AdoptionApplication_active_adopter_pet_key"
   //   ON "AdoptionApplication" ("adopterID", "petID")
@@ -529,6 +537,13 @@ enum PreferredAgeRange {
 enum ApplicationType {
   Adopt
   Foster
+}
+
+// The row is only ever created post-payment (see AdoptionApplication),
+// so this is always 'Paid' today — kept as an enum for schema clarity and
+// to leave room for a future status if the creation timing ever changes.
+enum PaymentStatus {
+  Paid
 }
 
 enum AdopterAccountStatus {

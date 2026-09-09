@@ -136,11 +136,21 @@ describe("DELETE /api/v1/adopters/me", () => {
       });
     expect(visitRes.status).toBe(201);
 
-    const appRes = await request(app)
-      .post("/api/v1/adoption-applications")
-      .set("Authorization", `Bearer ${token}`)
-      .send({ petID, shelterID, applicationType: "Adopt" });
-    expect(appRes.status).toBe(201);
+    // POST /adoption-applications only starts a Stripe Checkout Session now
+    // (see Part 5) — the row itself is only ever created by the payment
+    // webhook, so this test (which just needs an existing application as a
+    // precondition for the delete-cascade it's actually testing) creates
+    // the row directly instead of going through the HTTP endpoint.
+    await prisma.adoptionApplication.create({
+      data: {
+        petID,
+        shelterID,
+        adopterID: userID,
+        applicationType: "Adopt",
+        applicationStatus: "Pending",
+        stripeCheckoutSessionID: `cs_test_fake_${userID}`,
+      },
+    });
 
     // Simulates a submitted government ID without a real Storage upload —
     // deletePrivateFile is best-effort and swallows failures on a fake path.
@@ -185,16 +195,18 @@ describe("DELETE /api/v1/adopters/me", () => {
     test(`returns 409 and changes no data`, async () => {
       const { userID, token } = await registerAndLoginAdopter();
 
-      const appRes = await request(app)
-        .post("/api/v1/adoption-applications")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ petID, shelterID, applicationType: "Adopt" });
-      expect(appRes.status).toBe(201);
-      const applicationID = appRes.body.data.applicationID;
-
-      await prisma.adoptionApplication.update({
-        where: { applicationID },
-        data: { applicationStatus: "Accepted" },
+      // Same reasoning as above — create the row directly (already Accepted,
+      // since that's the precondition this test needs) rather than via the
+      // now-checkout-session-only POST endpoint.
+      await prisma.adoptionApplication.create({
+        data: {
+          petID,
+          shelterID,
+          adopterID: userID,
+          applicationType: "Adopt",
+          applicationStatus: "Accepted",
+          stripeCheckoutSessionID: `cs_test_fake_${userID}`,
+        },
       });
 
       const res = await request(app)

@@ -14,6 +14,7 @@ import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
 import AdopterDashboard from "./pages/protected/adopter/AdopterDashboard";
 import AdoptApply from "./pages/protected/adopter/AdoptApply";
+import AdoptApplyConfirmation from "./pages/protected/adopter/AdoptApplyConfirmation";
 import OnboardingWizard from "./pages/protected/adopter/onboarding/OnboardingWizard";
 import StaffDashboard from "./pages/protected/staff/StaffDashboard";
 import VetDashboard from "./pages/protected/vet/VetDashboard";
@@ -65,6 +66,22 @@ const App = () => {
             availability, duplicate application) with spec-specific redirect
             targets/toasts, so it doesn't use ProtectedRoute/RoleRoute. */}
         <Route path="/adopt/apply/:petID" element={<AdoptApply />} />
+
+        {/* Post-Stripe-Checkout landing page — payment already happened, so
+            this only needs auth + role, not AdoptApply's own
+            pet-availability/duplicate-application guards (which would be
+            actively wrong here: the webhook may be creating that very row
+            while this page is polling for it). */}
+        <Route
+          path="/adopt/apply/:petID/confirmation"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Adopter"]}>
+                <AdoptApplyConfirmation />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
 
         {/* Onboarding wizard — guards itself (see OnboardingWizard.tsx)
             beyond the standard ProtectedRoute + RoleRoute(Adopter) wrapper.

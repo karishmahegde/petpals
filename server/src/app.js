@@ -18,6 +18,15 @@ app.use(
     credentials: true, // required for httpOnly cookies to work
   }),
 );
+
+// Stripe webhook — mounted BEFORE express.json() below, and given its own
+// express.raw() body parser (see routes/webhooks/stripe.routes.js), since
+// stripe.webhooks.constructEvent needs the untouched raw request body to
+// verify the signature. Every other route is unaffected and still gets the
+// normal JSON-parsed body from express.json().
+const stripeWebhookRouter = require("./routes/webhooks/stripe.routes");
+app.use("/api/v1/webhooks", stripeWebhookRouter);
+
 app.use(express.json());
 app.use(helmet()); // sets various HTTP response headers to protect your app from common web vulnerabilities
 

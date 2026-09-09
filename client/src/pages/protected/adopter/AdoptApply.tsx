@@ -22,10 +22,14 @@ import CancelApplicationModal from "./CancelApplicationModal";
 import { getPetById } from "../../../logic/api/petsApi";
 import { getMyApplications } from "../../../logic/api/adoptersApi";
 import {
-  createApplication,
+  createCheckoutSession,
   type CreateApplicationPayload,
 } from "../../../logic/api/adoptionApplicationsApi";
 import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
+import {
+  saveApplyDraft,
+  loadApplyDraft,
+} from "../../../logic/adoptApplyDraft";
 import useAuthStore from "../../../logic/store/useAuthStore";
 
 const ACTIVE_STATUSES = ["Pending", "Accepted"];
@@ -128,19 +132,26 @@ const AdoptApply = () => {
 
   // Form state — declared unconditionally (before the guard early-return
   // below) since hooks can't be conditional, even though this state is only
-  // ever shown once allGuardsPassed is true.
+  // ever shown once allGuardsPassed is true. Stripe Checkout is a full-page
+  // redirect, so if the adopter backs out and lands back here (cancel_url),
+  // React state is gone — restore from the sessionStorage draft saved right
+  // before that redirect, if one exists for this pet.
   const [applicationType, setApplicationType] = useState<
     "Adopt" | "Foster" | null
-  >(null);
-  const [shelterMessage, setShelterMessage] = useState("");
+  >(() => loadApplyDraft(petID)?.applicationType ?? null);
+  const [shelterMessage, setShelterMessage] = useState(
+    () => loadApplyDraft(petID)?.shelterMessage ?? "",
+  );
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   const mutation = useMutation({
     mutationFn: (payload: CreateApplicationPayload) =>
-      createApplication(payload),
-    onSuccess: () => {
-      toast.success("Application submitted! We'll be in touch soon.");
-      navigate("/adopter", { replace: true });
+      createCheckoutSession(payload),
+    onSuccess: ({ checkoutUrl }) => {
+      // Leaving the SPA entirely for Stripe's hosted page — not a
+      // navigate(). The application row doesn't exist yet; it's only
+      // created once the webhook confirms payment (see AdoptApplyConfirmation).
+      window.location.href = checkoutUrl;
     },
     onError: (err) => {
       toast(extractError(err));
@@ -149,6 +160,7 @@ const AdoptApply = () => {
 
   const handleSubmit = () => {
     if (!pet || applicationType === null) return;
+    saveApplyDraft(petID, { applicationType, shelterMessage });
     mutation.mutate({
       petID: pet.petID,
       shelterID: pet.shelter.shelterID,
@@ -269,13 +281,24 @@ const AdoptApply = () => {
             />
           </div>
 
+          {/* Fee disclosure — clearly visible, not fine print, per spec §3.1. */}
+          <div className="mb-6 rounded-lg border border-gold-md bg-gold-light p-4">
+            <p className="font-body text-sm font-bold text-neutral-charcoal">
+              $15.00 USD application processing fee
+            </p>
+            <p className="mt-1 font-body text-xs text-neutral-charcoal">
+              This fee is non-refundable, including if your application is
+              declined or withdrawn.
+            </p>
+          </div>
+
           <button
             type="button"
             onClick={handleSubmit}
             disabled={applicationType === null || mutation.isPending}
             className="w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {mutation.isPending ? "Submitting…" : "Submit"}
+            {mutation.isPending ? "Redirecting to payment…" : "Continue to Payment"}
           </button>
           <button
             type="button"

@@ -9,12 +9,16 @@ const router = express.Router();
  * @swagger
  * /adoption-applications:
  *   post:
- *     summary: Submit an adoption application for a pet
+ *     summary: Start payment for an adoption application (creates a Stripe Checkout Session)
  *     description: >
- *       The authenticated adopter applies for a specific pet. The application is
- *       created with applicationStatus = Pending. The pet must exist and be
- *       'available', and the adopter must not already have an active (Pending or
- *       Accepted) application for the same pet.
+ *       Validates the pet/shelter/application eligibility (pet exists, is
+ *       'available', shelterID matches, no existing active application for
+ *       this adopter+pet), ensures the adopter has a Stripe Customer, then
+ *       creates a $15 Stripe Checkout Session and returns its URL. The
+ *       AdoptionApplication row itself is NOT created by this endpoint — it
+ *       is only ever created by the Stripe webhook once payment is
+ *       confirmed (POST /webhooks/stripe), with the form data carried
+ *       through via the session's metadata.
  *     tags: [Adoption Applications]
  *     security:
  *       - bearerAuth: []
@@ -40,7 +44,7 @@ const router = express.Router();
  *                 nullable: true
  *     responses:
  *       201:
- *         description: The created application record (applicationStatus = Pending)
+ *         description: The Stripe Checkout Session URL to redirect the browser to
  *         content:
  *           application/json:
  *             schema:
@@ -48,7 +52,10 @@ const router = express.Router();
  *                 - $ref: '#/components/schemas/ApiEnvelope'
  *                 - type: object
  *                   properties:
- *                     data: { $ref: '#/components/schemas/AdoptionApplication' }
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         checkoutUrl: { type: string }
  *       400:
  *         description: Missing/invalid petID or shelterID, or shelterID does not match the pet's shelter
  *         content:
@@ -68,6 +75,48 @@ router.post(
   authenticate,
   authorizeRoles(ROLES.ADOPTER),
   controller.createApplication,
+);
+
+/**
+ * @swagger
+ * /adoption-applications:
+ *   get:
+ *     summary: Look up the logged-in adopter's application by Stripe Checkout Session ID
+ *     description: >
+ *       Used by the post-payment confirmation page to poll for the
+ *       AdoptionApplication row the webhook creates. Returns data: null
+ *       (not a 404) while the webhook hasn't landed yet — that's the
+ *       expected common answer for a poll, not an error.
+ *     tags: [Adoption Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: checkoutSessionId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: The application record if found yet, otherwise null
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       nullable: true
+ *                       $ref: '#/components/schemas/AdoptionApplicationDetail'
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get(
+  "/",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  controller.getByCheckoutSession,
 );
 
 /**
