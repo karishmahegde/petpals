@@ -1,393 +1,234 @@
 # PetPals — Animal Adoption Management System
 
-## Claude Code Project Context
+Multi-shelter pet adoption platform (solo full-stack learning project). Unifies animal listings, adoption workflows, and medical records across every branch of a shelter organisation. Differentiators: (1) network-wide search & workflows, (2) universal health passport that travels with an animal across inter-shelter transfers, (3) AI pet–adopter compatibility matcher (OpenAI, Sprint 6).
 
----
-
-## What This Project Is
-
-PetPals is a multi-shelter pet adoption platform built as a solo full-stack learning project. It serves as an internal operations backbone for shelter networks — going beyond existing solutions like Petfinder by supporting inter-shelter workflows, a universal animal health passport, and an AI-powered pet-adopter compatibility matcher.
-
-**The core problem it solves:** Animal shelters operate in silos. PetPals unifies animal listings, adoption workflows, and medical records across all branches of an organisation in one platform.
-
----
-
-## Three Innovative Differentiators
-
-1. **Unified multi-shelter network** — animal search and workflows span all shelter branches
-2. **Universal health passport** — medical records travel with an animal across inter-shelter transfers
-3. **AI-powered compatibility matcher** — OpenAI API matches adopters to pets based on lifestyle and pet profile (Sprint 6)
-
----
-
-## Six User Roles
-
-| Role              | Description                                                                       |
-| ----------------- | --------------------------------------------------------------------------------- |
-| **Admin**         | Organisation-wide oversight — manages shelters, assigns managers, views analytics |
-| **Shelter Staff** | Day-to-day operations — manages pets, applications, volunteers, events, donations |
-| **Adopter**       | Browses pets, submits applications, schedules visits, tracks application status   |
-| **Veterinarian**  | Manages health appointments, vaccination records, universal health passport       |
-| **Volunteer**     | Views assigned tasks, manages schedule, marks tasks complete                      |
-| **Donor**         | Makes donations to specific shelter branches, views donation history              |
+**Roles:** Admin (org oversight, shelters, analytics) · Shelter Staff (pets, applications, volunteers, events, donations) · Adopter (browse, apply, schedule visits, track status) · Veterinarian (appointments, vaccinations, health passport) · Volunteer (assigned tasks) · Donor (donations + history).
 
 ---
 
 ## Tech Stack
 
-### Frontend (`client/`)
+**Frontend (`client/`):** React 18 + Vite + TS · React Router v6 · Zustand (auth `{ user, token, role }`, access token in memory) · TanStack Query (all server state) · Axios (`logic/api/axiosInstance.ts`) · Tailwind (tokens in `tailwind.config.js`: rose/gold/teal + neutrals; Benne display, Montserrat body) · react-icons (Fa/Hi/Pi/Tb) · react-hot-toast (`<Toaster/>` mounted once near root, styled there — not per call) · embla-carousel (Home carousel autoplay, Featured Pets slider drag-only).
 
-- **React 18** + **Vite** + **TypeScript**
-- **Tailwind CSS** — design tokens in `tailwind.config.js` (rose, gold, teal families + neutrals; Benne display font + Montserrat body font)
-- **React Router v6**
-- **Zustand** — global/auth state (who is logged in, access token in memory)
-- **TanStack Query** — server state, data fetching, caching, background sync
-- **Axios** — configured via `client/src/logic/api/axiosInstance.ts`
-- **react-icons** — Fa*, Hi*, Pi*, Tb* families in use
-- **react-hot-toast** — `<Toaster />` provider mounted once near app root; styling configured there, not per-call
-- **embla-carousel-react** + **embla-carousel-autoplay** — Home page carousel (autoplay) and Featured Pets slider (drag-only)
+**Backend (`server/`):** Node 18 + Express · Prisma (`server/src/prisma/schema.prisma`) · PostgreSQL 15 + PostGIS (`ST_MakePoint/SetSRID/Distance/DWithin`) · Supabase (managed Postgres + storage; buckets `pet-images`, `government-ids` private) · `zipcodes` npm (offline US zip→coords, behind `services/geocoding/`) · JWT two-token · bcrypt (10 rounds) · cookie-parser · node-cron (nightly TokenDenylist cleanup) · Stripe (application-fee Checkout).
 
-### Backend (`server/`)
-
-- **Node.js 18 + Express**
-- **Prisma ORM** — schema at `server/src/prisma/schema.prisma`
-- **PostgreSQL 15 + PostGIS** — PostGIS for geolocation (`ST_MakePoint`, `ST_SetSRID`, `ST_Distance`, `ST_DWithin`)
-- **Supabase** — managed Postgres + media storage; bucket is `pet-images`
-- **zipcodes** (npm) — offline US zip-to-coordinates lookup, isolated behind a generic interface (see Geocoding Module)
-- **JWT** — two-token stateless auth (access 15m + refresh 7d)
-- **bcrypt** — password hashing (10 salt rounds)
-- **cookie-parser** — httpOnly cookie parsing for refresh flow
-- **node-cron** — nightly cleanup of expired TokenDenylist entries
-
-### Infrastructure
-
-- **Docker + Docker Compose** — local dev
-- **Vercel** (frontend) / **Railway** (backend)
-- **GitHub** — branch strategy: `main` → `dev` → `feature/*`
-
-### Testing
-
-- **Jest + Supertest** — unit + integration (target: 70% coverage)
-- **Cypress** — E2E, critical adoption flows only
-
-### AI Feature (Sprint 6)
-
-- **OpenAI API** — pet-adopter compatibility matcher
+**Infra:** Docker Compose (local) · Vercel (FE) / Railway (BE) · branches `main` → `dev` → `feature/*`.
+**Testing:** Jest + Supertest (unit + integration, target 70%) · Cypress (critical adoption flows only).
 
 ---
 
-## ⚠️ Permanent Known Issues / Workarounds
+## ⚠️ Permanent Known Issues
 
-### PostGIS migration drift (CRITICAL)
-
-**Never run `npx prisma migrate dev`** — it will detect drift from the manually-added `shelterLocation` geography column and ask to reset the database.
-
-For any schema change:
-
-1. Edit `schema.prisma`
-2. Apply the SQL change directly in Supabase SQL editor
-3. Run `npx prisma generate` to regenerate the client
-
-The `shelterLocation` column must always be re-added manually after any DB reset:
-
-```sql
-ALTER TABLE "Shelter" ADD COLUMN "shelterLocation" geography(Point, 4326);
-```
-
-Seed file uses `prisma.$executeRaw` for PostGIS values — intentional.
-
-### CHAR(n) padding risk
-
-`CHAR(n)` right-pads shorter values with spaces, breaking strict string comparisons. Use `VARCHAR` unless the column's declared length exactly matches its content width (all `*Sex CHAR(1)` columns are safe; `petSex` was fixed from `CHAR(2)` → `CHAR(1)` in Sprint 2). Check this pattern on any new fixed-length column.
-
-### TanStack Query — key on what queryFn actually consumes
-
-`queryKey` must reflect everything `queryFn` depends on, not just the state that superficially looks like "the input." A computed override driven by different state than the nominal `filters` object can silently break refetching if the key doesn't include it. (Full incident: Sprint 2 pets-query bug, see past chats.)
-
-### Age filtering — computed cutoff, not stored value
-
-`petDOB` → `buildAgeFilter(minAge, maxAge)`: `minAge` uses direct `lte`; `maxAge` requires shifting the cutoff back one month AND using strict `gt` (not `gte`) to avoid excluding a pet exactly at the boundary. Both parts required together.
+- **PostGIS migration drift (CRITICAL) — never run `npx prisma migrate dev`.** It detects drift from the hand-added `shelterLocation` geography column and offers to reset the DB. For any schema change: edit `schema.prisma` → apply the SQL directly in the Supabase editor → `npx prisma generate`. After any DB reset, re-add all hand-applied constraints, including:
+  ```sql
+  ALTER TABLE "Shelter" ADD COLUMN "shelterLocation" geography(Point, 4326);
+  ```
+  Seed uses `prisma.$executeRaw` for PostGIS values — intentional.
+- **`CHAR(n)` padding:** right-pads with spaces, breaking strict string compares. Use `VARCHAR` unless the declared length exactly matches content width (`*Sex CHAR(1)` are safe; `petSex` was fixed `CHAR(2)`→`CHAR(1)`). Check on every new fixed-length column.
+- **TanStack `queryKey` must include everything `queryFn` reads** — not just the state that looks like "the input". A computed override driven by other state silently breaks refetching if it's not in the key.
+- **Age filter:** `petDOB` → `buildAgeFilter(minAge, maxAge)`. `minAge` = direct `lte`; `maxAge` = shift the cutoff back one month **and** use strict `gt` (not `gte`). Both parts required together.
 
 ---
 
-## Authentication System (Sprint 1 Complete)
+## Authentication (Sprint 1 ✅)
 
-### Two-token architecture
+Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every protected call) + **refresh** (httpOnly cookie, 7 days, only issues new access tokens). Central `USERS` table (`userID` PK/FK shared by all six role tables) holds `userEmail`, `userPassword` (hashed), `role`, `refreshToken` (hashed).
 
-| Token         | Storage                   | Expiry     | Purpose                                                          |
-| ------------- | ------------------------- | ---------- | ---------------------------------------------------------------- |
-| Access token  | Zustand memory (frontend) | 15 minutes | Sent in Authorization header on every protected API request      |
-| Refresh token | httpOnly cookie (browser) | 7 days     | Used only to issue new access tokens — never sent in API headers |
+**Session restore:** `App.tsx` calls `POST /auth/refresh-token` (cookie) on every load; success populates Zustand incl. the name from the role table, failure → public pages only.
 
-### USERS table (central auth table)
+| Endpoint | Auth | Notes |
+| --- | --- | --- |
+| `POST /auth/register` | — | `USERS` + role row atomically via `$transaction` |
+| `POST /auth/login` | — | access token + httpOnly cookie; name from role table |
+| `POST /auth/logout` | Bearer | nulls `USERS.refreshToken`, clears cookie |
+| `POST /auth/refresh-token` | cookie only | — |
 
-All six role-specific tables (Admin, Staff, Veterinarian, Adopter, Volunteer, Donor) share a central `USERS` table via `userID` as PK/FK. Stores `userEmail`, `userPassword` (hashed), `role`, `refreshToken` (hashed).
+**Guards:** FE `ProtectedRoute` (→ `/login` if no token), `RoleRoute` (→ `/forbidden` if wrong role). BE `authenticate.js` (verifies Bearer, sets `req.user`), `authorizeRoles('Staff','Admin')` factory.
 
-### Session restore on page load
-
-`App.tsx` calls `POST /auth/refresh-token` using the httpOnly cookie on every load. Success populates Zustand (token + user info incl. name from role table). Failure → public pages, `ProtectedRoute` redirects to `/login` on protected-route access attempts.
-
-### Auth endpoints
-
-| Endpoint                   | Auth required    | Notes                                                                     |
-| -------------------------- | ---------------- | ------------------------------------------------------------------------- |
-| `POST /auth/register`      | No               | Creates USERS row + role-specific row atomically via `$transaction`       |
-| `POST /auth/login`         | No               | Returns access token + sets httpOnly cookie; fetches name from role table |
-| `POST /auth/logout`        | Yes (Bearer)     | Nullifies `USERS.refreshToken` + clears cookie                            |
-| `POST /auth/refresh-token` | No (cookie only) | httpOnly cookie is the only auth mechanism                                |
-
-### Frontend route guards
-
-- `ProtectedRoute` — redirects to `/login` if no token in Zustand
-- `RoleRoute` — redirects to `/forbidden` if role not permitted
-
-### Backend RBAC middleware
-
-- `authenticate.js` — verifies Bearer token, attaches `req.user`
-- `authorizeRoles.js` — factory middleware, e.g. `authorizeRoles('Staff', 'Admin')`
-
-### Post-login redirect (Sprint 3)
-
-`/login` reads a `redirect` query param (e.g. `/login?redirect=/adopt/apply/5`) — a query param rather than `location.state`, so a page refresh mid-login doesn't lose it. After login, an Adopter is sent to `redirect`; any other role is sent to `/adopt` with a toast (see PetDetailsModal below). No `redirect` param falls back to the default role-dashboard redirect. Both the post-login path and an already-authenticated user hitting `/login` directly resolve through the same branch, so behavior is identical either way.
+**Post-login redirect (Sprint 3):** `/login?redirect=/adopt/apply/5` — a query param (survives a mid-login refresh). Adopter → `redirect`; other roles → `/adopt` + "need an adopter account" toast; no param → role-dashboard default. The same branch handles post-login and an already-authed user hitting `/login`.
 
 ---
 
 ## Folder Structure
 
 ```
-petpals/
-├── client/
-│   ├── src/
-│   │   ├── logic/
-│   │   │   ├── api/            # axiosInstance.ts, authApi.ts, petsApi.ts
-│   │   │   ├── route/          # ProtectedRoute.tsx, RoleRoute.tsx
-│   │   │   ├── store/          # useAuthStore.ts (Zustand: { user, token, role })
-│   │   │   └── geocoding/      # (empty — geocoding is server-side only)
-│   │   ├── static/
-│   │   │   ├── assets/images/branding/
-│   │   │   └── content/        # CMS-ready static page copy, one file/folder per page
-│   │   ├── components/
-│   │   │   ├── ui/             # Reusable, content-agnostic (Card, PetCatalogCard, FilterControls...)
-│   │   │   └── layout/         # Navbar, Footer, PublicLayout
-│   │   ├── pages/
-│   │   │   ├── public/
-│   │   │   │   ├── home/       # Home.tsx, Carousel.tsx, FeaturedPets.tsx, Searchbar.tsx
-│   │   │   │   ├── adopt/      # PetCatalog.tsx (owns filter state), PetFilterBar.tsx, ShelterLocationFilter.tsx, PetDetailsModal.tsx
-│   │   │   │   ├── auth/       # Login.tsx, Register.tsx
-│   │   │   │   └── errors/     # Forbidden.tsx, NotFound.tsx
-│   │   │   ├── protected/      # adopter/ staff/ vet/ volunteer/ donor/ admin/
-│   │   │   ├── about/          # planned
-│   │   │   └── volunteerinfo/  # planned
-│   │   ├── styles/index.css
-│   │   ├── main.tsx
-│   │   ├── App.tsx             # Routes + session restore on mount
-│   │   └── vite-env.d.ts
-│   ├── index.html / vite.config.ts / tailwind.config.js / .eslintrc.cjs
-│
-├── server/
-│   ├── src/
-│   │   ├── routes/             # grouped: auth/ public/ adopter/ — one <domain>.routes.js per file
-│   │   ├── controllers/        # same grouping as routes/
-│   │   ├── middleware/         # authenticate.js, authorizeRoles.js, errorHandler.js, upload.js
-│   │   ├── services/
-│   │   │   ├── auth/ public/ adopter/
-│   │   │   ├── geocoding/      # index.js is the ONLY importable file; usPostalCodeGeocoder.js is the only "US"-aware file
-│   │   │   └── storage/        # index.js is the ONLY importable file (Supabase Storage)
-│   │   ├── utils/               # errors.js, response.js
-│   │   ├── config/prisma.js    # Singleton Prisma client, PrismaPg adapter
-│   │   ├── prisma/schema.prisma / seed.js
-│   │   ├── tests/unit/ integration/
-│   │   ├── app.js / index.js
-│   ├── .env.example / package.json
-│
-├── docs/                        # Numbered .docx reference files
-├── docker-compose.yml / .gitignore / README.md / CLAUDE.md
+client/src/
+  logic/
+    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi
+    route/       ProtectedRoute, RoleRoute
+    store/       useAuthStore (Zustand: { user, token, role })
+    toast/       shared toast helpers
+    adopter/     adopter-domain view helpers (applicationStatus.ts)
+    geocoding/   (empty — server-side only)
+  static/        assets/images/branding/ · content/ (CMS-ready page copy, one file/folder per page)
+  components/
+    ui/          generic primitives (Card, ButtonElement, Avatar, ConfirmActionModal, Phone*, SegmentedControl)
+      marketing/ SectionContainer, SectionHeading[Center]
+      pets/      PetCatalogCard, PetDetailsModal, FilterControls
+      dashboard/ DashboardHeading, DashboardWidgetHeader, DashboardList, StatTile
+    layout/      Navbar, Footer, PublicLayout, DashboardNavbar, DashboardSidebar
+  pages/
+    public/      home/ · adopt/ (PetCatalog.tsx owns filter state; PetFilterBar, ShelterLocationFilter) · auth/ · about/ · volunteer-info/
+    errors/      Forbidden, NotFound
+    protected/adopter/
+      apply/       AdoptApply, AdoptApplyConfirmation   (the /adopt/apply/* funnel)
+      onboarding/  OnboardingWizard + steps/
+      shared/      GovernmentIdSection   (used by onboarding + Profile)
+      dashboard/   DashboardLayout + DashboardRoutes + one file per tab
+                   (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
+        overview/  *Widget.tsx
+        shared/    ApplicationsList, VisitsList
+    (staff/ vet/ volunteer/ donor/ admin/ — planned)
+  App.tsx        routes + session restore on mount
+
+server/src/
+  routes/ controllers/ services/   grouped auth/ public/ adopter/ — one <domain>.<layer>.js per file
+  middleware/   authenticate, authorizeRoles, errorHandler, upload
+  services/geocoding/   index.js is the ONLY import; usPostalCodeGeocoder.js the only US-aware file
+  services/storage/     index.js is the ONLY import (Supabase Storage)
+  utils/        errors.js, response.js
+  config/prisma.js   singleton Prisma client (PrismaPg adapter)
+  prisma/       schema.prisma, seed.js
+  tests/        unit/ integration/
+  app.js / index.js
 ```
 
-### Component Placement Rule
+### Component Placement
 
-Test: reusable across _different, unrelated_ pages with no fixed content of its own, or built for one page's content only?
+- Generic, content-agnostic, reused anywhere → `components/ui/`
+- Generic but scoped to one area → `components/ui/<area>/` (`marketing/`, `pets/`, `dashboard/`)
+- Shared by 2+ screens of one feature → a `shared/` folder beside them (e.g. `dashboard/shared/`)
+- Imports a feature's API or hard-codes its routes → beside the feature under `pages/`, never `components/`
+- Otherwise page-specific → sibling of the page that owns it
 
-- Generic, content-agnostic, reused → `components/ui/`
-- Page-specific, even if complex → sibling of the page that owns it
+### State Ownership
 
-### State Ownership Rule
-
-State lives in exactly one place (the page component); everything below is a relay — displays what it's given via props, reports changes upward via callbacks, never keeps a competing local copy of the same truth.
-
-Related: conditional rendering (`{isOpen && <X/>}`) fully unmounts/resets state; CSS-based hiding (`hidden` class) preserves it. Choose deliberately based on whether a user would expect state to persist across a collapse/expand.
-
----
-
-## Database — Pet Catalog Additions (Sprint 2)
-
-| Column         | Table | Purpose                                                                                                                    |
-| -------------- | ----- | -------------------------------------------------------------------------------------------------------------------------- |
-| `petDOB`       | Pet   | Replaced `petAge` (static, went stale) — age computed live at request time                                                 |
-| `featuredFlag` | Pet   | `BOOLEAN DEFAULT FALSE` — powers Home page Featured Pets (`GET /pets/featured`); set via SQL for now, staff toggle planned |
-
-`petSex` narrowed `CHAR(2)` → `CHAR(1)` — see Known Issues.
-`species` filtering on `GET /pets` migrated name-based → ID-based (`?speciesID=1`), matching `GET /breeds` convention.
+State lives in exactly one place (the page component); everything below relays — renders props, reports up via callbacks, keeps no competing copy. Conditional render (`{isOpen && <X/>}`) unmounts/resets state; the `hidden` class preserves it — choose per whether state should survive a collapse/expand.
 
 ---
 
-## API Design
+## API
 
-### Base URL
+Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.app/api/v1` (prod). Everything under `/api/v1/`.
 
-- Production: `https://petpals-api.up.railway.app/api/v1`
-- Local dev: `http://localhost:5000/api/v1`
+**Conventions:** plural nouns · kebab-case multi-word (`/adoption-applications`) · no verbs in URLs · one nesting level (`/pets/:id/photos`) · query params for filter/sort/paginate · `PATCH /<resource>/:id/status` for status changes.
 
-### Naming Conventions
-
-- Plural nouns: `/pets`, `/adopters`, `/shelters`
-- Kebab-case multi-word: `/adoption-applications`, `/pet-photos`
-- No verbs in URLs — HTTP method conveys action
-- One level of nesting only: `/pets/:id/photos`
-- Query params for filtering/sorting/pagination: `/pets?species=dog&page=1&limit=20`
-- `PATCH` for status updates: `/adoption-applications/:id/status`
-
-### Standard Response Structure
-
-**Success (single/list):**
-
+**Response envelope:**
 ```json
-{
-  "success": true,
-  "message": "Pet retrieved successfully",
-  "data": { "petID": 1, "petName": "Buddy" }
-}
+{ "success": true,  "message": "...", "data": {…|[…]}, "pagination"?: { "page", "limit", "total", "totalPages" } }
+{ "success": false, "message": "...", "error": { "code": "NOT_FOUND", "details": "..." } }
 ```
+`GET /pets/featured` returns a bare array (no envelope pagination).
 
-**Success (paginated) — adds `pagination`:**
+**Error codes:** `BAD_REQUEST` 400 · `UNAUTHORIZED` 401 · `FORBIDDEN` 403 · `NOT_FOUND` 404 · `CONFLICT` 409 · `VALIDATION_ERROR` 422 · `INTERNAL_SERVER_ERROR` 500.
 
-```json
-{ "success": true, "message": "Pets retrieved successfully", "data": [ ... ],
-  "pagination": { "page": 1, "limit": 20, "total": 143, "totalPages": 8 } }
-```
+### Public pet catalog (Sprint 2 ✅ — all no-auth)
 
-`GET /pets/featured` returns a bare array, no pagination — small fixed result set.
+`GET /pets` (full filter set — see Filter System) · `/pets/:id` · `/pets/featured` (`featuredFlag=true AND adoptionStatus="available"`) · `/species` (alpha) · `/breeds` (cascading, repeatable `speciesID`) · `/shelters` (open) · `/shelters/nearby` (`lat`/`lng` **or** `postalCode`, `radius` default 25 km).
 
-**Error:**
+### Adopter portal (Sprint 3)
 
-```json
-{
-  "success": false,
-  "message": "Pet not found",
-  "error": { "code": "NOT_FOUND", "details": "No pet exists with ID 42" }
-}
-```
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET / PUT | `/adopters/me` | profile |
+| GET | `/adopters/me/applications` | paginated; `status`, `petID`, `limit` |
+| POST | `/adoption-applications` | returns a $15 Stripe Checkout URL; the row is created by the **Stripe webhook after payment**, not here |
+| GET | `/adoption-applications/:id` | adopter (own) or staff |
+| PATCH | `/adoption-applications/:id/status` | `{ status: "Withdrawn" }` — adopter, from `Pending`/`Accepted`; fee non-refundable, re-apply OK. Staff transitions TBD |
+| GET / POST | `/adopters/me/visits` · `/visits` | `?upcoming=true` |
+| PATCH | `/visits/:id` | `{ visitStatus: "Cancelled" }` — adopter, future non-closed visits. Staff confirm/complete TBD |
+| GET | `/adopters/me/appointments` | `?upcoming=true`; vet appointments for pets the adopter has an **Accepted** application for. Vet CRUD is Sprint 5 |
+| GET | `/adopters/me/favorites` · `/adopters/me/adopted-pets` | favorites = full pet-detail shape; adopted-pets = `PetCard` shape |
+| GET / POST | `/adopters/me/government-id` | ID-doc upload → `government-ids` bucket |
 
-### Error Codes
+### Domains not yet built
 
-| Code                    | HTTP Status | When                              |
-| ----------------------- | ----------- | --------------------------------- |
-| `BAD_REQUEST`           | 400         | Invalid or missing input          |
-| `UNAUTHORIZED`          | 401         | No token or token invalid/expired |
-| `FORBIDDEN`             | 403         | Valid token but wrong role        |
-| `NOT_FOUND`             | 404         | Resource does not exist           |
-| `CONFLICT`              | 409         | Duplicate record                  |
-| `VALIDATION_ERROR`      | 422         | Request body failed validation    |
-| `INTERNAL_SERVER_ERROR` | 500         | Unexpected server error           |
-
-### Public Pet Catalog Endpoints (Sprint 2 — complete)
-
-| Method | Endpoint           | Auth | Notes                                                                   |
-| ------ | ------------------ | ---- | ----------------------------------------------------------------------- |
-| GET    | `/pets`            | No   | Full filter set — see Filter System                                     |
-| GET    | `/pets/:id`        | No   | Single pet detail                                                       |
-| GET    | `/pets/featured`   | No   | `featuredFlag=true AND adoptionStatus="available"`, no pagination       |
-| GET    | `/species`         | No   | Full list, alphabetical                                                 |
-| GET    | `/breeds`          | No   | Cascading, filtered by repeatable `speciesID`                           |
-| GET    | `/shelters`        | No   | Full open-shelter list                                                  |
-| GET    | `/shelters/nearby` | No   | `lat`/`lng` OR `postalCode` (mutually exclusive), `radius` default 25km |
-
-### Resource Domains (remaining, not yet built)
-
-| Domain                | Base Path                        |
-| --------------------- | -------------------------------- |
-| Auth                  | `/auth`                          |
-| Adopters              | `/adopters`                      |
-| Adoption Applications | `/adoption-applications` — `POST /` and `GET /:id` built; remaining CRUD/status transitions still to come |
-| Staff                 | `/staff`                         |
-| Appointments          | `/appointments`                  |
-| Vaccinations          | `/appointments/:id/vaccinations` |
-| Tasks                 | `/tasks`                         |
-| Events                | `/events`                        |
-| Donors                | `/donors`                        |
-| Donations             | `/donations`                     |
-| Transfers             | `/transfers`                     |
+Staff `/staff` · Appointments (vet CRUD) `/appointments` · Vaccinations `/appointments/:id/vaccinations` · Tasks `/tasks` · Events `/events` · Donors `/donors` · Donations `/donations` · Transfers `/transfers`.
 
 ---
 
-## Filter System (Sprint 2 — complete)
+## Filter System (Sprint 2 ✅)
 
-Public pet catalog (`/adopt`), six independent filters. Full reference: `docs/09-Filter_System_Deep_Dive.docx`.
+Public catalog (`/adopt`), six independent filters. Full ref: `docs/09-Filter_System_Deep_Dive.docx`.
 
-- **Live vs. staged:** species/breed/size/age refine instantly; location search requires explicit "Find Nearby Shelters" trigger (two-step network chain).
-- **Shelter filtering:** `selectedShelterIDs` (manual) and `nearbyShelterIDs` (location search) tracked as separate arrays, merged via deduplicated union only when building the `/pets` request — kept separate for different lifecycles and UI distinction (gold "Nearby" badge). Zero-result location search forces `petFilters.shelterID = [-1]` (sentinel, never matches) to distinguish "searched, found nothing" from "no filter applied."
-- **Geocoding module:** `GET /shelters/nearby` accepts `lat`/`lng` directly or `postalCode` (resolved server-side via `services/geocoding/`). `index.js` is the only importable file; `usPostalCodeGeocoder.js` is the only US-specific file — supporting another country means one new file + one import change.
-- **PostGIS query pattern:** `ST_SetSRID(ST_MakePoint(lng, lat), 4326)` — note lng first. `ST_Distance` measures (meters→km, 2dp); `ST_DWithin` filters (uses spatial indexes, more efficient than manual distance comparison).
-- **Home page search handoff:** `Searchbar.tsx` never fetches directly — builds a `/adopt` URL and navigates; `PetCatalog.tsx` reads params once on mount and seeds its own state via the same setters used elsewhere (no parallel logic path).
+- **Live vs. staged:** species/breed/size/age refine instantly; location search needs an explicit "Find Nearby Shelters" trigger (two-step network chain).
+- **Shelter filtering:** `selectedShelterIDs` (manual) and `nearbyShelterIDs` (location) kept as separate arrays — different lifecycles, gold "Nearby" badge — merged as a deduped union only when building the `/pets` request. A zero-result location search sets `shelterID = [-1]` (sentinel, never matches) to distinguish "searched, found nothing" from "no filter".
+- **PostGIS:** `ST_SetSRID(ST_MakePoint(lng, lat), 4326)` — **lng first**. `ST_Distance` measures (m→km, 2dp); `ST_DWithin` filters (uses the spatial index).
+- **Home handoff:** `Searchbar.tsx` never fetches — it builds a `/adopt` URL and navigates; `PetCatalog.tsx` reads params once on mount and seeds state via the same setters used elsewhere (no parallel path).
+- **Species** filtering is ID-based (`?speciesID=1`), matching `/breeds`.
 
 ---
 
-## PetDetailsModal (in progress — Sprint 2/3 boundary)
+## Adopter Portal (Sprint 3 — in progress)
 
-Opens over `/adopt` via card click or deep link (`?petID=X`). `openId` state and URL-reading logic live in `PetCatalog.tsx`, not `PetCatalogCard.tsx` — the card receives `openId` + `onKnowMore(petID)` as props and never decides its own behavior (needed since the card is reused on `/adopt`, opening the modal, and on Home's Featured Pets, which navigates to `/adopt?petID=X` first).
+**PetDetailsModal** (`components/ui/pets/`) — opens over `/adopt` via card click or `?petID=X` deep link. `openId` + URL-reading logic live in the *page* (`PetCatalog.tsx`, or `Overview.tsx` for the dashboard widgets), never in `PetCatalogCard` — the card takes `openId` + `onKnowMore(petID)` props (it's reused on `/adopt`, Home Featured Pets, and dashboard `PetsWidget`/`FavoritesWidget`). "Adopt" button: not logged in → `/login?redirect=/adopt/apply/:petID`; Adopter + pet `available` → `/adopt/apply/:petID`; otherwise the modal closes + a toast (same copy as the `/login` non-adopter toast).
 
-"Adopt" button (Sprint 3 — routing/guard layer complete, form itself still to come): not logged in → `/login?redirect=/adopt/apply/:petID` (see Post-login redirect above). Logged in as Adopter → `/adopt/apply/:petID`, if the pet is still `available` (fast-fail check against the modal's already-loaded data; the authoritative re-check happens again on mount of `/adopt/apply/:petID`). Logged in as any other role, or the pet is no longer available → modal closes (not a route change — the modal only ever renders while already on `/adopt`) with a toast; same toast copy either way, and identical to what `/login` shows a non-Adopter redirected there.
+**AdoptApply** (`apply/AdoptApply.tsx`) — re-runs **every** guard on mount (not just at click-time), independent of entry path: not logged in → `/login?redirect=`; not an Adopter → `/adopt` + toast; pet re-fetched and not `available` → `/adopt` + toast; existing `Pending`/`Accepted` application (`GET /adopters/me/applications?petID=`) → `/adopter/applications` + toast. Deliberately does **not** use `ProtectedRoute`/`RoleRoute` — their fixed `/login`/`/forbidden` targets don't match this flow's redirects and toasts.
 
-### AdoptApply guard page (Sprint 3)
+**Application submit** → `POST /adoption-applications` returns a Stripe Checkout URL; the `AdoptionApplication` row is created by the Stripe webhook after payment, not synchronously. Confirmation lands on `apply/AdoptApplyConfirmation.tsx`.
 
-`/adopt/apply/:petID` (`pages/protected/adopter/AdoptApply.tsx`) re-runs every guard on mount, independent of how it was reached: not logged in → `/login?redirect=...`; not an Adopter → `/adopt` + toast; pet re-fetched and not `available` → `/adopt` + toast; an existing `Pending`/`Accepted` application for this pet (via `GET /adopters/me/applications?petID=`) → `/adopter/applications` + toast. It does not use `ProtectedRoute`/`RoleRoute` — their fixed `/login` (no param) and `/forbidden` targets don't match this flow's redirect targets and toasts, so the checks are self-contained in the page instead.
+**Dashboard** (`/adopter/*`): `dashboard/DashboardLayout` (navbar + sidebar) → `DashboardRoutes` → one file per tab (`Overview`, `Pets`, `Appointments`, `Favorites`, `Applications`, `Visits`, `Profile`).
+
+**Overview widgets** (`dashboard/overview/*Widget.tsx`) — each a self-contained `Card` owning its own `useQuery` + loading/empty state; title row via `DashboardWidgetHeader`.
+
+**Dashboard-list pattern** (Applications + Visits), three layers:
+1. `*Widget` / tab page — does the `useQuery`, renders the shell, hands the array down.
+2. `dashboard/shared/{Applications,Visits}List.tsx` — feature glue, no fetching; supplies `renderRow` (→ one `DashboardListRow`) + a `confirmAction` config. A separate file because both the widget and the full tab page render it.
+3. `components/ui/dashboard/DashboardList.tsx` — generic: `DashboardListRow` (row layout) + `DashboardActionList<T>` (owns the `<ul>`, pending-item state, the mutation + toasts + query invalidation, and `ConfirmActionModal`); also `RowMedallion`, `RowActionButton`.
+
+Appointments has no destructive action, so `AppointmentsWidget` uses `DashboardListRow` directly.
+
+Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`: Pending → "Under Consideration", Accepted → "Approved", Rejected → "Declined".
+
+---
+
+## Database Notes
+
+- `Pet.petDOB` replaced static `petAge` (age computed at request time). `Pet.featuredFlag BOOLEAN DEFAULT FALSE` powers `/pets/featured` (set via SQL for now, staff toggle planned).
+- Hand-applied constraints (PostGIS column, partial unique indexes) live only in Supabase and must be re-added after any reset — see Known Issues. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`.
 
 ---
 
 ## Non-Functional Requirements
 
-| ID    | Category        | Requirement                                                    |
-| ----- | --------------- | -------------------------------------------------------------- |
-| NF-01 | Security        | bcrypt + two-token JWT auth (access 15m + refresh 7d httpOnly) |
-| NF-02 | Security        | RBAC on all endpoints via `authorizeRoles`                     |
-| NF-03 | Performance     | API response < 500ms for standard CRUD                         |
-| NF-04 | Scalability     | New shelters via admin panel only — no architectural changes   |
-| NF-05 | Availability    | 99.5% uptime target                                            |
-| NF-06 | Data Integrity  | ACID transactions for adoption-critical data                   |
-| NF-07 | Geolocation     | PostGIS for location-based search                              |
-| NF-08 | Maintainability | 70% test coverage; unit + integration priority                 |
-| NF-09 | Usability       | Responsive and accessible, desktop + mobile                    |
-| NF-10 | Data Privacy    | Sensitive fields never exposed in API responses                |
-| NF-11 | API Docs        | All endpoints documented via Swagger/OpenAPI                   |
-| NF-12 | Error Handling  | Consistent structured error responses                          |
+| ID | Requirement |
+| --- | --- |
+| NF-01 | bcrypt + two-token JWT (access 15m + refresh 7d httpOnly) |
+| NF-02 | RBAC on all endpoints via `authorizeRoles` |
+| NF-03 | API response < 500 ms for standard CRUD |
+| NF-04 | New shelters via admin panel only — no architectural changes |
+| NF-05 | 99.5% uptime target |
+| NF-06 | ACID transactions for adoption-critical data |
+| NF-07 | PostGIS for location-based search |
+| NF-08 | 70% test coverage; unit + integration priority |
+| NF-09 | Responsive + accessible, desktop + mobile |
+| NF-10 | Sensitive fields never exposed in API responses |
+| NF-11 | All endpoints documented via Swagger/OpenAPI |
+| NF-12 | Consistent structured error responses |
 
 ---
 
 ## Sprint Plan
 
-| Sprint | Focus                                                                                                          | Status          |
-| ------ | -------------------------------------------------------------------------------------------------------------- | --------------- |
-| 1      | Auth + project setup                                                                                           | ✅ Complete     |
-| 2      | Public portal — pet catalog, filter system, Home page, PetDetailsModal                                         | ✅ Complete     |
-| 3      | Adopter portal — profile, application flow, status tracking, visit scheduling, favorites, /login redirect-back | 🚧 In progress  |
-| 4      | Shelter staff and admin operations                                                                             | Upcoming        |
-| 5      | Vet, volunteer, donor flows                                                                                    | Upcoming        |
-| 6      | AI compatibility matcher (OpenAI API)                                                                          | Upcoming        |
-| 7      | Testing + 70% coverage + cleanup (remove TokenDenylist, migrate to RefreshTokens table)                        | Upcoming        |
-| 8      | Deployment, polish, final report                                                                               | Upcoming        |
+| # | Focus | Status |
+| --- | --- | --- |
+| 1 | Auth + project setup | ✅ |
+| 2 | Public portal — catalog, filter system, Home, PetDetailsModal | ✅ |
+| 3 | Adopter portal — profile, dashboard, application flow + withdraw, visits (list + cancel), appointments (read-only), favorites, /login redirect-back | 🚧 |
+| 4 | Shelter staff + admin operations | — |
+| 5 | Vet, volunteer, donor flows (incl. vet-managed appointments/vaccinations) | — |
+| 6 | AI compatibility matcher (OpenAI API) | — |
+| 7 | Testing to 70% + cleanup (remove TokenDenylist → RefreshTokens table) | — |
+| 8 | Deployment, polish, final report | — |
 
 ---
 
-## Code Style Preferences
+## Code Style
 
-- 2-space indentation
-- Single quotes (JS); TypeScript throughout frontend
-- Async/await over `.then()` chains
-- Controllers thin — business logic in services
-- Standard response structure on all API responses
-- Never expose `userPassword`, `refreshToken`, `governmentID`, `stripeCustomerID` in API responses
-- Prisma for all DB access — no raw SQL except PostGIS (`prisma.$queryRaw`)
-- All routes under `/api/v1/`
-- Tests: `server/src/tests/unit/` and `integration/`; integration tests seed via API calls, clean up via Prisma in `afterAll`, run with `--runInBand`
-- Frontend: closed/fixed-value filters validated strictly (400 on invalid input); open/DB-driven filters unvalidated (unmatched value → zero rows, not an error)
-- React state: never mutate in place — always build new array/object (`.filter()`, `.map()`, spread) — reference equality drives re-renders
+- 2-space indent · single quotes (JS) · TS throughout frontend · async/await, not `.then()` chains
+- Controllers thin — business logic in services · standard response envelope on every response
+- **Never expose** `userPassword`, `refreshToken`, `governmentID`, `stripeCustomerID`
+- Prisma for all DB access — raw SQL only for PostGIS (`prisma.$queryRaw`)
+- Tests in `server/src/tests/unit|integration/`; integration seeds via API calls, cleans up via Prisma in `afterAll`, runs `--runInBand`
+- Filters: closed/fixed-value validated strictly (400 on bad input); open/DB-driven unvalidated (unmatched value → zero rows, not an error)
+- React state: never mutate in place — build a new array/object every time (`.filter`/`.map`/spread); reference equality drives re-renders
