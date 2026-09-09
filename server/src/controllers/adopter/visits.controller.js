@@ -9,6 +9,14 @@ const badRequest = (message) => {
   return err;
 };
 
+const parseId = (raw) => {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    throw badRequest("id is required and must be a positive integer");
+  }
+  return n;
+};
+
 // ——————————————— POST /visits ———————————————
 const createVisit = async (req, res, next) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -61,4 +69,26 @@ const createVisit = async (req, res, next) => {
   }
 };
 
-module.exports = { createVisit };
+// ——————————————— PATCH /visits/:id ———————————————
+const cancelVisit = async (req, res, next) => {
+  let visitID;
+  try {
+    visitID = parseId(req.params.id);
+  } catch (err) {
+    return next(err);
+  }
+
+  // Adopters may only cancel — no other status transition is exposed here.
+  if (req.body?.visitStatus !== "Cancelled") {
+    return next(badRequest('visitStatus is required and must be "Cancelled"'));
+  }
+
+  try {
+    const visit = await visitsService.cancelVisit(visitID, req.user.userID);
+    return successResponse(res, "Visit cancelled successfully", visit);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { createVisit, cancelVisit };

@@ -1,7 +1,7 @@
-import DashboardHeading from "../../../../components/ui/DashboardHeading";
+import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 
 // "Favorites" section of the adopter dashboard.
-const AdopterFavorites = () => (
+const Favorites = () => (
   <div>
     <DashboardHeading
       title="Favorites"
@@ -13,4 +13,4 @@ const AdopterFavorites = () => (
   </div>
 );
 
-export default AdopterFavorites;
+export default Favorites;

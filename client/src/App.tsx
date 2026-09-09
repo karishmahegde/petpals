@@ -12,9 +12,9 @@ import Register from "./pages/public/auth/Register";
 import Adopt from "./pages/public/adopt/Adopt";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
-import AdopterDashboard from "./pages/protected/adopter/AdopterDashboard";
-import AdoptApply from "./pages/protected/adopter/AdoptApply";
-import AdoptApplyConfirmation from "./pages/protected/adopter/AdoptApplyConfirmation";
+import DashboardLayout from "./pages/protected/adopter/dashboard/DashboardLayout";
+import AdoptApply from "./pages/protected/adopter/apply/AdoptApply";
+import AdoptApplyConfirmation from "./pages/protected/adopter/apply/AdoptApplyConfirmation";
 import OnboardingWizard from "./pages/protected/adopter/onboarding/OnboardingWizard";
 import StaffDashboard from "./pages/protected/staff/StaffDashboard";
 import VetDashboard from "./pages/protected/vet/VetDashboard";
@@ -104,7 +104,7 @@ const App = () => {
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Adopter"]}>
-                <AdopterDashboard />
+                <DashboardLayout />
               </RoleRoute>
             </ProtectedRoute>
           }

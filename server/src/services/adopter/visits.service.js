@@ -18,6 +18,12 @@ const notFound = (message) => {
   return err;
 };
 
+const conflict = (message) => {
+  const err = new Error(message);
+  err.code = "CONFLICT";
+  return err;
+};
+
 // ——————————————— CREATE VISIT (POST /visits) ———————————————
 const createVisit = async ({
   adopterID,
@@ -78,4 +84,44 @@ const listVisitsByAdopter = async (adopterID, { upcomingOnly = false } = {}) => 
   });
 };
 
-module.exports = { createVisit, listVisitsByAdopter };
+// ——————————————— CANCEL VISIT (PATCH /visits/:id) ———————————————
+// Adopter-initiated only, and only to 'Cancelled'. Staff confirming or
+// completing a visit is separate, later work. A visit that has already
+// passed, or is already Cancelled/Completed, can't be cancelled.
+const cancelVisit = async (visitID, adopterID) => {
+  const visit = await prisma.visit.findUnique({
+    where: { visitID },
+    select: {
+      visitID: true,
+      adopterID: true,
+      visitStatus: true,
+      visitTime: true,
+    },
+  });
+
+  if (!visit) {
+    throw notFound(`No visit exists with ID ${visitID}`);
+  }
+  if (visit.adopterID !== adopterID) {
+    const err = new Error("You can only cancel your own visits");
+    err.code = "FORBIDDEN";
+    throw err;
+  }
+  if (visit.visitStatus === "Cancelled") {
+    throw conflict("This visit is already cancelled");
+  }
+  if (visit.visitStatus === "Completed") {
+    throw conflict("A completed visit can't be cancelled");
+  }
+  if (visit.visitTime.getTime() <= Date.now()) {
+    throw conflict("A visit in the past can't be cancelled");
+  }
+
+  return prisma.visit.update({
+    where: { visitID },
+    data: { visitStatus: "Cancelled" },
+    select: LIST_SELECT,
+  });
+};
+
+module.exports = { createVisit, listVisitsByAdopter, cancelVisit };

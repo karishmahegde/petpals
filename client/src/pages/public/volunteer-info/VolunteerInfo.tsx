@@ -1,6 +1,6 @@
 import ButtonElement from "../../../components/ui/ButtonElement";
-import SectionContainer from "../../../components/ui/SectionContainer";
-import SectionHeadingCenter from "../../../components/ui/SectionHeadingCenter";
+import SectionContainer from "../../../components/ui/marketing/SectionContainer";
+import SectionHeadingCenter from "../../../components/ui/marketing/SectionHeadingCenter";
 import { volunteerContent } from "../../../static/content/volunteer-info";
 
 const VolunteerInfo = () => {

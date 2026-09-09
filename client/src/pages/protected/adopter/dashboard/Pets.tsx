@@ -1,7 +1,7 @@
-import DashboardHeading from "../../../../components/ui/DashboardHeading";
+import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 
 // "My Pets" section of the adopter dashboard.
-const AdopterPets = () => (
+const Pets = () => (
   <div>
     <DashboardHeading
       title="My Pets"
@@ -13,4 +13,4 @@ const AdopterPets = () => (
   </div>
 );
 
-export default AdopterPets;
+export default Pets;

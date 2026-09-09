@@ -1,19 +1,19 @@
 // AdoptApplyConfirmation.tsx
 // Page: post-Stripe-Checkout landing page. Route: /adopt/apply/:petID/confirmation
-// Never assumes payment succeeded just because the redirect happened — the
+// Never assumes payment succeeded just because the redirect happened - the
 // AdoptionApplication row is only ever created by the Stripe webhook, which
 // can lag slightly behind the browser's own redirect. This page polls for
 // that row rather than trusting client-side payment state (see Part 5 spec
 // §3.3/§4.2). Guarded only by ProtectedRoute + RoleRoute(["Adopter"]) in
-// App.tsx — no pet-availability/duplicate-application re-check here, since
+// App.tsx - no pet-availability/duplicate-application re-check here, since
 // payment already happened and the webhook may be creating that very row
 // while this page is polling for it.
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import Card from "../../../components/ui/Card";
-import { getApplicationByCheckoutSession } from "../../../logic/api/adoptionApplicationsApi";
-import { clearApplyDraft } from "../../../logic/adoptApplyDraft";
+import Card from "../../../../components/ui/Card";
+import { getApplicationByCheckoutSession } from "../../../../logic/api/adoptionApplicationsApi";
+import { clearApplyDraft } from "../../../../logic/adoptApplyDraft";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 30000;
@@ -37,7 +37,7 @@ const AdoptApplyConfirmation = () => {
   });
 
   // Tracks how long we've been polling, purely to decide when to show the
-  // "still processing" fallback — separate from the query itself.
+  // "still processing" fallback - separate from the query itself.
   useEffect(() => {
     if (!sessionId || application) return;
     const interval = setInterval(
@@ -64,8 +64,8 @@ const AdoptApplyConfirmation = () => {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <p className="font-body text-sm text-rose-dark">
-          Missing checkout session — if you just paid, check your dashboard
-          for your application.
+          Missing checkout session - if you just paid, check your dashboard for
+          your application.
         </p>
       </div>
     );
@@ -81,8 +81,8 @@ const AdoptApplyConfirmation = () => {
             </h1>
             <p className="font-body text-sm text-neutral-charcoal">
               Your {application.applicationType.toLowerCase()} application
-              {application.pet ? ` for ${application.pet.petName}` : ""} is
-              in. We'll be in touch soon.
+              {application.pet ? ` for ${application.pet.petName}` : ""} is in.
+              We'll be in touch soon.
             </p>
             <button
               type="button"
@@ -98,8 +98,8 @@ const AdoptApplyConfirmation = () => {
               Still processing
             </h1>
             <p className="font-body text-sm text-neutral-charcoal">
-              Your payment is being finalized — this can take a minute.
-              Check your dashboard shortly for your application.
+              Your payment is being finalized - this can take a minute. Check
+              your dashboard shortly for your application.
             </p>
             <button
               type="button"

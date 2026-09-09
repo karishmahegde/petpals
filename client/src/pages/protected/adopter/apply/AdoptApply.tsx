@@ -16,21 +16,18 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FaPaw } from "react-icons/fa";
-import Card from "../../../components/ui/Card";
-import SegmentedControl from "../../../components/ui/SegmentedControl";
-import CancelApplicationModal from "./CancelApplicationModal";
-import { getPetById } from "../../../logic/api/petsApi";
-import { getMyApplications } from "../../../logic/api/adoptersApi";
+import Card from "../../../../components/ui/Card";
+import SegmentedControl from "../../../../components/ui/SegmentedControl";
+import ConfirmActionModal from "../../../../components/ui/ConfirmActionModal";
+import { getPetById } from "../../../../logic/api/petsApi";
+import { getMyApplications } from "../../../../logic/api/adoptersApi";
 import {
   createCheckoutSession,
   type CreateApplicationPayload,
-} from "../../../logic/api/adoptionApplicationsApi";
-import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
-import {
-  saveApplyDraft,
-  loadApplyDraft,
-} from "../../../logic/adoptApplyDraft";
-import useAuthStore from "../../../logic/store/useAuthStore";
+} from "../../../../logic/api/adoptionApplicationsApi";
+import { showAdopterAccountToast } from "../../../../logic/toast/adopterAccountToast";
+import { saveApplyDraft, loadApplyDraft } from "../../../../logic/adoptApplyDraft";
+import useAuthStore from "../../../../logic/store/useAuthStore";
 
 const ACTIVE_STATUSES = ["Pending", "Accepted"];
 
@@ -52,7 +49,7 @@ const AdoptApply = () => {
 
   const isAdopter = !!token && role === "Adopter";
 
-  // Guard 1 + 2 — auth and role, re-checked on every mount.
+  // Guard 1 + 2 - auth and role, re-checked on every mount.
   useEffect(() => {
     if (!token) {
       navigate(`/login?redirect=/adopt/apply/${petID}`, { replace: true });
@@ -65,14 +62,14 @@ const AdoptApply = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, role]);
 
-  // Guard 3 — pet availability, re-fetched (not cached/route-state).
+  // Guard 3 - pet availability, re-fetched (not cached/route-state).
   // `["pet", petID]` is the same key PetDetailsModal uses, so on arrival
   // here from the modal this query already has cached data and resolves
-  // instantly — but that data may be stale. isLoading (isPending &&
+  // instantly - but that data may be stale. isLoading (isPending &&
   // isFetching) goes false the moment ANY cached data exists, even mid
   // background-revalidation, so it can't be used to gate rendering here.
   // isFetching stays true through that revalidation, so petSettled below
-  // only becomes true once this mount's own fetch has actually resolved —
+  // only becomes true once this mount's own fetch has actually resolved -
   // otherwise the form could render for a beat on stale "available" data
   // before flipping to unavailable and redirecting away.
   const {
@@ -97,9 +94,9 @@ const AdoptApply = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdopter, petSettled, petError, petAvailable]);
 
-  // Guard 4 — duplicate active application. Only runs once guard 3 has
+  // Guard 4 - duplicate active application. Only runs once guard 3 has
   // genuinely settled (pet availability is the more fundamental failure and
-  // must short-circuit first) — same stale-cache reasoning as above applies
+  // must short-circuit first) - same stale-cache reasoning as above applies
   // here too, since this page can be revisited for the same pet.
   const { data: existingApplications, isFetching: applicationsFetching } =
     useQuery({
@@ -130,11 +127,11 @@ const AdoptApply = () => {
     applicationsSettled &&
     !hasActiveApplication;
 
-  // Form state — declared unconditionally (before the guard early-return
+  // Form state - declared unconditionally (before the guard early-return
   // below) since hooks can't be conditional, even though this state is only
   // ever shown once allGuardsPassed is true. Stripe Checkout is a full-page
   // redirect, so if the adopter backs out and lands back here (cancel_url),
-  // React state is gone — restore from the sessionStorage draft saved right
+  // React state is gone - restore from the sessionStorage draft saved right
   // before that redirect, if one exists for this pet.
   const [applicationType, setApplicationType] = useState<
     "Adopt" | "Foster" | null
@@ -148,7 +145,7 @@ const AdoptApply = () => {
     mutationFn: (payload: CreateApplicationPayload) =>
       createCheckoutSession(payload),
     onSuccess: ({ checkoutUrl }) => {
-      // Leaving the SPA entirely for Stripe's hosted page — not a
+      // Leaving the SPA entirely for Stripe's hosted page - not a
       // navigate(). The application row doesn't exist yet; it's only
       // created once the webhook confirms payment (see AdoptApplyConfirmation).
       window.location.href = checkoutUrl;
@@ -197,7 +194,7 @@ const AdoptApply = () => {
           Adoption Application
         </h1>
 
-        {/* Pet summary card — data already loaded by the guard above, no
+        {/* Pet summary card - data already loaded by the guard above, no
             separate fetch. */}
         <Card className="mb-6 p-5">
           <div className="flex items-center gap-4">
@@ -281,7 +278,7 @@ const AdoptApply = () => {
             />
           </div>
 
-          {/* Fee disclosure — clearly visible, not fine print, per spec §3.1. */}
+          {/* Fee disclosure - clearly visible, not fine print, per spec §3.1. */}
           <div className="mb-6 rounded-lg border border-gold-md bg-gold-light p-4">
             <p className="font-body text-sm font-bold text-neutral-charcoal">
               $15.00 USD application processing fee
@@ -298,7 +295,9 @@ const AdoptApply = () => {
             disabled={applicationType === null || mutation.isPending}
             className="w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {mutation.isPending ? "Redirecting to payment…" : "Continue to Payment"}
+            {mutation.isPending
+              ? "Redirecting to payment…"
+              : "Continue to Payment"}
           </button>
           <button
             type="button"
@@ -310,11 +309,16 @@ const AdoptApply = () => {
         </Card>
       </div>
 
-      <CancelApplicationModal
+      <ConfirmActionModal
         isOpen={showCancelModal}
-        onKeepEditing={() => setShowCancelModal(false)}
-        onDiscard={() => navigate(-1)}
-      />
+        title="Cancel application?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        onCancel={() => setShowCancelModal(false)}
+        onConfirm={() => navigate(-1)}
+      >
+        Are you sure you want to cancel? Your application hasn't been submitted.
+      </ConfirmActionModal>
     </div>
   );
 };

@@ -16,6 +16,7 @@ import { getSpecies, getBreeds, type Breed } from "../../../../../logic/api/pets
 interface PreferencesStepProps {
   profile: AdopterProfileData;
   onContinue: () => void;
+  onBack?: () => void;
 }
 
 const inputClass =
@@ -41,7 +42,7 @@ const extractError = (err: unknown): string =>
     ? String(err.response.data.message)
     : "Something went wrong. Please try again.";
 
-const PreferencesStep = ({ profile, onContinue }: PreferencesStepProps) => {
+const PreferencesStep = ({ profile, onContinue, onBack }: PreferencesStepProps) => {
   const speciesQuery = useQuery({ queryKey: ["species"], queryFn: getSpecies });
   const speciesIDs = (speciesQuery.data ?? []).map((s) => s.speciesID);
   const breedsQuery = useQuery({
@@ -162,14 +163,25 @@ const PreferencesStep = ({ profile, onContinue }: PreferencesStepProps) => {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={handleContinue}
-        disabled={mutation.isPending}
-        className="mt-6 w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
-      >
-        {mutation.isPending ? "Saving…" : "Continue"}
-      </button>
+      <div className="mt-6 flex gap-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Back
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleContinue}
+          disabled={mutation.isPending}
+          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {mutation.isPending ? "Saving…" : "Continue"}
+        </button>
+      </div>
     </div>
   );
 };

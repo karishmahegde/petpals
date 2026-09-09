@@ -1,7 +1,7 @@
-import DashboardHeading from "../../../../components/ui/DashboardHeading";
+import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 
 // "Appointments" section of the adopter dashboard.
-const AdopterAppointments = () => (
+const Appointments = () => (
   <div>
     <DashboardHeading
       title="Appointments"
@@ -13,4 +13,4 @@ const AdopterAppointments = () => (
   </div>
 );
 
-export default AdopterAppointments;
+export default Appointments;

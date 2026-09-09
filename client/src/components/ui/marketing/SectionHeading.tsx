@@ -1,4 +1,4 @@
-// components/ui/SectionHeading.tsx
+// components/ui/marketing/SectionHeading.tsx
 interface SectionHeadingProps {
   children: React.ReactNode;
   className?: string;

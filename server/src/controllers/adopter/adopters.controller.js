@@ -1,6 +1,7 @@
 const adoptersService = require("../../services/adopter/adopters.service");
 const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
 const visitsService = require("../../services/adopter/visits.service");
+const appointmentsService = require("../../services/adopter/appointments.service");
 const vaccinationsService = require("../../services/adopter/vaccinations.service");
 const {
   assertValidCloseAccountMode,
@@ -376,6 +377,26 @@ const getMyVisits = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /adopters/me/appointments ———————————————
+const getMyAppointments = async (req, res, next) => {
+  // Only the exact string "true" enables the upcoming-only filter.
+  const upcomingOnly = req.query.upcoming === "true";
+
+  try {
+    const appointments = await appointmentsService.listAppointmentsByAdopter(
+      req.user.userID,
+      { upcomingOnly },
+    );
+    return successResponse(
+      res,
+      "Appointments retrieved successfully",
+      appointments,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— GET /adopters/me/adopted-pets ———————————————
 const getMyAdoptedPets = async (req, res, next) => {
   try {
@@ -432,6 +453,7 @@ module.exports = {
   getGovernmentId,
   getMyApplications,
   getMyVisits,
+  getMyAppointments,
   getMyAdoptedPets,
   getMyAdoptedPetVaccinations,
   closeAccount,

@@ -67,6 +67,13 @@ const OnboardingWizard = () => {
 
   const handleContinue = () => advanceMutation.mutate(step);
 
+  // Plain previous-step navigation — doesn't save whatever's currently
+  // typed on this step (only Continue does), same as standard multi-step
+  // form UX. Undefined on step 2: there's no earlier wizard page to go to
+  // (Step 1/Account is registration, never actually routed to).
+  const handleBack =
+    step > 2 ? () => navigate(`/onboarding/step/${step - 1}`) : undefined;
+
   // Doesn't complete onboarding — just lets the adopter browse the rest of
   // the app for this browser session (see OnboardingGate.tsx). The next
   // real login, or trying to actually apply to adopt a pet, brings them
@@ -100,19 +107,37 @@ const OnboardingWizard = () => {
 
             <Card className="p-6 md:p-8">
               {step === 2 && (
-                <PersonalStep profile={profile} onContinue={handleContinue} />
+                <PersonalStep
+                  profile={profile}
+                  onContinue={handleContinue}
+                  onBack={handleBack}
+                />
               )}
-              {step === 3 && <IdentityStep onContinue={handleContinue} />}
+              {step === 3 && (
+                <IdentityStep onContinue={handleContinue} onBack={handleBack} />
+              )}
               {step === 4 && (
-                <HouseholdStep profile={profile} onContinue={handleContinue} />
+                <HouseholdStep
+                  profile={profile}
+                  onContinue={handleContinue}
+                  onBack={handleBack}
+                />
               )}
               {step === 5 && (
-                <LifestyleStep profile={profile} onContinue={handleContinue} />
+                <LifestyleStep
+                  profile={profile}
+                  onContinue={handleContinue}
+                  onBack={handleBack}
+                />
               )}
               {step === 6 && (
-                <PreferencesStep profile={profile} onContinue={handleContinue} />
+                <PreferencesStep
+                  profile={profile}
+                  onContinue={handleContinue}
+                  onBack={handleBack}
+                />
               )}
-              {step === 7 && <ReviewStep profile={profile} />}
+              {step === 7 && <ReviewStep profile={profile} onBack={handleBack} />}
             </Card>
           </div>
         )}

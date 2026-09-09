@@ -17,6 +17,7 @@ import useAuthStore from "../../../../../logic/store/useAuthStore";
 
 interface ReviewStepProps {
   profile: AdopterProfileData;
+  onBack?: () => void;
 }
 
 const extractError = (err: unknown): string =>
@@ -26,7 +27,7 @@ const extractError = (err: unknown): string =>
 
 const humanize = (value: string) => value.replace(/_/g, " ");
 
-const ReviewStep = ({ profile }: ReviewStepProps) => {
+const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
   const navigate = useNavigate();
   const updateUser = useAuthStore((state) => state.updateUser);
 
@@ -173,14 +174,25 @@ const ReviewStep = ({ profile }: ReviewStepProps) => {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => mutation.mutate()}
-        disabled={mutation.isPending}
-        className="mt-6 w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
-      >
-        {mutation.isPending ? "Submitting…" : "Submit"}
-      </button>
+      <div className="mt-6 flex gap-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Back
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending}
+          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {mutation.isPending ? "Submitting…" : "Submit"}
+        </button>
+      </div>
     </div>
   );
 };

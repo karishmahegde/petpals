@@ -10,8 +10,8 @@ import {
   getNearbyShelters,
   type PetFilters,
 } from "../../../../logic/api/petsApi";
-import CardComponent from "../../../../components/ui/PetCatalogCard";
-import PetDetailsModal from "../../../../components/ui/PetDetailsModal";
+import CardComponent from "../../../../components/ui/pets/PetCatalogCard";
+import PetDetailsModal from "../../../../components/ui/pets/PetDetailsModal";
 import PetFilterBar from "./PetFilterBar";
 
 const LIMIT = 20;

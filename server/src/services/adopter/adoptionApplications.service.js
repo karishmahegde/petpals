@@ -2,6 +2,7 @@ const prisma = require("../../config/prisma");
 const stripe = require("../../config/stripe");
 const { APPLICATION_FEE_CENTS, APPLICATION_FEE_USD } = require("../../config/fees");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
+const { formatAgeFromDOBYears, formatSex } = require("../public/pets.service");
 
 // Scalar shape returned to the client for an application. Stripe reference
 // IDs (session/payment intent) are deliberately excluded — no adopter-facing
@@ -248,7 +249,13 @@ const LIST_SELECT = {
   shelterID: true,
   applicationStatus: true,
   createdAt: true,
-  pet: { select: { petName: true, petPhoto: true } },
+  pet: {
+    select: {
+      petName: true,
+      petPhoto: true,
+      breed: { select: { breedName: true } },
+    },
+  },
   shelter: { select: { shelterName: true } },
 };
 
@@ -286,6 +293,8 @@ const listApplicationsByAdopter = async (
 // pet's own status is now 'adopted'. There's no explicit adoption-completed
 // timestamp, so "most recently adopted first" is approximated by the accepted
 // application's createdAt.
+// Returned in the same PetCard shape as GET /pets and GET /pets/featured
+// (petsApi.ts's PetCard) so the client can reuse PetCatalogCard as-is.
 const listAdoptedPetsByAdopter = async (adopterID) => {
   const rows = await prisma.adoptionApplication.findMany({
     where: {
@@ -299,8 +308,9 @@ const listAdoptedPetsByAdopter = async (adopterID) => {
         select: {
           petID: true,
           petName: true,
+          petDOB: true,
           petPhoto: true,
-          intakeDate: true,
+          petSex: true,
           breed: {
             select: {
               breedName: true,
@@ -316,11 +326,63 @@ const listAdoptedPetsByAdopter = async (adopterID) => {
   return rows.map((row) => ({
     petID: row.pet.petID,
     petName: row.pet.petName,
+    petAge: formatAgeFromDOBYears(row.pet.petDOB),
+    petSex: formatSex(row.pet.petSex),
     petPhoto: row.pet.petPhoto,
-    breed: row.pet.breed.breedName,
-    species: row.pet.breed.species.speciesName,
-    intakeDate: row.pet.intakeDate,
+    breed: {
+      breedName: row.pet.breed.breedName,
+      speciesName: row.pet.breed.species.speciesName,
+    },
   }));
+};
+
+// ——————————————— WITHDRAW APPLICATION (PATCH /adoption-applications/:id/status) ———————————————
+// Adopter-initiated only, and only to 'Withdrawn'. Staff-driven transitions
+// (Pending → Accepted/Rejected) are separate, later work — this handles just
+// the adopter withdrawing their own application. Moving to 'Withdrawn' also
+// clears the partial unique index on (adopterID, petID), so re-applying for
+// the same pet stays possible.
+const WITHDRAWABLE_STATUSES = ["Pending", "Accepted"];
+
+const withdrawApplication = async (applicationID, adopterID) => {
+  const application = await prisma.adoptionApplication.findUnique({
+    where: { applicationID },
+    select: { applicationID: true, adopterID: true, applicationStatus: true },
+  });
+
+  if (!application) {
+    const err = new Error(
+      `No adoption application exists with ID ${applicationID}`,
+    );
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+
+  if (application.adopterID !== adopterID) {
+    const err = new Error(
+      "You can only withdraw your own adoption applications",
+    );
+    err.code = "FORBIDDEN";
+    throw err;
+  }
+
+  if (!WITHDRAWABLE_STATUSES.includes(application.applicationStatus)) {
+    throw conflict(
+      `A ${application.applicationStatus.toLowerCase()} application can't be withdrawn`,
+    );
+  }
+
+  const updated = await prisma.adoptionApplication.update({
+    where: { applicationID },
+    data: { applicationStatus: "Withdrawn" },
+    select: {
+      ...APPLICATION_SELECT,
+      pet: { select: { petName: true } },
+      shelter: { select: { shelterName: true } },
+    },
+  });
+
+  return toClientShape(updated);
 };
 
 module.exports = {
@@ -332,4 +394,5 @@ module.exports = {
   getApplicationById,
   listApplicationsByAdopter,
   listAdoptedPetsByAdopter,
+  withdrawApplication,
 };

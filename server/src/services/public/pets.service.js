@@ -280,4 +280,6 @@ module.exports = {
   getPetDetails,
   PET_DETAIL_SELECT,
   formatPetDetail,
+  formatAgeFromDOBYears,
+  formatSex,
 };

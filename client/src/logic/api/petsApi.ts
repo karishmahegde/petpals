@@ -164,3 +164,12 @@ export const getFeaturedPets = async (): Promise<PetCard[]> => {
   const response = await axiosInstance.get("/pets/featured");
   return response.data.data;
 };
+
+// ———————————————— FAVORITES API ————————————————
+export const addFavorite = async (petID: number): Promise<void> => {
+  await axiosInstance.post(`/pets/${petID}/favorites`);
+};
+
+export const removeFavorite = async (petID: number): Promise<void> => {
+  await axiosInstance.delete(`/pets/${petID}/favorites`);
+};

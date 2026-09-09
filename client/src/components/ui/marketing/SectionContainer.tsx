@@ -1,4 +1,4 @@
-// components/ui/SectionContainer.tsx
+// components/ui/marketing/SectionContainer.tsx
 import { forwardRef } from "react";
 
 interface SectionContainerProps {

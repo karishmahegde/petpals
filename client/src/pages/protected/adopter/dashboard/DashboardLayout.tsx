@@ -1,14 +1,14 @@
 import { useState } from "react";
-import DashboardNavbar from "../../../components/layout/DashboardNavbar";
-import DashboardSidebar from "../../../components/layout/DashboardSidebar";
-import AdopterDashboardMain from "./AdopterDashboardMain";
+import DashboardNavbar from "../../../../components/layout/DashboardNavbar";
+import DashboardSidebar from "../../../../components/layout/DashboardSidebar";
+import DashboardRoutes from "./DashboardRoutes";
 
-const AdopterDashboard = () => {
+const DashboardLayout = () => {
   // Sidebar drawer state (mobile). Moves to a shared DashboardLayout once the
   // other role dashboards need it too.
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Dummy — replace with real unread state once the notification system exists.
+  // Dummy - replace with real unread state once the notification system exists.
   const hasNotifications = false;
 
   return (
@@ -20,17 +20,14 @@ const AdopterDashboard = () => {
       />
 
       <div className="flex flex-1">
-        <DashboardSidebar
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-        />
+        <DashboardSidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
 
         <main className="min-w-0 flex-1 p-6 md:p-8">
-          <AdopterDashboardMain />
+          <DashboardRoutes />
         </main>
       </div>
     </div>
   );
 };
 
-export default AdopterDashboard;
+export default DashboardLayout;

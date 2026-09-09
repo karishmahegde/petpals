@@ -376,6 +376,47 @@ router.get(
 
 /**
  * @swagger
+ * /adopters/me/appointments:
+ *   get:
+ *     summary: List vet appointments for the logged-in adopter's pets
+ *     description: >
+ *       Appointments for every pet the adopter has an Accepted adoption
+ *       application for (same access rule as the vaccination history
+ *       endpoint). Ordered by appointmentDate ascending. Each record includes
+ *       the pet name, shelter name, and vet name.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: upcoming
+ *         schema: { type: boolean }
+ *         description: When exactly "true", returns only appointments with appointmentDate in the future
+ *     responses:
+ *       200:
+ *         description: The adopter's pets' appointments, ordered by date ascending (not paginated)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/AppointmentListItem' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get(
+  "/me/appointments",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getMyAppointments,
+);
+
+/**
+ * @swagger
  * /adopters/me/adopted-pets:
  *   get:
  *     summary: List pets the logged-in adopter has successfully adopted

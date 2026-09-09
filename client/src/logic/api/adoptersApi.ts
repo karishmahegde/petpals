@@ -2,6 +2,7 @@
 // (profile, applications, visits, favorites, …). stripeCustomerID and other
 // sensitive fields are never returned by the backend.
 import axiosInstance from "./axiosInstance";
+import type { Pagination, PetCard, PetDetail } from "./petsApi";
 
 export interface AdopterProfile {
   userID: number;
@@ -118,22 +119,129 @@ export const uploadGovernmentId = async (
 };
 
 // ———————————————— APPLICATIONS API ————————————————
+export type ApplicationStatus =
+  | "Pending"
+  | "Accepted"
+  | "Rejected"
+  | "Withdrawn";
+
 export interface AdoptionApplicationListItem {
   applicationID: number;
   petID: number;
   shelterID: number;
-  applicationStatus: "Pending" | "Accepted" | "Rejected" | "Withdrawn";
+  applicationStatus: ApplicationStatus;
   createdAt: string;
-  pet: { petName: string; petPhoto: string | null };
+  pet: {
+    petName: string;
+    petPhoto: string | null;
+    breed: { breedName: string };
+  };
   shelter: { shelterName: string };
 }
 
-export const getMyApplications = async (params?: {
+export interface PaginatedApplications {
+  data: AdoptionApplicationListItem[];
+  pagination: Pagination;
+}
+
+interface ApplicationListParams {
   petID?: number;
-  status?: "Pending" | "Accepted" | "Rejected" | "Withdrawn";
-}): Promise<AdoptionApplicationListItem[]> => {
+  status?: ApplicationStatus;
+  page?: number;
+  limit?: number;
+}
+
+export const getMyApplications = async (
+  params?: ApplicationListParams,
+): Promise<AdoptionApplicationListItem[]> => {
   const response = await axiosInstance.get("/adopters/me/applications", {
     params,
+  });
+  return response.data.data;
+};
+
+// Same endpoint as getMyApplications, but keeps the pagination envelope — used
+// by the full Applications section, which drives Prev/Next off it.
+export const getMyApplicationsPage = async (
+  params?: ApplicationListParams,
+): Promise<PaginatedApplications> => {
+  const response = await axiosInstance.get("/adopters/me/applications", {
+    params,
+  });
+  return { data: response.data.data, pagination: response.data.pagination };
+};
+
+// Lightweight count-only read — same endpoint as getMyApplications, but with
+// limit=1 to fetch as little as possible, reading pagination.total for the
+// real total instead of relying on how many rows came back on one page.
+export const getMyApplicationsCount = async (): Promise<number> => {
+  const response = await axiosInstance.get("/adopters/me/applications", {
+    params: { limit: 1 },
+  });
+  return response.data.pagination.total;
+};
+
+// ———————————————— ADOPTED PETS API ————————————————
+// Same PetCard shape as GET /pets / GET /pets/featured — lets the client
+// reuse PetCatalogCard as-is for the adopter's own pets.
+export const getMyAdoptedPets = async (): Promise<PetCard[]> => {
+  const response = await axiosInstance.get("/adopters/me/adopted-pets");
+  return response.data.data;
+};
+
+// ———————————————— FAVORITES API ————————————————
+// Each entry is the full pet-detail shape (same as GET /pets/:id) — see
+// petsApi.ts's PetDetail.
+export const getMyFavorites = async (): Promise<PetDetail[]> => {
+  const response = await axiosInstance.get("/adopters/me/favorites");
+  return response.data.data;
+};
+
+// ———————————————— VISITS API ————————————————
+export type VisitStatus = "Confirmed" | "Cancelled" | "Completed";
+
+export interface VisitListItem {
+  visitID: number;
+  adopterID: number;
+  petID: number | null;
+  staffID: number | null;
+  shelterID: number;
+  visitTime: string;
+  remarks: string | null;
+  // null until a staff member confirms it.
+  visitStatus: VisitStatus | null;
+  shelter: { shelterName: string };
+  pet: { petName: string } | null;
+}
+
+// Ordered by visitTime ascending. `upcoming` narrows to future visits only.
+export const getMyVisits = async (params?: {
+  upcoming?: boolean;
+}): Promise<VisitListItem[]> => {
+  const response = await axiosInstance.get("/adopters/me/visits", {
+    params: params?.upcoming ? { upcoming: "true" } : undefined,
+  });
+  return response.data.data;
+};
+
+// ———————————————— APPOINTMENTS API ————————————————
+// Vet appointments for the adopter's own pets (pets they have an Accepted
+// application for). Set by the shelter/vet — the adopter can't create these.
+export interface AppointmentListItem {
+  appointmentID: number;
+  appointmentDate: string;
+  appointmentReason: string;
+  pet: { petID: number; petName: string };
+  shelter: { shelterName: string };
+  vet: { vetName: string };
+}
+
+// Ordered by appointmentDate ascending. `upcoming` narrows to future ones.
+export const getMyAppointments = async (params?: {
+  upcoming?: boolean;
+}): Promise<AppointmentListItem[]> => {
+  const response = await axiosInstance.get("/adopters/me/appointments", {
+    params: params?.upcoming ? { upcoming: "true" } : undefined,
   });
   return response.data.data;
 };

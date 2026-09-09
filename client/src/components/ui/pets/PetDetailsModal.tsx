@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { FaPaw, FaTimes } from "react-icons/fa";
-import { getPetById } from "../../logic/api/petsApi";
-import { showAdopterAccountToast } from "../../logic/toast/adopterAccountToast";
-import useAuthStore from "../../logic/store/useAuthStore";
-import ButtonElement from "./ButtonElement";
+import { FaHeart, FaPaw, FaRegHeart, FaTimes } from "react-icons/fa";
+import {
+  addFavorite,
+  getPetById,
+  removeFavorite,
+} from "../../../logic/api/petsApi";
+import { getMyFavorites } from "../../../logic/api/adoptersApi";
+import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
+import { showLoginRequiredToast } from "../../../logic/toast/loginRequiredToast";
+import useAuthStore from "../../../logic/store/useAuthStore";
+import ButtonElement from "../ButtonElement";
 
 interface PetDetailsModalProps {
   petID: number | null;
@@ -21,12 +27,45 @@ const boxHeadingStyle =
 
 const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { token, role } = useAuthStore();
+  const isAdopter = Boolean(token) && role === "Adopter";
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["pet", petID],
     queryFn: () => getPetById(petID!),
     enabled: petID !== null,
+  });
+
+  const { data: favorites } = useQuery({
+    queryKey: ["adopter", "favorites"],
+    queryFn: getMyFavorites,
+    enabled: isAdopter,
+  });
+  const isFavorited =
+    favorites?.some((favorite) => favorite.petID === petID) ?? false;
+
+  const invalidateFavorites = () =>
+    queryClient.invalidateQueries({ queryKey: ["adopter", "favorites"] });
+  const addFavoriteMutation = useMutation({
+    mutationFn: addFavorite,
+    onSuccess: () => {
+      invalidateFavorites();
+      toast.success("Added to favorites!");
+    },
+    onError: () => {
+      toast.error("Something went wrong. Please try again.");
+    },
+  });
+  const removeFavoriteMutation = useMutation({
+    mutationFn: removeFavorite,
+    onSuccess: () => {
+      invalidateFavorites();
+      toast.success("Removed from favorites!");
+    },
+    onError: () => {
+      toast.error("Something went wrong. Please try again.");
+    },
   });
 
   // Drives the mobile slide-up entrance. The modal doesn't unmount between
@@ -77,6 +116,22 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
     navigate(`/adopt/apply/${petID}`);
   };
 
+  const handleFavoriteClick = () => {
+    if (!token) {
+      showLoginRequiredToast(navigate);
+      return;
+    }
+    if (role !== "Adopter") {
+      showAdopterAccountToast(navigate);
+      return;
+    }
+    if (isFavorited) {
+      removeFavoriteMutation.mutate(petID);
+    } else {
+      addFavoriteMutation.mutate(petID);
+    }
+  };
+
   return (
     // Backdrop: bottom sheet on mobile (items-end), centered card from sm
     // up — closing on backdrop click, same as the explicit close button.
@@ -85,7 +140,7 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
       onClick={onClose}
     >
       <div
-        className={`max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white transition-transform duration-300 ease-out sm:max-w-lg sm:translate-y-0 sm:rounded-2xl sm:transition-none ${
+        className={`max-h-[90vh] w-full overflow-y-auto rounded-t-2xl font-body bg-white transition-transform duration-300 ease-out sm:max-w-lg sm:translate-y-0 sm:rounded-2xl sm:transition-none ${
           entered ? "translate-y-0" : "translate-y-full"
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -176,7 +231,7 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
               {/* About */}
               <div className={boxStyle}>
                 <h3 className={boxHeadingStyle}>About</h3>
-                <p className="font-body font-light text-sm italic text-neutral-charcoal">
+                <p className="font-light text-sm italic text-neutral-charcoal">
                   {data.petDesc || "No description available."}
                 </p>
               </div>
@@ -219,12 +274,31 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
                 </p>
               </div>
 
-              <ButtonElement
-                onClick={handleAdoptClick}
-                className="w-full bg-teal-dark text-center"
-              >
-                Adopt or Foster
-              </ButtonElement>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleFavoriteClick}
+                  aria-label={
+                    isFavorited ? "Remove from favorites" : "Save to favorites"
+                  }
+                  title={
+                    isFavorited ? "Remove from favorites" : "Save to favorites"
+                  }
+                  className="my-5 flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 border-neutral-lightgray"
+                >
+                  {isFavorited ? (
+                    <FaHeart className="text-rose-md" />
+                  ) : (
+                    <FaRegHeart className="text-neutral-gray" />
+                  )}
+                </button>
+                <ButtonElement
+                  onClick={handleAdoptClick}
+                  className="flex-1 bg-teal-dark text-center"
+                >
+                  Adopt or Foster
+                </ButtonElement>
+              </div>
             </div>
           </>
         )}

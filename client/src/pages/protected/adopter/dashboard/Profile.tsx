@@ -7,12 +7,12 @@ import {
   PiLightningFill,
   PiSealCheck,
 } from "react-icons/pi";
-import DashboardHeading from "../../../../components/ui/DashboardHeading";
+import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import Avatar from "../../../../components/ui/Avatar";
 import PhoneInputField from "../../../../components/ui/PhoneInputField";
 import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import CloseAccountModal from "./CloseAccountModal";
-import GovernmentIdSection from "./GovernmentIdSection";
+import GovernmentIdSection from "../shared/GovernmentIdSection";
 import {
   getAdopterProfile,
   updateAdopterProfile,
@@ -262,7 +262,7 @@ const inputClass =
 
 // ——————————————————————————————————————————————————————————————
 
-const AdopterProfile = () => {
+const Profile = () => {
   const queryClient = useQueryClient();
 
   const profileQuery = useQuery({
@@ -587,7 +587,10 @@ const AdopterProfile = () => {
                     title="Randomize avatar"
                     className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm transition-colors hover:brightness-90"
                   >
-                    <PiArrowsClockwiseBold className="h-3.5 w-3.5" aria-hidden />
+                    <PiArrowsClockwiseBold
+                      className="h-3.5 w-3.5"
+                      aria-hidden
+                    />
                   </button>
                 )}
               </div>
@@ -598,7 +601,11 @@ const AdopterProfile = () => {
                 <p className="mt-1 font-body text-xs text-neutral-gray">
                   Joined on {formatShortDate(new Date(profile.createdAt))}
                   {profile.lastLoginAt && (
-                    <> · Last login {formatShortDate(new Date(profile.lastLoginAt))}</>
+                    <>
+                      {" "}
+                      · Last login{" "}
+                      {formatShortDate(new Date(profile.lastLoginAt))}
+                    </>
                   )}
                 </p>
               </div>
@@ -741,4 +748,4 @@ const EmptyPrompt = ({
   </button>
 );
 
-export default AdopterProfile;
+export default Profile;

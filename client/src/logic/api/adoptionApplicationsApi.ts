@@ -24,6 +24,11 @@ export interface AdoptionApplication {
   pet?: { petName: string };
 }
 
+// GET /adoption-applications/:id — adds the shelter name alongside the pet name.
+export interface AdoptionApplicationDetail extends AdoptionApplication {
+  shelter?: { shelterName: string };
+}
+
 // Starts payment — creates a Stripe Checkout Session and returns its URL.
 // Does NOT create the application row; that only happens once the Stripe
 // webhook confirms payment (see server/.../adoptionApplications.service.js
@@ -44,5 +49,29 @@ export const getApplicationByCheckoutSession = async (
   const response = await axiosInstance.get("/adoption-applications", {
     params: { checkoutSessionId },
   });
+  return response.data.data;
+};
+
+// Full detail for one application the adopter owns — for the planned inline
+// detail view on the Applications tab (opened via ?applicationID=).
+export const getApplicationById = async (
+  applicationID: number,
+): Promise<AdoptionApplicationDetail> => {
+  const response = await axiosInstance.get(
+    `/adoption-applications/${applicationID}`,
+  );
+  return response.data.data;
+};
+
+// Adopter-initiated withdraw — the only status change this endpoint accepts
+// from an adopter. The $15 processing fee is not refunded; re-applying for the
+// same pet is allowed afterwards.
+export const withdrawApplication = async (
+  applicationID: number,
+): Promise<AdoptionApplicationDetail> => {
+  const response = await axiosInstance.patch(
+    `/adoption-applications/${applicationID}/status`,
+    { status: "Withdrawn" },
+  );
   return response.data.data;
 };

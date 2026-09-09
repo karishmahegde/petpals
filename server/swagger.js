@@ -184,6 +184,10 @@ const schemas = {
         type: "string",
         enum: ["Pending", "Accepted", "Rejected", "Withdrawn"],
       },
+      applicationType: { type: "string", enum: ["Adopt", "Foster"] },
+      shelterMessage: { type: "string", nullable: true },
+      paymentStatus: { type: "string", enum: ["Paid"] },
+      amountPaid: { type: "number", example: 15 },
       createdAt: { type: "string", format: "date-time" },
     },
   },
@@ -220,7 +224,11 @@ const schemas = {
         type: "object",
         properties: {
           petName: { type: "string" },
-          petPhoto: { type: "string" },
+          petPhoto: { type: "string", nullable: true },
+          breed: {
+            type: "object",
+            properties: { breedName: { type: "string" } },
+          },
         },
       },
       shelter: {
@@ -267,6 +275,30 @@ const schemas = {
     ],
   },
 
+  AppointmentListItem: {
+    type: "object",
+    properties: {
+      appointmentID: { type: "integer" },
+      appointmentDate: { type: "string", format: "date-time" },
+      appointmentReason: { type: "string" },
+      pet: {
+        type: "object",
+        properties: {
+          petID: { type: "integer" },
+          petName: { type: "string" },
+        },
+      },
+      shelter: {
+        type: "object",
+        properties: { shelterName: { type: "string" } },
+      },
+      vet: {
+        type: "object",
+        properties: { vetName: { type: "string" } },
+      },
+    },
+  },
+
   PetDetail: {
     type: "object",
     properties: {
@@ -302,13 +334,20 @@ const schemas = {
   },
   AdoptedPet: {
     type: "object",
+    description: "Same shape as a pet catalog card (see PetCard on GET /pets).",
     properties: {
       petID: { type: "integer" },
       petName: { type: "string" },
-      petPhoto: { type: "string" },
-      breed: { type: "string" },
-      species: { type: "string" },
-      intakeDate: { type: "string", format: "date-time" },
+      petAge: { type: "string", example: "2 yr" },
+      petSex: { type: "string" },
+      petPhoto: { type: "string", nullable: true },
+      breed: {
+        type: "object",
+        properties: {
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
     },
   },
   VaccinationRecord: {

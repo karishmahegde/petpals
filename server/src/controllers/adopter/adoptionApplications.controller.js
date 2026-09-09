@@ -125,4 +125,46 @@ const getApplication = async (req, res, next) => {
   }
 };
 
-module.exports = { createApplication, getByCheckoutSession, getApplication };
+// ——————————————— PATCH /adoption-applications/:id/status ———————————————
+// Adopters may only move an application to 'Withdrawn'. Staff-driven status
+// transitions will extend this endpoint later.
+const VALID_ADOPTER_STATUS_CHANGES = ["Withdrawn"];
+
+const updateApplicationStatus = async (req, res, next) => {
+  let applicationID;
+  try {
+    applicationID = parseId(req.params.id, "id");
+  } catch (err) {
+    return next(err);
+  }
+
+  const { status } = req.body ?? {};
+  if (!VALID_ADOPTER_STATUS_CHANGES.includes(status)) {
+    return next(
+      badRequest(
+        `status is required and must be one of: ${VALID_ADOPTER_STATUS_CHANGES.join(", ")}`,
+      ),
+    );
+  }
+
+  try {
+    const application = await adoptionApplicationsService.withdrawApplication(
+      applicationID,
+      req.user.userID,
+    );
+    return successResponse(
+      res,
+      "Adoption application withdrawn successfully",
+      application,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  createApplication,
+  getByCheckoutSession,
+  getApplication,
+  updateApplicationStatus,
+};

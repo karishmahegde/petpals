@@ -13,6 +13,7 @@ export default {
           dark: "#CA7D7D",
         },
         gold: {
+          lightest: "#FFF6E5",
           light: "#FFE7B9",
           DEFAULT: "#FFD78A",
           md: "#FFCA62",

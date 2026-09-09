@@ -163,4 +163,68 @@ router.get(
   controller.getApplication,
 );
 
+/**
+ * @swagger
+ * /adoption-applications/{id}/status:
+ *   patch:
+ *     summary: Withdraw an adoption application
+ *     description: >
+ *       Adopter-only. The adopter may move their own application to
+ *       'Withdrawn', and only from 'Pending' or 'Accepted'. The $15
+ *       processing fee is not refunded. Withdrawing clears the active
+ *       (adopterID, petID) uniqueness constraint, so the adopter can
+ *       re-apply for the same pet afterwards. Staff-driven status
+ *       transitions are not handled here yet.
+ *     tags: [Adoption Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [Withdrawn]
+ *     responses:
+ *       200:
+ *         description: The updated application, with nested pet.petName and shelter.shelterName
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdoptionApplicationDetail' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Role not permitted, or an adopter acting on another adopter's application
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The application is already Rejected or Withdrawn, so it can't be withdrawn
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.patch(
+  "/:id/status",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  controller.updateApplicationStatus,
+);
+
 module.exports = router;

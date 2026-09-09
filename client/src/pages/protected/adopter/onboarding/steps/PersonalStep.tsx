@@ -15,6 +15,7 @@ import {
 interface PersonalStepProps {
   profile: AdopterProfileData;
   onContinue: () => void;
+  onBack?: () => void;
 }
 
 const inputClass =
@@ -75,7 +76,7 @@ const findStateCode = (countryCode: string, name: string) =>
         ?.isoCode ?? "")
     : "";
 
-const PersonalStep = ({ profile, onContinue }: PersonalStepProps) => {
+const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
   const [avatarSeed, setAvatarSeed] = useState(profile.avatarSeed);
   const [dob, setDob] = useState(
     profile.adopterDOB ? profile.adopterDOB.slice(0, 10) : "",
@@ -356,14 +357,25 @@ const PersonalStep = ({ profile, onContinue }: PersonalStepProps) => {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={handleContinue}
-        disabled={mutation.isPending}
-        className="mt-6 w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
-      >
-        {mutation.isPending ? "Saving…" : "Continue"}
-      </button>
+      <div className="mt-6 flex gap-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Back
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleContinue}
+          disabled={mutation.isPending}
+          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {mutation.isPending ? "Saving…" : "Continue"}
+        </button>
+      </div>
     </div>
   );
 };
