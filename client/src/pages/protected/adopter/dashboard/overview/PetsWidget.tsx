@@ -4,9 +4,10 @@
 // FeaturedPets.tsx and FavoritesWidget.tsx) instead of its own card markup —
 // a fun prompt to go adopt one when there are none yet.
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 import Card from "../../../../../components/ui/Card";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import DashboardWidgetHeader from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
+import DashboardEmptyMessage from "../../../../../components/ui/dashboard/DashboardEmptyMessage";
 import PetCatalogCard from "../../../../../components/ui/pets/PetCatalogCard";
 import { getMyAdoptedPets } from "../../../../../logic/api/adoptersApi";
 
@@ -36,15 +37,15 @@ const PetsWidget = ({ openId, onKnowMore }: PetsWidgetProps) => {
 
         {!isLoading && (!pets || pets.length === 0) && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p className="font-body text-xs text-neutral-gray">
+            <DashboardEmptyMessage>
               No pets yet, your future best friend is out there! 🐾
-            </p>
-            <Link
+            </DashboardEmptyMessage>
+            <ButtonElement
               to="/adopt"
-              className="rounded-xl bg-teal-dark px-5 py-2.5 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
+              className="bg-teal-dark hover:bg-gold-dark"
             >
               Explore Pets
-            </Link>
+            </ButtonElement>
           </div>
         )}
 

@@ -5,9 +5,10 @@
 // state passed down as onKnowMore — this widget never keeps its own
 // competing copy of "which pet is open" (State Ownership Rule).
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import Card from "../../../../../components/ui/Card";
 import DashboardWidgetHeader from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
+import DashboardEmptyMessage from "../../../../../components/ui/dashboard/DashboardEmptyMessage";
 import PetCatalogCard from "../../../../../components/ui/pets/PetCatalogCard";
 import { getMyFavorites } from "../../../../../logic/api/adoptersApi";
 
@@ -37,15 +38,15 @@ const FavoritesWidget = ({ openId, onKnowMore }: FavoritesWidgetProps) => {
 
         {!isLoading && (!favorites || favorites.length === 0) && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p className="font-body text-xs text-neutral-gray">
+            <DashboardEmptyMessage>
               No favorites yet. tap the heart on a pet you love!
-            </p>
-            <Link
+            </DashboardEmptyMessage>
+            <ButtonElement
               to="/adopt"
-              className="rounded-xl bg-teal-dark px-5 py-2.5 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
+              className="bg-teal-dark hover:bg-gold-dark"
             >
               Explore Pets
-            </Link>
+            </ButtonElement>
           </div>
         )}
 

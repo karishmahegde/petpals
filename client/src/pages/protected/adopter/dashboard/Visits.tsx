@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
+import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import {
   getMyVisits,
   type VisitListItem,
@@ -46,15 +47,12 @@ const Visits = () => {
 
       {visits && visits.length === 0 && (
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-white p-10 text-center shadow-md">
-          <p className="font-body text-sm text-neutral-gray">
+          <DashboardEmptyMessage>
             You have no visits scheduled.
-          </p>
-          <Link
-            to="/adopt"
-            className="rounded-xl bg-teal-dark px-5 py-2.5 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
-          >
+          </DashboardEmptyMessage>
+          <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
             Explore Pets
-          </Link>
+          </ButtonElement>
         </div>
       )}
 

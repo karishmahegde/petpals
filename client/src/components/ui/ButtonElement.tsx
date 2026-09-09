@@ -4,9 +4,11 @@ import { Link } from "react-router-dom";
 type ButtonSize = "md" | "sm";
 
 // Colour comes from `className` (e.g. "bg-teal-dark hover:bg-gold-dark").
+// Text is `text-xs font-light` at every size (set in sharedClassName below) —
+// size only varies the padding / radius / margin.
 const SIZE_CLASS: Record<ButtonSize, string> = {
   md: "my-5 rounded-md px-6 py-2", // default page CTA
-  sm: "rounded-lg px-4 py-2 font-body text-xs font-light", // compact, e.g. a dashboard row action
+  sm: "rounded-lg px-4 py-2", // compact, e.g. a dashboard row action
 };
 
 interface ButtonElementProps {
@@ -29,7 +31,9 @@ const ButtonElement = ({
   size = "md",
   disabled = false,
 }: ButtonElementProps) => {
-  const sharedClassName = `inline-block text-white transition ${SIZE_CLASS[size]} ${className}`;
+  // `font-body` here — the app sets no global body font, so a button without
+  // it renders in the browser default serif.
+  const sharedClassName = `inline-block font-body text-xs font-light text-white transition ${SIZE_CLASS[size]} ${className}`;
 
   if (to) {
     return (

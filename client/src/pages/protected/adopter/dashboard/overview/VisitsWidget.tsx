@@ -2,9 +2,10 @@
 // "Visits" preview widget on the adopter Overview page — the next few upcoming
 // shelter visits. "View All" leads to /adopter/visits for the full history.
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import Card from "../../../../../components/ui/Card";
 import DashboardWidgetHeader from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
+import DashboardEmptyMessage from "../../../../../components/ui/dashboard/DashboardEmptyMessage";
 import { getMyVisits } from "../../../../../logic/api/adoptersApi";
 import VisitsList from "../shared/VisitsList";
 
@@ -32,15 +33,10 @@ const VisitsWidget = () => {
 
       {!isLoading && upcoming.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-          <p className="font-body text-sm text-neutral-gray">
-            No upcoming visits
-          </p>
-          <Link
-            to="/adopt"
-            className="rounded-xl bg-teal-dark px-5 py-2.5 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
-          >
+          <DashboardEmptyMessage>No upcoming visits</DashboardEmptyMessage>
+          <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
             Explore Pets
-          </Link>
+          </ButtonElement>
         </div>
       )}
 

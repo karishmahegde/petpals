@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import Card from "../../../../../components/ui/Card";
 import DashboardWidgetHeader from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
+import DashboardEmptyMessage from "../../../../../components/ui/dashboard/DashboardEmptyMessage";
 import {
   DashboardListRow,
   RowActionButton,
@@ -48,9 +49,9 @@ const AppointmentsWidget = () => {
 
         {!isLoading && upcoming.length === 0 && (
           <div className="flex h-full items-center justify-center text-center">
-            <p className="font-body text-xs text-neutral-gray">
+            <DashboardEmptyMessage>
               No upcoming appointments
-            </p>
+            </DashboardEmptyMessage>
           </div>
         )}
 

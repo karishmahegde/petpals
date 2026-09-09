@@ -3,9 +3,10 @@
 // recent applications, with the same rows and actions as the full section.
 // "View All" leads to /adopter/applications for the rest.
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import Card from "../../../../../components/ui/Card";
 import DashboardWidgetHeader from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
+import DashboardEmptyMessage from "../../../../../components/ui/dashboard/DashboardEmptyMessage";
 import { getMyApplications } from "../../../../../logic/api/adoptersApi";
 import ApplicationsList from "../shared/ApplicationsList";
 
@@ -33,15 +34,12 @@ const ApplicationsWidget = () => {
 
       {!isLoading && !hasApplications && (
         <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-          <p className="font-body text-sm text-neutral-gray">
+          <DashboardEmptyMessage>
             You have no active applications
-          </p>
-          <Link
-            to="/adopt"
-            className="rounded-xl bg-teal-dark px-5 py-2.5 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
-          >
+          </DashboardEmptyMessage>
+          <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
             Explore Pets
-          </Link>
+          </ButtonElement>
         </div>
       )}
 
