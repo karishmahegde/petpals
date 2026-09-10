@@ -44,7 +44,10 @@ const ApplicationsWidget = () => {
       )}
 
       {!isLoading && hasApplications && (
-        <ApplicationsList applications={applications} />
+        <ApplicationsList
+          applications={applications}
+          rowClassName="bg-teal-light"
+        />
       )}
     </Card>
   );

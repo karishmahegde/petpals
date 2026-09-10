@@ -2,27 +2,17 @@
 // "Appointments" preview widget on the adopter Overview page — the next few
 // upcoming vet appointments for the adopter's pets. "View All" leads to
 // /adopter/appointments. Appointments are set by the shelter/vet, so there's
-// no "schedule" affordance here.
+// no "schedule" affordance here. Same rows as the full section (shared
+// AppointmentsList); "View Details" deep-links into it.
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import Card from "../../../../../components/ui/Card";
 import DashboardWidgetHeader from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
 import DashboardEmptyMessage from "../../../../../components/ui/dashboard/DashboardEmptyMessage";
-import {
-  DashboardListRow,
-  RowActionButton,
-} from "../../../../../components/ui/dashboard/DashboardList";
 import { getMyAppointments } from "../../../../../logic/api/adoptersApi";
+import AppointmentsList from "../shared/AppointmentsList";
 
 const PREVIEW_LIMIT = 3;
-
-// "5:00 PM" -> ["5:00", "PM"] for the two-line time block.
-const splitTime = (iso: string): [string, string] => {
-  const parts = new Date(iso)
-    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-    .split(" ");
-  return [parts[0], parts[1] ?? ""];
-};
 
 const AppointmentsWidget = () => {
   const navigate = useNavigate();
@@ -56,40 +46,13 @@ const AppointmentsWidget = () => {
         )}
 
         {!isLoading && upcoming.length > 0 && (
-          <ul className="flex flex-col gap-4">
-            {upcoming.map((appointment) => {
-              const [clock, meridiem] = splitTime(appointment.appointmentDate);
-
-              return (
-                <li key={appointment.appointmentID}>
-                  <DashboardListRow
-                    leading={
-                      <div className="w-16 shrink-0 text-center">
-                        <p className="font-body text-lg font-bold text-neutral-charcoal">
-                          {clock}
-                        </p>
-                        <p className="font-display text-2xl font-light text-neutral-charcoal">
-                          {meridiem}
-                        </p>
-                      </div>
-                    }
-                    title={`${appointment.pet.petName} - ${appointment.appointmentReason}`}
-                    actions={
-                      <RowActionButton
-                        onClick={() =>
-                          navigate(
-                            `/adopter/appointments?appointmentID=${appointment.appointmentID}`,
-                          )
-                        }
-                      >
-                        View Details
-                      </RowActionButton>
-                    }
-                  />
-                </li>
-              );
-            })}
-          </ul>
+          <AppointmentsList
+            appointments={upcoming}
+            variant="upcoming"
+            onViewDetails={(id) =>
+              navigate(`/adopter/appointments?appointmentID=${id}`)
+            }
+          />
         )}
       </div>
     </Card>

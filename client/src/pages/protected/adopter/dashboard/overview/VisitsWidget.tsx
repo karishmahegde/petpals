@@ -40,7 +40,9 @@ const VisitsWidget = () => {
         </div>
       )}
 
-      {!isLoading && upcoming.length > 0 && <VisitsList visits={upcoming} />}
+      {!isLoading && upcoming.length > 0 && (
+        <VisitsList visits={upcoming} rowClassName="bg-rose-light" />
+      )}
     </Card>
   );
 };

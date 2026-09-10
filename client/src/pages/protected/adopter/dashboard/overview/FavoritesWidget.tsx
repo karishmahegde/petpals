@@ -58,6 +58,7 @@ const FavoritesWidget = ({ openId, onKnowMore }: FavoritesWidgetProps) => {
                   pet={pet}
                   openId={openId}
                   onKnowMore={onKnowMore}
+                  unavailable={pet.adoptionStatus !== "available"}
                 />
               </div>
             ))}

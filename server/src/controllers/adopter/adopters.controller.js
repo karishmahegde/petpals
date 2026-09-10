@@ -398,6 +398,24 @@ const getMyAppointments = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /adopters/me/appointments/:id ———————————————
+const getMyAppointmentDetail = async (req, res, next) => {
+  const appointmentID = Number(req.params.id);
+  if (!Number.isInteger(appointmentID) || appointmentID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const detail = await appointmentsService.getAppointmentDetailForAdopter(
+      req.user.userID,
+      appointmentID,
+    );
+    return successResponse(res, "Appointment detail retrieved successfully", detail);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— GET /adopters/me/adopted-pets ———————————————
 const getMyAdoptedPets = async (req, res, next) => {
   try {
@@ -473,6 +491,7 @@ module.exports = {
   getMyApplications,
   getMyVisits,
   getMyAppointments,
+  getMyAppointmentDetail,
   getMyAdoptedPets,
   getMyAdoptedPetDetail,
   getMyAdoptedPetVaccinations,

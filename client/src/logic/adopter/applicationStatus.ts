@@ -17,7 +17,7 @@ export const APPLICATION_STATUS_META: Record<
   Rejected: { label: "Declined", className: "bg-neutral-gray text-white" },
   Withdrawn: {
     label: "Withdrawn",
-    className: "bg-neutral-lightgray text-neutral-charcoal",
+    className: "bg-neutral-gray text-neutral-white",
   },
 };
 

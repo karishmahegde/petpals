@@ -3,7 +3,7 @@ const { formatSex } = require("../public/pets.service");
 
 // ——————————————— ADOPTED-PET DETAIL (GET /adopters/me/adopted-pets/:petId) ———————————————
 // One consolidated payload for the My Pets side panel: basic details, intake,
-// compatibility, full health history (vaccinations + vet appointments), and
+// compatibility, health history (vaccinations + upcoming vet appointments), and
 // the adoption record. Same access rule as the vaccination-history endpoint —
 // the adopter must hold an Accepted application for this pet, otherwise 403.
 
@@ -85,8 +85,10 @@ const getAdoptedPetDetailForAdopter = async (adopterID, petID) => {
       },
       orderBy: { administeredDate: "desc" },
     }),
+    // Only upcoming appointments here — the full past-and-future history lives
+    // on the Appointments section; the panel just surfaces what's next.
     prisma.appointment.findMany({
-      where: { petID },
+      where: { petID, appointmentDate: { gt: new Date() } },
       select: {
         appointmentID: true,
         appointmentDate: true,
@@ -94,7 +96,7 @@ const getAdoptedPetDetailForAdopter = async (adopterID, petID) => {
         vet: { select: { vetName: true } },
         shelter: { select: { shelterName: true } },
       },
-      orderBy: { appointmentDate: "desc" },
+      orderBy: { appointmentDate: "asc" },
     }),
   ]);
 

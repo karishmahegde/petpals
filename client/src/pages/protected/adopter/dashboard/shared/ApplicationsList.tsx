@@ -23,9 +23,14 @@ import {
 
 interface ApplicationsListProps {
   applications: AdoptionApplicationListItem[];
+  /** Row background — defaults to the DashboardListRow gold tint. */
+  rowClassName?: string;
 }
 
-const ApplicationsList = ({ applications }: ApplicationsListProps) => {
+const ApplicationsList = ({
+  applications,
+  rowClassName,
+}: ApplicationsListProps) => {
   const navigate = useNavigate();
 
   return (
@@ -38,6 +43,7 @@ const ApplicationsList = ({ applications }: ApplicationsListProps) => {
 
         return (
           <DashboardListRow
+            className={rowClassName}
             leading={
               <RowMedallion
                 src={pet.petPhoto}

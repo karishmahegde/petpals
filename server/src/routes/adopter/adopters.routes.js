@@ -417,6 +417,47 @@ router.get(
 
 /**
  * @swagger
+ * /adopters/me/appointments/{id}:
+ *   get:
+ *     summary: Full detail for one vet appointment (Appointments detail panel)
+ *     description: >
+ *       The record behind one Appointments row: pet summary, date/time, reason,
+ *       vet, shelter, and the vaccines administered that day. Requires an
+ *       Accepted adoption application by this adopter for the appointment's
+ *       pet — otherwise 404.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The appointment detail payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AppointmentDetail' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/me/appointments/:id",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getMyAppointmentDetail,
+);
+
+/**
+ * @swagger
  * /adopters/me/adopted-pets:
  *   get:
  *     summary: List pets the logged-in adopter has successfully adopted
@@ -456,7 +497,7 @@ router.get(
  *     summary: Full detail for one pet the adopter has adopted (My Pets panel)
  *     description: >
  *       One consolidated payload: basic details, intake, compatibility, full
- *       health history (vaccinations + vet appointments), and the adoption
+ *       health history (vaccinations + upcoming vet appointments), and the adoption
  *       record. Requires an Accepted adoption application by this adopter for
  *       the pet — otherwise 403.
  *     tags: [Adopters]

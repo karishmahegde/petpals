@@ -13,6 +13,8 @@ import { relativeDateBadge } from "../../../../../logic/utils/datetime";
 
 interface VisitsListProps {
   visits: VisitListItem[];
+  /** Row background — defaults to the DashboardListRow gold tint. */
+  rowClassName?: string;
 }
 
 const BADGE_CLASS: Record<string, string> = {
@@ -23,7 +25,7 @@ const BADGE_CLASS: Record<string, string> = {
   Completed: "bg-neutral-lightgray text-neutral-charcoal",
 };
 
-const VisitsList = ({ visits }: VisitsListProps) => (
+const VisitsList = ({ visits, rowClassName }: VisitsListProps) => (
   <DashboardActionList
     items={visits}
     getKey={(visit) => visit.visitID}
@@ -38,6 +40,7 @@ const VisitsList = ({ visits }: VisitsListProps) => (
 
       return (
         <DashboardListRow
+          className={rowClassName}
           leading={
             <div className="w-12 shrink-0 text-center">
               <p className="font-body text-sm font-bold text-neutral-charcoal">

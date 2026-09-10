@@ -299,6 +299,42 @@ const schemas = {
     },
   },
 
+  AppointmentDetail: {
+    type: "object",
+    description:
+      "Full record behind one Appointments row, for the detail slide-over.",
+    properties: {
+      appointmentID: { type: "integer" },
+      appointmentCode: { type: "string", example: "APT-00123" },
+      appointmentDate: { type: "string", format: "date-time" },
+      appointmentReason: { type: "string" },
+      pet: {
+        type: "object",
+        properties: {
+          petID: { type: "integer" },
+          petName: { type: "string" },
+          petPhoto: { type: "string", nullable: true },
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
+      vetName: { type: "string", nullable: true },
+      shelterName: { type: "string" },
+      shelterAddress: { type: "string" },
+      vaccinesAdministered: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            recordID: { type: "integer" },
+            vaccineName: { type: "string" },
+            dueDate: { type: "string", format: "date-time" },
+          },
+        },
+      },
+    },
+  },
+
   PetDetail: {
     type: "object",
     properties: {

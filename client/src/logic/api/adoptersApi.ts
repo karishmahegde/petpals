@@ -232,6 +232,7 @@ export interface AdoptedPetDetail {
   };
   health: {
     vaccinations: AdoptedPetVaccination[];
+    // Upcoming only, soonest first — full history is on the Appointments section.
     appointments: AdoptedPetAppointment[];
   };
   adoption: {
@@ -306,6 +307,41 @@ export const getMyAppointments = async (params?: {
   const response = await axiosInstance.get("/adopters/me/appointments", {
     params: params?.upcoming ? { upcoming: "true" } : undefined,
   });
+  return response.data.data;
+};
+
+// Full record behind one Appointments row — for the detail slide-over
+// (GET /adopters/me/appointments/:id). Requires an Accepted application for
+// the appointment's pet (404 otherwise).
+export interface AppointmentDetail {
+  appointmentID: number;
+  appointmentCode: string; // e.g. "APT-00123"
+  appointmentDate: string;
+  appointmentReason: string;
+  pet: {
+    petID: number;
+    petName: string;
+    petPhoto: string | null;
+    breedName: string;
+    speciesName: string;
+  };
+  vetName: string | null;
+  shelterName: string;
+  shelterAddress: string;
+  // Vaccination records for the pet dated the same day as the appointment.
+  vaccinesAdministered: {
+    recordID: number;
+    vaccineName: string;
+    dueDate: string;
+  }[];
+}
+
+export const getAppointmentDetail = async (
+  appointmentID: number,
+): Promise<AppointmentDetail> => {
+  const response = await axiosInstance.get(
+    `/adopters/me/appointments/${appointmentID}`,
+  );
   return response.data.data;
 };
 

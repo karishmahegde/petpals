@@ -20,6 +20,10 @@ interface CardComponentProps {
   // "View Details" (the click then routes to the My Pets side panel, not the
   // public PetDetailsModal — the parent decides via its onKnowMore handler).
   ctaLabel?: string;
+  // Favorites can hold pets that are no longer adoptable — those render dimmed
+  // with an "Unavailable" chip instead of the CTA. The heart stays live so the
+  // adopter can still unfavorite them.
+  unavailable?: boolean;
 }
 
 const CardComponent = ({
@@ -27,6 +31,7 @@ const CardComponent = ({
   openId,
   onKnowMore,
   ctaLabel = "Know More",
+  unavailable = false,
 }: CardComponentProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -89,20 +94,22 @@ const CardComponent = ({
       className={`overflow-hidden font-body rounded-2xl bg-white shadow-md ${isDeepLinked ? "ring-4 ring-gold-md ring-offset-2" : ""}`}
     >
       <div className="relative aspect-square w-full">
-        {pet.petPhoto ? (
-          <img
-            src={pet.petPhoto}
-            alt={`${pet.petName} photo`}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-neutral-offwhite">
-            <FaPaw
-              className="h-12 w-12 text-rose-md"
-              aria-label={`${pet.petName} photo placeholder`}
+        <div className={unavailable ? "h-full w-full opacity-50 grayscale" : "h-full w-full"}>
+          {pet.petPhoto ? (
+            <img
+              src={pet.petPhoto}
+              alt={`${pet.petName} photo`}
+              className="h-full w-full object-cover"
             />
-          </div>
-        )}
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-neutral-offwhite">
+              <FaPaw
+                className="h-12 w-12 text-rose-md"
+                aria-label={`${pet.petName} photo placeholder`}
+              />
+            </div>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleHeartClick}
@@ -118,7 +125,7 @@ const CardComponent = ({
           )}
         </button>
       </div>
-      <div className="flex flex-col p-4">
+      <div className={`flex flex-col p-4 ${unavailable ? "opacity-60" : ""}`}>
         <p className="truncate text-md font-bold text-neutral-charcoal">
           {pet.petName}
         </p>
@@ -129,12 +136,18 @@ const CardComponent = ({
           <div className={pillStyle}>{pet.petAge}</div>
           <div className={pillStyle}>{pet.petSex}</div>
         </div>
-        <button
-          className="my-2 rounded-xl bg-black px-2 py-3 text-xs text-white"
-          onClick={() => onKnowMore(pet.petID)}
-        >
-          {ctaLabel}
-        </button>
+        {unavailable ? (
+          <span className="my-2 block rounded-xl bg-neutral-gray px-2 py-3 text-center text-xs text-white">
+            Unavailable
+          </span>
+        ) : (
+          <button
+            className="my-2 rounded-xl bg-black px-2 py-3 text-xs text-white"
+            onClick={() => onKnowMore(pet.petID)}
+          >
+            {ctaLabel}
+          </button>
+        )}
       </div>
     </div>
   );
