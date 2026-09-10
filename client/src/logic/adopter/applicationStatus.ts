@@ -1,24 +1,18 @@
 // Shared presentation + rules for an adoption application's status — the
-// adopter-facing label and badge colour differ from the raw DB enum ("Pending"
+// adopter-facing label and badge tone differ from the raw DB enum ("Pending"
 // reads as "Under Consideration", etc.). Shared so every place that shows an
-// application status (the section list now, the detail view later) stays in
-// sync.
+// application status (the section list, the detail slide-over) stays in sync.
 import type { ApplicationStatus } from "../api/adoptersApi";
+import type { BadgeTone } from "../../components/ui/Badge";
 
 export const APPLICATION_STATUS_META: Record<
   ApplicationStatus,
-  { label: string; className: string }
+  { label: string; tone: BadgeTone }
 > = {
-  Pending: {
-    label: "Under Consideration",
-    className: "bg-gold-md text-white",
-  },
-  Accepted: { label: "Approved", className: "bg-green text-white" },
-  Rejected: { label: "Declined", className: "bg-neutral-gray text-white" },
-  Withdrawn: {
-    label: "Withdrawn",
-    className: "bg-neutral-gray text-neutral-white",
-  },
+  Pending: { label: "Under Consideration", tone: "gold" },
+  Accepted: { label: "Approved", tone: "green" },
+  Rejected: { label: "Declined", tone: "gray" },
+  Withdrawn: { label: "Withdrawn", tone: "gray" },
 };
 
 // The adopter can only withdraw an application that's still in play.

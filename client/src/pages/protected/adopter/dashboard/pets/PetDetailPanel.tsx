@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FaPaw } from "react-icons/fa";
 import { getAdoptedPetDetail } from "../../../../../logic/api/adoptersApi";
+import Badge from "../../../../../components/ui/Badge";
 import SegmentedControl from "../../../../../components/ui/SegmentedControl";
 import SlideOver from "../../../../../components/ui/SlideOver";
 import {
@@ -98,9 +99,9 @@ const PetDetailPanel = ({ petID, onClose }: PetDetailPanelProps) => {
               </p>
             </div>
             {data.adoptionStatus === "adopted" && (
-              <span className="shrink-0 rounded-full bg-gold-md px-3 py-1 text-xs font-medium text-white">
+              <Badge tone="gold" className="shrink-0">
                 Adopted
-              </span>
+              </Badge>
             )}
           </div>
 

@@ -68,7 +68,7 @@ const ApplicationsList = ({
                 strong: true,
               },
             ]}
-            badge={{ label: status.label, className: status.className }}
+            badge={{ label: status.label, tone: status.tone }}
             actions={
               <>
                 <RowActionButton

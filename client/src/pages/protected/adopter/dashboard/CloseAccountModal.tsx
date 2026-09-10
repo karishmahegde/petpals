@@ -164,7 +164,7 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
                 type="button"
                 onClick={() => mutation.mutate(mode)}
                 disabled={!canConfirm}
-                className="rounded-xl bg-rose-dark px-4 py-2 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
+                className="rounded-xl bg-red px-4 py-2 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
               >
                 {mutation.isPending
                   ? "Working…"

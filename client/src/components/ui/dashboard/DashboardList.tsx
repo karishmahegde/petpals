@@ -21,13 +21,13 @@ import {
 import toast from "react-hot-toast";
 import ButtonElement from "../ButtonElement";
 import ConfirmActionModal from "../ConfirmActionModal";
+import Badge, { type BadgeTone } from "../Badge";
 
 // ————————————————————————————— DashboardListRow —————————————————————————————
 
 export interface RowBadge {
   label: ReactNode;
-  /** Tailwind bg + text classes, e.g. "bg-green text-white". */
-  className: string;
+  tone: BadgeTone;
 }
 
 export interface RowLine {
@@ -82,13 +82,7 @@ export const DashboardListRow = ({
 
     {(badge || actions) && (
       <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-        {badge && (
-          <span
-            className={`rounded-full px-4 py-1.5 font-body text-xs font-light ${badge.className}`}
-          >
-            {badge.label}
-          </span>
-        )}
+        {badge && <Badge tone={badge.tone}>{badge.label}</Badge>}
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>
     )}
@@ -133,7 +127,7 @@ type RowActionVariant = "primary" | "danger";
 
 const ACTION_VARIANT: Record<RowActionVariant, string> = {
   primary: "bg-teal-dark",
-  danger: "bg-rose-md",
+  danger: "bg-red", // withdraw / cancel
 };
 
 interface RowActionButtonProps {

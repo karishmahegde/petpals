@@ -7,25 +7,37 @@ import {
   DashboardListRow,
   RowActionButton,
 } from "../../../../../components/ui/dashboard/DashboardList";
+import type { RowLine } from "../../../../../components/ui/dashboard/DashboardList";
+import type { BadgeTone } from "../../../../../components/ui/Badge";
 import type { VisitListItem } from "../../../../../logic/api/adoptersApi";
 import { cancelVisit } from "../../../../../logic/api/visitsApi";
-import { relativeDateBadge } from "../../../../../logic/utils/datetime";
+import { formatTime, relativeDateBadge } from "../../../../../logic/utils/datetime";
 
 interface VisitsListProps {
   visits: VisitListItem[];
   /** Row background — defaults to the DashboardListRow gold tint. */
   rowClassName?: string;
+  /**
+   * "View Details" handler. When given (the full section), each row gets a
+   * View Details button that opens the detail slide-over; omitted on the
+   * Overview widget, which stays action-light.
+   */
+  onViewDetails?: (visitID: number) => void;
 }
 
-const BADGE_CLASS: Record<string, string> = {
-  Soon: "bg-gold-md text-neutral-dark",
-  Upcoming: "bg-teal-light text-teal-dark",
-  Past: "bg-neutral-lightgray text-neutral-charcoal",
-  Cancelled: "bg-neutral-lightgray text-neutral-charcoal",
-  Completed: "bg-neutral-lightgray text-neutral-charcoal",
+const BADGE_TONE: Record<string, BadgeTone> = {
+  Soon: "gold",
+  Upcoming: "teal",
+  Past: "neutral",
+  Cancelled: "neutral",
+  Completed: "neutral",
 };
 
-const VisitsList = ({ visits, rowClassName }: VisitsListProps) => (
+const VisitsList = ({
+  visits,
+  rowClassName,
+  onViewDetails,
+}: VisitsListProps) => (
   <DashboardActionList
     items={visits}
     getKey={(visit) => visit.visitID}
@@ -37,6 +49,11 @@ const VisitsList = ({ visits, rowClassName }: VisitsListProps) => (
         ? visit.visitStatus!
         : relativeDateBadge(when);
       const canCancel = !isClosed && when.getTime() > Date.now();
+
+      const lines: RowLine[] = [
+        { text: `${formatTime(when)} | ${visit.shelter.shelterName}` },
+      ];
+      if (visit.remarks) lines.push({ text: visit.remarks });
 
       return (
         <DashboardListRow
@@ -54,19 +71,30 @@ const VisitsList = ({ visits, rowClassName }: VisitsListProps) => (
           title={
             visit.pet ? `Pet Meet - ${visit.pet.petName}` : "Shelter Visit"
           }
-          lines={[{ text: visit.shelter.shelterName }]}
+          lines={lines}
           badge={{
             label: badgeLabel,
-            className: BADGE_CLASS[badgeLabel] ?? BADGE_CLASS.Upcoming,
+            tone: BADGE_TONE[badgeLabel] ?? "teal",
           }}
           actions={
-            canCancel && (
-              <RowActionButton
-                variant="danger"
-                onClick={() => confirmCancel(visit)}
-              >
-                Cancel
-              </RowActionButton>
+            (onViewDetails || canCancel) && (
+              <>
+                {onViewDetails && (
+                  <RowActionButton
+                    onClick={() => onViewDetails(visit.visitID)}
+                  >
+                    View Details
+                  </RowActionButton>
+                )}
+                {canCancel && (
+                  <RowActionButton
+                    variant="danger"
+                    onClick={() => confirmCancel(visit)}
+                  >
+                    Cancel
+                  </RowActionButton>
+                )}
+              </>
             )
           }
         />

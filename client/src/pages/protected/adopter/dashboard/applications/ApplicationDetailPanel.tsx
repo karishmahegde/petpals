@@ -13,6 +13,7 @@ import {
   withdrawApplication,
 } from "../../../../../logic/api/adoptionApplicationsApi";
 import SlideOver from "../../../../../components/ui/SlideOver";
+import Badge from "../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../components/ui/ConfirmActionModal";
 import { formatFullDate } from "../../../../../logic/utils/datetime";
 import {
@@ -84,7 +85,7 @@ const ApplicationDetailPanel = ({
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}
-              className="w-full rounded-xl bg-rose-md px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95"
+              className="w-full rounded-xl bg-red px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95"
             >
               Withdraw Application
             </button>
@@ -141,11 +142,7 @@ const ApplicationDetailPanel = ({
               />
               <dt className={label}>Status</dt>
               <dd>
-                <span
-                  className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${status.className}`}
-                >
-                  {status.label}
-                </span>
+                <Badge tone={status.tone}>{status.label}</Badge>
               </dd>
             </dl>
 

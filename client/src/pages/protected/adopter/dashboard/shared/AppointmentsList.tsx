@@ -7,6 +7,7 @@ import {
   DashboardListRow,
   RowActionButton,
 } from "../../../../../components/ui/dashboard/DashboardList";
+import type { BadgeTone } from "../../../../../components/ui/Badge";
 import type { AppointmentListItem } from "../../../../../logic/api/adoptersApi";
 import {
   formatTime,
@@ -20,9 +21,9 @@ interface AppointmentsListProps {
   variant?: "upcoming" | "past";
 }
 
-const BADGE_CLASS: Record<string, string> = {
-  Soon: "bg-gold-md text-neutral-dark",
-  Upcoming: "bg-teal-light text-teal-dark",
+const BADGE_TONE: Record<string, BadgeTone> = {
+  Soon: "gold",
+  Upcoming: "teal",
 };
 
 const AppointmentsList = ({
@@ -58,8 +59,8 @@ const AppointmentsList = ({
               },
             ]}
             badge={
-              variant === "upcoming" && BADGE_CLASS[badgeLabel]
-                ? { label: badgeLabel, className: BADGE_CLASS[badgeLabel] }
+              variant === "upcoming" && BADGE_TONE[badgeLabel]
+                ? { label: badgeLabel, tone: BADGE_TONE[badgeLabel] }
                 : undefined
             }
             actions={

@@ -13,6 +13,7 @@ import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToas
 import { showLoginRequiredToast } from "../../../logic/toast/loginRequiredToast";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import ButtonElement from "../ButtonElement";
+import Badge from "../Badge";
 
 interface PetDetailsModalProps {
   petID: number | null;
@@ -241,19 +242,19 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
                 <h3 className={boxHeadingStyle}>Compatibility</h3>
                 <div className="flex flex-wrap gap-2">
                   {data.compatibleWithChildren && (
-                    <span className="rounded-full border border-teal-md bg-teal-light px-3 py-1 text-xs text-teal-dark">
+                    <Badge tone="teal" variant="outline">
                       Good with children
-                    </span>
+                    </Badge>
                   )}
                   {data.compatibleWithPets && (
-                    <span className="rounded-full border border-teal-md bg-teal-light px-3 py-1 text-xs text-teal-dark">
+                    <Badge tone="teal" variant="outline">
                       Good with other pets
-                    </span>
+                    </Badge>
                   )}
                   {data.specialNeeds && (
-                    <span className="rounded-full border border-gold-md bg-gold-light px-3 py-1 text-xs text-neutral-charcoal">
+                    <Badge tone="gold" variant="outline">
                       Special needs
-                    </span>
+                    </Badge>
                   )}
                   {!hasCompatibilityInfo && (
                     <span className="text-xs italic text-neutral-gray">

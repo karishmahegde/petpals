@@ -28,6 +28,9 @@ export default {
         green: {
           DEFAULT: "#91B381",
         },
+        red: {
+          DEFAULT: "#FF6262",
+        },
         neutral: {
           white: "#FFFFFF",
           offwhite: "#FAFAFA",

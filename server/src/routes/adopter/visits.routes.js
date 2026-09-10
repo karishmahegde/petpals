@@ -62,6 +62,36 @@ router.post(
 /**
  * @swagger
  * /visits/{id}:
+ *   get:
+ *     summary: Full detail for one of the adopter's visits (Visits detail panel)
+ *     description: >
+ *       Adopter-only — the adopter may view their own visits (403 otherwise).
+ *       Includes the pet summary, shelter, assigned staff name, and whether the
+ *       visit can still be cancelled.
+ *     tags: [Visits]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: The visit detail payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/VisitDetail' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  *   patch:
  *     summary: Cancel a scheduled visit
  *     description: >
@@ -113,6 +143,13 @@ router.post(
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  */
+router.get(
+  "/:id",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  controller.getVisitDetail,
+);
+
 router.patch(
   "/:id",
   authenticate,

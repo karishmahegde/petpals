@@ -303,6 +303,35 @@ const schemas = {
     ],
   },
 
+  VisitDetail: {
+    type: "object",
+    description: "Full record behind one Visits row, for the detail slide-over.",
+    properties: {
+      visitID: { type: "integer" },
+      visitTime: { type: "string", format: "date-time" },
+      remarks: { type: "string", nullable: true },
+      visitStatus: {
+        type: "string",
+        nullable: true,
+        enum: ["Confirmed", "Cancelled", "Completed"],
+      },
+      canCancel: { type: "boolean" },
+      pet: {
+        type: "object",
+        nullable: true,
+        properties: {
+          petName: { type: "string" },
+          petPhoto: { type: "string", nullable: true },
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
+      shelterName: { type: "string" },
+      shelterAddress: { type: "string" },
+      assignedStaffName: { type: "string", nullable: true },
+    },
+  },
+
   AppointmentListItem: {
     type: "object",
     properties: {

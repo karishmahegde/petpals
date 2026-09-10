@@ -84,6 +84,67 @@ const listVisitsByAdopter = async (adopterID, { upcomingOnly = false } = {}) => 
   });
 };
 
+// ——————————————— VISIT DETAIL (GET /visits/:id) ———————————————
+// The record behind one Visits row, for the detail slide-over. Adopter-owned
+// only (403 otherwise).
+const getVisitDetailForAdopter = async (visitID, adopterID) => {
+  const visit = await prisma.visit.findUnique({
+    where: { visitID },
+    select: {
+      visitID: true,
+      adopterID: true,
+      visitTime: true,
+      remarks: true,
+      visitStatus: true,
+      pet: {
+        select: {
+          petName: true,
+          petPhoto: true,
+          breed: {
+            select: {
+              breedName: true,
+              species: { select: { speciesName: true } },
+            },
+          },
+        },
+      },
+      shelter: { select: { shelterName: true, shelterAddress: true } },
+      staff: { select: { staffName: true } },
+    },
+  });
+
+  if (!visit) {
+    throw notFound(`No visit exists with ID ${visitID}`);
+  }
+  if (visit.adopterID !== adopterID) {
+    const err = new Error("You can only view your own visits");
+    err.code = "FORBIDDEN";
+    throw err;
+  }
+
+  const isClosed =
+    visit.visitStatus === "Cancelled" || visit.visitStatus === "Completed";
+
+  return {
+    visitID: visit.visitID,
+    visitTime: visit.visitTime,
+    remarks: visit.remarks,
+    visitStatus: visit.visitStatus,
+    canCancel: !isClosed && visit.visitTime.getTime() > Date.now(),
+    pet: visit.pet
+      ? {
+          petName: visit.pet.petName,
+          petPhoto: visit.pet.petPhoto,
+          breedName: visit.pet.breed.breedName,
+          speciesName: visit.pet.breed.species.speciesName,
+        }
+      : null,
+    shelterName: visit.shelter.shelterName,
+    shelterAddress: visit.shelter.shelterAddress,
+    assignedStaffName: visit.staff ? visit.staff.staffName : null,
+  };
+};
+
 // ——————————————— CANCEL VISIT (PATCH /visits/:id) ———————————————
 // Adopter-initiated only, and only to 'Cancelled'. Staff confirming or
 // completing a visit is separate, later work. A visit that has already
@@ -124,4 +185,9 @@ const cancelVisit = async (visitID, adopterID) => {
   });
 };
 
-module.exports = { createVisit, listVisitsByAdopter, cancelVisit };
+module.exports = {
+  createVisit,
+  listVisitsByAdopter,
+  getVisitDetailForAdopter,
+  cancelVisit,
+};

@@ -69,6 +69,26 @@ const createVisit = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /visits/:id ———————————————
+const getVisitDetail = async (req, res, next) => {
+  let visitID;
+  try {
+    visitID = parseId(req.params.id);
+  } catch (err) {
+    return next(err);
+  }
+
+  try {
+    const visit = await visitsService.getVisitDetailForAdopter(
+      visitID,
+      req.user.userID,
+    );
+    return successResponse(res, "Visit detail retrieved successfully", visit);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— PATCH /visits/:id ———————————————
 const cancelVisit = async (req, res, next) => {
   let visitID;
@@ -91,4 +111,4 @@ const cancelVisit = async (req, res, next) => {
   }
 };
 
-module.exports = { createVisit, cancelVisit };
+module.exports = { createVisit, getVisitDetail, cancelVisit };

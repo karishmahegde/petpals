@@ -16,6 +16,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FaPaw } from "react-icons/fa";
+import Badge from "../../../../components/ui/Badge";
 import Card from "../../../../components/ui/Card";
 import SegmentedControl from "../../../../components/ui/SegmentedControl";
 import ConfirmActionModal from "../../../../components/ui/ConfirmActionModal";
@@ -221,19 +222,19 @@ const AdoptApply = () => {
               </p>
               <div className="flex flex-wrap gap-2">
                 {pet.compatibleWithChildren && (
-                  <span className="rounded-full border border-teal-md bg-teal-light px-3 py-1 text-xs text-teal-dark">
+                  <Badge tone="teal" variant="outline">
                     Good with children
-                  </span>
+                  </Badge>
                 )}
                 {pet.compatibleWithPets && (
-                  <span className="rounded-full border border-teal-md bg-teal-light px-3 py-1 text-xs text-teal-dark">
+                  <Badge tone="teal" variant="outline">
                     Good with other pets
-                  </span>
+                  </Badge>
                 )}
                 {pet.specialNeeds && (
-                  <span className="rounded-full border border-gold-md bg-gold-light px-3 py-1 text-xs text-neutral-charcoal">
+                  <Badge tone="gold" variant="outline">
                     Special needs
-                  </span>
+                  </Badge>
                 )}
                 {!hasCompatibilityInfo && (
                   <span className="font-body text-xs italic text-neutral-gray">
