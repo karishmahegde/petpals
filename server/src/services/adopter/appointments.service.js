@@ -41,9 +41,6 @@ const listAppointmentsByAdopter = async (
 // approximated as the pet's vaccination records dated the same calendar day as
 // the appointment.
 
-// "APT-" + zero-padded appointment ID — the human-facing reference.
-const formatAppointmentCode = (id) => `APT-${String(id).padStart(5, "0")}`;
-
 const startOfDay = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -65,6 +62,7 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
     },
     select: {
       appointmentID: true,
+      appointmentCode: true,
       appointmentDate: true,
       appointmentReason: true,
       pet: {
@@ -111,7 +109,7 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
 
   return {
     appointmentID: appointment.appointmentID,
-    appointmentCode: formatAppointmentCode(appointment.appointmentID),
+    appointmentCode: appointment.appointmentCode,
     appointmentDate: appointment.appointmentDate,
     appointmentReason: appointment.appointmentReason,
     pet: {

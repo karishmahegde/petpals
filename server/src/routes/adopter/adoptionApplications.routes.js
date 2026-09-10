@@ -126,7 +126,8 @@ router.get(
  *     summary: Get a single adoption application by ID
  *     description: >
  *       Adopters may only retrieve their own applications; staff may retrieve
- *       any. The response includes the pet name and shelter name.
+ *       any. Includes the pet summary, assigned staff name, and the shelter's
+ *       closing remark — for the Applications section's detail slide-over.
  *     tags: [Adoption Applications]
  *     security:
  *       - bearerAuth: []
@@ -138,7 +139,7 @@ router.get(
  *           type: integer
  *     responses:
  *       200:
- *         description: The application record, with nested pet.petName and shelter.shelterName
+ *         description: The full application record
  *         content:
  *           application/json:
  *             schema:
@@ -146,7 +147,7 @@ router.get(
  *                 - $ref: '#/components/schemas/ApiEnvelope'
  *                 - type: object
  *                   properties:
- *                     data: { $ref: '#/components/schemas/AdoptionApplicationDetail' }
+ *                     data: { $ref: '#/components/schemas/AdoptionApplicationFullDetail' }
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403:

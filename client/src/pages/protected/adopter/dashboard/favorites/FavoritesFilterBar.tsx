@@ -10,6 +10,7 @@ import { FaDna } from "react-icons/fa";
 import { PiBirdBold } from "react-icons/pi";
 import { TbArrowsSort } from "react-icons/tb";
 import Card from "../../../../../components/ui/Card";
+import SelectField from "../../../../../components/ui/SelectField";
 import {
   CheckboxDropdown,
   Pill,
@@ -105,25 +106,15 @@ const FavoritesFilterBar = ({
           selectedValues={filters.breeds}
           onToggle={(v) => toggle("breeds", String(v))}
         />
-        <div>
-          <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-neutral-charcoal">
-            <TbArrowsSort />
-            Sort By
-          </label>
-          <select
-            value={filters.sort}
-            onChange={(e) =>
-              onChange({ sort: e.target.value as FavoritesSort })
-            }
-            className="w-full rounded-md border border-neutral-lightgray bg-white px-3 py-2.5 text-sm text-neutral-charcoal"
-          >
-            {(Object.keys(SORT_LABELS) as FavoritesSort[]).map((value) => (
-              <option key={value} value={value}>
-                {SORT_LABELS[value]}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SelectField
+          label="Sort By"
+          icon={<TbArrowsSort />}
+          value={filters.sort}
+          onChange={(v) => onChange({ sort: v as FavoritesSort })}
+          options={(Object.keys(SORT_LABELS) as FavoritesSort[]).map(
+            (value) => ({ value, label: SORT_LABELS[value] }),
+          )}
+        />
       </div>
 
       {(filters.species.length > 0 || filters.breeds.length > 0) && (

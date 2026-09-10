@@ -25,11 +25,18 @@ interface ApplicationsListProps {
   applications: AdoptionApplicationListItem[];
   /** Row background — defaults to the DashboardListRow gold tint. */
   rowClassName?: string;
+  /**
+   * "View Details" handler. When given (the full section), it opens the detail
+   * slide-over in place; when omitted (the Overview widget), the row routes to
+   * the Applications tab with ?applicationID=.
+   */
+  onViewDetails?: (applicationID: number) => void;
 }
 
 const ApplicationsList = ({
   applications,
   rowClassName,
+  onViewDetails,
 }: ApplicationsListProps) => {
   const navigate = useNavigate();
 
@@ -66,9 +73,11 @@ const ApplicationsList = ({
               <>
                 <RowActionButton
                   onClick={() =>
-                    navigate(
-                      `/adopter/applications?applicationID=${application.applicationID}`,
-                    )
+                    onViewDetails
+                      ? onViewDetails(application.applicationID)
+                      : navigate(
+                          `/adopter/applications?applicationID=${application.applicationID}`,
+                        )
                   }
                 >
                   View Details

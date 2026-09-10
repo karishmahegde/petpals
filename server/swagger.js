@@ -209,6 +209,34 @@ const schemas = {
       },
     ],
   },
+  // Richer shape returned by GET /adoption-applications/:id only — for the
+  // Applications section's detail slide-over.
+  AdoptionApplicationFullDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/AdoptionApplication" },
+      {
+        type: "object",
+        properties: {
+          applicationCode: { type: "string", example: "APP-00123" },
+          staffRemark: { type: "string", nullable: true },
+          assignedStaffName: { type: "string", nullable: true },
+          pet: {
+            type: "object",
+            properties: {
+              petName: { type: "string" },
+              petPhoto: { type: "string", nullable: true },
+              breedName: { type: "string" },
+              speciesName: { type: "string" },
+            },
+          },
+          shelter: {
+            type: "object",
+            properties: { shelterName: { type: "string" } },
+          },
+        },
+      },
+    ],
+  },
   AdoptionApplicationListItem: {
     type: "object",
     properties: {

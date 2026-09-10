@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { FaPaw } from "react-icons/fa";
 import Card from "../../../../components/ui/Card";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
+import SelectField from "../../../../components/ui/SelectField";
 import { getMyAppointments } from "../../../../logic/api/adoptersApi";
 import AppointmentsList from "./shared/AppointmentsList";
 import AppointmentDetailPanel from "./appointments/AppointmentDetailPanel";
@@ -27,23 +29,20 @@ const PetFilterSelect = ({
   value: PetFilter;
   onChange: (value: PetFilter) => void;
 }) => (
-  <label className="flex flex-col gap-1">
-    <span className="font-body text-sm font-semibold text-teal-dark">Pet</span>
-    <select
-      value={value === "all" ? "all" : String(value)}
-      onChange={(e) =>
-        onChange(e.target.value === "all" ? "all" : Number(e.target.value))
-      }
-      className="rounded-lg border border-neutral-lightgray bg-white px-3 py-2 font-body text-sm text-neutral-charcoal"
-    >
-      <option value="all">All pets</option>
-      {options.map((pet) => (
-        <option key={pet.petID} value={pet.petID}>
-          {pet.petName}
-        </option>
-      ))}
-    </select>
-  </label>
+  <SelectField
+    label="Pet"
+    icon={<FaPaw className="text-neutral-gray" />}
+    className="max-w-xs"
+    value={value === "all" ? "all" : String(value)}
+    onChange={(v) => onChange(v === "all" ? "all" : Number(v))}
+    options={[
+      { value: "all", label: "All pets" },
+      ...options.map((pet) => ({
+        value: String(pet.petID),
+        label: pet.petName,
+      })),
+    ]}
+  />
 );
 
 // "Appointments" section of the adopter dashboard — upcoming and past vet

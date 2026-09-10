@@ -214,13 +214,29 @@ const getApplicationByCheckoutSession = async (adopterID, sessionId) => {
 };
 
 // ——————————————— GET APPLICATION BY ID (GET /adoption-applications/:id) ———————————————
+// Powers the Applications section's detail slide-over: the scalar fields plus
+// the pet summary, assigned staff name, and the shelter's closing remark.
 const getApplicationById = async (applicationID, user) => {
   const application = await prisma.adoptionApplication.findUnique({
     where: { applicationID },
     select: {
       ...APPLICATION_SELECT,
-      pet: { select: { petName: true } },
+      applicationCode: true,
+      staffRemark: true,
+      pet: {
+        select: {
+          petName: true,
+          petPhoto: true,
+          breed: {
+            select: {
+              breedName: true,
+              species: { select: { speciesName: true } },
+            },
+          },
+        },
+      },
       shelter: { select: { shelterName: true } },
+      staff: { select: { staffName: true } },
     },
   });
 
@@ -239,7 +255,29 @@ const getApplicationById = async (applicationID, user) => {
     throw err;
   }
 
-  return toClientShape(application);
+  return {
+    applicationID: application.applicationID,
+    applicationCode: application.applicationCode,
+    petID: application.petID,
+    adopterID: application.adopterID,
+    shelterID: application.shelterID,
+    staffID: application.staffID,
+    applicationStatus: application.applicationStatus,
+    applicationType: application.applicationType,
+    shelterMessage: application.shelterMessage,
+    staffRemark: application.staffRemark,
+    paymentStatus: application.paymentStatus,
+    amountPaid: Number(application.amountPaid),
+    createdAt: application.createdAt,
+    pet: {
+      petName: application.pet.petName,
+      petPhoto: application.pet.petPhoto,
+      breedName: application.pet.breed.breedName,
+      speciesName: application.pet.breed.species.speciesName,
+    },
+    shelter: { shelterName: application.shelter.shelterName },
+    assignedStaffName: application.staff ? application.staff.staffName : null,
+  };
 };
 
 // ——————————————— LIST APPLICATIONS FOR AN ADOPTER (GET /adopters/me/applications) ———————————————

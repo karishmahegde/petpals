@@ -229,6 +229,14 @@ model Favorite {
 
 model AdoptionApplication {
   applicationID           Int               @id @default(autoincrement())
+  // Human-facing reference, e.g. "APP-00048". Postgres GENERATED ALWAYS STORED
+  // column computed from applicationID — READ-ONLY, never set in a
+  // create()/update(). Same manual-migration pattern as Pet.petCode (see
+  // CLAUDE.md — migrate dev is banned):
+  //   ALTER TABLE "AdoptionApplication" ADD COLUMN "applicationCode" TEXT
+  //     GENERATED ALWAYS AS ('APP-' || lpad("applicationID"::text, 5, '0')) STORED;
+  //   CREATE UNIQUE INDEX "AdoptionApplication_applicationCode_key" ON "AdoptionApplication" ("applicationCode");
+  applicationCode         String?           @unique @db.Text
   petID                   Int
   adopterID               Int
   createdAt               DateTime          @default(now())
@@ -346,6 +354,14 @@ model TransferHistory {
 
 model Appointment {
   appointmentID     Int          @id @default(autoincrement())
+  // Human-facing reference, e.g. "APT-00123". Postgres GENERATED ALWAYS STORED
+  // column computed from appointmentID — READ-ONLY, never set in a
+  // create()/update(). Same manual-migration pattern as Pet.petCode (see
+  // CLAUDE.md — migrate dev is banned):
+  //   ALTER TABLE "Appointment" ADD COLUMN "appointmentCode" TEXT
+  //     GENERATED ALWAYS AS ('APT-' || lpad("appointmentID"::text, 5, '0')) STORED;
+  //   CREATE UNIQUE INDEX "Appointment_appointmentCode_key" ON "Appointment" ("appointmentCode");
+  appointmentCode   String?      @unique @db.Text
   petID             Int
   vetID             Int
   shelterID         Int

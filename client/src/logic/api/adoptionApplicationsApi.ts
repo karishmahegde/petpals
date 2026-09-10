@@ -24,9 +24,36 @@ export interface AdoptionApplication {
   pet?: { petName: string };
 }
 
-// GET /adoption-applications/:id — adds the shelter name alongside the pet name.
+// Shape returned by the withdraw endpoint — adds the shelter name alongside
+// the pet name.
 export interface AdoptionApplicationDetail extends AdoptionApplication {
   shelter?: { shelterName: string };
+}
+
+// Richer shape from GET /adoption-applications/:id — for the Applications
+// section's detail slide-over.
+export interface AdoptionApplicationFullDetail {
+  applicationID: number;
+  applicationCode: string; // e.g. "APP-00123"
+  petID: number;
+  adopterID: number;
+  shelterID: number;
+  staffID: number | null;
+  applicationStatus: "Pending" | "Accepted" | "Rejected" | "Withdrawn";
+  applicationType: "Adopt" | "Foster";
+  shelterMessage: string | null;
+  staffRemark: string | null;
+  paymentStatus: "Paid";
+  amountPaid: number;
+  createdAt: string;
+  pet: {
+    petName: string;
+    petPhoto: string | null;
+    breedName: string;
+    speciesName: string;
+  };
+  shelter: { shelterName: string };
+  assignedStaffName: string | null;
 }
 
 // Starts payment — creates a Stripe Checkout Session and returns its URL.
@@ -52,11 +79,12 @@ export const getApplicationByCheckoutSession = async (
   return response.data.data;
 };
 
-// Full detail for one application the adopter owns — for the planned inline
-// detail view on the Applications tab (opened via ?applicationID=).
+// Full detail for one application the adopter owns — powers the Applications
+// section's detail slide-over (opened via a row's "View Details", or deep-linked
+// via ?applicationID= from the Overview widget).
 export const getApplicationById = async (
   applicationID: number,
-): Promise<AdoptionApplicationDetail> => {
+): Promise<AdoptionApplicationFullDetail> => {
   const response = await axiosInstance.get(
     `/adoption-applications/${applicationID}`,
   );
