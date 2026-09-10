@@ -451,6 +451,51 @@ router.get(
 
 /**
  * @swagger
+ * /adopters/me/adopted-pets/{petId}:
+ *   get:
+ *     summary: Full detail for one pet the adopter has adopted (My Pets panel)
+ *     description: >
+ *       One consolidated payload: basic details, intake, compatibility, full
+ *       health history (vaccinations + vet appointments), and the adoption
+ *       record. Requires an Accepted adoption application by this adopter for
+ *       the pet — otherwise 403.
+ *     tags: [Adopters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: petId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The adopted-pet detail payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdoptedPetDetail' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Role not permitted, or the adopter has no Accepted application for this pet
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/me/adopted-pets/:petId",
+  authenticate,
+  authorizeRoles(ROLES.ADOPTER),
+  adoptersController.getMyAdoptedPetDetail,
+);
+
+/**
+ * @swagger
  * /adopters/me/adopted-pets/{petId}/vaccinations:
  *   get:
  *     summary: Vaccination history for a pet the adopter has adopted (read-only)

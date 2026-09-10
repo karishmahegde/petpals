@@ -16,9 +16,18 @@ interface CardComponentProps {
   pet: PetCard;
   openId: number | null;
   onKnowMore: (petID: number) => void;
+  // CTA text. Defaults to the catalog wording; the "My Pets" renderings pass
+  // "View Details" (the click then routes to the My Pets side panel, not the
+  // public PetDetailsModal — the parent decides via its onKnowMore handler).
+  ctaLabel?: string;
 }
 
-const CardComponent = ({ pet, openId, onKnowMore }: CardComponentProps) => {
+const CardComponent = ({
+  pet,
+  openId,
+  onKnowMore,
+  ctaLabel = "Know More",
+}: CardComponentProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { token, role } = useAuthStore();
@@ -124,7 +133,7 @@ const CardComponent = ({ pet, openId, onKnowMore }: CardComponentProps) => {
           className="my-2 rounded-xl bg-black px-2 py-3 text-xs text-white"
           onClick={() => onKnowMore(pet.petID)}
         >
-          Know More
+          {ctaLabel}
         </button>
       </div>
     </div>

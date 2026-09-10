@@ -3,6 +3,7 @@ const adoptionApplicationsService = require("../../services/adopter/adoptionAppl
 const visitsService = require("../../services/adopter/visits.service");
 const appointmentsService = require("../../services/adopter/appointments.service");
 const vaccinationsService = require("../../services/adopter/vaccinations.service");
+const adoptedPetsService = require("../../services/adopter/adoptedPets.service");
 const {
   assertValidCloseAccountMode,
   closeAccountMessage,
@@ -409,6 +410,24 @@ const getMyAdoptedPets = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /adopters/me/adopted-pets/:petId ———————————————
+const getMyAdoptedPetDetail = async (req, res, next) => {
+  const petID = Number(req.params.petId);
+  if (!Number.isInteger(petID) || petID < 1) {
+    return next(badRequest("petId must be a positive integer"));
+  }
+
+  try {
+    const detail = await adoptedPetsService.getAdoptedPetDetailForAdopter(
+      req.user.userID,
+      petID,
+    );
+    return successResponse(res, "Adopted pet detail retrieved successfully", detail);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— GET /adopters/me/adopted-pets/:petId/vaccinations ———————————————
 const getMyAdoptedPetVaccinations = async (req, res, next) => {
   const petID = Number(req.params.petId);
@@ -455,6 +474,7 @@ module.exports = {
   getMyVisits,
   getMyAppointments,
   getMyAdoptedPets,
+  getMyAdoptedPetDetail,
   getMyAdoptedPetVaccinations,
   closeAccount,
 };

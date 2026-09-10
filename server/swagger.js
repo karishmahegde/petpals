@@ -360,6 +360,75 @@ const schemas = {
       vetName: { type: "string", nullable: true },
     },
   },
+  AdoptedPetDetail: {
+    type: "object",
+    description:
+      "Consolidated detail for the My Pets side panel: basic details, intake, compatibility, health history, and the adoption record.",
+    properties: {
+      petID: { type: "integer" },
+      petCode: { type: "string", example: "PE003794" },
+      petName: { type: "string" },
+      petPhoto: { type: "string", nullable: true },
+      microchipID: { type: "string", nullable: true },
+      petAge: { type: "string", example: "5 months" },
+      petDOB: { type: "string", format: "date-time" },
+      petSex: { type: "string" },
+      petColor: { type: "string" },
+      petSize: { type: "string", nullable: true, example: "Medium" },
+      petHeight: { type: "number", description: "centimetres" },
+      petWeight: { type: "number", description: "kilograms" },
+      petBGroup: { type: "string", example: "DEA4" },
+      petDesc: { type: "string", nullable: true },
+      adoptionStatus: { type: "string", example: "adopted" },
+      breed: {
+        type: "object",
+        properties: {
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
+      compatibility: {
+        type: "object",
+        properties: {
+          children: { type: "boolean" },
+          otherPets: { type: "boolean" },
+          specialNeeds: { type: "boolean" },
+        },
+      },
+      health: {
+        type: "object",
+        properties: {
+          vaccinations: {
+            type: "array",
+            items: { $ref: "#/components/schemas/VaccinationRecord" },
+          },
+          appointments: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                appointmentID: { type: "integer" },
+                appointmentDate: { type: "string", format: "date-time" },
+                appointmentReason: { type: "string" },
+                vetName: { type: "string", nullable: true },
+                shelterName: { type: "string", nullable: true },
+              },
+            },
+          },
+        },
+      },
+      adoption: {
+        type: "object",
+        properties: {
+          adoptedOn: { type: "string", format: "date-time" },
+          shelterName: { type: "string" },
+          shelterAddress: { type: "string" },
+          yourMessage: { type: "string", nullable: true },
+          staffRemark: { type: "string", nullable: true },
+        },
+      },
+    },
+  },
   Favorite: {
     type: "object",
     properties: {

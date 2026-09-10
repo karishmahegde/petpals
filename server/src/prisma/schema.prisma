@@ -119,6 +119,16 @@ model Breed {
 
 model Pet {
   petID                  Int                   @id @default(autoincrement())
+  // Human-facing pet reference, e.g. "PE000002". A Postgres GENERATED ALWAYS
+  // STORED column computed from petID — the DB always populates it, so it's
+  // never actually null at runtime. Typed optional only because Prisma has no
+  // first-class generated-column support: READ-ONLY, never set it in a
+  // create()/update() (Postgres rejects writes to generated columns). Added by
+  // hand in Supabase (migrate dev is banned — see CLAUDE.md):
+  //   ALTER TABLE "Pet" ADD COLUMN "petCode" TEXT
+  //     GENERATED ALWAYS AS ('PE' || lpad("petID"::text, 6, '0')) STORED;
+  //   CREATE UNIQUE INDEX "Pet_petCode_key" ON "Pet" ("petCode");
+  petCode                String?               @unique @db.Text
   petName                String                @db.VarChar(45)
   breedID                Int
   petDOB                 DateTime
@@ -227,6 +237,12 @@ model AdoptionApplication {
   applicationStatus       ApplicationStatus @default(Pending)
   applicationType         ApplicationType   @default(Adopt)
   shelterMessage          String?           @db.VarChar(500)
+  // Staff-authored closing note shown to the adopter once the pet is adopted
+  // (the "Remarks from Shelter" line in the My Pets detail panel). Nullable —
+  // set by staff, not part of the adopter's submission. Column added by hand
+  // in Supabase (see CLAUDE.md — migrate dev is banned):
+  //   ALTER TABLE "AdoptionApplication" ADD COLUMN "staffRemark" VARCHAR(300);
+  staffRemark             String?           @db.VarChar(300)
   // Payment fields — this row is only ever created by the Stripe webhook
   // after payment is confirmed (see adoptionApplications.service.js
   // finalizeApplication), so every create() call sets all four explicitly.

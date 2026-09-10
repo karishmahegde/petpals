@@ -4,6 +4,7 @@
 // FeaturedPets.tsx and FavoritesWidget.tsx) instead of its own card markup —
 // a fun prompt to go adopt one when there are none yet.
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import Card from "../../../../../components/ui/Card";
 import ButtonElement from "../../../../../components/ui/ButtonElement";
 import DashboardWidgetHeader from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
@@ -11,12 +12,11 @@ import DashboardEmptyMessage from "../../../../../components/ui/dashboard/Dashbo
 import PetCatalogCard from "../../../../../components/ui/pets/PetCatalogCard";
 import { getMyAdoptedPets } from "../../../../../logic/api/adoptersApi";
 
-interface PetsWidgetProps {
-  openId: number | null;
-  onKnowMore: (petID: number) => void;
-}
-
-const PetsWidget = ({ openId, onKnowMore }: PetsWidgetProps) => {
+// Unlike FavoritesWidget, "My Pets" cards don't open the public PetDetailsModal.
+// "View Details" routes into the My Pets tab, which (next) reads ?petID and
+// opens the side panel for that pet.
+const PetsWidget = () => {
+  const navigate = useNavigate();
   const { data: pets, isLoading } = useQuery({
     queryKey: ["adopter", "adopted-pets"],
     queryFn: getMyAdoptedPets,
@@ -55,8 +55,11 @@ const PetsWidget = ({ openId, onKnowMore }: PetsWidgetProps) => {
               <div key={pet.petID} className="w-40 p-1 shrink-0">
                 <PetCatalogCard
                   pet={pet}
-                  openId={openId}
-                  onKnowMore={onKnowMore}
+                  openId={null}
+                  ctaLabel="View Details"
+                  onKnowMore={(petID) =>
+                    navigate(`/adopter/pets?petID=${petID}`)
+                  }
                 />
               </div>
             ))}

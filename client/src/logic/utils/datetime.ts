@@ -33,6 +33,18 @@ export const formatFullDate = (date = new Date()): string =>
     year: "numeric",
   });
 
+/** Numeric date, e.g. "05/16/2025". */
+export const formatNumericDate = (date = new Date()): string =>
+  date.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+
+/** Time of day, e.g. "5:30 PM". */
+export const formatTime = (date = new Date()): string =>
+  date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
 /**
  * Relative badge for a scheduled event: "Soon" within the next 7 days,
  * "Upcoming" further out, "Past" once it has elapsed. Independent of any

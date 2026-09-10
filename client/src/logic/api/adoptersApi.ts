@@ -189,6 +189,69 @@ export const getMyAdoptedPets = async (): Promise<PetCard[]> => {
   return response.data.data;
 };
 
+// One consolidated payload for the My Pets side panel (PetDetailPanel) —
+// GET /adopters/me/adopted-pets/:petId. Requires an Accepted application for
+// the pet (403 otherwise).
+export interface AdoptedPetVaccination {
+  recordID: number;
+  vaccineName: string;
+  administeredDate: string;
+  dueDate: string;
+  vetName: string | null;
+}
+
+export interface AdoptedPetAppointment {
+  appointmentID: number;
+  appointmentDate: string;
+  appointmentReason: string;
+  vetName: string | null;
+  shelterName: string | null;
+}
+
+export interface AdoptedPetDetail {
+  petID: number;
+  petCode: string; // e.g. "PE003794"
+  petName: string;
+  petPhoto: string | null;
+  microchipID: string | null;
+  petAge: string; // long form, e.g. "5 months"
+  petDOB: string;
+  petSex: string;
+  petColor: string;
+  petSize: string | null;
+  petHeight: number; // cm
+  petWeight: number; // kg
+  petBGroup: string;
+  petDesc: string | null;
+  adoptionStatus: string;
+  breed: { breedName: string; speciesName: string };
+  compatibility: {
+    children: boolean;
+    otherPets: boolean;
+    specialNeeds: boolean;
+  };
+  health: {
+    vaccinations: AdoptedPetVaccination[];
+    appointments: AdoptedPetAppointment[];
+  };
+  adoption: {
+    adoptedOn: string; // Accepted application's createdAt
+    shelterName: string;
+    shelterAddress: string;
+    yourMessage: string | null;
+    staffRemark: string | null;
+  };
+}
+
+export const getAdoptedPetDetail = async (
+  petID: number,
+): Promise<AdoptedPetDetail> => {
+  const response = await axiosInstance.get(
+    `/adopters/me/adopted-pets/${petID}`,
+  );
+  return response.data.data;
+};
+
 // ———————————————— FAVORITES API ————————————————
 // Each entry is the full pet-detail shape (same as GET /pets/:id) — see
 // petsApi.ts's PetDetail.

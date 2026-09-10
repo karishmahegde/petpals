@@ -30,7 +30,7 @@ const Overview = () => {
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <StatsWidget />
-        <PetsWidget openId={openPetId} onKnowMore={setOpenPetId} />
+        <PetsWidget />
       </div>
 
       <div className="mt-6 flex flex-col gap-6 lg:flex-row">

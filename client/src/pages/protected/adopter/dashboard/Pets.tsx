@@ -1,18 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import ButtonElement from "../../../../components/ui/ButtonElement";
 import Card from "../../../../components/ui/Card";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 import PetCatalogCard from "../../../../components/ui/pets/PetCatalogCard";
-import PetDetailsModal from "../../../../components/ui/pets/PetDetailsModal";
+import PetDetailPanel from "./pets/PetDetailPanel";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import { getMyAdoptedPets } from "../../../../logic/api/adoptersApi";
 
-// "My Pets" section of the adopter dashboard. Owns the PetDetailsModal open
-// state (State Ownership Rule) — the cards below only report up via onKnowMore.
+// "My Pets" section of the adopter dashboard. Owns the pet-details open state
+// (State Ownership Rule) — the cards below only report up via onKnowMore, and
+// PetDetailPanel just renders what it's handed.
+// Entry from the Overview "My Pets" widget deep-links via ?petID=X, read once
+// on mount here (URL-reading lives in the page, same as PetCatalog.tsx).
 const Pets = () => {
-  const [openPetId, setOpenPetId] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [openPetId, setOpenPetId] = useState<number | null>(() => {
+    const petID = Number(searchParams.get("petID"));
+    return Number.isInteger(petID) && petID > 0 ? petID : null;
+  });
+
+  useEffect(() => {
+    if (searchParams.has("petID")) {
+      searchParams.delete("petID");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // Run once on mount — the initial state above already captured the value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     data: adoptedPets,
@@ -71,6 +88,7 @@ const Pets = () => {
                   <PetCatalogCard
                     pet={pet}
                     openId={openPetId}
+                    ctaLabel="View Details"
                     onKnowMore={setOpenPetId}
                   />
                 </div>
@@ -98,7 +116,7 @@ const Pets = () => {
         </Card>
       </div>
 
-      <PetDetailsModal petID={openPetId} onClose={() => setOpenPetId(null)} />
+      <PetDetailPanel petID={openPetId} onClose={() => setOpenPetId(null)} />
     </div>
   );
 };
