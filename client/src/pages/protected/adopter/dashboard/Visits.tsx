@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { FaPlus } from "react-icons/fa";
 import ButtonElement from "../../../../components/ui/ButtonElement";
 import Card from "../../../../components/ui/Card";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
@@ -11,6 +13,7 @@ import {
 } from "../../../../logic/api/adoptersApi";
 import VisitsList from "./shared/VisitsList";
 import VisitDetailPanel from "./visits/VisitDetailPanel";
+import ScheduleVisitPanel from "./visits/ScheduleVisitPanel";
 
 const isUpcoming = (visit: VisitListItem): boolean =>
   visit.visitStatus !== "Cancelled" &&
@@ -21,6 +24,24 @@ const isUpcoming = (visit: VisitListItem): boolean =>
 // Past/Cancelled card, same shape as the Appointments tab.
 const Visits = () => {
   const [openId, setOpenId] = useState<number | null>(null);
+
+  // "Schedule a visit" — opened from the header button, or auto-opened
+  // pre-filled when arriving via ?petID= from a pet detail page.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [schedulePetID, setSchedulePetID] = useState<number | null>(() => {
+    const id = Number(searchParams.get("petID"));
+    return Number.isInteger(id) && id > 0 ? id : null;
+  });
+
+  useEffect(() => {
+    if (schedulePetID !== null) setScheduleOpen(true);
+    if (searchParams.has("petID")) {
+      searchParams.delete("petID");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data: visits, isLoading, isError } = useQuery({
     queryKey: ["adopter", "visits", "all"],
@@ -36,7 +57,15 @@ const Visits = () => {
       <DashboardHeading
         title="Visits"
         emoji="🏠"
-        message="Your scheduled shelter visits and meet-and-greets"
+        message="Manage shelter visits and meet-and-greets"
+        action={{
+          label: "Schedule Visit",
+          icon: <FaPlus />,
+          onClick: () => {
+            setSchedulePetID(null);
+            setScheduleOpen(true);
+          },
+        }}
       />
 
       {isLoading && (
@@ -95,6 +124,11 @@ const Visits = () => {
       )}
 
       <VisitDetailPanel visitID={openId} onClose={() => setOpenId(null)} />
+      <ScheduleVisitPanel
+        open={scheduleOpen}
+        initialPetID={schedulePetID}
+        onClose={() => setScheduleOpen(false)}
+      />
     </div>
   );
 };

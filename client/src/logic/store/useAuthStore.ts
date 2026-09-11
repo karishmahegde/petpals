@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { AuthUser } from "../../logic/api/authApi";
 import { clearOnboardingSkipped } from "../onboardingSkip";
+import { queryClient } from "../queryClient";
 
 interface AuthState {
   // Defines the shape of your Zustand store
@@ -25,6 +26,7 @@ const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     clearOnboardingSkipped(); // don't let a skip leak into whoever logs in next on this tab
+    queryClient.clear(); // drop all cached server data so the next user on this tab starts clean
     set({ user: null, token: null, role: null }); // on logout, resets everything to null - clears the session from memory
   },
 
