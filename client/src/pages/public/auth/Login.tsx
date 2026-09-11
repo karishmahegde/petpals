@@ -6,13 +6,12 @@
 //   - On success: stores session in Zustand and redirects to role-based dashboard
 //   - On failure: displays server error message inline
 // Route: /login
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import Card from "../../../components/ui/Card";
 import axios from "axios";
 import { login as loginApi } from "../../../logic/api/authApi";
-import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
 import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
@@ -20,11 +19,14 @@ import backgroundImg from "../../../static/assets/images/background.png";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Shared by both destinations that land here: right after a fresh login, and
-// an already-authenticated user hitting /login directly.
-const resolveDestination = (userRole: string, redirectParam: string | null) => {
-  if (!redirectParam) return `/${userRole.toLowerCase()}`;
-  return userRole === "Adopter" ? redirectParam : "/adopt";
-};
+// an already-authenticated user hitting /login directly. `redirectParam` now
+// comes from every guarded route (ProtectedRoute sets it generically), not
+// just the adopter-only apply flow — so this no longer pre-filters by role.
+// The redirect target enforces its own access: RoleRoute sends a mismatched
+// role to /forbidden, and AdoptApply re-checks role itself (-> /adopt + a
+// toast) since it deliberately bypasses RoleRoute.
+const resolveDestination = (userRole: string, redirectParam: string | null) =>
+  redirectParam || `/${userRole.toLowerCase()}`;
 
 const Login = () => {
   const [searchParams] = useSearchParams();
@@ -53,20 +55,6 @@ const Login = () => {
     const { token, role } = useAuthStore.getState();
     return token && role ? { role } : null;
   });
-
-  useEffect(() => {
-    if (
-      alreadyAuthenticated &&
-      redirect &&
-      alreadyAuthenticated.role !== "Adopter"
-    ) {
-      showAdopterAccountToast(navigate);
-    }
-    // Intentionally mount-only — alreadyAuthenticated is itself frozen at
-    // mount, so re-running this on navigate/redirect identity changes would
-    // add nothing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   if (alreadyAuthenticated) {
     return (

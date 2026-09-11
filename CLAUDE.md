@@ -13,7 +13,7 @@ Multi-shelter pet adoption platform (solo full-stack learning project). Unifies 
 **Backend (`server/`):** Node 18 + Express · Prisma (`server/src/prisma/schema.prisma`) · PostgreSQL 15 + PostGIS (`ST_MakePoint/SetSRID/Distance/DWithin`) · Supabase (managed Postgres + storage; buckets `pet-images`, `government-ids` private) · `zipcodes` npm (offline US zip→coords, behind `services/geocoding/`) · JWT two-token · bcrypt (10 rounds) · cookie-parser · node-cron (nightly TokenDenylist cleanup) · Stripe (application-fee Checkout).
 
 **Infra:** Docker Compose (local) · Vercel (FE) / Railway (BE) · branches `main` → `dev` → `feature/*`.
-**Testing:** Jest + Supertest (unit + integration, target 70%) · Cypress (critical adoption flows only).
+**Testing:** Jest + Supertest (unit + integration, target 70%) · Cypress (critical adoption flows only — `client/cypress/e2e/`; needs both dev servers running locally, `npm run cypress:open` / `cypress:run` from `client/`). Specs seed their own data via `cy.request()` straight to the API (e.g. `cy.registerTestAdopter()`), never pre-existing fixtures.
 
 ---
 
@@ -43,9 +43,9 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 | `POST /auth/logout` | Bearer | nulls `USERS.refreshToken`, clears cookie |
 | `POST /auth/refresh-token` | cookie only | — |
 
-**Guards:** FE `ProtectedRoute` (→ `/login` if no token), `RoleRoute` (→ `/forbidden` if wrong role). BE `authenticate.js` (verifies Bearer, sets `req.user`), `authorizeRoles('Staff','Admin')` factory.
+**Guards:** FE `ProtectedRoute` (→ `/login?redirect=<path+search>` if no token — see below), `RoleRoute` (→ `/forbidden` if wrong role). BE `authenticate.js` (verifies Bearer, sets `req.user`), `authorizeRoles('Staff','Admin')` factory.
 
-**Post-login redirect (Sprint 3):** `/login?redirect=/adopt/apply/5` — a query param (survives a mid-login refresh). Adopter → `redirect`; other roles → `/adopt` + "need an adopter account" toast; no param → role-dashboard default. The same branch handles post-login and an already-authed user hitting `/login`.
+**Post-login redirect (Sprint 3):** `/login?redirect=/adopt/apply/5` — a query param (survives a mid-login refresh), URL-encoded. Any guarded route can send one — `ProtectedRoute` builds it from `location.pathname + location.search` for every protected page, and the adopt-apply flow's own navigates (`PetDetailsModal`, `AdoptApply`) set it explicitly. Login is role-agnostic about it: redirect present → go there, else → role-dashboard default (`resolveDestination` in `Login.tsx`). The same branch handles post-login and an already-authed user hitting `/login` directly. Role correctness is the *destination's* job, not Login's — `RoleRoute` bounces a mismatched role to `/forbidden`, and `AdoptApply` (which bypasses `RoleRoute`) re-checks role itself → `/adopt` + toast.
 
 ---
 
@@ -232,3 +232,4 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 - Tests in `server/src/tests/unit|integration/`; integration seeds via API calls, cleans up via Prisma in `afterAll`, runs `--runInBand`
 - Filters: closed/fixed-value validated strictly (400 on bad input); open/DB-driven unvalidated (unmatched value → zero rows, not an error)
 - React state: never mutate in place — build a new array/object every time (`.filter`/`.map`/spread); reference equality drives re-renders
+- **Verify before merge — frontend and backend are asymmetric:** frontend has `npm run typecheck` + `npm run lint` (run from `client/`) and both must be clean. The backend has **neither** — it's plain JS (no TypeScript, so nothing for a typechecker to check) and ESLint isn't installed or configured there at all (no config file, not in `package.json`). Don't assume a backend lint/typecheck step exists. The closest backend sanity check is loading the app to catch syntax/require errors: `node -e "require('./src/app.js')"`.

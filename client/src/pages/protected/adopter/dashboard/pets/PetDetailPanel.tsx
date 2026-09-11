@@ -165,21 +165,33 @@ const PetDetailPanel = ({ petID, onClose }: PetDetailPanelProps) => {
               </p>
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
-                {vaccinations.map((v) => (
-                  <li
-                    key={v.recordID}
-                    className="rounded-lg border border-neutral-lightgray bg-neutral-offwhite p-3"
-                  >
-                    <p className="font-body text-sm font-semibold text-neutral-charcoal">
-                      {v.vaccineName}
-                    </p>
-                    <p className="font-body text-xs text-neutral-gray">
-                      Given {formatShortDate(new Date(v.administeredDate))} ·
-                      due {formatShortDate(new Date(v.dueDate))}
-                      {v.vetName ? ` · ${v.vetName}` : ""}
-                    </p>
-                  </li>
-                ))}
+                {vaccinations.map((v) => {
+                  const isOverdue = new Date(v.dueDate).getTime() < Date.now();
+                  return (
+                    <li
+                      key={v.recordID}
+                      className="rounded-lg border border-neutral-lightgray bg-neutral-offwhite p-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-body text-sm font-semibold text-neutral-charcoal">
+                          {v.vaccineName}
+                        </p>
+                        {isOverdue && <Badge tone="red">Overdue</Badge>}
+                      </div>
+                      <p className="font-body text-xs text-neutral-gray">
+                        Given {formatShortDate(new Date(v.administeredDate))} ·{" "}
+                        <span
+                          className={
+                            isOverdue ? "font-semibold text-red" : undefined
+                          }
+                        >
+                          due {formatShortDate(new Date(v.dueDate))}
+                        </span>
+                        {v.vetName ? ` · ${v.vetName}` : ""}
+                      </p>
+                    </li>
+                  );
+                })}
               </ul>
             ))}
 

@@ -14,6 +14,7 @@ export type BadgeTone =
   | "green"
   | "teal"
   | "rose"
+  | "red"
   | "gray"
   | "neutral";
 
@@ -32,6 +33,7 @@ const SOLID: Record<BadgeTone, string> = {
   green: "bg-green text-white",
   teal: "bg-teal-light text-teal-dark",
   rose: "bg-rose-md text-white",
+  red: "bg-red text-white", // urgent/destructive — matches the withdraw/cancel buttons
   gray: "bg-neutral-gray text-white",
   neutral: "bg-neutral-lightgray text-neutral-charcoal",
 };
@@ -41,6 +43,7 @@ const OUTLINE: Record<BadgeTone, string> = {
   green: "border border-green bg-green/10 text-green",
   teal: "border border-teal-md bg-teal-light text-teal-dark",
   rose: "border border-rose-md bg-rose-light text-rose-dark",
+  red: "border border-red bg-red/10 text-red",
   gray: "border border-neutral-gray bg-neutral-lightgray text-neutral-charcoal",
   neutral:
     "border border-neutral-lightgray bg-neutral-offwhite text-neutral-charcoal",

@@ -30,6 +30,9 @@ yarn-error.log*
 # ── Testing ───────────────────────────────────────────────────
 coverage/
 .nyc_output/
+client/cypress/videos/
+client/cypress/screenshots/
+client/cypress/downloads/
 
 # ── Docker ────────────────────────────────────────────────────
 docker-compose.override.yml
