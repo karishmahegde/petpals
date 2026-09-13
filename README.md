@@ -3,7 +3,7 @@
 **A unified, multi-shelter Animal Adoption Management System**
 
 <div align="center">
-<img src="./docs/assets/petpals.gif" alt="PetPals banner — a multi-shelter animal adoption platform" width="100%" /> 
+<img src="./docs/assets/petpals.gif" alt="PetPals banner — a multi-shelter animal adoption platform" width="20%" /> 
 </div>
 
 Connecting shelters, adopters, vets, volunteers, and donors on one platform with inter-shelter animal transfers, a universal pet health passport, and AI-powered adopter matching.
