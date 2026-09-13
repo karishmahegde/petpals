@@ -1,9 +1,9 @@
 import { adoptContent } from "../../../static/content/adopt";
 import adoptImage from "../../../static/assets/images/adopt/adopt.png";
 import PetCatalog from "./sections/PetCatalog";
-import SectionContainer from "../../../components/ui/SectionContainer";
-import SectionHeading from "../../../components/ui/SectionHeading";
-import SectionHeadingCenter from "../../../components/ui/SectionHeadingCenter";
+import SectionContainer from "../../../components/ui/marketing/SectionContainer";
+import SectionHeading from "../../../components/ui/marketing/SectionHeading";
+import SectionHeadingCenter from "../../../components/ui/marketing/SectionHeadingCenter";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { useScrollToHash } from "../../../logic/hooks/useScrollToHash";
 

@@ -10,7 +10,7 @@ import {
   CheckboxDropdown,
   Pill,
   type FilterOption,
-} from "../../../../components/ui/FilterControls";
+} from "../../../../components/ui/pets/FilterControls";
 import ShelterLocationFilter from "./ShelterLocationFilter";
 
 const SIZE_OPTIONS = ["Small", "Medium", "Large"];

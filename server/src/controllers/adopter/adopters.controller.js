@@ -1,0 +1,499 @@
+const adoptersService = require("../../services/adopter/adopters.service");
+const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
+const visitsService = require("../../services/adopter/visits.service");
+const appointmentsService = require("../../services/adopter/appointments.service");
+const vaccinationsService = require("../../services/adopter/vaccinations.service");
+const adoptedPetsService = require("../../services/adopter/adoptedPets.service");
+const {
+  assertValidCloseAccountMode,
+  closeAccountMessage,
+} = require("../../services/auth/auth.service");
+const { successResponse, successListResponse } = require("../../utils/response");
+const { normalizePhone } = require("../../utils/phone");
+
+const badRequest = (message) => {
+  const err = new Error(message);
+  err.code = "BAD_REQUEST";
+  return err;
+};
+
+// ——————————————— GET /adopters/me ———————————————
+const getMe = async (req, res, next) => {
+  try {
+    const adopter = await adoptersService.getAdopterProfile(req.user.userID);
+    return successResponse(res, "Adopter profile retrieved successfully", adopter);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// Fields an adopter may change on their own profile. Anything outside this list
+// is ignored; the admin-only fields below are actively rejected.
+const UPDATABLE_FIELDS = [
+  "avatarSeed",
+  "adopterName",
+  "adopterDOB",
+  "adopterSex",
+  "adopterPhone",
+  "housingType",
+  "ownsOrRents",
+  "landlordContact",
+  "householdSize",
+  "numChildren",
+  "employmentStatus",
+  "activityLevel",
+  "yardAvailable",
+  "petExperience",
+  "currentPets",
+  "preferredBreedID",
+  "preferredAgeRange",
+  "preferredSize",
+  "openToSpecialNeeds",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "state",
+  "zip",
+  "country",
+];
+
+// Set by admins or the system only. A self-service update naming any of these is
+// rejected outright rather than silently dropped, so escalation attempts surface.
+const ADMIN_ONLY_FIELDS = [
+  "adopterEmail",
+  "adopterPassword",
+  "adopterRiskFlag",
+  "preQualifyFlag",
+  "accountStatus",
+];
+
+// Onboarding progression state — only advanced via the dedicated
+// onboarding-step/onboarding-complete endpoints below, never set directly
+// through the general profile update.
+const PROGRESSION_ONLY_FIELDS = ["onboardingComplete", "onboardingStep"];
+
+const ENUM_VALUES = {
+  housingType: ["Apartment", "House", "Other"],
+  ownsOrRents: ["Owns", "Rents"],
+  employmentStatus: ["Unemployed", "Student", "Self_employed", "Employed"],
+  activityLevel: ["Sedentary", "Medium", "Active"],
+  petExperience: ["No", "Little", "Some", "Very"],
+  preferredAgeRange: ["Young", "Adult", "Old"],
+  preferredSize: ["Small", "Medium", "Large"],
+};
+
+const INTEGER_FIELDS = [
+  "householdSize",
+  "numChildren",
+  "preferredBreedID",
+  "currentPets",
+];
+const BOOLEAN_FIELDS = ["yardAvailable", "openToSpecialNeeds"];
+// Max lengths from schema.prisma (VarChar/Char widths).
+const STRING_MAX = {
+  avatarSeed: 64,
+  adopterName: 45,
+  landlordContact: 20,
+  adopterSex: 1,
+  addressLine1: 100,
+  addressLine2: 100,
+  city: 45,
+  state: 45,
+  zip: 10,
+  country: 45,
+};
+// Columns that are NOT NULL in the schema — cannot be cleared via update.
+const NON_NULLABLE = [
+  "avatarSeed",
+  "adopterName",
+  "yardAvailable",
+  "currentPets",
+  "openToSpecialNeeds",
+  "addressLine1",
+  "city",
+  "state",
+  "zip",
+  "country",
+];
+
+// ——————————————— PUT /adopters/me ———————————————
+const updateMe = async (req, res, next) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+
+  const rejected = [...ADMIN_ONLY_FIELDS, ...PROGRESSION_ONLY_FIELDS].filter(
+    (f) => f in body,
+  );
+  if (rejected.length > 0) {
+    return next(
+      badRequest(`These fields cannot be updated here: ${rejected.join(", ")}`),
+    );
+  }
+
+  const data = {};
+  for (const field of UPDATABLE_FIELDS) {
+    if (!(field in body)) continue; // partial update — only touch provided fields
+    const value = body[field];
+
+    if (value === null) {
+      if (NON_NULLABLE.includes(field)) {
+        return next(badRequest(`${field} cannot be null`));
+      }
+      data[field] = null;
+      continue;
+    }
+
+    if (field in ENUM_VALUES && !ENUM_VALUES[field].includes(value)) {
+      return next(
+        badRequest(`${field} must be one of: ${ENUM_VALUES[field].join(", ")}`),
+      );
+    }
+
+    if (INTEGER_FIELDS.includes(field)) {
+      if (!Number.isInteger(value) || value < 0) {
+        return next(badRequest(`${field} must be a non-negative integer`));
+      }
+    }
+
+    if (BOOLEAN_FIELDS.includes(field) && typeof value !== "boolean") {
+      return next(badRequest(`${field} must be a boolean`));
+    }
+
+    if (field in STRING_MAX) {
+      if (
+        typeof value !== "string" ||
+        value.length === 0 ||
+        value.length > STRING_MAX[field]
+      ) {
+        return next(
+          badRequest(
+            `${field} must be a non-empty string of at most ${STRING_MAX[field]} characters`,
+          ),
+        );
+      }
+    }
+
+    if (field === "adopterDOB") {
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        return next(badRequest("adopterDOB must be a valid date"));
+      }
+      data[field] = parsed;
+      continue;
+    }
+
+    // Stores the parsed E.164 form — never what the client sent raw, even if
+    // it looks correct.
+    if (field === "adopterPhone") {
+      try {
+        data[field] = normalizePhone(value);
+      } catch (err) {
+        return next(err);
+      }
+      continue;
+    }
+
+    data[field] = value;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return next(badRequest("No updatable fields provided"));
+  }
+
+  try {
+    const adopter = await adoptersService.updateAdopterProfile(
+      req.user.userID,
+      data,
+    );
+    return successResponse(res, "Adopter profile updated successfully", adopter);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PATCH /adopters/me/onboarding-step ———————————————
+const advanceOnboardingStep = async (req, res, next) => {
+  const step = Number(req.body?.step);
+  if (!Number.isInteger(step) || step < 2 || step > 7) {
+    return next(badRequest("step must be an integer between 2 and 7"));
+  }
+
+  try {
+    const adopter = await adoptersService.advanceOnboardingStep(
+      req.user.userID,
+      step,
+    );
+    return successResponse(res, "Onboarding step updated successfully", adopter);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PATCH /adopters/me/onboarding-complete ———————————————
+const completeOnboarding = async (req, res, next) => {
+  try {
+    const adopter = await adoptersService.completeOnboarding(req.user.userID);
+    return successResponse(res, "Onboarding completed successfully", adopter);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— POST /adopters/me/government-id ———————————————
+const MAX_ID_FIELD_LEN = 45; // schema.prisma: idType / idNumber are VarChar(45)
+
+const uploadGovernmentId = async (req, res, next) => {
+  const idType =
+    typeof req.body.idType === "string" ? req.body.idType.trim() : "";
+  const idNumber =
+    typeof req.body.idNumber === "string" ? req.body.idNumber.trim() : "";
+
+  if (!idType || idType.length > MAX_ID_FIELD_LEN) {
+    return next(
+      badRequest(
+        `idType is required and must be at most ${MAX_ID_FIELD_LEN} characters`,
+      ),
+    );
+  }
+  if (!idNumber || idNumber.length > MAX_ID_FIELD_LEN) {
+    return next(
+      badRequest(
+        `idNumber is required and must be at most ${MAX_ID_FIELD_LEN} characters`,
+      ),
+    );
+  }
+  if (!req.file) {
+    return next(badRequest("A document file is required in the 'file' field"));
+  }
+
+  try {
+    const record = await adoptersService.createGovernmentId(req.user.userID, {
+      idType,
+      idNumber,
+      file: {
+        buffer: req.file.buffer,
+        mimetype: req.file.mimetype,
+        originalname: req.file.originalname,
+      },
+    });
+    return successResponse(
+      res,
+      "Government ID submitted successfully",
+      record,
+      201,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/government-id ———————————————
+const getGovernmentId = async (req, res, next) => {
+  try {
+    const record = await adoptersService.getGovernmentId(req.user.userID);
+    return successResponse(
+      res,
+      "Government ID retrieved successfully",
+      record,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/applications ———————————————
+const VALID_APPLICATION_STATUSES = [
+  "Pending",
+  "Accepted",
+  "Rejected",
+  "Withdrawn",
+];
+
+const getMyApplications = async (req, res, next) => {
+  const { page: pageRaw, limit: limitRaw, status, petID: petIDRaw } = req.query;
+
+  let page = 1;
+  if (pageRaw !== undefined) {
+    page = Number(pageRaw);
+    if (!Number.isInteger(page) || page < 1) {
+      return next(badRequest("page must be an integer >= 1"));
+    }
+  }
+
+  let limit = 20;
+  if (limitRaw !== undefined) {
+    limit = Number(limitRaw);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return next(badRequest("limit must be an integer between 1 and 100"));
+    }
+  }
+
+  if (
+    status !== undefined &&
+    !VALID_APPLICATION_STATUSES.includes(status)
+  ) {
+    return next(
+      badRequest(
+        `status must be one of: ${VALID_APPLICATION_STATUSES.join(", ")}`,
+      ),
+    );
+  }
+
+  let petID;
+  if (petIDRaw !== undefined) {
+    petID = Number(petIDRaw);
+    if (!Number.isInteger(petID) || petID < 1) {
+      return next(badRequest("petID must be a positive integer"));
+    }
+  }
+
+  try {
+    const result = await adoptionApplicationsService.listApplicationsByAdopter(
+      req.user.userID,
+      { status, petID, page, limit },
+    );
+    return successListResponse(
+      res,
+      "Adoption applications retrieved successfully",
+      result.data,
+      result.pagination,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/visits ———————————————
+const getMyVisits = async (req, res, next) => {
+  // Convenience flag — only the exact string "true" enables it; absent or any
+  // other value returns all visits.
+  const upcomingOnly = req.query.upcoming === "true";
+
+  try {
+    const visits = await visitsService.listVisitsByAdopter(req.user.userID, {
+      upcomingOnly,
+    });
+    return successResponse(res, "Visits retrieved successfully", visits);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/appointments ———————————————
+const getMyAppointments = async (req, res, next) => {
+  // Only the exact string "true" enables the upcoming-only filter.
+  const upcomingOnly = req.query.upcoming === "true";
+
+  try {
+    const appointments = await appointmentsService.listAppointmentsByAdopter(
+      req.user.userID,
+      { upcomingOnly },
+    );
+    return successResponse(
+      res,
+      "Appointments retrieved successfully",
+      appointments,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/appointments/:id ———————————————
+const getMyAppointmentDetail = async (req, res, next) => {
+  const appointmentID = Number(req.params.id);
+  if (!Number.isInteger(appointmentID) || appointmentID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const detail = await appointmentsService.getAppointmentDetailForAdopter(
+      req.user.userID,
+      appointmentID,
+    );
+    return successResponse(res, "Appointment detail retrieved successfully", detail);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/adopted-pets ———————————————
+const getMyAdoptedPets = async (req, res, next) => {
+  try {
+    const pets = await adoptionApplicationsService.listAdoptedPetsByAdopter(
+      req.user.userID,
+    );
+    return successResponse(res, "Adopted pets retrieved successfully", pets);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/adopted-pets/:petId ———————————————
+const getMyAdoptedPetDetail = async (req, res, next) => {
+  const petID = Number(req.params.petId);
+  if (!Number.isInteger(petID) || petID < 1) {
+    return next(badRequest("petId must be a positive integer"));
+  }
+
+  try {
+    const detail = await adoptedPetsService.getAdoptedPetDetailForAdopter(
+      req.user.userID,
+      petID,
+    );
+    return successResponse(res, "Adopted pet detail retrieved successfully", detail);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/me/adopted-pets/:petId/vaccinations ———————————————
+const getMyAdoptedPetVaccinations = async (req, res, next) => {
+  const petID = Number(req.params.petId);
+  if (!Number.isInteger(petID) || petID < 1) {
+    return next(badRequest("petId must be a positive integer"));
+  }
+
+  try {
+    const records = await vaccinationsService.listPetVaccinationsForAdopter(
+      req.user.userID,
+      petID,
+    );
+    return successResponse(
+      res,
+      "Vaccination history retrieved successfully",
+      records,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— DELETE /adopters/me ———————————————
+const closeAccount = async (req, res, next) => {
+  const { mode } = req.body ?? {};
+
+  try {
+    assertValidCloseAccountMode(mode);
+    await adoptersService.closeAccount(req.user.userID, mode);
+    return successResponse(res, closeAccountMessage(mode), null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  getMe,
+  updateMe,
+  advanceOnboardingStep,
+  completeOnboarding,
+  uploadGovernmentId,
+  getGovernmentId,
+  getMyApplications,
+  getMyVisits,
+  getMyAppointments,
+  getMyAppointmentDetail,
+  getMyAdoptedPets,
+  getMyAdoptedPetDetail,
+  getMyAdoptedPetVaccinations,
+  closeAccount,
+};

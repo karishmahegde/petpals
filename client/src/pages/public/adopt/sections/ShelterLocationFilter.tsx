@@ -9,7 +9,7 @@ import {
   Dropdown,
   Pill,
   type FilterOption,
-} from "../../../../components/ui/FilterControls";
+} from "../../../../components/ui/pets/FilterControls";
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250];
 const DEFAULT_RADIUS = 25;

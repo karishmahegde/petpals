@@ -125,4 +125,32 @@ describe("POST /api/v1/auth/register", () => {
     );
     expect(passwordMatches).toBe(true);
   });
+
+  // —————————————————— AVATAR SEED ——————————————————
+  test("registration sets a non-empty avatarSeed, and two accounts get different seeds", async () => {
+    const first = await request(app)
+      .post("/api/v1/auth/register")
+      .send(validPayload());
+    expect(first.status).toBe(201);
+    createdUserIDs.push(first.body.data.userID);
+
+    const second = await request(app)
+      .post("/api/v1/auth/register")
+      .send(validPayload());
+    expect(second.status).toBe(201);
+    createdUserIDs.push(second.body.data.userID);
+
+    const firstAdopter = await prisma.adopter.findUnique({
+      where: { userID: first.body.data.userID },
+    });
+    const secondAdopter = await prisma.adopter.findUnique({
+      where: { userID: second.body.data.userID },
+    });
+
+    expect(firstAdopter.avatarSeed).toEqual(expect.any(String));
+    expect(firstAdopter.avatarSeed.length).toBeGreaterThan(0);
+    expect(secondAdopter.avatarSeed).toEqual(expect.any(String));
+    expect(secondAdopter.avatarSeed.length).toBeGreaterThan(0);
+    expect(firstAdopter.avatarSeed).not.toBe(secondAdopter.avatarSeed);
+  });
 });

@@ -13,6 +13,7 @@ export default {
           dark: "#CA7D7D",
         },
         gold: {
+          lightest: "#FFF6E5",
           light: "#FFE7B9",
           DEFAULT: "#FFD78A",
           md: "#FFCA62",
@@ -23,6 +24,12 @@ export default {
           DEFAULT: "#D6ECEF",
           md: "#B0E5EC",
           dark: "#6BA8B0",
+        },
+        green: {
+          DEFAULT: "#91B381",
+        },
+        red: {
+          DEFAULT: "#FF6262",
         },
         neutral: {
           white: "#FFFFFF",

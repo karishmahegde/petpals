@@ -4,6 +4,10 @@ const jwt = require("jsonwebtoken"); //to verify the JWT token
 const app = require("../../../app"); // loads dotenv, so process.env.JWT_SECRET is populated below
 const prisma = require("../../../config/prisma"); //to interact with the database
 
+// Chained register + login + Prisma round trips against the remote Supabase
+// instance can exceed Jest's 5s default.
+jest.setTimeout(20000);
+
 // Runs against the DATABASE_URL configured in server/.env — the seed user
 // created for this suite is removed in afterAll so no test data accumulates.
 // Users.userEmail is VARCHAR(45), so the generated address must stay short.
@@ -99,5 +103,60 @@ describe("POST /api/v1/auth/login", () => {
       userID: seedUser.userID,
       role: seedUser.role,
     });
+  });
+});
+
+// —————————————————— BLOCKED ACCOUNT STATUSES (ADOPTER) ——————————————————
+describe("POST /api/v1/auth/login — blocked adopter accountStatus", () => {
+  const blockedUsers = {};
+
+  beforeAll(async () => {
+    for (const status of ["Deactivated", "Banned"]) {
+      const payload = {
+        name: `${status} Test User`,
+        email: uniqueEmail(),
+        password: "Secret123!",
+        role: "adopter",
+      };
+      const res = await request(app)
+        .post("/api/v1/auth/register")
+        .send(payload);
+      const userID = res.body.data.userID;
+      await prisma.adopter.update({
+        where: { userID },
+        data: { accountStatus: status },
+      });
+      blockedUsers[status] = { userID, email: payload.email, password: payload.password };
+    }
+  });
+
+  afterAll(async () => {
+    const userIDs = Object.values(blockedUsers).map((u) => u.userID);
+    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
+    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
+    await prisma.$disconnect();
+  });
+
+  test("Deactivated account login is blocked with a distinct message", async () => {
+    const { email, password } = blockedUsers.Deactivated;
+    const res = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email, password });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("UNAUTHORIZED");
+    expect(res.body.message).toMatch(/deactivated/i);
+    expect(res.body.message).not.toMatch(/suspended/i);
+  });
+
+  test("Banned account login is blocked", async () => {
+    const { email, password } = blockedUsers.Banned;
+    const res = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email, password });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("UNAUTHORIZED");
+    expect(res.body.message).toMatch(/banned/i);
   });
 });

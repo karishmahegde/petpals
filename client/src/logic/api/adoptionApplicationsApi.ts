@@ -1,0 +1,105 @@
+// What it does: API functions for the /adoption-applications domain —
+// distinct base path from /adopters/me/..., so it gets its own file.
+import axiosInstance from "./axiosInstance";
+
+export interface CreateApplicationPayload {
+  petID: number;
+  shelterID: number;
+  applicationType: "Adopt" | "Foster";
+  shelterMessage: string | null;
+}
+
+export interface AdoptionApplication {
+  applicationID: number;
+  petID: number;
+  adopterID: number;
+  shelterID: number;
+  staffID: number | null;
+  applicationStatus: "Pending" | "Accepted" | "Rejected" | "Withdrawn";
+  applicationType: "Adopt" | "Foster";
+  shelterMessage: string | null;
+  paymentStatus: "Paid";
+  amountPaid: number;
+  createdAt: string;
+  pet?: { petName: string };
+}
+
+// Shape returned by the withdraw endpoint — adds the shelter name alongside
+// the pet name.
+export interface AdoptionApplicationDetail extends AdoptionApplication {
+  shelter?: { shelterName: string };
+}
+
+// Richer shape from GET /adoption-applications/:id — for the Applications
+// section's detail slide-over.
+export interface AdoptionApplicationFullDetail {
+  applicationID: number;
+  applicationCode: string; // e.g. "APP-00123"
+  petID: number;
+  adopterID: number;
+  shelterID: number;
+  staffID: number | null;
+  applicationStatus: "Pending" | "Accepted" | "Rejected" | "Withdrawn";
+  applicationType: "Adopt" | "Foster";
+  shelterMessage: string | null;
+  staffRemark: string | null;
+  paymentStatus: "Paid";
+  amountPaid: number;
+  createdAt: string;
+  pet: {
+    petName: string;
+    petPhoto: string | null;
+    breedName: string;
+    speciesName: string;
+  };
+  shelter: { shelterName: string };
+  assignedStaffName: string | null;
+}
+
+// Starts payment — creates a Stripe Checkout Session and returns its URL.
+// Does NOT create the application row; that only happens once the Stripe
+// webhook confirms payment (see server/.../adoptionApplications.service.js
+// finalizeApplication). Redirect the browser to checkoutUrl on success.
+export const createCheckoutSession = async (
+  payload: CreateApplicationPayload,
+): Promise<{ checkoutUrl: string }> => {
+  const response = await axiosInstance.post("/adoption-applications", payload);
+  return response.data.data;
+};
+
+// Polling read for the post-payment confirmation page — null while the
+// webhook hasn't landed yet (the expected, common answer for a poll), not
+// an error.
+export const getApplicationByCheckoutSession = async (
+  checkoutSessionId: string,
+): Promise<AdoptionApplication | null> => {
+  const response = await axiosInstance.get("/adoption-applications", {
+    params: { checkoutSessionId },
+  });
+  return response.data.data;
+};
+
+// Full detail for one application the adopter owns — powers the Applications
+// section's detail slide-over (opened via a row's "View Details", or deep-linked
+// via ?applicationID= from the Overview widget).
+export const getApplicationById = async (
+  applicationID: number,
+): Promise<AdoptionApplicationFullDetail> => {
+  const response = await axiosInstance.get(
+    `/adoption-applications/${applicationID}`,
+  );
+  return response.data.data;
+};
+
+// Adopter-initiated withdraw — the only status change this endpoint accepts
+// from an adopter. The $15 processing fee is not refunded; re-applying for the
+// same pet is allowed afterwards.
+export const withdrawApplication = async (
+  applicationID: number,
+): Promise<AdoptionApplicationDetail> => {
+  const response = await axiosInstance.patch(
+    `/adoption-applications/${applicationID}/status`,
+    { status: "Withdrawn" },
+  );
+  return response.data.data;
+};

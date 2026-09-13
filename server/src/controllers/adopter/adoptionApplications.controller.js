@@ -1,0 +1,170 @@
+const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
+const { successResponse } = require("../../utils/response");
+
+const badRequest = (message) => {
+  const err = new Error(message);
+  err.code = "BAD_REQUEST";
+  return err;
+};
+
+const parseId = (value, field) => {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) {
+    throw badRequest(`${field} is required and must be a positive integer`);
+  }
+  return n;
+};
+
+const VALID_APPLICATION_TYPES = ["Adopt", "Foster"];
+const MAX_SHELTER_MESSAGE_LEN = 500; // schema.prisma: shelterMessage is VarChar(500)
+
+// ——————————————— POST /adoption-applications ———————————————
+const createApplication = async (req, res, next) => {
+  let petID;
+  let shelterID;
+  try {
+    petID = parseId(req.body?.petID, "petID");
+    shelterID = parseId(req.body?.shelterID, "shelterID");
+  } catch (err) {
+    return next(err);
+  }
+
+  const { applicationType, shelterMessage: shelterMessageRaw } = req.body ?? {};
+  if (!VALID_APPLICATION_TYPES.includes(applicationType)) {
+    return next(
+      badRequest(
+        `applicationType is required and must be one of: ${VALID_APPLICATION_TYPES.join(", ")}`,
+      ),
+    );
+  }
+
+  let shelterMessage = null;
+  if (shelterMessageRaw !== undefined && shelterMessageRaw !== null) {
+    if (
+      typeof shelterMessageRaw !== "string" ||
+      shelterMessageRaw.length > MAX_SHELTER_MESSAGE_LEN
+    ) {
+      return next(
+        badRequest(
+          `shelterMessage must be a string of at most ${MAX_SHELTER_MESSAGE_LEN} characters`,
+        ),
+      );
+    }
+    shelterMessage = shelterMessageRaw.trim() || null;
+  }
+
+  try {
+    // Creates a Stripe Checkout Session — the AdoptionApplication row
+    // itself is only ever created by the webhook once payment is confirmed
+    // (see adoptionApplications.service.js finalizeApplication).
+    const { checkoutUrl } = await adoptionApplicationsService.createCheckoutSession({
+      adopterID: req.user.userID,
+      petID,
+      shelterID,
+      applicationType,
+      shelterMessage,
+    });
+    return successResponse(
+      res,
+      "Checkout session created successfully",
+      { checkoutUrl },
+      201,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adoption-applications?checkoutSessionId= (confirmation-page polling) ———————————————
+const getByCheckoutSession = async (req, res, next) => {
+  const sessionId = req.query?.checkoutSessionId;
+  if (typeof sessionId !== "string" || !sessionId) {
+    return next(badRequest("checkoutSessionId is required"));
+  }
+
+  try {
+    const application = await adoptionApplicationsService.getApplicationByCheckoutSession(
+      req.user.userID,
+      sessionId,
+    );
+    // application is null while the webhook hasn't landed yet — that's the
+    // expected common case for a poll, not an error.
+    return successResponse(
+      res,
+      application
+        ? "Adoption application found"
+        : "No adoption application found for this checkout session yet",
+      application,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adoption-applications/:id ———————————————
+const getApplication = async (req, res, next) => {
+  let applicationID;
+  try {
+    applicationID = parseId(req.params.id, "id");
+  } catch (err) {
+    return next(err);
+  }
+
+  try {
+    const application = await adoptionApplicationsService.getApplicationById(
+      applicationID,
+      req.user,
+    );
+    return successResponse(
+      res,
+      "Adoption application retrieved successfully",
+      application,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PATCH /adoption-applications/:id/status ———————————————
+// Adopters may only move an application to 'Withdrawn'. Staff-driven status
+// transitions will extend this endpoint later.
+const VALID_ADOPTER_STATUS_CHANGES = ["Withdrawn"];
+
+const updateApplicationStatus = async (req, res, next) => {
+  let applicationID;
+  try {
+    applicationID = parseId(req.params.id, "id");
+  } catch (err) {
+    return next(err);
+  }
+
+  const { status } = req.body ?? {};
+  if (!VALID_ADOPTER_STATUS_CHANGES.includes(status)) {
+    return next(
+      badRequest(
+        `status is required and must be one of: ${VALID_ADOPTER_STATUS_CHANGES.join(", ")}`,
+      ),
+    );
+  }
+
+  try {
+    const application = await adoptionApplicationsService.withdrawApplication(
+      applicationID,
+      req.user.userID,
+    );
+    return successResponse(
+      res,
+      "Adoption application withdrawn successfully",
+      application,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  createApplication,
+  getByCheckoutSession,
+  getApplication,
+  updateApplicationStatus,
+};

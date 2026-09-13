@@ -7,17 +7,32 @@
 //   - On failure: displays server error message inline
 // Route: /login
 import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { unstable_batchedUpdates } from "react-dom";
+import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import Card from "../../../components/ui/Card";
 import axios from "axios";
 import { login as loginApi } from "../../../logic/api/authApi";
+import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Shared by both destinations that land here: right after a fresh login, and
+// an already-authenticated user hitting /login directly. `redirectParam` now
+// comes from every guarded route (ProtectedRoute sets it generically), not
+// just the adopter-only apply flow — so this no longer pre-filters by role.
+// The redirect target enforces its own access: RoleRoute sends a mismatched
+// role to /forbidden, and AdoptApply re-checks role itself (-> /adopt + a
+// toast) since it deliberately bypasses RoleRoute.
+const resolveDestination = (userRole: string, redirectParam: string | null) =>
+  redirectParam || `/${userRole.toLowerCase()}`;
+
 const Login = () => {
-  const { token, role } = useAuthStore();
+  const [searchParams] = useSearchParams();
+  // Query param, not location.state — survives a page refresh mid-login,
+  // which state would not.
+  const redirect = searchParams.get("redirect");
 
   const navigate = useNavigate(); // for programmatic navigation — redirecting the user to a different route from inside the code rather than from a link click
   const storeLogin = useAuthStore((state) => state.login); // zustand global state management with token
@@ -27,8 +42,27 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (token && role) {
-    return <Navigate to={`/${role.toLowerCase()}`} replace />;
+  // Captured once, on mount — true only if a session already existed when
+  // this page was first reached (e.g. visiting /login directly while
+  // already logged in). Deliberately NOT reactive to later token/role
+  // changes: handleSubmit navigates explicitly on a fresh login, and
+  // staying reactive here would re-run this same redirect during that same
+  // store update, racing with the explicit navigate() and producing a
+  // stray render where this component returns nothing — a visible flash
+  // of blank space inside PublicLayout's Navbar/Footer before the real
+  // destination appears.
+  const [alreadyAuthenticated] = useState(() => {
+    const { token, role } = useAuthStore.getState();
+    return token && role ? { role } : null;
+  });
+
+  if (alreadyAuthenticated) {
+    return (
+      <Navigate
+        to={resolveDestination(alreadyAuthenticated.role, redirect)}
+        replace
+      />
+    );
   }
 
   const validate = (): string => {
@@ -52,8 +86,21 @@ const Login = () => {
     try {
       // sending the credentials to the login API
       const { token, user } = await loginApi({ email, password });
-      storeLogin(user, token, user.role);
-      navigate(`/${user.role.toLowerCase()}`, { replace: true });
+      // A real credential login — not the silent session-restore bootstrap
+      // in App.tsx — is the one point that should undo a prior "Skip for
+      // now" (see onboardingSkip.ts): next login shows the onboarding form
+      // again if it's still incomplete.
+      clearOnboardingSkipped();
+      // storeLogin (Zustand) and navigate (React Router) are two unrelated
+      // subscriptions — without forcing them into one batch, Navbar (which
+      // reads the store directly) can commit and paint the "logged in" chip
+      // a frame before the route actually changes away from /login, which
+      // reads as the navbar updating while the login form is still on
+      // screen. batchedUpdates forces both into a single commit.
+      unstable_batchedUpdates(() => {
+        storeLogin(user, token, user.role);
+        navigate(resolveDestination(user.role, redirect), { replace: true });
+      });
     } catch (err: unknown) {
       // error runs when no server
       const message =
