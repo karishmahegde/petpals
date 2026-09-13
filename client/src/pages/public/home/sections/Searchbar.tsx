@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import SectionContainer from "../../../../components/ui/SectionContainer";
-import SectionHeading from "../../../../components/ui/SectionHeading";
+import SectionContainer from "../../../../components/ui/marketing/SectionContainer";
+import SectionHeading from "../../../../components/ui/marketing/SectionHeading";
 import { FaChevronDown, FaSearch } from "react-icons/fa";
 import { HiOutlineLocationMarker } from "react-icons/hi";
 import { useQuery } from "@tanstack/react-query";

@@ -69,6 +69,14 @@ export interface PetDetail {
   // Not yet returned by GET /pets/:id on the backend — falls back to a
   // placeholder in the UI until the service selects/returns this field.
   petPhoto: string | null;
+  adoptionStatus:
+    | "incoming"
+    | "available"
+    | "pending"
+    | "adopted"
+    | "fostered"
+    | "transferred"
+    | "deceased";
   breed: {
     breedID: number;
     breedName: string;
@@ -155,4 +163,13 @@ export const getPetById = async (petID: number): Promise<PetDetail> => {
 export const getFeaturedPets = async (): Promise<PetCard[]> => {
   const response = await axiosInstance.get("/pets/featured");
   return response.data.data;
+};
+
+// ———————————————— FAVORITES API ————————————————
+export const addFavorite = async (petID: number): Promise<void> => {
+  await axiosInstance.post(`/pets/${petID}/favorites`);
+};
+
+export const removeFavorite = async (petID: number): Promise<void> => {
+  await axiosInstance.delete(`/pets/${petID}/favorites`);
 };

@@ -2,8 +2,8 @@ import Carousel from "./sections/Carousel";
 import FeaturedPets from "./sections/FeaturedPets";
 import Searchbar from "./sections/Searchbar";
 import { homeStatic } from "../../../static/content/home";
-import SectionContainer from "../../../components/ui/SectionContainer";
-import SectionHeading from "../../../components/ui/SectionHeading";
+import SectionContainer from "../../../components/ui/marketing/SectionContainer";
+import SectionHeading from "../../../components/ui/marketing/SectionHeading";
 
 const { adoptContent, featVolunteer } = homeStatic;
 

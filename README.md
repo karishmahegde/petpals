@@ -1,265 +1,164 @@
-# 🐾 PetPals - Animal Adoption Management System
+# PetPals
 
-A multi-shelter pet adoption platform built as a full-stack project following real software engineering practices. PetPals goes beyond existing solutions by serving as an internal operations backbone for shelter networks, with features like inter-shelter animal transfers, a universal health passport, and an AI-powered pet-adopter compatibility matcher.
+**A unified, multi-shelter Animal Adoption Management System**
 
----
+<div align="center">
+<img src="./docs/assets/petpals.gif" alt="PetPals banner — a multi-shelter animal adoption platform" width="100%" /> 
+</div>
 
-## ✨ Key Features
+Connecting shelters, adopters, vets, volunteers, and donors on one platform with inter-shelter animal transfers, a universal pet health passport, and AI-powered adopter matching.
 
-| Feature                       | Description                                                                  |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| **Multi-shelter network**     | Unified animal listings and workflows across all branches of an organisation |
-| **Inter-shelter transfers**   | Capacity-aware transfer requests with full transfer history                  |
-| **Universal health passport** | Medical records that travel with an animal across shelter relocations        |
-| **AI compatibility matcher**  | Claude-powered pet-adopter matching to improve adoption success rates        |
-| **Role-based access control** | Six distinct roles: Admin, Shelter Staff, Adopter, Vet, Volunteer, Donor     |
-| **Donation management**       | Stripe-integrated donor flow with impact tracking                            |
+<!-- Badges -->
 
----
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
 
-## 🛠️ Tech Stack
+## 🟤 About the Project
 
-**Frontend**
+Animal shelters typically operate in isolation. Each branch manages intake, adoptions, and medical records separately, with no shared visibility across locations. Animals get overlooked, applications get lost, and adopters face inconsistent experiences depending on which shelter they contact.
 
-- React 18 + Vite
-- Tailwind CSS
-- React Router v6
-- Zustand (global/auth state)
-- TanStack Query (server state & caching)
+**PetPals** is a full-stack Animal Adoption Management System designed to unify multiple shelters into a single collaborative network. It was built using production-quality engineering tools, frameworks and practices end-to-end including user-focused design, sprint-based delivery, formal specs, API documentation, automated testing, and CI/CD.
 
-**Backend**
+## 🔶 Key Features
 
-- Node.js 18 + Express
-- Prisma ORM
-- PostgreSQL 15 + PostGIS
-- Supabase (media storage)
+| Feature                        | Description                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| **Multi-shelter network**      | Unified animal listings and workflows across all branches of an organisation      |
+| **Inter-shelter transfers**    | Capacity-aware transfer requests with full transfer history                       |
+| **Universal health passport**  | Medical records that travel with an animal across shelter relocations             |
+| **AI compatibility matcher**   | OpenAI-powered pet–adopter matching to improve adoption success rates _(planned)_ |
+| **Role-based access control**  | Six distinct roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor |
+| **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                     |
+| **Two-token JWT auth**         | Short-lived access token + httpOnly refresh cookie, with post-login redirect-back |
+| **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                         |
+| **Donation management**        | Stripe-integrated donor flow with impact tracking _(planned)_                     |
 
-**Auth**
+## 🟤 Tech Stack
 
-- JWT (stateless authentication)
-- bcrypt (password hashing)
+### Frontend
 
-**Infrastructure**
+![React](https://img.shields.io/badge/React_18-61DAFB?style=flat-square&logo=react&logoColor=black) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) ![Zustand](https://img.shields.io/badge/Zustand-593D88?style=flat-square) ![TanStack Query](https://img.shields.io/badge/TanStack_Query-FF4154?style=flat-square&logo=reactquery&logoColor=white)
 
-- Docker + Docker Compose (local dev)
-- Vercel (frontend deployment)
-- Railway (backend deployment)
+### Backend
 
-**Testing**
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) ![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=flat-square&logo=stripe&logoColor=white) ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black)
 
-- Jest + Supertest (unit & integration)
-- Cypress (E2E - critical flows only)
+### Database
 
-**AI Feature**
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white) ![PostGIS](https://img.shields.io/badge/PostGIS-4169E1?style=flat-square) ![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)
 
-- OpenAI API (pet-adopter compatibility matcher, Sprint 6)
+### Auth
 
----
+![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) ![bcrypt](https://img.shields.io/badge/bcrypt-338033?style=flat-square)
 
-## 🚀 Getting Started
+### AI
+
+![OpenAI](https://img.shields.io/badge/OpenAI_API-412991?style=flat-square&logo=openai&logoColor=white)
+
+### Testing
+
+![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) ![Supertest](https://img.shields.io/badge/Supertest-323330?style=flat-square) ![Cypress](https://img.shields.io/badge/Cypress-17202C?style=flat-square&logo=cypress&logoColor=white)
+
+### Infrastructure
+
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white) ![Railway](https://img.shields.io/badge/Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white)
+
+### Tooling
+
+![Figma](https://img.shields.io/badge/Figma-F24E1E?style=flat-square&logo=figma&logoColor=white)
+
+## 🔶 Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
-- Docker + Docker Compose
-- Git
+- **Node.js 18+** and **Git**
+- **Docker + Docker Compose** _(Option A only)_
+- A free **[Supabase](https://supabase.com)** account — the project's database (Postgres + PostGIS) and file storage both run on it, even in local dev
 
-### 1. Clone the repository
+### Option A: Quick Start with Docker - to run the app end-to-end without installing Node locally.
 
 ```bash
-git clone https://github.com/<your-username>/petpals.git
+# 1. Clone the repo
+git clone https://github.com/karishmahegde/petpals.git
 cd petpals
-```
 
-### 2. Set up environment variables
+# 2. Copy the env template and fill in your Supabase / JWT / Stripe values
+cp server/.env.example server/.env
 
-```bash
-cp .env.example .env
-# Fill in values in .env - see comments in the file
-```
-
-### 3a. Run with Docker (recommended)
-
-```bash
+# 3. Build and start everything (Postgres, API, client) in one command
 docker-compose up --build
 ```
 
-- Client → http://localhost:3000
-- API → http://localhost:5000
-- DB → localhost:5432
+| Service              | URL                   |
+| -------------------- | --------------------- |
+| Client               | http://localhost:3000 |
+| API                  | http://localhost:5000 |
+| DB (local container) | localhost:5432        |
 
-### 3b. Run manually (without Docker)
+> ⚠️ The bundled Docker Postgres container does **not** include PostGIS or object storage — features like "nearby shelters" search and photo/ID uploads need `DATABASE_URL` pointed at Supabase regardless of whether you use Docker for the app containers. See [`setup/SETUP.md`](./setup/SETUP.md) for the full explanation.
 
-**Server**
-
-```bash
-cd server
-npm install
-npx prisma generate
-npx prisma migrate dev
-npm run dev
-```
-
-**Client**
+### Option B: Local Contributor Setup
 
 ```bash
-cd client
-npm install
-npm run dev
+# 1. Clone the repo
+git clone https://github.com/karishmahegde/petpals.git
+cd petpals
+```
+
+Then follow **[`setup/SETUP.md`](./setup/SETUP.md)** end-to-end, which covers:
+
+1. Creating a free Supabase project (database + file storage)
+2. Configuring `server/.env` and `client/.env.local`
+3. Applying the Prisma schema (`prisma migrate deploy` — **never** `migrate dev`, see the guide for why)
+4. Running the one-time SQL script for PostGIS / generated columns / storage buckets
+5. Seeding sample data — prints 6 ready-to-use test logins (Admin, Staff, Vet, Adopter, Volunteer, Donor)
+6. Starting the server and client dev servers
+
+Once both are running:
+
+```bash
+# Terminal 1
+cd server && npm run dev      # → http://localhost:5000
+
+# Terminal 2
+cd client && npm run dev      # → http://localhost:3000
 ```
 ---
 
-## 🗂️ Project Structure
+## 🟤 Project Structure
 
-```
+Top-level layout of the repository:
+
+```text
 petpals/
-├── client/                  # React frontend (Vite + TypeScript)
-│   ├── src/
-│   │   ├── api/             # Axios API calls — axiosInstance.ts, authApi.ts
-│   │   ├── assets/          # Static assets — images/ (backgrounds, branding)
-│   │   ├── components/
-│   │   │   ├── ui/          # Reusable primitives (buttons, inputs, cards) — Card.tsx
-│   │   │   ├── layout/      # Navbar, sidebar, page shells — Navbar.tsx
-│   │   │   ├── forms/       # Form components
-│   │   │   ├── ProtectedRoute.tsx  # Redirects to /login if not authenticated
-│   │   │   └── RoleRoute.tsx       # Redirects to /forbidden if role not permitted
-│   │   ├── layouts/         # Route-level page shells — PublicLayout.tsx
-│   │   ├── pages/
-│   │   │   ├── adopter/
-│   │   │   ├── staff/
-│   │   │   ├── vet/
-│   │   │   ├── volunteer/
-│   │   │   ├── donor/
-│   │   │   ├── admin/
-│   │   │   ├── auth/        # Login.tsx, Register.tsx
-│   │   │   └── errors/      # Forbidden.tsx, NotFound.tsx
-│   │   ├── store/           # Zustand global state — useAuthStore.ts
-│   │   ├── styles/          # index.css — Tailwind directives
-│   │   ├── main.tsx	# The TypeScript entry point. React starts here
-│   │   ├── App.tsx	# The root component. Defines all the routes — which URL path renders which page component.
-│   │   └── vite-env.d.ts	# Vite/TypeScript ambient type declarations
-│   ├── index.html	# The single HTML file for the entire React app. Uses Single Page Application (SPA)
-│   ├── vite.config.ts
-│   └── tailwind.config.js	# Configures Tailwind CSS
-│   └── .eslintrc.cjs	    # Linting Code
-│   └── Dockerfile		# Instructions for building the server's Docker container. Read top to bottom like a recipe.
-│
-├── server/                  # Node.js + Express REST API
-│   ├── src/
-│   │   ├── routes/          # Express routers (one per resource) — auth.routes.js
-│   │   ├── controllers/     # Route handler logic — auth.controller.js
-│   │   ├── middleware/      # Auth (JWT), RBAC, error handling — authenticate.js, authorizeRoles.js, errorHandler.js
-│   │   ├── services/        # Business logic layer — auth.service.js
-│   │   ├── utils/           # Shared helpers — errors.js, response.js
-│   │   ├── config/          # DB and env config — prisma.js
-│   │   ├── prisma/
-│   │   │   ├── migrations/ # Version control migration files generated by running the Prisma migrate command
-│   │   │   └── schema.prisma	# Prisma reads this file and uses it to create the PostgreSQL tables and generate the TypeScript/JavaScript client used to query the database.
-│   │   │   └── seed.js # The seed database for intitial testing
-│   │   ├── tests/
-│   │   │   ├── unit/         # authenticate.test.js, authorizeRoles.test.js
-│   │   │   └── integration/  # auth.register.test.js, auth.login.test.js, auth.logout.test.js
-│   │   ├── app.js           # Builds the Express app (middleware, routes, error handler) — exported for both index.js and Supertest
-│   │   └── index.js         # Entry point — imports app.js and starts the server on PORT
-│   └── .env.example	# A template that lists every environment variable the project needs, with placeholder values instead of real ones. This one is committed to GitHub.
-│   └── package.json		# Describes your server as a Node.js project. Lists every library it depends on and defines the commands you can run.
-│   └── Dockerfile		# Instructions for building the server's Docker container. Read top to bottom like a recipe.
-│
-├── docs/
-│   └── 01_Project_Overview.pdf
-│   └── 02_Requirements.pdf
-│   └── 03_Personas.pdf
-│   └── 04_Database_Design.pdf
-│   └── 05_API_Design.pdf
-└── CLAUDE.md   # the permanent context file
-└── docker-compose.yml	# Defines three "containers”: PostgreSQL, Express server, and React app. Tells Docker how to run them all together with one command: docker-compose up.
-└── .gitignore	# Tells Git which files and folders to completely ignore — they will never be committed or pushed to GitHub, no matter what.
-```
----
-
-## 🗂️ Project Structure
-
-```
-petpals/
-├── client/                  # React frontend (Vite + TypeScript)
-│   ├── public/
-│   │   └── favicon.png
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── layout/      # Navbar, page shells
-│   │   │   └── ui/          # Reusable primitives — Card.tsx, ButtonElement.tsx, etc.
-│   │   ├── logic/
-│   │   │   ├── api/         # Axios API calls — axiosInstance.ts, authApi.ts, petsApi.ts
-│   │   │   ├── hooks/       # Shared hooks — useScrollToHash.ts, useScrollToTop.ts
-│   │   │   ├── route/       # ProtectedRoute.tsx, RoleRoute.tsx
-│   │   │   └── store/       # Zustand global state — useAuthStore.ts
-│   │   ├── pages/
-│   │   │   ├── errors/      # Forbidden.tsx, NotFound.tsx
-│   │   │   ├── protected/   # Role-based dashboards — adopter, staff, vet, volunteer, donor, admin
-│   │   │   └── public/      # Public marketing, auth, and catalog pages
-│   │   ├── static/
-│   │   │   ├── assets/      # images/ — backgrounds, branding, page imagery
-│   │   │   └── content/     # Page copy/content data
-│   │   ├── App.tsx          # Root component — defines all the routes
-│   │   ├── index.css        # Tailwind directives
-│   │   ├── main.tsx         # React entry point
-│   │   └── vite-env.d.ts    # Vite/TypeScript ambient type declarations
-│   ├── .env.local
-│   ├── .eslintrc.cjs
-│   ├── Dockerfile
-│   ├── index.html
-│   ├── package.json
-│   ├── postcss.config.js
-│   ├── tailwind.config.js	  # Configures Tailwind CSS
-│   ├── tsconfig.json
-│   └── vite.config.ts
-│
-├── server/                  # Node.js + Express REST API
-│   ├── src/
-│   │   ├── config/          # DB and env config — prisma.js
-│   │   ├── controllers/     # Route handler logic
-│   │   ├── middleware/      # Auth (JWT), RBAC, error handling
-│   │   ├── prisma/          # schema.prisma, migrations/, seed.js
-│   │   ├── routes/          # Express routers (one per resource)
-│   │   ├── services/        # Business logic layer
-│   │   ├── tests/
-│   │   │   ├── integration/ # Full request-response cycle against a real DB
-│   │   │   └── unit/        # Mocked dependencies — controller/service logic in isolation
-│   │   ├── utils/           # Shared helpers — errors.js, response.js
-│   │   ├── app.js           # Builds the Express app — exported for both index.js and Supertest
-│   │   └── index.js         # Entry point — starts the server on PORT
-│   ├── .env
-│   ├── .env.example	      # Template listing every environment variable the project needs — committed to GitHub
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── prisma.config.ts
-│   └── swagger.js
-│
-├── docs/                    # Project documentation PDFs
-│
-├── CLAUDE.md                # The permanent context file
-├── docker-compose.yml	      # Orchestrates PostgreSQL, Express server, and React app — one command: docker-compose up
-└── .gitignore
+├── client/                # React + Vite + TypeScript frontend
+├── server/                # Node.js + Express REST API (Prisma + PostgreSQL)
+├── setup/                 # ⭐ Everything needed to get the project running locally
+│   ├── SETUP.md           #    Step-by-step setup guide (start here)
+│   └── manual-constraints.sql  # One-time SQL for PostGIS / hand-applied DB pieces
+├── docs/                  # Project documentation (design PDFs, diagrams, screenshots)
+├── docker-compose.yml     # Orchestrates Postgres + server + client — `docker-compose up`
+├── CLAUDE.md              # Full architecture, API, and conventions reference
+├── LICENSE
+└── README.md              # You are here
 ```
 
----
+## 🔶 API Reference
 
-## 📡 API
+Base URL (dev): `http://localhost:5000/api/v1`
 
-Base URL: `http://localhost:5000/api/v1`
-
-Full API documentation is available via Swagger at `/api/docs` once the server is running.
+Interactive Swagger/OpenAPI docs are served at **`/api/docs`** once the server is running.
 
 ### Resource domains
 
 | Domain                | Base path                        |
 | --------------------- | -------------------------------- |
 | Auth                  | `/auth`                          |
-| Pets                  | `/pets`                          |
+| Pets (public catalog) | `/pets`, `/species`, `/breeds`   |
+| Shelters              | `/shelters`                      |
 | Adopters              | `/adopters`                      |
 | Adoption Applications | `/adoption-applications`         |
-| Shelters              | `/shelters`                      |
-| Staff                 | `/staff`                         |
+| Visits                | `/visits`                        |
+| Staff operations      | `/staff`                         |
 | Appointments          | `/appointments`                  |
 | Vaccinations          | `/appointments/:id/vaccinations` |
 | Tasks                 | `/tasks`                         |
@@ -267,51 +166,24 @@ Full API documentation is available via Swagger at `/api/docs` once the server i
 | Donors & Donations    | `/donors`, `/donations`          |
 | Shelter Transfers     | `/transfers`                     |
 
----
+## 🟤 Testing
 
-## 🧪 Testing
-
-```bash
-cd server
-npm test                 # run all tests
-npm run test:coverage    # with coverage report
-```
+- **Unit & Integration:** Jest + Supertest (`server/tests/`)
+- **End-to-End:** Cypress (`e2e/`)
 
 ```bash
-cd client
-npm run typecheck        # TypeScript type check
-npm run lint             # ESLint
+npm run test --prefix server
+npm run test:e2e
 ```
 
-Target: 70% coverage across unit and integration tests. Cypress E2E is scoped to critical adoption flows only.
+> Note: Jest's `.toBe()` checks reference equality; `.toEqual()` checks deep value equality — use `.toEqual()` when comparing objects/arrays.
+
+## 🔶 License
+
+Distributed under the MIT License. See [`LICENSE`](./LICENSE) for details.
 
 ---
 
-## ✏️ Prototype
-
-Figma High Fidelity prototype: https://www.figma.com/design/dtiJqWSoBhaMrgrs12fXYK/PetPals
-
-## 🗄️ Database
-
-The schema is defined in `server/src/prisma/schema.prisma` and covers 26 tables across all six user roles.
-
-ER Diagram: https://dbdiagram.io/d/PetPals-69bf5ca6fb2db18e3bd4b303
-
----
-
-## 📄 Documentation
-
-All project documentation lives in the `docs/` folder:
-
-- `01_Project Overview.pdf`
-- `02_Requirements.pdf`
-- `03_Personas.pdf`
-- `04_Database Design.pdf`
-- `05_API Design.pdf`
-- `06_Auth System.pdf`
-
----
-
-## 👤 Author
-
-Built by [Karishma Hegde ✨](https://karishmahegde.netlify.app)
+<div align="center">
+Made with 🐾 by <a href="https://github.com/your-username">Karishma</a>
+</div>

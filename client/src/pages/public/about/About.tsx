@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import CountUp from "react-countup";
-import SectionContainer from "../../../components/ui/SectionContainer";
-import SectionHeading from "../../../components/ui/SectionHeading";
-import SectionHeadingCenter from "../../../components/ui/SectionHeadingCenter";
+import SectionContainer from "../../../components/ui/marketing/SectionContainer";
+import SectionHeading from "../../../components/ui/marketing/SectionHeading";
+import SectionHeadingCenter from "../../../components/ui/marketing/SectionHeadingCenter";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { aboutContent } from "../../../static/content/about";
 

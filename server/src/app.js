@@ -18,6 +18,15 @@ app.use(
     credentials: true, // required for httpOnly cookies to work
   }),
 );
+
+// Stripe webhook — mounted BEFORE express.json() below, and given its own
+// express.raw() body parser (see routes/webhooks/stripe.routes.js), since
+// stripe.webhooks.constructEvent needs the untouched raw request body to
+// verify the signature. Every other route is unaffected and still gets the
+// normal JSON-parsed body from express.json().
+const stripeWebhookRouter = require("./routes/webhooks/stripe.routes");
+app.use("/api/v1/webhooks", stripeWebhookRouter);
+
 app.use(express.json());
 app.use(helmet()); // sets various HTTP response headers to protect your app from common web vulnerabilities
 
@@ -34,14 +43,20 @@ app.get("/health", (req, res) => {
 });
 
 // ── API Routes ────────────
-const authRouter = require("./routes/auth.routes");
+const authRouter = require("./routes/auth/auth.routes");
 app.use("/api/v1/auth", authRouter);
-const petsRouter = require("./routes/pets.routes");
+const petsRouter = require("./routes/public/pets.routes");
 app.use("/api/v1", petsRouter);
-const sheltersRouter = require("./routes/shelters.routes");
+const sheltersRouter = require("./routes/public/shelters.routes");
 app.use("/api/v1", sheltersRouter);
-// app.use('/api/v1/adopters',             require('./routes/adopters'));
-// app.use('/api/v1/adoption-applications',require('./routes/adoptionApplications'));
+const adoptersRouter = require("./routes/adopter/adopters.routes");
+app.use("/api/v1/adopters", adoptersRouter);
+const adoptionApplicationsRouter = require("./routes/adopter/adoptionApplications.routes");
+app.use("/api/v1/adoption-applications", adoptionApplicationsRouter);
+const visitsRouter = require("./routes/adopter/visits.routes");
+app.use("/api/v1/visits", visitsRouter);
+const favoritesRouter = require("./routes/adopter/favorites.routes");
+app.use("/api/v1", favoritesRouter);
 // app.use('/api/v1/staff',                require('./routes/staff'));
 // app.use('/api/v1/appointments',         require('./routes/appointments'));
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));

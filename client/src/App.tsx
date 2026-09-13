@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import PublicLayout from "./components/layout/PublicLayout";
 import ProtectedRoute from "./logic/route/ProtectedRoute";
 import RoleRoute from "./logic/route/RoleRoute";
+import OnboardingGate from "./logic/route/OnboardingGate";
 import Home from "./pages/public/home/Home";
 import About from "./pages/public/about/About";
 import VolunteerInfo from "./pages/public/volunteer-info/VolunteerInfo";
@@ -11,7 +12,10 @@ import Register from "./pages/public/auth/Register";
 import Adopt from "./pages/public/adopt/Adopt";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
-import AdopterDashboard from "./pages/protected/adopter/AdopterDashboard";
+import DashboardLayout from "./pages/protected/adopter/dashboard/DashboardLayout";
+import AdoptApply from "./pages/protected/adopter/apply/AdoptApply";
+import AdoptApplyConfirmation from "./pages/protected/adopter/apply/AdoptApplyConfirmation";
+import OnboardingWizard from "./pages/protected/adopter/onboarding/OnboardingWizard";
 import StaffDashboard from "./pages/protected/staff/StaffDashboard";
 import VetDashboard from "./pages/protected/vet/VetDashboard";
 import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
@@ -45,80 +49,118 @@ const App = () => {
   if (!authReady) return <div className="min-h-screen bg-rose-light" />; //in between load
 
   return (
-    <Routes>
-      <Route element={<PublicLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/volunteerinfo" element={<VolunteerInfo />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/adopt" element={<Adopt />} />
-        <Route path="/forbidden" element={<Forbidden />} />
-        <Route path="*" element={<NotFound />} />
-      </Route>
+    <OnboardingGate>
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/volunteerinfo" element={<VolunteerInfo />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/adopt" element={<Adopt />} />
+          <Route path="/forbidden" element={<Forbidden />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
 
-      {/* Role-based dashboards — guarded by ProtectedRoute (authenticated) + RoleRoute (correct role) */}
-      <Route
-        path="/adopter"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["Adopter"]}>
-              <AdopterDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/staff"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["Staff"]}>
-              <StaffDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/vet"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["Veterinarian"]}>
-              <VetDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/volunteer"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["Volunteer"]}>
-              <VolunteerDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/donor"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["Donor"]}>
-              <DonorDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["Admin"]}>
-              <AdminDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+        {/* Adoption application entry — guards itself (auth, role, pet
+            availability, duplicate application) with spec-specific redirect
+            targets/toasts, so it doesn't use ProtectedRoute/RoleRoute. */}
+        <Route path="/adopt/apply/:petID" element={<AdoptApply />} />
+
+        {/* Post-Stripe-Checkout landing page — payment already happened, so
+            this only needs auth + role, not AdoptApply's own
+            pet-availability/duplicate-application guards (which would be
+            actively wrong here: the webhook may be creating that very row
+            while this page is polling for it). */}
+        <Route
+          path="/adopt/apply/:petID/confirmation"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Adopter"]}>
+                <AdoptApplyConfirmation />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Onboarding wizard — guards itself (see OnboardingWizard.tsx)
+            beyond the standard ProtectedRoute + RoleRoute(Adopter) wrapper.
+            Exempted from OnboardingGate above via its own "/onboarding"
+            path prefix. */}
+        <Route
+          path="/onboarding/step/:step"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Adopter"]}>
+                <OnboardingWizard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Role-based dashboards — guarded by ProtectedRoute (authenticated) + RoleRoute (correct role) */}
+        <Route
+          path="/adopter/*"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Adopter"]}>
+                <DashboardLayout />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Staff"]}>
+                <StaffDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vet"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Veterinarian"]}>
+                <VetDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/volunteer"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Volunteer"]}>
+                <VolunteerDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Donor"]}>
+                <DonorDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Admin"]}>
+                <AdminDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </OnboardingGate>
   );
 };
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaUserCircle } from "react-icons/fa";
+import Avatar from "../ui/Avatar";
 import logoNav from "../../static/assets/images/branding/logoNav.png";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
@@ -91,7 +92,15 @@ const Navbar = () => {
                 onClick={() => setDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 font-body text-sm font-medium text-neutral-dark bg-gold-md px-4 py-2 rounded-xl hover:brightness-95 transition-colors"
               >
-                <FaUserCircle className="h-5 w-5" />
+                {user.avatarSeed ? (
+                  <Avatar
+                    seed={user.avatarSeed}
+                    size={20}
+                    className="h-8 w-8 rounded-full"
+                  />
+                ) : (
+                  <FaUserCircle className="h-5 w-5" />
+                )}
                 {firstName}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -204,8 +213,16 @@ const Navbar = () => {
           {user ? (
             // Logged-in: dashboard + logout with distinct background
             <div className="flex flex-col gap-2 pt-3 border-t border-neutral-gray/40">
-              <div className="flex gap-1.5 p-2 rounded-lg text-white">
-                <FaUserCircle className="h-5 w-5" />
+              <div className="flex items-center gap-1.5 p-2 rounded-lg text-white">
+                {user.avatarSeed ? (
+                  <Avatar
+                    seed={user.avatarSeed}
+                    size={20}
+                    className="h-5 w-5 rounded-full"
+                  />
+                ) : (
+                  <FaUserCircle className="h-5 w-5" />
+                )}
                 <span className="font-body text-sm font-medium">
                   {firstName}
                 </span>

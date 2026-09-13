@@ -2,7 +2,11 @@ const { ERROR_CODES } = require("../utils/errors");
 const { errorResponse } = require("../utils/response");
 
 const errorHandler = (err, req, res, next) => {
-  if (process.env.NODE_ENV !== "production" && err.code !== "UNAUTHORIZED") {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    err.code !== "UNAUTHORIZED" &&
+    !err.quiet
+  ) {
     console.error(err.stack);
   }
 

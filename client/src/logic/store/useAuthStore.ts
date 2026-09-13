@@ -1,6 +1,8 @@
 // What it does: Zustand global store holding the authenticated user's session, token, and role
 import { create } from "zustand";
 import { AuthUser } from "../../logic/api/authApi";
+import { clearOnboardingSkipped } from "../onboardingSkip";
+import { queryClient } from "../queryClient";
 
 interface AuthState {
   // Defines the shape of your Zustand store
@@ -9,6 +11,9 @@ interface AuthState {
   role: string | null;
   login: (user: AuthUser, token: string, role: string) => void;
   logout: () => void;
+  // Patches fields on the current user in place — e.g. onboardingStep after
+  // advancing a wizard step, without a full re-login/refresh round trip.
+  updateUser: (patch: Partial<AuthUser>) => void;
 }
 
 const useAuthStore = create<AuthState>((set) => ({
@@ -19,7 +24,14 @@ const useAuthStore = create<AuthState>((set) => ({
 
   login: (user, token, role) => set({ user, token, role }), // on login, updates all three state fields at once
 
-  logout: () => set({ user: null, token: null, role: null }), // on logout, resets everything to null - clears the session from memory
+  logout: () => {
+    clearOnboardingSkipped(); // don't let a skip leak into whoever logs in next on this tab
+    queryClient.clear(); // drop all cached server data so the next user on this tab starts clean
+    set({ user: null, token: null, role: null }); // on logout, resets everything to null - clears the session from memory
+  },
+
+  updateUser: (patch) =>
+    set((state) => (state.user ? { user: { ...state.user, ...patch } } : {})),
 }));
 
 export default useAuthStore;

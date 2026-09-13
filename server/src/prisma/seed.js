@@ -6,12 +6,17 @@ require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const SUPABASE_URL =
-  "https://aulounxhkawyqqzjeeqi.supabase.co/storage/v1/object/public/pet-images";
+const SUPABASE_PROJECT_URL = process.env.SUPABASE_URL;
+if (!SUPABASE_PROJECT_URL) {
+  throw new Error("SUPABASE_URL must be set in .env to seed pet photo URLs");
+}
+// Public base URL for the pet-images bucket — pet photos are served directly from here.
+const SUPABASE_URL = `${SUPABASE_PROJECT_URL}/storage/v1/object/public/pet-images`;
 
 // Computes a DOB so the pet is (approximately) `years` years and `months`
 // months old as of TODAY — not as of intakeDate. Age is now always derived
@@ -46,6 +51,8 @@ async function main() {
     create: {
       userID: adminUser.userID,
       adminName: "Isabella Martinez",
+      avatarSeed: crypto.randomUUID(),
+      accountStatus: "Active",
     },
   });
 
@@ -57,7 +64,7 @@ async function main() {
     create: {
       shelterName: "PetPals Downtown",
       shelterAddress: "123 Main Street, New York, NY 10001",
-      shelterPhone: "2125550101",
+      shelterPhone: "+12125550101",
       shelterEmail: "downtown@petpals.com",
       shelterZIP: 10001,
       shelterSize: 50,
@@ -77,7 +84,7 @@ async function main() {
     create: {
       shelterName: "PetPals Brooklyn",
       shelterAddress: "456 Park Avenue, Brooklyn, NY 11201",
-      shelterPhone: "7185550202",
+      shelterPhone: "+17185550202",
       shelterEmail: "brooklyn@petpals.com",
       shelterZIP: 11201,
       shelterSize: 40,
@@ -108,7 +115,8 @@ async function main() {
     create: {
       userID: staffUser.userID,
       staffName: "Sasha Grey",
-      staffPhone: "2125550103",
+      avatarSeed: crypto.randomUUID(),
+      staffPhone: "+12125550103",
       shelterID: shelter1.shelterID,
       staffDOB: new Date("1988-03-15"),
       staffSex: "F",
@@ -141,12 +149,12 @@ async function main() {
     create: {
       userID: vetUser.userID,
       vetName: "Jay Asarathi",
-      vetPhone: "2125550104",
+      avatarSeed: crypto.randomUUID(),
+      vetPhone: "+12125550104",
       vetAddress: "789 Oak Lane, New York, NY 10002",
       vetDOB: new Date("1980-07-22"),
       vetSex: "M",
       shelterID: shelter1.shelterID,
-      isActive: true,
       accountStatus: "Active",
     },
   });
@@ -168,7 +176,8 @@ async function main() {
     create: {
       userID: adopterUser.userID,
       adopterName: "Emelie Archer",
-      adopterPhone: "2125550105",
+      avatarSeed: crypto.randomUUID(),
+      adopterPhone: "+12125550105",
       adopterDOB: new Date("1998-11-05"),
       adopterSex: "F",
       housingType: "Apartment",
@@ -212,13 +221,14 @@ async function main() {
     create: {
       userID: volunteerUser.userID,
       volunteerName: "Bryan Smith",
-      volunteerPhone: "2125550106",
+      avatarSeed: crypto.randomUUID(),
+      volunteerPhone: "+12125550106",
       volunteerAddress: "321 Elm Street, Chicago, IL 60601",
       volunteerDOB: new Date("2005-09-18"),
       volunteerSex: "M",
       volunteerSchedule: "Weekends 9am-5pm",
       shelterID: shelter1.shelterID,
-      volunteerStatus: true,
+      accountStatus: "Active",
     },
   });
 
@@ -244,10 +254,12 @@ async function main() {
     create: {
       userID: donorUser.userID,
       donorName: "Charlotte Salazar",
-      donorPhone: "2125550107",
+      avatarSeed: crypto.randomUUID(),
+      donorPhone: "+12125550107",
       donorAddress: "654 Pine Road, California, CA 90001",
       donorDOB: new Date("1958-04-30"),
       donorSex: "F",
+      accountStatus: "Active",
     },
   });
 

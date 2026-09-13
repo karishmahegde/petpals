@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import useEmblaCarousel from "embla-carousel-react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { getFeaturedPets } from "../../../../logic/api/petsApi";
-import CardComponent from "../../../../components/ui/PetCatalogCard";
-import SectionContainer from "../../../../components/ui/SectionContainer";
-import SectionHeading from "../../../../components/ui/SectionHeading";
+import CardComponent from "../../../../components/ui/pets/PetCatalogCard";
+import SectionContainer from "../../../../components/ui/marketing/SectionContainer";
+import SectionHeading from "../../../../components/ui/marketing/SectionHeading";
 
 const FeaturedPets = () => {
   const navigate = useNavigate();

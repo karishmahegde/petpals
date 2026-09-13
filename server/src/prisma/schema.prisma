@@ -10,7 +10,7 @@ model Users {
   userID       Int           @id @default(autoincrement())
   userEmail    String        @unique @db.VarChar(45)
   userPassword String        @db.VarChar(255)
-  refreshToken  String? @db.Text
+  refreshToken String?       @db.Text
   role         role
   admin        Admin?
   adopter      Adopter?
@@ -21,10 +21,12 @@ model Users {
 }
 
 model Admin {
-  userID    Int      @id
-  adminName String   @db.VarChar(45)
-  createdAt DateTime @default(now())
-  user      Users    @relation(fields: [userID], references: [userID])
+  userID        Int                 @id
+  avatarSeed    String              @db.VarChar(64)
+  adminName     String              @db.VarChar(45)
+  createdAt     DateTime            @default(now())
+  accountStatus AdminAccountStatus? @default(Active)
+  user          Users               @relation(fields: [userID], references: [userID])
 }
 
 model Shelter {
@@ -38,7 +40,6 @@ model Shelter {
   shelterStatus      ShelterStatus             @default(Open)
   managerStaffID     Int?
   shelterLocation    Unsupported("geography")?
-  adopters           Adopter[]
   adoptionApps       AdoptionApplication[]
   appointments       Appointment[]
   donations          Donation[]
@@ -58,6 +59,7 @@ model Shelter {
 
 model Staff {
   userID           Int                    @id
+  avatarSeed       String                 @db.VarChar(64)
   staffName        String                 @db.VarChar(45)
   staffPhone       String?                @db.VarChar(20)
   shelterID        Int?
@@ -66,7 +68,7 @@ model Staff {
   staffDOJ         DateTime?
   staffDOS         DateTime?
   staffDesignation StaffDesignation?
-  accountStatus    StaffAccountStatus?
+  accountStatus    StaffAccountStatus?    @default(Active)
   adoptionApps     AdoptionApplication[]
   events           Event[]
   pets             Pet[]
@@ -84,6 +86,7 @@ model Staff {
 
 model Veterinarian {
   userID             Int                 @id
+  avatarSeed         String              @db.VarChar(64)
   vetName            String              @db.VarChar(45)
   vetAddress         String?             @db.VarChar(45)
   vetPhone           String?             @db.VarChar(20)
@@ -91,8 +94,7 @@ model Veterinarian {
   vetSex             String?             @db.Char(1)
   createdAt          DateTime            @default(now())
   shelterID          Int?
-  isActive           Boolean             @default(true)
-  accountStatus      VetAccountStatus?
+  accountStatus      VetAccountStatus?   @default(Active)
   appointments       Appointment[]
   healthRecords      HealthRecord[]
   vaccinationRecords VaccinationRecord[]
@@ -117,6 +119,16 @@ model Breed {
 
 model Pet {
   petID                  Int                   @id @default(autoincrement())
+  // Human-facing pet reference, e.g. "PE000002". A Postgres GENERATED ALWAYS
+  // STORED column computed from petID — the DB always populates it, so it's
+  // never actually null at runtime. Typed optional only because Prisma has no
+  // first-class generated-column support: READ-ONLY, never set it in a
+  // create()/update() (Postgres rejects writes to generated columns). Added by
+  // hand in Supabase (migrate dev is banned — see CLAUDE.md):
+  //   ALTER TABLE "Pet" ADD COLUMN "petCode" TEXT
+  //     GENERATED ALWAYS AS ('PE' || lpad("petID"::text, 6, '0')) STORED;
+  //   CREATE UNIQUE INDEX "Pet_petCode_key" ON "Pet" ("petCode");
+  petCode                String?               @unique @db.Text
   petName                String                @db.VarChar(45)
   breedID                Int
   petDOB                 DateTime
@@ -165,8 +177,8 @@ model PetPhoto {
 
 model Adopter {
   userID             Int                   @id
+  avatarSeed         String                @db.VarChar(64)
   adopterName        String                @db.VarChar(45)
-  shelterID          Int?
   adopterDOB         DateTime?             @db.Date
   adopterSex         String?               @db.Char(1)
   createdAt          DateTime              @default(now())
@@ -187,13 +199,19 @@ model Adopter {
   preferredAgeRange  PreferredAgeRange?
   preferredSize      PetSize?
   openToSpecialNeeds Boolean               @default(false)
-  adopterType        AdopterType?
   emailVerified      Boolean               @default(false)
   lastLoginAt        DateTime?
   stripeCustomerID   String?               @db.VarChar(255)
-  accountStatus      AccountStatus?
+  accountStatus      AdopterAccountStatus? @default(Active)
+  addressLine1       String                @default("") @db.VarChar(100)
+  addressLine2       String?               @db.VarChar(100)
+  city               String                @default("") @db.VarChar(45)
+  state              String                @default("") @db.VarChar(45)
+  zip                String                @default("") @db.VarChar(10)
+  country            String                @default("") @db.VarChar(45)
+  onboardingComplete Boolean               @default(false)
+  onboardingStep     Int                   @default(2)
   preferredBreed     Breed?                @relation(fields: [preferredBreedID], references: [breedID])
-  shelter            Shelter?              @relation(fields: [shelterID], references: [shelterID])
   user               Users                 @relation(fields: [userID], references: [userID])
   applications       AdoptionApplication[]
   favorites          Favorite[]
@@ -210,17 +228,49 @@ model Favorite {
 }
 
 model AdoptionApplication {
-  applicationID     Int               @id @default(autoincrement())
-  petID             Int
-  adopterID         Int
-  createdAt         DateTime          @default(now())
-  staffID           Int?
-  shelterID         Int
-  applicationStatus ApplicationStatus @default(Pending)
-  adopter           Adopter           @relation(fields: [adopterID], references: [userID])
-  pet               Pet               @relation(fields: [petID], references: [petID])
-  shelter           Shelter           @relation(fields: [shelterID], references: [shelterID])
-  staff             Staff?            @relation(fields: [staffID], references: [userID])
+  applicationID           Int               @id @default(autoincrement())
+  // Human-facing reference, e.g. "APP-00048". Postgres GENERATED ALWAYS STORED
+  // column computed from applicationID — READ-ONLY, never set in a
+  // create()/update(). Same manual-migration pattern as Pet.petCode (see
+  // CLAUDE.md — migrate dev is banned):
+  //   ALTER TABLE "AdoptionApplication" ADD COLUMN "applicationCode" TEXT
+  //     GENERATED ALWAYS AS ('APP-' || lpad("applicationID"::text, 5, '0')) STORED;
+  //   CREATE UNIQUE INDEX "AdoptionApplication_applicationCode_key" ON "AdoptionApplication" ("applicationCode");
+  applicationCode         String?           @unique @db.Text
+  petID                   Int
+  adopterID               Int
+  createdAt               DateTime          @default(now())
+  staffID                 Int?
+  shelterID               Int
+  applicationStatus       ApplicationStatus @default(Pending)
+  applicationType         ApplicationType   @default(Adopt)
+  shelterMessage          String?           @db.VarChar(500)
+  // Staff-authored closing note shown to the adopter once the pet is adopted
+  // (the "Remarks from Shelter" line in the My Pets detail panel). Nullable —
+  // set by staff, not part of the adopter's submission. Column added by hand
+  // in Supabase (see CLAUDE.md — migrate dev is banned):
+  //   ALTER TABLE "AdoptionApplication" ADD COLUMN "staffRemark" VARCHAR(300);
+  staffRemark             String?           @db.VarChar(300)
+  // Payment fields — this row is only ever created by the Stripe webhook
+  // after payment is confirmed (see adoptionApplications.service.js
+  // finalizeApplication), so every create() call sets all four explicitly.
+  // No missing-Prisma-default gap like the Part 3 address-field incident.
+  stripeCheckoutSessionID String            @db.VarChar(255)
+  stripePaymentIntentID   String?           @db.VarChar(255)
+  paymentStatus           PaymentStatus     @default(Paid)
+  amountPaid              Decimal           @default(15.00) @db.Decimal(6, 2)
+  adopter                 Adopter           @relation(fields: [adopterID], references: [userID])
+  pet                     Pet               @relation(fields: [petID], references: [petID])
+  shelter                 Shelter           @relation(fields: [shelterID], references: [shelterID])
+  staff                   Staff?            @relation(fields: [staffID], references: [userID])
+  // Partial unique index enforced in the DB only — not expressible in Prisma:
+  //   CREATE UNIQUE INDEX "AdoptionApplication_active_adopter_pet_key"
+  //   ON "AdoptionApplication" ("adopterID", "petID")
+  //   WHERE "applicationStatus" IN ('Pending', 'Accepted');
+  // Added via raw SQL in the Supabase editor (same manual-migration workaround
+  // as the PostGIS shelterLocation column). Blocks a second active application
+  // for the same adopter+pet; Rejected/Withdrawn rows are excluded so
+  // resubmission stays possible.
 
   @@index([adopterID])
   @@index([petID])
@@ -304,6 +354,14 @@ model TransferHistory {
 
 model Appointment {
   appointmentID     Int          @id @default(autoincrement())
+  // Human-facing reference, e.g. "APT-00123". Postgres GENERATED ALWAYS STORED
+  // column computed from appointmentID — READ-ONLY, never set in a
+  // create()/update(). Same manual-migration pattern as Pet.petCode (see
+  // CLAUDE.md — migrate dev is banned):
+  //   ALTER TABLE "Appointment" ADD COLUMN "appointmentCode" TEXT
+  //     GENERATED ALWAYS AS ('APT-' || lpad("appointmentID"::text, 5, '0')) STORED;
+  //   CREATE UNIQUE INDEX "Appointment_appointmentCode_key" ON "Appointment" ("appointmentCode");
+  appointmentCode   String?      @unique @db.Text
   petID             Int
   vetID             Int
   shelterID         Int
@@ -328,18 +386,19 @@ model VolunteerApplication {
 }
 
 model Volunteer {
-  userID            Int                    @id
-  volunteerName     String                 @db.VarChar(45)
-  volunteerAddress  String?                @db.VarChar(45)
-  volunteerPhone    String?                @db.VarChar(20)
-  volunteerDOB      DateTime?              @db.Date
-  volunteerSex      String?                @db.Char(1)
-  volunteerSchedule String?                @db.VarChar(100)
+  userID            Int                     @id
+  avatarSeed        String                  @db.VarChar(64)
+  volunteerName     String                  @db.VarChar(45)
+  volunteerAddress  String?                 @db.VarChar(45)
+  volunteerPhone    String?                 @db.VarChar(20)
+  volunteerDOB      DateTime?               @db.Date
+  volunteerSex      String?                 @db.Char(1)
+  volunteerSchedule String?                 @db.VarChar(100)
   shelterID         Int?
-  createdAt         DateTime               @default(now())
-  volunteerStatus   Boolean                @default(false)
-  shelter           Shelter?               @relation(fields: [shelterID], references: [shelterID])
-  user              Users                  @relation(fields: [userID], references: [userID])
+  createdAt         DateTime                @default(now())
+  accountStatus     VolunteerAccountStatus? @default(Pending)
+  shelter           Shelter?                @relation(fields: [shelterID], references: [shelterID])
+  user              Users                   @relation(fields: [userID], references: [userID])
   applications      VolunteerApplication[]
   events            VolunteerEvent[]
   tasks             VolunteerTask[]
@@ -352,6 +411,9 @@ model GovernmentID {
   idType             String             @db.VarChar(45)
   idNumber           String             @db.VarChar(45)
   verificationStatus VerificationStatus @default(Pending)
+  documentURL        String?            @db.VarChar(500) // object path within the private government-ids bucket; read via signed URL
+
+  @@unique([userID, userType]) // one government ID per user; DB-level guarantee behind the service's duplicate check
 }
 
 model Task {
@@ -399,16 +461,18 @@ model VolunteerEvent {
 }
 
 model Donor {
-  userID           Int        @id
-  donorName        String     @db.VarChar(45)
-  donorAddress     String?    @db.VarChar(45)
-  donorPhone       String?    @db.VarChar(20)
-  donorDOB         DateTime?  @db.Date
-  donorSex         String?    @db.Char(1)
-  createdAt        DateTime   @default(now())
-  stripeCustomerID String?    @db.VarChar(255)
+  userID           Int                 @id
+  avatarSeed       String              @db.VarChar(64)
+  donorName        String              @db.VarChar(45)
+  donorAddress     String?             @db.VarChar(45)
+  donorPhone       String?             @db.VarChar(20)
+  donorDOB         DateTime?           @db.Date
+  donorSex         String?             @db.Char(1)
+  createdAt        DateTime            @default(now())
+  stripeCustomerID String?             @db.VarChar(255)
+  accountStatus    DonorAccountStatus? @default(Active)
   donations        Donation[]
-  user             Users      @relation(fields: [userID], references: [userID])
+  user             Users               @relation(fields: [userID], references: [userID])
 }
 
 model Donation {
@@ -502,27 +566,53 @@ enum PreferredAgeRange {
   Old
 }
 
-enum AdopterType {
-  Fosterer
-  Owner
+enum ApplicationType {
+  Adopt
+  Foster
 }
 
-enum AccountStatus {
+// The row is only ever created post-payment (see AdoptionApplication),
+// so this is always 'Paid' today — kept as an enum for schema clarity and
+// to leave room for a future status if the creation timing ever changes.
+enum PaymentStatus {
+  Paid
+}
+
+enum AdopterAccountStatus {
   Active
-  Suspended
   Banned
+  Deactivated
+}
+
+enum DonorAccountStatus {
+  Active
+  Banned
+  Deactivated
 }
 
 enum StaffAccountStatus {
-  Pending
   Active
-  Suspended
+  Deactivated
 }
 
 enum VetAccountStatus {
+  Active
+  Deactivated
+}
+
+enum AdminAccountStatus {
+  Active
+  Deactivated
+}
+
+// Volunteer applications go through staff approval — new volunteers start
+// Pending until a staff member activates them, then follow the same
+// Active/Banned/Deactivated lifecycle as everyone else.
+enum VolunteerAccountStatus {
   Pending
   Active
-  Suspended
+  Banned
+  Deactivated
 }
 
 enum VisitStatus {
@@ -540,6 +630,7 @@ enum ApplicationStatus {
   Pending
   Accepted
   Rejected
+  Withdrawn
 }
 
 enum NotificationType {
