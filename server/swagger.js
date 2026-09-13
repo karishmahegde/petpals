@@ -529,6 +529,235 @@ const schemas = {
       petID: { type: "integer" },
     },
   },
+
+  Shelter: {
+    type: "object",
+    description:
+      "Full shelter record returned by the Admin shelter-management endpoints. lat/lng are derived from the PostGIS shelterLocation column and are null until it has been set.",
+    properties: {
+      shelterID: { type: "integer" },
+      shelterName: { type: "string" },
+      shelterAddress: { type: "string" },
+      shelterPhone: { type: "string", example: "+12125550101" },
+      shelterEmail: { type: "string" },
+      shelterZIP: { type: "integer", example: 10001 },
+      shelterSize: { type: "integer" },
+      shelterStatus: { type: "string", enum: ["Open", "Full", "Closed"] },
+      managerStaffID: { type: "integer", nullable: true },
+      lat: { type: "number", nullable: true },
+      lng: { type: "number", nullable: true },
+    },
+  },
+  ShelterCreate: {
+    type: "object",
+    required: [
+      "shelterName",
+      "shelterAddress",
+      "shelterPhone",
+      "shelterEmail",
+      "shelterZIP",
+      "shelterSize",
+    ],
+    properties: {
+      shelterName: { type: "string", maxLength: 45 },
+      shelterAddress: { type: "string", maxLength: 45 },
+      shelterPhone: { type: "string", example: "+12125550101" },
+      shelterEmail: { type: "string", maxLength: 45 },
+      shelterZIP: { type: "integer", example: 10001 },
+      shelterSize: { type: "integer", minimum: 1 },
+    },
+  },
+  StaffListItem: {
+    type: "object",
+    description:
+      "One row of the Admin staff listing. Only STAFF's own columns plus the shelter name — no USERS fields (userPassword, refreshToken) are ever included.",
+    properties: {
+      userID: { type: "integer" },
+      avatarSeed: { type: "string" },
+      staffName: { type: "string" },
+      staffPhone: { type: "string", nullable: true },
+      shelterID: { type: "integer", nullable: true },
+      staffDOB: { type: "string", format: "date", nullable: true },
+      staffSex: { type: "string", nullable: true },
+      staffDOJ: { type: "string", format: "date-time", nullable: true },
+      staffDOS: { type: "string", format: "date-time", nullable: true },
+      staffDesignation: {
+        type: "string",
+        enum: ["Manager", "Senior", "Associate"],
+        nullable: true,
+      },
+      accountStatus: {
+        type: "string",
+        enum: ["Active", "Deactivated"],
+        nullable: true,
+      },
+      shelter: {
+        type: "object",
+        nullable: true,
+        properties: { shelterName: { type: "string" } },
+      },
+    },
+  },
+  AnalyticsOverview: {
+    type: "object",
+    description: "Org-wide KPI summary for the Admin dashboard's Overview tab.",
+    properties: {
+      shelters: {
+        type: "object",
+        properties: {
+          total: { type: "integer" },
+          byStatus: {
+            type: "object",
+            additionalProperties: { type: "integer" },
+            example: { Open: 5, Full: 2, Closed: 1 },
+          },
+        },
+      },
+      pets: {
+        type: "object",
+        properties: {
+          total: { type: "integer" },
+          byStatus: {
+            type: "object",
+            additionalProperties: { type: "integer" },
+            example: { available: 90, pending: 10, adopted: 30 },
+          },
+        },
+      },
+      adopters: {
+        type: "object",
+        properties: {
+          total: { type: "integer" },
+          byStatus: {
+            type: "object",
+            additionalProperties: { type: "integer" },
+            example: { Active: 480, Banned: 5, Deactivated: 15 },
+          },
+        },
+      },
+      applications: {
+        type: "object",
+        properties: {
+          total: { type: "integer" },
+          byStatus: {
+            type: "object",
+            additionalProperties: { type: "integer" },
+            example: { Pending: 50, Accepted: 200, Rejected: 30, Withdrawn: 20 },
+          },
+          adoptionRate: {
+            type: "number",
+            nullable: true,
+            description:
+              "Accepted / total, as a 0-1 fraction rounded to 2dp. null if there are no applications yet.",
+            example: 0.67,
+          },
+        },
+      },
+    },
+  },
+  ShelterAnalyticsItem: {
+    type: "object",
+    description: "One shelter's capacity-planning breakdown.",
+    properties: {
+      shelterID: { type: "integer" },
+      shelterName: { type: "string" },
+      shelterSize: { type: "integer" },
+      petCount: { type: "integer" },
+      petsByStatus: {
+        type: "object",
+        additionalProperties: { type: "integer" },
+        example: { available: 12, pending: 3, adopted: 5 },
+      },
+      openApplicationCount: {
+        type: "integer",
+        description: "Applications currently Pending at this shelter.",
+      },
+      utilization: {
+        type: "number",
+        nullable: true,
+        description:
+          "petCount / shelterSize as a percentage rounded to 2dp. null for a 0-capacity shelter.",
+        example: 84.0,
+      },
+    },
+  },
+  AdopterListItem: {
+    type: "object",
+    description:
+      "One row of the Admin adopter listing. governmentID and stripeCustomerID are never included.",
+    properties: {
+      userID: { type: "integer" },
+      avatarSeed: { type: "string" },
+      adopterName: { type: "string" },
+      adopterPhone: { type: "string", nullable: true },
+      accountStatus: {
+        type: "string",
+        enum: ["Active", "Banned", "Deactivated"],
+        nullable: true,
+      },
+      adopterRiskFlag: { type: "boolean" },
+      preQualifyFlag: { type: "boolean" },
+      createdAt: { type: "string", format: "date-time" },
+      city: { type: "string" },
+      state: { type: "string" },
+      country: { type: "string" },
+      user: {
+        type: "object",
+        properties: { userEmail: { type: "string" } },
+      },
+    },
+  },
+  StaffDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/StaffListItem" },
+      {
+        type: "object",
+        properties: {
+          managedShelters: {
+            type: "array",
+            description:
+              "Shelter(s), if any, where this staff member is the currently-assigned manager.",
+            items: {
+              type: "object",
+              properties: {
+                shelterID: { type: "integer" },
+                shelterName: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    ],
+  },
+  StaffUpdate: {
+    type: "object",
+    description:
+      "Partial update — send only the fields to change. Account activation is a separate endpoint (PATCH /staff/:id/status).",
+    properties: {
+      staffDesignation: {
+        type: "string",
+        enum: ["Manager", "Senior", "Associate"],
+      },
+      shelterID: {
+        type: "integer",
+        description:
+          "If this staff member currently manages their old shelter, that shelter's managerStaffID is cleared automatically.",
+      },
+    },
+  },
+  ShelterUpdate: {
+    type: "object",
+    description:
+      "Partial update — send only the fields to change. shelterLocation is re-derived automatically whenever shelterAddress or shelterZIP is included.",
+    properties: {
+      shelterName: { type: "string", maxLength: 45 },
+      shelterAddress: { type: "string", maxLength: 45 },
+      shelterPhone: { type: "string" },
+      shelterEmail: { type: "string", maxLength: 45 },
+      shelterZIP: { type: "integer" },
+      shelterSize: { type: "integer", minimum: 1 },
+    },
+  },
 };
 
 const options = {
