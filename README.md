@@ -122,6 +122,7 @@ cd server && npm run dev      # → http://localhost:5000
 # Terminal 2
 cd client && npm run dev      # → http://localhost:3000
 ```
+---
 
 ## 🟤 Project Structure
 
