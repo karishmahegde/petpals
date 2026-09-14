@@ -31,8 +31,10 @@ const router = express.Router();
  *         description: Optional filter by designation
  *       - in: query
  *         name: accountStatus
- *         schema: { type: string, enum: [Active, Deactivated] }
- *         description: Optional filter by account status
+ *         schema: { type: string, enum: [Pending, Active, Deactivated] }
+ *         description: >
+ *           Optional filter by account status. Pending is a self-registered
+ *           account awaiting admin approval.
  *     responses:
  *       200:
  *         description: Paginated staff list, ordered by staffName ascending
@@ -96,6 +98,12 @@ router.get(
  *       (account activation is PATCH /staff/:id/status, a separate endpoint).
  *       If shelterID changes and this staff member currently manages their
  *       old shelter, that shelter's managerStaffID is cleared automatically.
+ *       Staff.staffDesignation and Shelter.managerStaffID are kept in sync:
+ *       setting staffDesignation to 'Manager' makes this staff member the
+ *       managerStaffID of their (possibly newly-assigned) shelter, overwriting
+ *       any previous manager there; moving a Manager away from 'Manager' (or
+ *       away from a shelter) clears managerStaffID on the shelter they were
+ *       managing.
  *     tags: [Staff, Admin]
  *     security:
  *       - bearerAuth: []
@@ -148,10 +156,16 @@ router.patch(
  *   patch:
  *     summary: Activate or deactivate a staff account (Admin only)
  *     description: >
- *       Deactivating clears managerStaffID on every shelter this staff member
- *       currently manages. A Deactivated staff account is rejected on its
- *       next login attempt (POST /auth/login) — existing already-issued
- *       access tokens are unaffected until they expire.
+ *       This is also how a self-registered (Pending) staff account is
+ *       approved or declined — setting accountStatus to 'Active' approves it,
+ *       'Deactivated' declines it. There is no distinct approve/decline
+ *       endpoint. Deactivating clears managerStaffID on every shelter this
+ *       staff member currently manages. A Deactivated (or still-Pending)
+ *       staff account is rejected on its next login attempt
+ *       (POST /auth/login) — existing already-issued access tokens are
+ *       unaffected until they expire. Pending itself is never an accepted
+ *       target here — an admin approves or declines, never manually reverts
+ *       someone back to Pending.
  *     tags: [Staff, Admin]
  *     security:
  *       - bearerAuth: []

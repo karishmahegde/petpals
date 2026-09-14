@@ -47,10 +47,14 @@ router.get(
  *   get:
  *     summary: Per-shelter capacity breakdown (Admin only)
  *     description: >
- *       For each shelter: pet count (total and by adoptionStatus), open
- *       (Pending) application count, shelterSize, and utilization % (pet
- *       count / shelterSize, as a percentage rounded to 2dp — null for a
- *       0-capacity shelter). Ordered by shelterName ascending by default.
+ *       For each shelter: identifying/contact fields, shelterStatus, current
+ *       manager (managerStaffID + managerName), active staff count, pet
+ *       count (total and by adoptionStatus), open (Pending) application
+ *       count, shelterSize, and utilization % (pet count / shelterSize, as a
+ *       percentage rounded to 2dp — null for a 0-capacity shelter). Ordered
+ *       by shelterName ascending by default — the one endpoint behind the
+ *       Admin Shelters tab (list + edit-form pre-fill), not just capacity
+ *       analytics.
  *     tags: [Analytics, Admin]
  *     security:
  *       - bearerAuth: []
@@ -87,6 +91,54 @@ router.get(
   authenticate,
   authorizeRoles(ROLES.ADMIN),
   analyticsController.getShelterBreakdown,
+);
+
+/**
+ * @swagger
+ * /analytics/monthly-stats:
+ *   get:
+ *     summary: Jan-Dec Intake vs. Adoptions counts for one calendar year, for the Admin Overview chart (Admin only)
+ *     description: >
+ *       Twelve points, January through December of the given `year`. Intake
+ *       counts pets by Pet.intakeDate; Adoptions counts applications with
+ *       applicationStatus 'Accepted' by their submission month
+ *       (AdoptionApplication.createdAt) — the schema has no separate
+ *       "accepted on" timestamp, the same approximation adoptionRate already
+ *       makes in GET /analytics/overview.
+ *     tags: [Analytics, Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer, minimum: 2000, example: 2026 }
+ *         description: Calendar year to report on. Defaults to the current year; cannot be after it.
+ *     responses:
+ *       200:
+ *         description: Monthly stats for the year, January first
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/MonthlyStatsPoint' }
+ *       400:
+ *         description: year is not an integer between 2000 and the current year
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get(
+  "/analytics/monthly-stats",
+  authenticate,
+  authorizeRoles(ROLES.ADMIN),
+  analyticsController.getMonthlyStats,
 );
 
 module.exports = router;

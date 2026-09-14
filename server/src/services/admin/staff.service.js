@@ -1,8 +1,11 @@
 const prisma = require("../../config/prisma");
 
-// Every field lives on STAFF itself except shelterName — no `user` relation is
-// included, so nothing from USERS (userPassword, refreshToken) can leak here
-// even by accident.
+// Every field lives on STAFF itself except shelterName and userEmail — the
+// `user` relation is scoped to userEmail alone, so nothing else from USERS
+// (userPassword, refreshToken) can leak here even by accident. Email matters
+// here specifically for reviewing a Pending (self-registered, not yet
+// assigned a shelter/designation) staff member — it may be the only
+// identifying detail on the row besides their name.
 const STAFF_LIST_SELECT = {
   userID: true,
   avatarSeed: true,
@@ -16,6 +19,7 @@ const STAFF_LIST_SELECT = {
   staffDesignation: true,
   accountStatus: true,
   shelter: { select: { shelterName: true } },
+  user: { select: { userEmail: true } },
 };
 
 // ——————————————— LIST STAFF (GET /staff) ———————————————
@@ -75,25 +79,59 @@ const getStaffDetail = async (userID) => {
 
 // ——————————————— UPDATE STAFF (PATCH /staff/:id) ———————————————
 // `data` is already validated and whitelisted by the controller (only
-// staffDesignation and/or shelterID). If shelterID is changing, clearing the
-// old shelter's managerStaffID is folded into the same updateMany — it only
-// matches (and only fires) when this staff member is actually that shelter's
-// current manager, so it's a no-op otherwise rather than needing a separate
-// read to check first.
+// staffDesignation and/or shelterID). Two managerStaffID side effects, both
+// folded into the same transaction as plain conditional updateMany/update
+// calls rather than separate reads to check first:
+//   - Moving shelters clears the OLD shelter's managerStaffID (updateMany
+//     only matches — and only fires — when this staff member is actually
+//     that shelter's current manager, a no-op otherwise).
+//   - Becoming (or remaining) a Manager at a real shelter makes them THAT
+//     shelter's managerStaffID — Staff.staffDesignation and
+//     Shelter.managerStaffID must never disagree about who manages a
+//     shelter. Losing the Manager designation (without also changing
+//     shelterID) clears it from their current shelter the same way.
 const updateStaff = async (userID, data) => {
   const existing = await prisma.staff.findUnique({
     where: { userID },
-    select: { shelterID: true },
+    select: { shelterID: true, staffDesignation: true },
   });
   if (!existing) {
     throw notFound(userID);
   }
 
+  const nextShelterID =
+    "shelterID" in data ? data.shelterID : existing.shelterID;
+  const nextDesignation =
+    "staffDesignation" in data ? data.staffDesignation : existing.staffDesignation;
   const shelterChanging =
     "shelterID" in data && data.shelterID !== existing.shelterID;
 
   const operations = [prisma.staff.update({ where: { userID }, data })];
+
   if (shelterChanging && existing.shelterID != null) {
+    operations.push(
+      prisma.shelter.updateMany({
+        where: { shelterID: existing.shelterID, managerStaffID: userID },
+        data: { managerStaffID: null },
+      }),
+    );
+  }
+
+  if (nextDesignation === "Manager" && nextShelterID != null) {
+    operations.push(
+      prisma.shelter.update({
+        where: { shelterID: nextShelterID },
+        data: { managerStaffID: userID },
+      }),
+    );
+  } else if (
+    existing.staffDesignation === "Manager" &&
+    !shelterChanging &&
+    existing.shelterID != null
+  ) {
+    // Demoted away from Manager, shelter unchanged — the block above only
+    // clears the OLD shelter when shelterID itself is changing, so this
+    // covers "still at the same shelter, no longer its manager".
     operations.push(
       prisma.shelter.updateMany({
         where: { shelterID: existing.shelterID, managerStaffID: userID },

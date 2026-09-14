@@ -52,22 +52,40 @@ const getOverview = async () => {
 };
 
 // ——————————————— SHELTER BREAKDOWN (GET /analytics/shelters) ———————————————
-// Three queries total, not one per shelter: the shelter list itself, pet
-// counts grouped by [shelterID, adoptionStatus], and open (Pending)
-// application counts grouped by shelterID — merged together in JS below.
+// Four queries total, not one per shelter: the shelter list itself, pet
+// counts grouped by [shelterID, adoptionStatus], open (Pending) application
+// counts grouped by shelterID, and active staff counts grouped by
+// shelterID — merged together in JS below.
 const getShelterBreakdown = async (sortBy) => {
-  const [shelters, petGroups, openApplicationGroups] = await Promise.all([
-    prisma.shelter.findMany({
-      select: { shelterID: true, shelterName: true, shelterSize: true },
-      orderBy: { shelterName: "asc" },
-    }),
-    prisma.pet.groupBy({ by: ["shelterID", "adoptionStatus"], _count: true }),
-    prisma.adoptionApplication.groupBy({
-      by: ["shelterID"],
-      where: { applicationStatus: "Pending" },
-      _count: true,
-    }),
-  ]);
+  const [shelters, petGroups, openApplicationGroups, staffGroups] =
+    await Promise.all([
+      prisma.shelter.findMany({
+        select: {
+          shelterID: true,
+          shelterName: true,
+          shelterAddress: true,
+          shelterPhone: true,
+          shelterEmail: true,
+          shelterZIP: true,
+          shelterSize: true,
+          shelterStatus: true,
+          managerStaffID: true,
+          manager: { select: { staffName: true } },
+        },
+        orderBy: { shelterName: "asc" },
+      }),
+      prisma.pet.groupBy({ by: ["shelterID", "adoptionStatus"], _count: true }),
+      prisma.adoptionApplication.groupBy({
+        by: ["shelterID"],
+        where: { applicationStatus: "Pending" },
+        _count: true,
+      }),
+      prisma.staff.groupBy({
+        by: ["shelterID"],
+        where: { accountStatus: "Active" },
+        _count: true,
+      }),
+    ]);
 
   const petsByShelter = new Map(); // shelterID -> { total, byStatus }
   for (const row of petGroups) {
@@ -83,6 +101,9 @@ const getShelterBreakdown = async (sortBy) => {
   const openApplicationsByShelter = new Map(
     openApplicationGroups.map((row) => [row.shelterID, row._count]),
   );
+  const staffCountByShelter = new Map(
+    staffGroups.map((row) => [row.shelterID, row._count]),
+  );
 
   const breakdown = shelters.map((shelter) => {
     const pets = petsByShelter.get(shelter.shelterID) ?? {
@@ -91,6 +112,7 @@ const getShelterBreakdown = async (sortBy) => {
     };
     const openApplicationCount =
       openApplicationsByShelter.get(shelter.shelterID) ?? 0;
+    const staffCount = staffCountByShelter.get(shelter.shelterID) ?? 0;
     // Percentage (not a 0-1 fraction, unlike adoptionRate above) — "utilization
     // %" in the spec. null, not 0 or Infinity, for a 0-capacity shelter.
     const utilization =
@@ -101,10 +123,18 @@ const getShelterBreakdown = async (sortBy) => {
     return {
       shelterID: shelter.shelterID,
       shelterName: shelter.shelterName,
+      shelterAddress: shelter.shelterAddress,
+      shelterPhone: shelter.shelterPhone,
+      shelterEmail: shelter.shelterEmail,
+      shelterZIP: shelter.shelterZIP,
       shelterSize: shelter.shelterSize,
+      shelterStatus: shelter.shelterStatus,
+      managerStaffID: shelter.managerStaffID,
+      managerName: shelter.manager?.staffName ?? null,
       petCount: pets.total,
       petsByStatus: pets.byStatus,
       openApplicationCount,
+      staffCount,
       utilization,
     };
   });
@@ -122,4 +152,58 @@ const getShelterBreakdown = async (sortBy) => {
   return breakdown;
 };
 
-module.exports = { getOverview, getShelterBreakdown };
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// ——————————————— MONTHLY STATS (GET /analytics/monthly-stats) ———————————————
+// Jan-Dec of the given calendar `year`, in order. Grouped in JS, not raw SQL
+// (CLAUDE.md reserves $queryRaw for PostGIS) — two ranged reads, not one query
+// per month. "Adoptions" is approximated as Accepted applications by their
+// *submission* month (createdAt) — the schema has no separate "accepted on"
+// timestamp, same limitation adoptionRate already accepts in getOverview.
+//
+// Everything here is UTC — Date.UTC for the range boundaries and
+// getUTCMonth()/getUTCFullYear() for bucketing, not the local-timezone
+// equivalents. A stored timestamp is one fixed UTC instant; reading it back
+// with local-timezone getters would make the resulting month/year bucket
+// depend on whatever timezone the server process happens to run in (dev
+// machine vs. production), which is exactly what caused pets to appear to
+// "leak" into the adjacent year.
+const getMonthlyStats = async (year) => {
+  const rangeStart = new Date(Date.UTC(year, 0, 1));
+  const rangeEnd = new Date(Date.UTC(year + 1, 0, 1)); // exclusive
+
+  const [pets, applications] = await Promise.all([
+    prisma.pet.findMany({
+      where: { intakeDate: { gte: rangeStart, lt: rangeEnd } },
+      select: { intakeDate: true },
+    }),
+    prisma.adoptionApplication.findMany({
+      where: {
+        applicationStatus: "Accepted",
+        createdAt: { gte: rangeStart, lt: rangeEnd },
+      },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const buckets = MONTH_LABELS.map((label) => ({
+    month: label,
+    year,
+    intake: 0,
+    adoptions: 0,
+  }));
+
+  for (const pet of pets) {
+    buckets[pet.intakeDate.getUTCMonth()].intake += 1;
+  }
+  for (const application of applications) {
+    buckets[application.createdAt.getUTCMonth()].adoptions += 1;
+  }
+
+  return buckets;
+};
+
+module.exports = { getOverview, getShelterBreakdown, getMonthlyStats };

@@ -45,4 +45,32 @@ const getShelterBreakdown = async (req, res, next) => {
   }
 };
 
-module.exports = { getOverview, getShelterBreakdown };
+const MIN_YEAR = 2000;
+
+// ——————————————— GET /analytics/monthly-stats ———————————————
+const getMonthlyStats = async (req, res, next) => {
+  const currentYear = new Date().getFullYear();
+  const { year: rawYear } = req.query;
+  let year = currentYear;
+  if (rawYear !== undefined) {
+    year = Number(rawYear);
+    if (!Number.isInteger(year) || year < MIN_YEAR || year > currentYear) {
+      return next(
+        badRequest(`year must be an integer between ${MIN_YEAR} and ${currentYear}`),
+      );
+    }
+  }
+
+  try {
+    const stats = await analyticsService.getMonthlyStats(year);
+    return successResponse(
+      res,
+      "Monthly stats retrieved successfully",
+      stats,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getOverview, getShelterBreakdown, getMonthlyStats };

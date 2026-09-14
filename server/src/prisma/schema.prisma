@@ -68,7 +68,7 @@ model Staff {
   staffDOJ         DateTime?
   staffDOS         DateTime?
   staffDesignation StaffDesignation?
-  accountStatus    StaffAccountStatus?    @default(Active)
+  accountStatus    StaffAccountStatus?    @default(Pending)
   adoptionApps     AdoptionApplication[]
   events           Event[]
   pets             Pet[]
@@ -591,6 +591,7 @@ enum DonorAccountStatus {
 }
 
 enum StaffAccountStatus {
+  Pending
   Active
   Deactivated
 }

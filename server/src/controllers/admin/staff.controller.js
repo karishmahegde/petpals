@@ -8,7 +8,14 @@ const badRequest = (message) => {
 };
 
 const STAFF_DESIGNATION_VALUES = ["Manager", "Senior", "Associate"];
-const STAFF_ACCOUNT_STATUS_VALUES = ["Active", "Deactivated"];
+// Filtering (GET /staff?accountStatus=) recognizes all three states, including
+// Pending — self-registered staff awaiting admin approval.
+const STAFF_ACCOUNT_STATUS_FILTER_VALUES = ["Pending", "Active", "Deactivated"];
+// PATCH /staff/:id/status only ever moves someone TO Active (approve) or
+// Deactivated (decline/deactivate) — there's no real workflow for an admin to
+// manually revert someone back to Pending, so it's deliberately not an
+// accepted target here even though it's a valid stored value.
+const STAFF_ACCOUNT_STATUS_TARGET_VALUES = ["Active", "Deactivated"];
 
 // ——————————————— GET /staff ———————————————
 const listStaff = async (req, res, next) => {
@@ -57,11 +64,11 @@ const listStaff = async (req, res, next) => {
 
   if (
     accountStatus !== undefined &&
-    !STAFF_ACCOUNT_STATUS_VALUES.includes(accountStatus)
+    !STAFF_ACCOUNT_STATUS_FILTER_VALUES.includes(accountStatus)
   ) {
     return next(
       badRequest(
-        `accountStatus must be one of: ${STAFF_ACCOUNT_STATUS_VALUES.join(", ")}`,
+        `accountStatus must be one of: ${STAFF_ACCOUNT_STATUS_FILTER_VALUES.join(", ")}`,
       ),
     );
   }
@@ -151,10 +158,10 @@ const updateStaffStatus = async (req, res, next) => {
   }
 
   const { accountStatus } = req.body ?? {};
-  if (!STAFF_ACCOUNT_STATUS_VALUES.includes(accountStatus)) {
+  if (!STAFF_ACCOUNT_STATUS_TARGET_VALUES.includes(accountStatus)) {
     return next(
       badRequest(
-        `accountStatus must be one of: ${STAFF_ACCOUNT_STATUS_VALUES.join(", ")}`,
+        `accountStatus must be one of: ${STAFF_ACCOUNT_STATUS_TARGET_VALUES.join(", ")}`,
       ),
     );
   }

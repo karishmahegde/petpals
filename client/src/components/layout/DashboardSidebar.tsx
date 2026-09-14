@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import type { IconType } from "react-icons";
 import {
   PiHouse,
+  PiUsersThree,
   PiDog,
   PiStethoscope,
   PiHeart,
@@ -37,6 +38,11 @@ const ROLE_HOME: Record<string, string> = {
 // Role-specific navigation. The constant "Main website" link is appended for
 // every role in renderNav — it is always the last item.
 const ROLE_NAV: Record<string, NavItem[]> = {
+  Admin: [
+    { label: "Overview", to: "/admin", icon: PiHouse, end: true },
+    { label: "Shelters", to: "/admin/shelters", icon: PiBuildings },
+    { label: "Staff", to: "/admin/staff", icon: PiUsersThree },
+  ],
   Adopter: [
     { label: "Overview", to: "/adopter", icon: PiHouse, end: true },
     { label: "My Pets", to: "/adopter/pets", icon: PiDog },

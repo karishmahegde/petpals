@@ -102,11 +102,6 @@ const schemas = {
         nullable: true,
       },
       openToSpecialNeeds: { type: "boolean" },
-      adopterType: {
-        type: "string",
-        enum: ["Fosterer", "Owner"],
-        nullable: true,
-      },
       emailVerified: { type: "boolean" },
       lastLoginAt: { type: "string", format: "date-time", nullable: true },
       accountStatus: {
@@ -144,7 +139,6 @@ const schemas = {
       preferredAgeRange: { type: "string", enum: ["Young", "Adult", "Old"], nullable: true },
       preferredSize: { type: "string", enum: ["Small", "Medium", "Large"], nullable: true },
       openToSpecialNeeds: { type: "boolean" },
-      adopterType: { type: "string", enum: ["Fosterer", "Owner"], nullable: true },
     },
   },
 
@@ -570,7 +564,7 @@ const schemas = {
   StaffListItem: {
     type: "object",
     description:
-      "One row of the Admin staff listing. Only STAFF's own columns plus the shelter name — no USERS fields (userPassword, refreshToken) are ever included.",
+      "One row of the Admin staff listing. Only STAFF's own columns plus shelterName and userEmail — no other USERS fields (userPassword, refreshToken) are ever included.",
     properties: {
       userID: { type: "integer" },
       avatarSeed: { type: "string" },
@@ -588,13 +582,19 @@ const schemas = {
       },
       accountStatus: {
         type: "string",
-        enum: ["Active", "Deactivated"],
+        description:
+          "'Pending' is a self-registered account awaiting admin approval (PATCH /staff/:id/status to 'Active' approves it, 'Deactivated' declines it) — never a state an admin sets directly.",
+        enum: ["Pending", "Active", "Deactivated"],
         nullable: true,
       },
       shelter: {
         type: "object",
         nullable: true,
         properties: { shelterName: { type: "string" } },
+      },
+      user: {
+        type: "object",
+        properties: { userEmail: { type: "string" } },
       },
     },
   },
@@ -655,13 +655,35 @@ const schemas = {
       },
     },
   },
+  MonthlyStatsPoint: {
+    type: "object",
+    description: "One calendar month's Intake vs. Adoptions counts.",
+    properties: {
+      month: { type: "string", example: "Jan" },
+      year: { type: "integer", example: 2026 },
+      intake: { type: "integer", description: "Pets with an intakeDate in this month." },
+      adoptions: {
+        type: "integer",
+        description:
+          "Applications with applicationStatus 'Accepted', by their submission month.",
+      },
+    },
+  },
   ShelterAnalyticsItem: {
     type: "object",
-    description: "One shelter's capacity-planning breakdown.",
+    description:
+      "One shelter's capacity-planning breakdown, plus the identifying/contact fields and current manager — enough to drive the Admin Shelters tab (list, status badge, edit-form pre-fill) without a second endpoint.",
     properties: {
       shelterID: { type: "integer" },
       shelterName: { type: "string" },
+      shelterAddress: { type: "string" },
+      shelterPhone: { type: "string", example: "+12125550101" },
+      shelterEmail: { type: "string" },
+      shelterZIP: { type: "integer", example: 10001 },
       shelterSize: { type: "integer" },
+      shelterStatus: { type: "string", enum: ["Open", "Full", "Closed"] },
+      managerStaffID: { type: "integer", nullable: true },
+      managerName: { type: "string", nullable: true },
       petCount: { type: "integer" },
       petsByStatus: {
         type: "object",
@@ -671,6 +693,10 @@ const schemas = {
       openApplicationCount: {
         type: "integer",
         description: "Applications currently Pending at this shelter.",
+      },
+      staffCount: {
+        type: "integer",
+        description: "Active staff currently assigned to this shelter.",
       },
       utilization: {
         type: "number",

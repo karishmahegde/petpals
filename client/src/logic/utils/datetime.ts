@@ -8,6 +8,14 @@ export const getGreeting = (date = new Date()): string => {
   return "Good evening";
 };
 
+/** Emoji matching getGreeting's time-of-day band — sun / partly-cloudy / crescent moon. */
+export const getGreetingEmoji = (date = new Date()): string => {
+  const hour = date.getHours();
+  if (hour < 12) return "☀️";
+  if (hour < 18) return "🌤️";
+  return "🌙";
+};
+
 /** Long, human-readable date, e.g. "Monday, June 1, 2026". */
 export const formatLongDate = (date = new Date()): string =>
   date.toLocaleDateString("en-US", {

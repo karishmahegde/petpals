@@ -20,7 +20,7 @@ import StaffDashboard from "./pages/protected/staff/StaffDashboard";
 import VetDashboard from "./pages/protected/vet/VetDashboard";
 import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
 import DonorDashboard from "./pages/protected/donor/DonorDashboard";
-import AdminDashboard from "./pages/protected/admin/AdminDashboard";
+import AdminDashboardLayout from "./pages/protected/admin/dashboard/DashboardLayout";
 import { refreshToken } from "./logic/api/authApi";
 import useAuthStore from "./logic/store/useAuthStore";
 import { useScrollToTop } from "./logic/hooks/useScrollToTop";
@@ -150,11 +150,11 @@ const App = () => {
           }
         />
         <Route
-          path="/admin"
+          path="/admin/*"
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Admin"]}>
-                <AdminDashboard />
+                <AdminDashboardLayout />
               </RoleRoute>
             </ProtectedRoute>
           }
