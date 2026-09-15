@@ -21,12 +21,30 @@ model Users {
 }
 
 model Admin {
-  userID        Int                 @id
-  avatarSeed    String              @db.VarChar(64)
-  adminName     String              @db.VarChar(45)
-  createdAt     DateTime            @default(now())
-  accountStatus AdminAccountStatus? @default(Active)
-  user          Users               @relation(fields: [userID], references: [userID])
+  userID            Int                 @id
+  avatarSeed        String              @db.VarChar(64)
+  adminName         String              @db.VarChar(45)
+  adminPhone        String?             @db.VarChar(20)
+  adminAddress      String?             @db.VarChar(45)
+  adminDOB          DateTime?           @db.Date
+  adminSex          String?             @db.Char(1)
+  createdAt         DateTime            @default(now())
+  lastLoginAt       DateTime?
+  // Self-registered admins start Pending, approved by an existing Admin —
+  // same shape as Staff. The very first Admin ever created is auto-activated
+  // (see auth.service.js's register()) so there's always someone to approve
+  // the rest.
+  accountStatus     AdminAccountStatus? @default(Pending)
+  // Audit trail for the *last* accountStatus change (approve/decline/
+  // activate/deactivate) — who did it and when. Not a full history log,
+  // just the most recent transition; set on self-service close-account too
+  // (statusChangedByID = self). Nulled, not blocked, if that admin is later
+  // deleted — see onDelete: SetNull below.
+  statusChangedByID Int?
+  statusChangedAt   DateTime?
+  user              Users               @relation(fields: [userID], references: [userID])
+  statusChangedBy   Admin?              @relation("AdminStatusChangedBy", fields: [statusChangedByID], references: [userID], onDelete: SetNull)
+  statusChangesMade Admin[]             @relation("AdminStatusChangedBy")
 }
 
 model Shelter {
@@ -94,7 +112,10 @@ model Veterinarian {
   vetSex             String?             @db.Char(1)
   createdAt          DateTime            @default(now())
   shelterID          Int?
-  accountStatus      VetAccountStatus?   @default(Active)
+  // Self-registered vets start Pending. No approval workflow is built yet
+  // (planned as Staff-owned, per the Staff dashboard once it exists) —
+  // approving one today means setting accountStatus by hand.
+  accountStatus      VetAccountStatus?   @default(Pending)
   appointments       Appointment[]
   healthRecords      HealthRecord[]
   vaccinationRecords VaccinationRecord[]
@@ -597,11 +618,13 @@ enum StaffAccountStatus {
 }
 
 enum VetAccountStatus {
+  Pending
   Active
   Deactivated
 }
 
 enum AdminAccountStatus {
+  Pending
   Active
   Deactivated
 }

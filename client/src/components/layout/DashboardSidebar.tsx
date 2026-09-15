@@ -9,6 +9,7 @@ import {
   PiHeart,
   PiFileText,
   PiBuildings,
+  PiShieldCheck,
   PiArrowUpRight,
   PiDotsThreeVertical,
 } from "react-icons/pi";
@@ -42,6 +43,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: "Overview", to: "/admin", icon: PiHouse, end: true },
     { label: "Shelters", to: "/admin/shelters", icon: PiBuildings },
     { label: "Staff", to: "/admin/staff", icon: PiUsersThree },
+    { label: "Admins", to: "/admin/admins", icon: PiShieldCheck },
   ],
   Adopter: [
     { label: "Overview", to: "/adopter", icon: PiHouse, end: true },

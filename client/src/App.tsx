@@ -9,6 +9,8 @@ import About from "./pages/public/about/About";
 import VolunteerInfo from "./pages/public/volunteer-info/VolunteerInfo";
 import Login from "./pages/public/auth/Login";
 import Register from "./pages/public/auth/Register";
+import WorkerLogin from "./pages/public/auth/WorkerLogin";
+import WorkerRegister from "./pages/public/auth/WorkerRegister";
 import Adopt from "./pages/public/adopt/Adopt";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
@@ -57,6 +59,8 @@ const App = () => {
           <Route path="/volunteerinfo" element={<VolunteerInfo />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/staff-portal/login" element={<WorkerLogin />} />
+          <Route path="/staff-portal/register" element={<WorkerRegister />} />
           <Route path="/adopt" element={<Adopt />} />
           <Route path="/forbidden" element={<Forbidden />} />
           <Route path="*" element={<NotFound />} />

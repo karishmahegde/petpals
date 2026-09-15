@@ -20,6 +20,17 @@ const ROLE_CONFIG = {
   donor: { roleEnum: "Donor", model: "donor", nameField: "donorName" },
 };
 
+// Roles whose table gates login behind admin/staff approval — self-registered
+// rows start Pending. Deliberately NOT relying on each table's DB-level
+// column default here (even though schema.prisma declares one to match):
+// this project hand-applies schema changes as raw SQL rather than Prisma
+// migrations (see manual-constraints.sql), and setting a column's default to
+// an enum value it just gained requires a separate transaction from the
+// ALTER TYPE that added it — so a freshly-set-up DB may still be mid-way
+// through that two-step SQL. Setting accountStatus explicitly here means
+// registration behaves correctly regardless.
+const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet"]);
+
 // ——————————————— REGISTER ———————————————
 const register = async ({ name, email, password, role }) => {
   const { roleEnum, model, nameField } = ROLE_CONFIG[role];
@@ -47,11 +58,22 @@ const register = async ({ name, email, password, role }) => {
       },
     });
 
+    let accountStatus;
+    if (PENDING_GATED_ROLES.has(role)) {
+      // Bootstrap: the very first Admin ever created has no one to approve
+      // them, so they auto-activate. Every Admin after that — and every
+      // Staff/Vet — starts Pending.
+      const isFirstAdmin =
+        role === "admin" && (await tx.admin.count()) === 0;
+      accountStatus = isFirstAdmin ? "Active" : "Pending";
+    }
+
     await tx[model].create({
       data: {
         userID: user.userID,
         [nameField]: name,
         avatarSeed: crypto.randomUUID(),
+        ...(accountStatus ? { accountStatus } : {}),
       },
     });
 
@@ -133,19 +155,28 @@ const login = async ({ email, password }) => {
       throw err;
     }
     if (roleRecord?.accountStatus === "Pending") {
+      // Staff/Vet are approved by an Admin/Staff member; a self-registered
+      // Volunteer is approved by staff. Generic wording since "pending staff
+      // approval" was only ever true for two of the four Pending-capable roles.
       const err = new Error(
-        "This account is pending staff approval and can't log in yet.",
+        "This account is pending approval and can't log in yet.",
       );
       err.code = "UNAUTHORIZED";
       throw err;
     }
   }
 
-  // Only Adopter tracks lastLoginAt today. Runs after every blocking check
-  // above, so a rejected login (wrong password, Banned/Deactivated/Pending
-  // account) never counts as one.
+  // Runs after every blocking check above, so a rejected login (wrong
+  // password, Banned/Deactivated/Pending account) never counts as one.
+  // Adopter and Admin track lastLoginAt; other roles don't have the column
+  // yet.
   if (user.role === "Adopter") {
     await prisma.adopter.update({
+      where: { userID: user.userID },
+      data: { lastLoginAt: new Date() },
+    });
+  } else if (user.role === "Admin") {
+    await prisma.admin.update({
       where: { userID: user.userID },
       data: { lastLoginAt: new Date() },
     });
@@ -158,6 +189,25 @@ const login = async ({ email, password }) => {
     avatarSeed,
     ...(isAdopter ? { onboardingComplete, onboardingStep } : {}),
   };
+};
+
+// ——————————————— ACCOUNT STATUS LOOKUP (used by authenticate.js) ———————————————
+// A JWT access token stays valid for its full 15-minute life regardless of
+// what happens to the account after it was issued — login() above only
+// blocks a *fresh* login. This closes that gap: authenticate() calls this on
+// every protected request so a just-deactivated/deleted account's token
+// stops working immediately instead of waiting out its natural expiry.
+// Returns null for a role with no accountStatus-bearing table (there are
+// none today — all six roles have one) or "DELETED" as a sentinel if the
+// role row itself no longer exists (a completed self-delete).
+const getAccountStatus = async (userID, role) => {
+  const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === role);
+  if (!config) return null;
+  const record = await prisma[config.model].findUnique({
+    where: { userID },
+    select: { accountStatus: true },
+  });
+  return record ? record.accountStatus : "DELETED";
 };
 
 const storeRefreshToken = async (userID, hashedRefreshToken) => {
@@ -273,6 +323,7 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
 module.exports = {
   register,
   login,
+  getAccountStatus,
   storeRefreshToken,
   logout,
   refreshToken,

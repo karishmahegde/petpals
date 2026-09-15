@@ -1,11 +1,13 @@
-// Register.tsx
-// Page: Public registration form for adopters, volunteers, and donors
-// Responsibilities:
-//   - Renders name, email, password, role, and consent fields with client-side validation
-//   - Calls authApi.register() on submit and handles loading/error states
-//   - On success: redirects to /login and shows a success toast
-//   - On failure: displays server error message inline
-// Route: /register
+// WorkerRegister.tsx
+// Page: Registration form for the worker portal (Admin, Staff, Veterinarian)
+// — structurally identical to the public Register.tsx (same name/email/
+// password/consent fields and validation, same POST /auth/register call).
+// Only the role picker and copy differ. All three roles land Pending
+// (self-registered, awaiting approval) except the very first Admin ever
+// created, which auto-activates (see auth.service.js's register()) —
+// Staff/Admin approvals have a review UI (Staff tab / Admins tab); Vet
+// approval doesn't yet (no Staff dashboard to host it).
+// Route: /staff-portal/register
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
@@ -13,7 +15,7 @@ import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import { register as registerApi } from "../../../logic/api/authApi";
 import useAuthStore from "../../../logic/store/useAuthStore";
-import backgroundImg from "../../../static/assets/images/background.png";
+import backgroundImg from "../../../static/assets/images/background-admin.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const nameRegex = /^[A-Za-z][A-Za-z'-]*(?: [A-Za-z'-]+)*$/;
@@ -23,7 +25,6 @@ interface PasswordRequirement {
   test: (password: string) => boolean;
 }
 
-// Checked off live as the user types - matches the backend's expected password strength
 const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
   { label: "At least 8 characters", test: (pw) => pw.length >= 8 },
   { label: "One uppercase letter", test: (pw) => /[A-Z]/.test(pw) },
@@ -44,37 +45,37 @@ interface RoleOption {
   border: string;
 }
 
-// Only the three public-facing self-service roles - admin, staff, and vet
-// accounts register through the separate worker portal (WorkerRegister.tsx),
-// since they need role-appropriate approval routing that doesn't apply here.
+// The three worker roles — distinct from the public Register.tsx's
+// Adopter/Volunteer/Donor picker. Values match auth.service.js's ROLE_CONFIG
+// keys exactly.
 const ROLE_OPTIONS: RoleOption[] = [
   {
-    value: "adopter",
-    label: "Adopter",
-    emoji: "🐾",
-    description: "I want to adopt or foster a pet",
-    bg: "bg-gold-light",
-    border: "border-gold-md",
-  },
-  {
-    value: "volunteer",
-    label: "Volunteer",
-    emoji: "❤️",
-    description: "I want to volunteer at a shelter",
+    value: "staff",
+    label: "Staff",
+    emoji: "🧑‍💼",
+    description: "I work at a shelter — pets, applications, volunteers",
     bg: "bg-teal-light",
     border: "border-teal-md",
   },
   {
-    value: "donor",
-    label: "Donor",
-    emoji: "💰",
-    description: "I want to donate to a shelter",
+    value: "vet",
+    label: "Veterinarian",
+    emoji: "🩺",
+    description: "I provide veterinary care for shelter animals",
     bg: "bg-rose-light",
     border: "border-rose-md",
   },
+  {
+    value: "admin",
+    label: "Admin",
+    emoji: "🛡️",
+    description: "I oversee shelters and organisation-wide operations",
+    bg: "bg-gold-light",
+    border: "border-gold-md",
+  },
 ];
 
-const Register = () => {
+const WorkerRegister = () => {
   const { token, role: sessionRole } = useAuthStore();
   const navigate = useNavigate();
 
@@ -112,7 +113,7 @@ const Register = () => {
     if (!PASSWORD_REQUIREMENTS.every((req) => req.test(password)))
       return "Password does not meet all requirements";
 
-    if (!role) return "Please select how you'd like to get involved";
+    if (!role) return "Please select your role";
     if (!agreeTerms)
       return "Please agree to the Terms of Service and Privacy Policy";
     if (!confirmAge) return "Please confirm you are 18 or older";
@@ -136,8 +137,10 @@ const Register = () => {
         password,
         role,
       });
-      toast.success("Registered successfully");
-      navigate("/login", { replace: true });
+      toast.success(
+        "Registered! Your account needs approval before you can sign in.",
+      );
+      navigate("/staff-portal/login", { replace: true });
     } catch (err: unknown) {
       const message =
         axios.isAxiosError(err) && err.response?.data?.message
@@ -156,22 +159,25 @@ const Register = () => {
     >
       <Card className="w-full max-w-lg p-10">
         {/* Heading */}
-        <h1 className="font-display text-3xl text-center text-neutral-dark mb-6">
-          Sign up 🐱
+        <h1 className="font-display text-3xl text-center text-neutral-dark mb-2">
+          Staff Portal 🧑‍💼
         </h1>
+        <p className="text-center font-body text-sm text-neutral-gray mb-6">
+          For Admin, Staff, and Veterinarian accounts
+        </p>
 
         {/* Sign in / Sign up tabs */}
         <div className="flex rounded-xl overflow-hidden mb-8">
           <button
             type="button"
-            onClick={() => navigate("/login")}
-            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-rose-md hover:brightness-95 transition-colors"
+            onClick={() => navigate("/staff-portal/login")}
+            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-teal-md hover:brightness-95 transition-colors"
           >
             Sign in
           </button>
           <button
             type="button"
-            className="flex-1 py-2.5 font-body text-sm text-white bg-rose-dark transition-colors"
+            className="flex-1 py-2.5 font-body text-sm text-white bg-teal-dark transition-colors"
           >
             Sign up
           </button>
@@ -234,7 +240,7 @@ const Register = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="jane.doe@email.com"
+              placeholder="jane.doe@petpals.com"
               maxLength={45}
               className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark placeholder:text-neutral-gray focus:outline-none focus:border-teal-dark"
             />
@@ -277,7 +283,7 @@ const Register = () => {
           {/* Role selection */}
           <div className="flex flex-col gap-1.5">
             <label className="font-body text-sm font-bold text-neutral-black">
-              How would you like to get involved?
+              What's your role?
             </label>
             <div className="flex flex-col gap-2.5 mt-1">
               {ROLE_OPTIONS.map((option) => {
@@ -305,6 +311,9 @@ const Register = () => {
                 );
               })}
             </div>
+            <p className="mt-1 font-body text-xs text-neutral-gray">
+              New accounts need approval before they can sign in.
+            </p>
           </div>
 
           {/* Consent checkboxes */}
@@ -346,14 +355,25 @@ const Register = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-teal-dark text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            className="w-full bg-gold-md text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing up..." : "sign up"}
           </button>
         </form>
+
+        <p className="mt-6 text-center font-body text-xs text-neutral-gray">
+          Looking to adopt, volunteer, or donate?{" "}
+          <button
+            type="button"
+            onClick={() => navigate("/register")}
+            className="font-semibold text-teal-dark underline"
+          >
+            Register here
+          </button>
+        </p>
       </Card>
     </div>
   );
 };
 
-export default Register;
+export default WorkerRegister;

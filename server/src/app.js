@@ -63,6 +63,8 @@ const favoritesRouter = require("./routes/adopter/favorites.routes");
 app.use("/api/v1", favoritesRouter);
 const staffRouter = require("./routes/admin/staff.routes");
 app.use("/api/v1", staffRouter);
+const adminsRouter = require("./routes/admin/admins.routes");
+app.use("/api/v1", adminsRouter);
 const analyticsRouter = require("./routes/admin/analytics.routes");
 app.use("/api/v1", analyticsRouter);
 // app.use('/api/v1/appointments',         require('./routes/appointments'));

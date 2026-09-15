@@ -1,11 +1,12 @@
-// Login.tsx
-// Page: Public login form for all user roles
-// Responsibilities:
-//   - Renders email and password fields with client-side validation
-//   - Calls authApi.login() on submit and handles loading/error states
-//   - On success: stores session in Zustand and redirects to role-based dashboard
-//   - On failure: displays server error message inline
-// Route: /login
+// WorkerLogin.tsx
+// Page: Login form for the worker portal (Admin, Staff, Veterinarian) —
+// structurally identical to the public Login.tsx (same email/password
+// fields, same validation, same session-restore/redirect logic via the
+// shared resolveDestination) since POST /auth/login is already role-agnostic.
+// Only the copy and the Sign up tab's target route differ; a separate page
+// exists so worker accounts have their own discoverable entry point instead
+// of being buried in the public /login flow.
+// Route: /staff-portal/login
 import { useState } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
@@ -13,35 +14,25 @@ import Card from "../../../components/ui/Card";
 import axios from "axios";
 import { login as loginApi } from "../../../logic/api/authApi";
 import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
-import { resolveDestination } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
-import backgroundImg from "../../../static/assets/images/background.png";
+import backgroundImg from "../../../static/assets/images/background-admin.png";
+import { resolveDestination } from "../../../logic/route/resolveDestination";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const Login = () => {
+const WorkerLogin = () => {
   const [searchParams] = useSearchParams();
-  // Query param, not location.state — survives a page refresh mid-login,
-  // which state would not.
   const redirect = searchParams.get("redirect");
 
-  const navigate = useNavigate(); // for programmatic navigation — redirecting the user to a different route from inside the code rather than from a link click
-  const storeLogin = useAuthStore((state) => state.login); // zustand global state management with token
+  const navigate = useNavigate();
+  const storeLogin = useAuthStore((state) => state.login);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Captured once, on mount — true only if a session already existed when
-  // this page was first reached (e.g. visiting /login directly while
-  // already logged in). Deliberately NOT reactive to later token/role
-  // changes: handleSubmit navigates explicitly on a fresh login, and
-  // staying reactive here would re-run this same redirect during that same
-  // store update, racing with the explicit navigate() and producing a
-  // stray render where this component returns nothing — a visible flash
-  // of blank space inside PublicLayout's Navbar/Footer before the real
-  // destination appears.
+  // Same "captured once, on mount" rationale as Login.tsx — see there.
   const [alreadyAuthenticated] = useState(() => {
     const { token, role } = useAuthStore.getState();
     return token && role ? { role } : null;
@@ -57,7 +48,6 @@ const Login = () => {
   }
 
   const validate = (): string => {
-    // field validation
     if (!email.trim()) return "Please enter your email";
     if (!emailRegex.test(email)) return "Please enter a valid email address";
     if (!password) return "Please enter your password";
@@ -65,9 +55,8 @@ const Login = () => {
   };
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    // Form submit handler — validates, calls login API, updates auth store, redirects
-    e.preventDefault(); // prevent default refresh
-    const validationError = validate(); // validate entries
+    e.preventDefault();
+    const validationError = validate();
     if (validationError) {
       setError(validationError);
       return;
@@ -75,25 +64,13 @@ const Login = () => {
     setError("");
     setLoading(true);
     try {
-      // sending the credentials to the login API
       const { token, user } = await loginApi({ email, password });
-      // A real credential login — not the silent session-restore bootstrap
-      // in App.tsx — is the one point that should undo a prior "Skip for
-      // now" (see onboardingSkip.ts): next login shows the onboarding form
-      // again if it's still incomplete.
       clearOnboardingSkipped();
-      // storeLogin (Zustand) and navigate (React Router) are two unrelated
-      // subscriptions — without forcing them into one batch, Navbar (which
-      // reads the store directly) can commit and paint the "logged in" chip
-      // a frame before the route actually changes away from /login, which
-      // reads as the navbar updating while the login form is still on
-      // screen. batchedUpdates forces both into a single commit.
       unstable_batchedUpdates(() => {
         storeLogin(user, token, user.role);
         navigate(resolveDestination(user.role, redirect), { replace: true });
       });
     } catch (err: unknown) {
-      // error runs when no server
       const message =
         axios.isAxiosError(err) && err.response?.data?.message
           ? String(err.response.data.message)
@@ -111,22 +88,25 @@ const Login = () => {
     >
       <Card className="w-full max-w-md p-12">
         {/* Heading */}
-        <h1 className="font-display text-3xl text-center text-neutral-dark mb-6">
-          Sign in 🐶
+        <h1 className="font-display text-3xl text-center text-neutral-dark mb-2">
+          Staff Portal 🧑‍💼
         </h1>
+        <p className="text-center font-body text-sm text-neutral-gray mb-6">
+          For Admin, Staff, and Veterinarian accounts
+        </p>
 
         {/* Sign in / Sign up tabs */}
         <div className="flex rounded-xl overflow-hidden mb-8">
           <button
             type="button"
-            className="flex-1 py-2.5 font-body text-sm text-white bg-rose-dark transition-colors"
+            className="flex-1 py-2.5 font-body text-sm text-white bg-teal-dark transition-colors"
           >
             Sign in
           </button>
           <button
             type="button"
-            onClick={() => navigate("/register")}
-            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-rose-md hover:brightness-95 transition-colors"
+            onClick={() => navigate("/staff-portal/register")}
+            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-teal-md hover:brightness-95 transition-colors"
           >
             Sign up
           </button>
@@ -135,7 +115,7 @@ const Login = () => {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          noValidate // to override browser's validation from running, and use validate()
+          noValidate
           className="flex flex-col gap-5"
         >
           {/* Email */}
@@ -151,7 +131,7 @@ const Login = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="jane.doe@email.com"
+              placeholder="jane.doe@petpals.com"
               className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark placeholder:text-neutral-gray focus:outline-none focus:border-teal-dark"
             />
           </div>
@@ -187,14 +167,25 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-teal-dark text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            className="w-full bg-gold-md text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing in..." : "sign in"}
           </button>
         </form>
+
+        <p className="mt-6 text-center font-body text-xs text-neutral-gray">
+          Looking to adopt, volunteer, or donate?{" "}
+          <button
+            type="button"
+            onClick={() => navigate("/login")}
+            className="font-semibold text-teal-dark underline"
+          >
+            Sign in here
+          </button>
+        </p>
       </Card>
     </div>
   );
 };
 
-export default Login;
+export default WorkerLogin;

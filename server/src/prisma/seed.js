@@ -71,6 +71,10 @@ async function main() {
       userID: adminUser.userID,
       adminName: "Isabella Martinez",
       avatarSeed: crypto.randomUUID(),
+      adminPhone: "+12125550102",
+      adminAddress: "456 Elm Street, New York, NY 10001",
+      adminDOB: new Date("1985-11-02"),
+      adminSex: "F",
       accountStatus: "Active",
     },
   });

@@ -33,6 +33,9 @@ const Footer = () => {
             {/* TODO: point to real Terms of Service page once it's built later this sprint */}
             <a href="#">Terms of Service</a>
           </p>
+          <p>
+            <Link to="/staff-portal/login">Staff Portal</Link>
+          </p>
         </div>
 
         <div className="lg:w-1/3 border-y-2 lg:border-x-2 lg:border-y-0 border-white p-3 flex flex-col items-center justify-center text-center">
