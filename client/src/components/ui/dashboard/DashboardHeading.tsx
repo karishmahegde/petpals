@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import ButtonElement from "../ButtonElement";
 import { formatLongDate } from "../../../logic/utils/datetime";
 
 // Reusable heading block for the top of a dashboard section — used across every
@@ -57,14 +58,16 @@ const DashboardHeading = ({
     </div>
 
     {action && (
-      <button
-        type="button"
+      <ButtonElement
         onClick={action.onClick}
-        className="flex shrink-0 items-center gap-2 rounded-xl bg-gold-md px-4 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:brightness-95"
+        size="sm"
+        className="shrink-0 bg-gold-md hover:brightness-95"
       >
-        {action.icon}
-        {action.label}
-      </button>
+        <span className="flex items-center gap-2">
+          {action.icon}
+          {action.label}
+        </span>
+      </ButtonElement>
     )}
   </header>
 );

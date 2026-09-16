@@ -8,7 +8,7 @@ import AppointmentsWidget from "./overview/AppointmentsWidget";
 import FavoritesWidget from "./overview/FavoritesWidget";
 import ApplicationsWidget from "./overview/ApplicationsWidget";
 import VisitsWidget from "./overview/VisitsWidget";
-import { getGreeting } from "../../../../logic/utils/datetime";
+import { getGreeting, getGreetingEmoji } from "../../../../logic/utils/datetime";
 
 // Landing / overview section of the adopter dashboard.
 const Overview = () => {
@@ -23,7 +23,7 @@ const Overview = () => {
     <div>
       <DashboardHeading
         title={`${getGreeting()}, ${firstName}`}
-        emoji="🌤️"
+        emoji={getGreetingEmoji()}
         message="Everything your pet needs, in one place"
         showDate
       />

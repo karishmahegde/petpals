@@ -32,6 +32,10 @@ const registerAndLoginAdopter = async () => {
 // For the wrong-role (403) case — a Staff registration only needs
 // name/email/password/role (see auth.service.js register()), so no shelter
 // or other fixture rows are required just to get a valid Staff token.
+// Self-registered Staff land Pending and can't log in until approved (see
+// StaffAccountStatus / the Staff Approvals workflow) — this test only cares
+// about the wrong-role check, not the approval gate itself, so it approves
+// directly via Prisma rather than going through an admin's own login.
 const registerAndLoginStaff = async () => {
   const payload = {
     name: "Profile Test Staff",
@@ -43,6 +47,10 @@ const registerAndLoginStaff = async () => {
     .post("/api/v1/auth/register")
     .send(payload);
   const userID = registerRes.body.data.userID;
+  await prisma.staff.update({
+    where: { userID },
+    data: { accountStatus: "Active" },
+  });
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });

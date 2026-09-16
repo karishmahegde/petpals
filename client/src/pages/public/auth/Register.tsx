@@ -44,7 +44,9 @@ interface RoleOption {
   border: string;
 }
 
-// Only the three self-service roles - admin, staff, and vet accounts are provisioned internally
+// Only the three public-facing self-service roles - admin, staff, and vet
+// accounts register through the separate worker portal (WorkerRegister.tsx),
+// since they need role-appropriate approval routing that doesn't apply here.
 const ROLE_OPTIONS: RoleOption[] = [
   {
     value: "adopter",
