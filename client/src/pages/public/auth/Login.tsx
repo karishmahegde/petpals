@@ -13,20 +13,11 @@ import Card from "../../../components/ui/Card";
 import axios from "axios";
 import { login as loginApi } from "../../../logic/api/authApi";
 import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
+import { resolveDestination } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Shared by both destinations that land here: right after a fresh login, and
-// an already-authenticated user hitting /login directly. `redirectParam` now
-// comes from every guarded route (ProtectedRoute sets it generically), not
-// just the adopter-only apply flow — so this no longer pre-filters by role.
-// The redirect target enforces its own access: RoleRoute sends a mismatched
-// role to /forbidden, and AdoptApply re-checks role itself (-> /adopt + a
-// toast) since it deliberately bypasses RoleRoute.
-const resolveDestination = (userRole: string, redirectParam: string | null) =>
-  redirectParam || `/${userRole.toLowerCase()}`;
 
 const Login = () => {
   const [searchParams] = useSearchParams();

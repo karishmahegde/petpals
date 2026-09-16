@@ -49,6 +49,48 @@ CREATE UNIQUE INDEX IF NOT EXISTS "AdoptionApplication_active_adopter_pet_key"
   ON "AdoptionApplication" ("adopterID", "petID")
   WHERE "applicationStatus" IN ('Pending', 'Accepted');
 
+-- ── Admin / Veterinarian self-registration approval gate ────────
+-- StaffAccountStatus already had Pending (self-registered staff await admin
+-- approval). Admin and Veterinarian now follow the same shape — both
+-- schema.prisma default to @default(Pending) — but since this project treats
+-- every schema change as hand-applied SQL rather than a new Prisma migration
+-- (see CLAUDE.md's Permanent Known Issues), the enum value and column
+-- default themselves only exist here.
+--
+-- IMPORTANT: run the two ALTER TYPE statements below FIRST, on their own —
+-- click Run, wait for it to finish — THEN run the two ALTER TABLE statements
+-- as a separate paste/Run. Postgres refuses to use a brand-new enum value in
+-- the same transaction that added it, and Supabase's SQL Editor sends a
+-- multi-statement paste as one implicit transaction.
+ALTER TYPE "AdminAccountStatus" ADD VALUE IF NOT EXISTS 'Pending';
+ALTER TYPE "VetAccountStatus" ADD VALUE IF NOT EXISTS 'Pending';
+
+-- ── Run only after the ALTER TYPE statements above have committed ──
+ALTER TABLE "Admin" ALTER COLUMN "accountStatus" SET DEFAULT 'Pending';
+ALTER TABLE "Veterinarian" ALTER COLUMN "accountStatus" SET DEFAULT 'Pending';
+
+-- ── Admin profile fields + status-change audit trail ────────────
+-- adminPhone/lastLoginAt are plain nullable columns. statusChangedByID is a
+-- self-referencing FK (which Admin last approved/declined/activated/
+-- deactivated this one) — SET NULL on delete so removing an admin who
+-- previously acted on others doesn't block or cascade-delete anything.
+ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "adminPhone" VARCHAR(20);
+ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "lastLoginAt" TIMESTAMP(3);
+ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "statusChangedByID" INTEGER;
+ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "statusChangedAt" TIMESTAMP(3);
+ALTER TABLE "Admin" DROP CONSTRAINT IF EXISTS "Admin_statusChangedByID_fkey";
+ALTER TABLE "Admin" ADD CONSTRAINT "Admin_statusChangedByID_fkey"
+  FOREIGN KEY ("statusChangedByID") REFERENCES "Admin"("userID")
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- ── Admin demographic fields (parity with Staff/Veterinarian) ───
+-- Plain nullable columns, safe as a single paste. GovernmentID needs no
+-- schema change at all — it's already role-agnostic via userType, and
+-- 'Admin' is already a UserType enum value.
+ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "adminAddress" VARCHAR(45);
+ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "adminDOB" DATE;
+ALTER TABLE "Admin" ADD COLUMN IF NOT EXISTS "adminSex" CHAR(1);
+
 -- ── Storage buckets ──────────────────────────────────────────────
 -- Supabase Storage buckets are just rows in storage.buckets, so they can be
 -- created here instead of by hand in the dashboard. pet-images is public

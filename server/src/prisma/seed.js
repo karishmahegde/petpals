@@ -25,10 +25,29 @@ const SUPABASE_URL = `${SUPABASE_PROJECT_URL}/storage/v1/object/public/pet-image
 // `refDate` (typically the original intakeDate) only supplies the day-of-month
 // for variety/realism — the actual month offset always comes from `months`,
 // counted back from today's month.
+// Both helpers build dates with Date.UTC, not `new Date(y, m, d)` (local
+// midnight) — a local-time construction stores as local-midnight-in-UTC,
+// which crosses into the previous UTC day whenever the machine's timezone is
+// ahead of UTC (e.g. UTC+5:30 shifts every date back by ~5.5 hours), and
+// since it's read back with local-timezone getters too, the resulting
+// month/year bucket depends on whatever timezone the *reading* process
+// happens to run in. UTC construction + UTC reads (see getMonthlyStats) keep
+// this deterministic across machines/environments.
 function dobFromAge(years, months, refDate) {
   const today = new Date();
-  const day = refDate ? refDate.getDate() : today.getDate();
-  return new Date(today.getFullYear() - years, today.getMonth() - months, day);
+  const day = refDate ? refDate.getUTCDate() : today.getUTCDate();
+  return new Date(
+    Date.UTC(today.getUTCFullYear() - years, today.getUTCMonth() - months, day),
+  );
+}
+
+// Same rationale as dobFromAge above: intakeDate relative to TODAY, not a
+// frozen calendar date, so a re-seed always lands some pets inside the Admin
+// Overview "Stats" chart's trailing-months window instead of aging out of it.
+// `day` (from the original reference date) is kept for variety only.
+function intakeDateMonthsAgo(monthsAgo, day) {
+  const today = new Date();
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - monthsAgo, day));
 }
 
 async function main() {
@@ -52,6 +71,10 @@ async function main() {
       userID: adminUser.userID,
       adminName: "Isabella Martinez",
       avatarSeed: crypto.randomUUID(),
+      adminPhone: "+12125550102",
+      adminAddress: "456 Elm Street, New York, NY 10001",
+      adminDOB: new Date("1985-11-02"),
+      adminSex: "F",
       accountStatus: "Active",
     },
   });
@@ -190,7 +213,6 @@ async function main() {
       petExperience: "Some",
       currentPets: 0,
       openToSpecialNeeds: false,
-      adopterType: "Owner",
       emailVerified: true,
       accountStatus: "Active",
     },
@@ -355,7 +377,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Apollo is a confident and loyal German Shepherd who takes his role as protector seriously. He thrives with experienced owners who can match his intelligence and energy. Best suited as the only pet in the home.",
-      intakeDate: new Date("2024-03-10"),
+      intakeDate: intakeDateMonthsAgo(11, 10), // Apollo
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -377,7 +399,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Buddy is the definition of a family dog — endlessly cheerful, gentle with kids, and a best friend to every dog he meets. He loves fetch, swimming, and curling up on the couch after a long walk.",
-      intakeDate: new Date("2024-06-01"),
+      intakeDate: intakeDateMonthsAgo(8, 1), // Buddy
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -399,7 +421,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Biscuit is a nose-to-the-ground explorer who never meets a smell he doesn't investigate. Calm and affectionate at home, he loves children and is happiest on long morning walks.",
-      intakeDate: new Date("2024-01-20"),
+      intakeDate: intakeDateMonthsAgo(14, 20), // Biscuit
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -421,7 +443,7 @@ async function main() {
       petSex: "F",
       petDesc:
         "Daisy is a bouncy young Lab who is still learning the ropes. She is eager to please and picks up new commands quickly. She adores children and other dogs — the more the merrier.",
-      intakeDate: new Date("2024-08-15"),
+      intakeDate: intakeDateMonthsAgo(6, 15), // Daisy
       intakeType: "stray",
       adoptionStatus: "pending",
       shelterID: shelter1.shelterID,
@@ -443,7 +465,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Rocky is a laid-back senior Bulldog who asks for little more than a comfy sofa and a patient owner. He has a mild heart condition that requires monthly vet visits but is otherwise healthy and full of personality.",
-      intakeDate: new Date("2023-11-05"),
+      intakeDate: intakeDateMonthsAgo(15, 5), // Rocky
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -465,7 +487,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Zeus is a powerful and disciplined Rottweiler who is deeply loyal to those he trusts. He requires an experienced handler and a home without other animals. With the right owner, he is an incredibly devoted companion.",
-      intakeDate: new Date("2024-04-22"),
+      intakeDate: intakeDateMonthsAgo(10, 22), // Zeus
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
@@ -487,7 +509,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Teddy is a fluffy 4-month-old Toy Poodle puppy who is curious about everything and afraid of nothing. He is still learning basic commands and would thrive with a patient first-time owner. Gets along wonderfully with kids and other pets.",
-      intakeDate: new Date("2025-02-01"),
+      intakeDate: intakeDateMonthsAgo(1, 1), // Teddy
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
@@ -509,7 +531,7 @@ async function main() {
       petSex: "F",
       petDesc:
         "Cleo is a vocal and opinionated Siamese who knows exactly what she wants. She forms deep bonds with her person but prefers to be the only animal in the home. Perfect for someone who wants a cat with real personality.",
-      intakeDate: new Date("2024-05-10"),
+      intakeDate: intakeDateMonthsAgo(9, 10), // Cleo
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -531,7 +553,7 @@ async function main() {
       petSex: "F",
       petDesc:
         "Mittens is a gentle and easygoing cat who gets along with everyone — children, dogs, other cats. She loves sunny windowsills and will happily sit on a lap for hours. A wonderful first cat for any household.",
-      intakeDate: new Date("2023-09-14"),
+      intakeDate: intakeDateMonthsAgo(17, 14), // Mittens
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
@@ -553,7 +575,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Shadow found his forever home and is now thriving with his new family. A calm and dignified British Shorthair who won everyone over with his quiet affection.",
-      intakeDate: new Date("2023-06-01"),
+      intakeDate: intakeDateMonthsAgo(18, 1), // Shadow
       intakeType: "surrendered",
       adoptionStatus: "adopted",
       shelterID: shelter2.shelterID,
@@ -575,7 +597,7 @@ async function main() {
       petSex: "F",
       petDesc:
         "Mochi is a 3-month-old Persian kitten with a cloud-like coat and the most expressive eyes. She is playful and sociable, already comfortable around children and other pets. She will need regular grooming.",
-      intakeDate: new Date("2025-03-15"),
+      intakeDate: intakeDateMonthsAgo(0, 15), // Mochi
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -597,7 +619,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Simba is a playful young Maine Coon who thinks he is much bigger than he is. He is endlessly curious, loves to climb, and chirps at birds through the window. Great with kids and other cats.",
-      intakeDate: new Date("2024-10-08"),
+      intakeDate: intakeDateMonthsAgo(4, 8), // Simba
       intakeType: "stray",
       adoptionStatus: "pending",
       shelterID: shelter2.shelterID,
@@ -619,7 +641,7 @@ async function main() {
       petSex: "F",
       petDesc:
         "Polly is a remarkably intelligent 10-year-old parrot with a vocabulary of over 50 words. She needs mental stimulation, daily interaction, and a quiet home environment. Not suitable for homes with young children.",
-      intakeDate: new Date("2024-02-14"),
+      intakeDate: intakeDateMonthsAgo(12, 14), // Polly
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -641,7 +663,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Bloo is a stunning Blue Macaw with a bold personality to match his striking plumage. He is social and vocal, and bonds deeply with his owner. Requires an experienced bird owner and a large enclosure.",
-      intakeDate: new Date("2024-07-30"),
+      intakeDate: intakeDateMonthsAgo(7, 30), // Bloo
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
@@ -663,7 +685,7 @@ async function main() {
       petSex: "M",
       petDesc:
         "Nimbus is a rescue pigeon who was found injured and nursed back to health. He is calm, gentle and surprisingly affectionate. He gets along well with other birds and is a wonderful low-maintenance companion.",
-      intakeDate: new Date("2024-09-05"),
+      intakeDate: intakeDateMonthsAgo(5, 5), // Nimbus
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,
@@ -685,7 +707,7 @@ async function main() {
       petSex: "F",
       petDesc:
         "Sky is a young white pigeon with a calm and trusting nature. She was rescued from a city rooftop and has since become very comfortable around people. A peaceful and easy companion for the right home.",
-      intakeDate: new Date("2025-01-20"),
+      intakeDate: intakeDateMonthsAgo(2, 20), // Sky
       intakeType: "stray",
       adoptionStatus: "available",
       shelterID: shelter2.shelterID,
@@ -707,7 +729,7 @@ async function main() {
       petSex: "F",
       petDesc:
         "Pebbles is a sweet Holland Lop rabbit who loves to binky around the room and then flop dramatically by your feet. She is litter trained, gentle with children, and gets along well with other small animals.",
-      intakeDate: new Date("2024-11-12"),
+      intakeDate: intakeDateMonthsAgo(3, 12), // Pebbles
       intakeType: "surrendered",
       adoptionStatus: "available",
       shelterID: shelter1.shelterID,

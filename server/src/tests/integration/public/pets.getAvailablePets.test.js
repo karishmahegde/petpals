@@ -3,6 +3,14 @@ const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 
+// beforeAll does ~20+ sequential creates straight against the remote
+// Supabase instance, which can exceed Jest's 5s default hook timeout — same
+// rationale as adopters.profile.test.js. Without this, a slow run times out
+// mid-beforeAll while the hook keeps executing in the background (Jest
+// timing out doesn't cancel the promise chain), racing afterAll's cleanup
+// and leaving orphaned IntegrationList* rows behind in the DB.
+jest.setTimeout(20000);
+
 // Replicates pets.service.js's formatAgeFromDOBYears exactly, so the
 // "correct petAge" assertion checks the actual computed value — not just
 // that it looks like a formatted string (already covered by the unit

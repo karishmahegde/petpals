@@ -2,6 +2,12 @@ const express = require("express"); //to create an express app
 const request = require("supertest");
 const jwt = require("jsonwebtoken"); //to verify the JWT token
 
+// authenticate.js now looks up the account's live status on every request
+// (see middleware/authenticate.js) — mocked here so this stays a DB-free
+// unit test; the real lookup is covered by the integration suite.
+jest.mock("../../../services/auth/auth.service");
+const authService = require("../../../services/auth/auth.service");
+
 const authenticate = require("../../../middleware/authenticate");
 
 const JWT_SECRET = "test-secret"; //to store the JWT secret
@@ -23,6 +29,7 @@ describe("authenticate middleware", () => {
 
   beforeEach(() => {
     app = buildApp(); //to build the express app
+    authService.getAccountStatus.mockReset().mockResolvedValue("Active");
   });
 
   // —————————————————— NO AUTHORIZATION HEADER ——————————————————
@@ -85,4 +92,27 @@ describe("authenticate middleware", () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual({ userID: 42, role: "Staff" });
   });
+
+  // —————————————————— BLOCKED ACCOUNT STATUS ——————————————————
+  test.each(["Deactivated", "Banned", "Pending", "DELETED"])(
+    "valid JWT but %s account status returns 401 UNAUTHORIZED",
+    async (status) => {
+      authService.getAccountStatus.mockResolvedValue(status);
+      const validToken = jwt.sign(
+        { userID: 42, role: "Staff" },
+        JWT_SECRET,
+        { expiresIn: "1h" },
+      );
+
+      const res = await request(app)
+        .get("/protected")
+        .set("Authorization", `Bearer ${validToken}`);
+
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        success: false,
+        error: { code: "UNAUTHORIZED" },
+      });
+    },
+  );
 });
