@@ -1,9 +1,15 @@
 const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
-const { successResponse } = require("../../utils/response");
+const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
   const err = new Error(message);
   err.code = "BAD_REQUEST";
+  return err;
+};
+
+const forbidden = (message) => {
+  const err = new Error(message);
+  err.code = "FORBIDDEN";
   return err;
 };
 
@@ -75,8 +81,23 @@ const createApplication = async (req, res, next) => {
   }
 };
 
-// ——————————————— GET /adoption-applications?checkoutSessionId= (confirmation-page polling) ———————————————
+// ——————————————— GET /adoption-applications ———————————————
+// One path, two unrelated purposes distinguished by presence of
+// checkoutSessionId — matches the original API design doc, which planned
+// both as sharing this exact method+path rather than one shadowing the
+// other. authorizeRoles on the route allows Adopter/Staff/Admin broadly;
+// the actual role restriction per branch is enforced here, since each
+// branch needs a different one and the middleware only supports one static
+// list.
+const VALID_APPLICATION_STATUSES = ["Pending", "Accepted", "Rejected", "Withdrawn"];
+
+// ?checkoutSessionId= — Adopter-only. Used by the post-payment confirmation
+// page to poll for the row the webhook creates asynchronously.
 const getByCheckoutSession = async (req, res, next) => {
+  if (req.user.role !== "Adopter") {
+    return next(forbidden("Only adopters can look up an application by checkout session"));
+  }
+
   const sessionId = req.query?.checkoutSessionId;
   if (typeof sessionId !== "string" || !sessionId) {
     return next(badRequest("checkoutSessionId is required"));
@@ -99,6 +120,75 @@ const getByCheckoutSession = async (req, res, next) => {
   } catch (err) {
     return next(err);
   }
+};
+
+// No checkoutSessionId — Staff/Admin-only. The shelter's application queue.
+const listApplications = async (req, res, next) => {
+  if (req.user.role !== "Staff" && req.user.role !== "Admin") {
+    return next(forbidden("Only staff or admin can list adoption applications"));
+  }
+
+  const {
+    status,
+    shelterID: shelterIDRaw,
+    page: pageRaw,
+    limit: limitRaw,
+  } = req.query;
+
+  let page = 1;
+  if (pageRaw !== undefined) {
+    page = Number(pageRaw);
+    if (!Number.isInteger(page) || page < 1) {
+      return next(badRequest("page must be an integer >= 1"));
+    }
+  }
+
+  let limit = 20;
+  if (limitRaw !== undefined) {
+    limit = Number(limitRaw);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return next(badRequest("limit must be an integer between 1 and 100"));
+    }
+  }
+
+  if (status !== undefined && !VALID_APPLICATION_STATUSES.includes(status)) {
+    return next(
+      badRequest(`status must be one of: ${VALID_APPLICATION_STATUSES.join(", ")}`),
+    );
+  }
+
+  // Only meaningful for Admin — a Staff caller's shelter is always their
+  // own, resolved server-side in the service, never from a query param.
+  let shelterID;
+  if (req.user.role === "Admin" && shelterIDRaw !== undefined) {
+    shelterID = Number(shelterIDRaw);
+    if (!Number.isInteger(shelterID) || shelterID < 1) {
+      return next(badRequest("shelterID must be a positive integer"));
+    }
+  }
+
+  try {
+    const result = await adoptionApplicationsService.listApplicationsForStaff(
+      { role: req.user.role, userID: req.user.userID },
+      { status, shelterID, page, limit },
+    );
+    return successListResponse(
+      res,
+      "Adoption applications retrieved successfully",
+      result.data,
+      result.pagination,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// Dispatches on checkoutSessionId presence — see the design note above.
+const getApplications = (req, res, next) => {
+  if (req.query?.checkoutSessionId !== undefined) {
+    return getByCheckoutSession(req, res, next);
+  }
+  return listApplications(req, res, next);
 };
 
 // ——————————————— GET /adoption-applications/:id ———————————————
@@ -126,9 +216,15 @@ const getApplication = async (req, res, next) => {
 };
 
 // ——————————————— PATCH /adoption-applications/:id/status ———————————————
-// Adopters may only move an application to 'Withdrawn'. Staff-driven status
-// transitions will extend this endpoint later.
+// Adopters may only move their own application to 'Withdrawn'. Staff/Admin
+// may only move a Pending application to 'Accepted' or 'Rejected'. Which
+// list applies is determined by role, not by a shared enum — an Adopter
+// sending "Accepted" should get the same validation error shape as sending
+// any other bogus value, not a 403 that leaks that the value is valid for
+// someone else.
 const VALID_ADOPTER_STATUS_CHANGES = ["Withdrawn"];
+const VALID_STAFF_STATUS_CHANGES = ["Accepted", "Rejected"];
+const MAX_STAFF_REMARK_LEN = 500; // schema.prisma: staffRemark is VarChar(500)
 
 const updateApplicationStatus = async (req, res, next) => {
   let applicationID;
@@ -138,23 +234,41 @@ const updateApplicationStatus = async (req, res, next) => {
     return next(err);
   }
 
-  const { status } = req.body ?? {};
-  if (!VALID_ADOPTER_STATUS_CHANGES.includes(status)) {
+  const isStaffActor = req.user.role === "Staff" || req.user.role === "Admin";
+  const allowedStatuses = isStaffActor
+    ? VALID_STAFF_STATUS_CHANGES
+    : VALID_ADOPTER_STATUS_CHANGES;
+
+  const { status, staffRemark: staffRemarkRaw } = req.body ?? {};
+  if (!allowedStatuses.includes(status)) {
     return next(
-      badRequest(
-        `status is required and must be one of: ${VALID_ADOPTER_STATUS_CHANGES.join(", ")}`,
-      ),
+      badRequest(`status is required and must be one of: ${allowedStatuses.join(", ")}`),
     );
   }
 
+  // staffRemark is staff-authored (schema.prisma design note) — only read
+  // from the body at all for the Staff/Admin branch, never for Adopter.
+  let staffRemark;
+  if (isStaffActor && staffRemarkRaw !== undefined && staffRemarkRaw !== null) {
+    if (typeof staffRemarkRaw !== "string" || staffRemarkRaw.length > MAX_STAFF_REMARK_LEN) {
+      return next(
+        badRequest(
+          `staffRemark must be a string of at most ${MAX_STAFF_REMARK_LEN} characters`,
+        ),
+      );
+    }
+    staffRemark = staffRemarkRaw.trim() || null;
+  }
+
   try {
-    const application = await adoptionApplicationsService.withdrawApplication(
+    const application = await adoptionApplicationsService.updateApplicationStatus(
       applicationID,
-      req.user.userID,
+      { status, staffRemark },
+      { role: req.user.role, userID: req.user.userID },
     );
     return successResponse(
       res,
-      "Adoption application withdrawn successfully",
+      `Adoption application ${status.toLowerCase()} successfully`,
       application,
     );
   } catch (err) {
@@ -164,7 +278,7 @@ const updateApplicationStatus = async (req, res, next) => {
 
 module.exports = {
   createApplication,
-  getByCheckoutSession,
+  getApplications,
   getApplication,
   updateApplicationStatus,
 };

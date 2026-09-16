@@ -13,6 +13,15 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Supabase dashboard as a NON-public bucket.
 const GOVERNMENT_IDS_BUCKET = "government-ids";
 
+// Name of the public bucket holding pet photos — unlike government-ids,
+// this one is publicly readable (pet photos are shown on the unauthenticated
+// public catalog). Writes/deletes still require the service role key
+// regardless of a bucket's public/private read setting, so
+// deletePrivateFile below works unchanged for this bucket too — "Private"
+// in its name describes its original use case, not a restriction on which
+// bucket it can target.
+const PET_IMAGES_BUCKET = "pet-images";
+
 const storageError = (message) => {
   const err = new Error(message);
   err.code = "INTERNAL_SERVER_ERROR";
@@ -82,6 +91,7 @@ const deletePrivateFile = async (bucket, objectPath) => {
 
 module.exports = {
   GOVERNMENT_IDS_BUCKET,
+  PET_IMAGES_BUCKET,
   uploadPrivateFile,
   deletePrivateFile,
 };

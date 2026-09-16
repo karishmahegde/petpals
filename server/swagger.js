@@ -419,6 +419,73 @@ const schemas = {
       specialNeeds: { type: "boolean" },
     },
   },
+  PetCreate: {
+    type: "object",
+    description:
+      "shelterID is never a body field — taken from the acting Staff member's own shelter, or required separately for Admin (see the endpoint description). petPhoto starts as a placeholder (POST /pets/:id/photos supplies the real one) and adoptionStatus always starts 'available' — neither is client-settable here.",
+    required: [
+      "breedID",
+      "petName",
+      "petDOB",
+      "petSex",
+      "petColor",
+      "petSize",
+      "intakeDate",
+      "petWeight",
+      "petHeight",
+    ],
+    properties: {
+      breedID: { type: "integer" },
+      petName: { type: "string", maxLength: 45 },
+      petDOB: { type: "string", format: "date" },
+      petSex: { type: "string", enum: ["M", "F"] },
+      petColor: { type: "string", maxLength: 45 },
+      petSize: { type: "string", enum: ["Small", "Medium", "Large"] },
+      intakeDate: { type: "string", format: "date" },
+      petWeight: { type: "number", exclusiveMinimum: 0 },
+      petHeight: { type: "number", exclusiveMinimum: 0 },
+      petBGroup: {
+        type: "string",
+        maxLength: 5,
+        description: "Optional — defaults to 'N/A' if omitted (often unknown at intake).",
+      },
+      shelterID: {
+        type: "integer",
+        description: "Admin only — required for that role, ignored for Staff.",
+      },
+    },
+  },
+  PetUpdate: {
+    type: "object",
+    description:
+      "Partial update — send only the fields to change. shelterID reassignment is out of scope (that's a transfer, not a profile edit); petPhoto/adoptionStatus are managed by their own endpoints, not here.",
+    properties: {
+      breedID: { type: "integer" },
+      petName: { type: "string", maxLength: 45 },
+      petDOB: { type: "string", format: "date" },
+      petSex: { type: "string", enum: ["M", "F"] },
+      petColor: { type: "string", maxLength: 45 },
+      petSize: { type: "string", enum: ["Small", "Medium", "Large"] },
+      intakeDate: { type: "string", format: "date" },
+      petWeight: { type: "number", exclusiveMinimum: 0 },
+      petHeight: { type: "number", exclusiveMinimum: 0 },
+      petBGroup: { type: "string", maxLength: 5 },
+      petDesc: { type: "string", maxLength: 500, nullable: true },
+      microchipID: { type: "string", maxLength: 45, nullable: true },
+      featuredFlag: { type: "boolean" },
+    },
+  },
+  PetPhoto: {
+    type: "object",
+    description:
+      "isPrimary is computed, not a stored column — true when this row's photoURL matches the pet's current petPhoto.",
+    properties: {
+      photoID: { type: "integer" },
+      photoURL: { type: "string" },
+      uploadedAt: { type: "string", format: "date-time" },
+      isPrimary: { type: "boolean" },
+    },
+  },
   AdoptedPet: {
     type: "object",
     description: "Same shape as a pet catalog card (see PetCard on GET /pets).",
