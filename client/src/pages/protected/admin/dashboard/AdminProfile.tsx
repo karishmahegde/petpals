@@ -1,12 +1,4 @@
 // AdminProfile.tsx
-// Mirrors the adopter dashboard's Profile.tsx layout and functionality
-// (identity strip with randomizable avatar, edit/view toggle, Danger zone)
-// exactly — just with Admin's own, much sparser field set. Admin has no
-// phone/DOB/housing/lifestyle/preferences like Adopter, so this skips
-// adopter Profile's generic multi-type field-dispatcher machinery (only ever
-// exercised for "text" here) in favor of a direct implementation of the same
-// pattern — same behavior, no dead code paths for field types Admin will
-// never have.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -25,7 +17,10 @@ import {
   type AdminAccountStatus,
   type AdminListItem,
 } from "../../../../logic/api/adminsApi";
-import { formatShortDate, formatFullDate } from "../../../../logic/utils/datetime";
+import {
+  formatShortDate,
+  formatFullDate,
+} from "../../../../logic/utils/datetime";
 
 const STATUS_TONE: Record<AdminAccountStatus, BadgeTone> = {
   Pending: "gold",
@@ -35,7 +30,11 @@ const STATUS_TONE: Record<AdminAccountStatus, BadgeTone> = {
 
 // Mirrors adopter Profile.tsx's SEX_LABELS/adopterSex handling.
 const SEX_VALUES = ["M", "F", "O"];
-const SEX_LABELS: Record<string, string> = { M: "Male", F: "Female", O: "Other" };
+const SEX_LABELS: Record<string, string> = {
+  M: "Male",
+  F: "Female",
+  O: "Other",
+};
 
 interface EditableProfile {
   avatarSeed: string;
@@ -220,9 +219,7 @@ const AdminProfile = () => {
                         type="text"
                         value={formState.adminName}
                         maxLength={45}
-                        onChange={(e) =>
-                          patch({ adminName: e.target.value })
-                        }
+                        onChange={(e) => patch({ adminName: e.target.value })}
                         className={inputClass}
                       />
                     ) : (
@@ -231,16 +228,12 @@ const AdminProfile = () => {
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-body text-xs text-neutral-gray">
-                    Phone
-                  </dt>
+                  <dt className="font-body text-xs text-neutral-gray">Phone</dt>
                   <dd className="mt-1 font-body text-sm text-neutral-dark">
                     {isEditing && formState ? (
                       <PhoneInputField
                         value={formState.adminPhone}
-                        onChange={(next) =>
-                          patch({ adminPhone: next ?? null })
-                        }
+                        onChange={(next) => patch({ adminPhone: next ?? null })}
                       />
                     ) : profile.adminPhone ? (
                       <PhoneDisplay value={profile.adminPhone} />
@@ -264,7 +257,9 @@ const AdminProfile = () => {
                         className={inputClass}
                       />
                     ) : profile.adminDOB ? (
-                      formatShortDate(new Date(`${profile.adminDOB.slice(0, 10)}T00:00:00`))
+                      formatShortDate(
+                        new Date(`${profile.adminDOB.slice(0, 10)}T00:00:00`),
+                      )
                     ) : (
                       <span className="text-neutral-gray">—</span>
                     )}
@@ -311,9 +306,9 @@ const AdminProfile = () => {
                         className={inputClass}
                       />
                     ) : (
-                      profile.adminAddress ?? (
+                      (profile.adminAddress ?? (
                         <span className="text-neutral-gray">—</span>
-                      )
+                      ))
                     )}
                   </dd>
                 </div>
@@ -378,8 +373,8 @@ const AdminProfile = () => {
           <div className="mt-10 rounded-2xl border border-rose-md bg-rose-lightest p-5 md:p-6">
             <h2 className="font-display text-lg text-rose-dark">Danger zone</h2>
             <p className="mt-1 font-body text-sm text-neutral-charcoal">
-              Closing your account deactivates or permanently deletes it.
-              This can't be undone.
+              Closing your account deactivates or permanently deletes it. This
+              can't be undone.
             </p>
             <button
               type="button"
