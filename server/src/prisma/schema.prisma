@@ -465,15 +465,22 @@ model VolunteerTask {
 }
 
 model Event {
-  eventID    Int              @id @default(autoincrement())
-  shelterID  Int
-  eventName  String           @db.VarChar(45)
-  eventDate  DateTime
-  eventDesc  String           @db.VarChar(300)
-  staffID    Int?
-  shelter    Shelter          @relation(fields: [shelterID], references: [shelterID])
-  staff      Staff?           @relation(fields: [staffID], references: [userID])
-  volunteers VolunteerEvent[]
+  eventID       Int              @id @default(autoincrement())
+  shelterID     Int
+  eventName     String           @db.VarChar(45)
+  eventDate     DateTime
+  eventDesc     String           @db.VarChar(300)
+  // Snapshot of shelter.shelterName at creation time — auto-assigned from
+  // the creating staff member's own shelter (or, for Admin, the shelterID
+  // they supply), never client-editable. See staff/events.service.js's
+  // resolveShelterForCreate. Denormalized rather than joined on every read
+  // so a later shelter rename doesn't rewrite where past events say they
+  // were held.
+  eventLocation String           @db.VarChar(45)
+  staffID       Int?
+  shelter       Shelter          @relation(fields: [shelterID], references: [shelterID])
+  staff         Staff?           @relation(fields: [staffID], references: [userID])
+  volunteers    VolunteerEvent[]
 }
 
 model VolunteerEvent {
