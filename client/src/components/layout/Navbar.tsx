@@ -11,6 +11,7 @@ const navLinks = [
   { label: "about", to: "/about" },
   { label: "volunteer", to: "/volunteerinfo" },
   { label: "adopt", to: "/adopt" },
+  { label: "events", to: "/events" },
 ];
 
 // DB role enum → client route
