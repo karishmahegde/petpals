@@ -6,9 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { FaPaw } from "react-icons/fa";
-import Card from "../../../../../../components/ui/Card";
-import DashboardWidgetHeader from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
-import DashboardEmptyMessage from "../../../../../../components/ui/dashboard/DashboardEmptyMessage";
+import { OverviewWidgetCard } from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
 import {
   DashboardListRow,
   RowActionButton,
@@ -34,59 +32,49 @@ const ApplicationsWidget = () => {
   const applications = data?.data ?? [];
 
   return (
-    <Card className="p-5">
-      <DashboardWidgetHeader
-        icon="📋"
-        title="Applications"
-        action={{ label: "View All", to: "/staff/applications" }}
-      />
-
-      {isLoading && (
-        <p className="font-body text-sm text-neutral-gray">Loading…</p>
-      )}
-
-      {!isLoading && applications.length === 0 && (
-        <DashboardEmptyMessage>No pending applications</DashboardEmptyMessage>
-      )}
-
-      {!isLoading && applications.length > 0 && (
-        <ul className="flex flex-col gap-4">
-          {applications.map((application) => (
-            <li key={application.applicationID}>
-              <DashboardListRow
-                className="bg-rose-light"
-                leading={
-                  <RowMedallion
-                    src={application.pet.petPhoto}
-                    alt={`${application.pet.petName} photo`}
-                    fallback={
-                      <FaPaw className="h-6 w-6 text-rose-dark" aria-hidden />
-                    }
-                  />
-                }
-                title={application.pet.petName}
-                lines={[
-                  {
-                    text: `Submitted by: ${application.adopter.adopterName}`,
-                  },
-                ]}
-                actions={
-                  <RowActionButton
-                    onClick={() =>
-                      navigate(
-                        `/staff/applications?applicationID=${application.applicationID}`,
-                      )
-                    }
-                  >
-                    View Details
-                  </RowActionButton>
-                }
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+    <OverviewWidgetCard
+      icon="📋"
+      title="Applications"
+      action={{ label: "View All", to: "/staff/applications" }}
+      className="min-h-[420px]"
+      isLoading={isLoading}
+      isEmpty={applications.length === 0}
+      emptyMessage="No pending applications"
+    >
+      <ul className="flex flex-col gap-4">
+        {applications.map((application) => (
+          <li key={application.applicationID}>
+            <DashboardListRow
+              className="bg-rose-light"
+              leading={
+                <RowMedallion
+                  src={application.pet.petPhoto}
+                  alt={`${application.pet.petName} photo`}
+                  fallback={
+                    <FaPaw className="h-6 w-6 text-rose-dark" aria-hidden />
+                  }
+                />
+              }
+              title={application.pet.petName}
+              lines={[
+                { text: `Submitted by: ${application.adopter.adopterName}` },
+              ]}
+              actions={
+                <RowActionButton
+                  onClick={() =>
+                    navigate(
+                      `/staff/applications?applicationID=${application.applicationID}`,
+                    )
+                  }
+                >
+                  View Details
+                </RowActionButton>
+              }
+            />
+          </li>
+        ))}
+      </ul>
+    </OverviewWidgetCard>
   );
 };
 

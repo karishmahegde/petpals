@@ -3,9 +3,7 @@
 // shelter visits. "View All" leads to /adopter/visits for the full history.
 import { useQuery } from "@tanstack/react-query";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
-import Card from "../../../../../../components/ui/Card";
-import DashboardWidgetHeader from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
-import DashboardEmptyMessage from "../../../../../../components/ui/dashboard/DashboardEmptyMessage";
+import { OverviewWidgetCard } from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
 import { getMyVisits } from "../../../../../../logic/api/adoptersApi";
 import VisitsList from "../../shared/VisitsList";
 
@@ -20,30 +18,22 @@ const VisitsWidget = () => {
   const upcoming = visits?.slice(0, PREVIEW_LIMIT) ?? [];
 
   return (
-    <Card className="flex w-full min-w-0 flex-1 basis-0 flex-col p-5">
-      <DashboardWidgetHeader
-        icon="🐭"
-        title="Visits"
-        action={{ label: "View All", to: "/adopter/visits" }}
-      />
-
-      {isLoading && (
-        <p className="font-body text-sm text-neutral-gray">Loading…</p>
-      )}
-
-      {!isLoading && upcoming.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-          <DashboardEmptyMessage>No upcoming visits</DashboardEmptyMessage>
-          <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
-            Explore Pets
-          </ButtonElement>
-        </div>
-      )}
-
-      {!isLoading && upcoming.length > 0 && (
-        <VisitsList visits={upcoming} rowClassName="bg-rose-light" />
-      )}
-    </Card>
+    <OverviewWidgetCard
+      icon="🐭"
+      title="Visits"
+      action={{ label: "View All", to: "/adopter/visits" }}
+      className="w-full min-w-0 flex-1 basis-0"
+      isLoading={isLoading}
+      isEmpty={upcoming.length === 0}
+      emptyMessage="No upcoming visits"
+      emptyAction={
+        <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
+          Explore Pets
+        </ButtonElement>
+      }
+    >
+      <VisitsList visits={upcoming} rowClassName="bg-rose-light" />
+    </OverviewWidgetCard>
   );
 };
 
