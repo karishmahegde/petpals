@@ -60,7 +60,9 @@ describe("GET /api/v1/pets/:id", () => {
       petID: 5,
       petName: "Buddy",
       petSex: "Male",
-      petPhoto: "buddy.jpg",
+      // Converted from the bare stored filename to a full public Storage
+      // URL — see storage/index.js's toPublicFileUrl.
+      petPhoto: `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-images/buddy.jpg`,
       petColor: "Golden",
       petHeight: 55,
       petWeight: 28.5,
