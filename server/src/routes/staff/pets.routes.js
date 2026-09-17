@@ -53,6 +53,14 @@ const router = express.Router();
  *         schema: { type: integer, minimum: 0 }
  *         description: Maximum age in MONTHS (inclusive)
  *       - in: query
+ *         name: sort
+ *         schema: { type: string, enum: [newest] }
+ *         description: >
+ *           Omit for the existing default order (petID descending).
+ *           'newest' orders by intakeDate descending — powers the Staff
+ *           Overview New Arrivers widget
+ *           (?adoptionStatus=incoming&sort=newest&limit=5).
+ *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
  *       - in: query
@@ -90,6 +98,53 @@ router.get(
   authenticate,
   authorizeRoles(ROLES.STAFF),
   petsController.listMyShelterPets,
+);
+
+/**
+ * @swagger
+ * /staff/me/pets/{id}:
+ *   get:
+ *     summary: Full detail for one of the staff member's own shelter's pets (Staff)
+ *     description: >
+ *       Richer than public GET /pets/:id — adds petCode, microchipID,
+ *       petSize, petBGroup, intakeDate, intakeType, featuredFlag, and the
+ *       raw petDOB (the public shape only returns the formatted petAge).
+ *       Powers the Pets tab's read-only detail view and pre-fills the edit
+ *       form with real values.
+ *     tags: [Pets, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The pet's full detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *       400:
+ *         description: id is not a positive integer
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Staff attempting to view a pet at another shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/staff/me/pets/:id",
+  authenticate,
+  authorizeRoles(ROLES.STAFF),
+  petsController.getShelterPetDetail,
 );
 
 /**
@@ -151,7 +206,10 @@ router.post(
  *       Partial update — only fields present in the body are changed.
  *       Staff may only edit pets at their own shelter (403 otherwise);
  *       Admin may edit any pet. shelterID reassignment is out of scope
- *       (that's a transfer, not a profile edit).
+ *       (that's a transfer, not a profile edit). Multipart, not JSON — an
+ *       optional `file` field replaces the pet's photo (v1 is one photo per
+ *       pet, not a gallery) in the same request/transaction as the field
+ *       changes; omit it to leave the photo untouched.
  *     tags: [Pets, Staff]
  *     security:
  *       - bearerAuth: []
@@ -163,8 +221,13 @@ router.post(
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
- *           schema: { $ref: '#/components/schemas/PetUpdate' }
+ *         multipart/form-data:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/PetUpdate'
+ *               - type: object
+ *                 properties:
+ *                   file: { type: string, format: binary, description: Optional — replaces the pet's photo }
  *     responses:
  *       200:
  *         description: The updated pet, in the same shape as public GET /pets/:id
@@ -177,7 +240,7 @@ router.post(
  *                   properties:
  *                     data: { $ref: '#/components/schemas/PetDetail' }
  *       400:
- *         description: No updatable fields provided, invalid field, or breedID doesn't reference an existing breed
+ *         description: No updatable fields provided, invalid field, an unsupported photo file type, or breedID doesn't reference an existing breed
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -193,6 +256,7 @@ router.put(
   "/pets/:id",
   authenticate,
   authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  singleFile("file"),
   petsController.updatePet,
 );
 
@@ -288,10 +352,11 @@ router.get(
  *   post:
  *     summary: Upload a photo for a pet (Staff, Admin)
  *     description: >
- *       Staff may only upload to pets at their own shelter; Admin may act
- *       on any. A pet can have multiple photos — the first one ever
- *       uploaded automatically becomes the primary (Pet.petPhoto); any
- *       later upload can also be made primary by sending primary=true.
+ *       v1 supports exactly one photo per pet, not a gallery — this REPLACES
+ *       whatever photo the pet had before (both the old Storage object and
+ *       its PetPhoto row are removed once the new one is safely committed).
+ *       Staff may only upload to pets at their own shelter; Admin may act on
+ *       any.
  *     tags: [Pets, Staff]
  *     security:
  *       - bearerAuth: []
@@ -309,10 +374,9 @@ router.get(
  *             required: [file]
  *             properties:
  *               file: { type: string, format: binary }
- *               primary: { type: string, enum: ["true", "false"] }
  *     responses:
  *       201:
- *         description: The pet's full photo list, each flagged with isPrimary
+ *         description: The pet's photo list (0 or 1 item in v1), each flagged with isPrimary
  *         content:
  *           application/json:
  *             schema:

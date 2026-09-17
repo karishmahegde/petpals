@@ -9,6 +9,8 @@ const badRequest = (message) => {
 
 const PET_SEX_VALUES = ["M", "F"]; // live DB column is character(1) — see schema.prisma's petSex note
 const PET_SIZE_VALUES = ["Small", "Medium", "Large"];
+const INTAKE_TYPE_VALUES = ["stray", "surrendered", "transferred"];
+const VALID_SORTS = ["newest"];
 const ADOPTION_STATUS_VALUES = [
   "incoming",
   "available",
@@ -26,6 +28,19 @@ const STRING_MAX = {
   microchipID: 45,
   petDesc: 500,
 };
+
+// PUT /pets/:id now optionally carries a photo alongside the field changes
+// (a single combined multipart request from the edit form's Save — see
+// logic/api/staffPetsApi.ts), so its body no longer arrives as parsed JSON
+// with real types: multer puts every non-file field on req.body as a
+// string. POST /pets stays plain JSON. validateField has to accept either
+// shape without weakening what it rejects, so numeric/boolean fields
+// coerce a STRING input before checking it, leaving a same-typed JSON value
+// (or any other wrong type) to fail exactly as before.
+const coerceIfString = (rawValue, coerce) =>
+  typeof rawValue === "string" ? coerce(rawValue) : rawValue;
+
+const PET_PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 // Required on create. The ticket listed breedID/petDOB/petSex/petColor/
 // petSize/intakeDate as POST's required set and framed petWeight/petHeight
@@ -48,6 +63,11 @@ const CREATE_REQUIRED_FIELDS = [
   "petHeight",
 ];
 
+// Optional on create — present-if-sent, validated the same as everywhere
+// else, but never required. petBGroup falls back to "N/A" when omitted
+// (see below); intakeType is nullable in the schema so it just stays null.
+const OPTIONAL_CREATE_FIELDS = ["petBGroup", "intakeType"];
+
 // PUT accepts a partial update of everything creatable, minus shelterID
 // (reassigning a pet to another shelter is a transfer, not a profile edit —
 // out of scope here), plus the ticket's explicit PUT-only additions.
@@ -59,7 +79,11 @@ const CREATE_REQUIRED_FIELDS = [
 // PUT-only (create always starts a pet at "available") — lets staff
 // manually correct/override it (e.g. mark deceased or transferred)
 // alongside the automatic Pending/Accepted transitions the adoption
-// application workflow already drives.
+// application workflow already drives. compatibleWithChildren/
+// compatibleWithPets/specialNeeds and featuredFlag are also PUT-only —
+// profile-facing judgment calls a shelter typically only makes once it's
+// had a chance to observe the pet, matching petDesc's own edit-only
+// treatment in the form.
 const UPDATABLE_FIELDS = [
   "breedID",
   "petName",
@@ -68,6 +92,7 @@ const UPDATABLE_FIELDS = [
   "petColor",
   "petSize",
   "intakeDate",
+  "intakeType",
   "petWeight",
   "petHeight",
   "petBGroup",
@@ -75,17 +100,22 @@ const UPDATABLE_FIELDS = [
   "microchipID",
   "featuredFlag",
   "adoptionStatus",
+  "compatibleWithChildren",
+  "compatibleWithPets",
+  "specialNeeds",
 ];
 
 // Shared by create (every required field present) and update (only present
 // fields are checked) so the two routes can't drift on what counts as valid.
 const validateField = (field, rawValue) => {
   switch (field) {
-    case "breedID":
-      if (!Number.isInteger(rawValue) || rawValue < 1) {
+    case "breedID": {
+      const breedID = coerceIfString(rawValue, Number);
+      if (!Number.isInteger(breedID) || breedID < 1) {
         throw badRequest("breedID must be a positive integer");
       }
-      return rawValue;
+      return breedID;
+    }
 
     case "petName":
     case "petColor":
@@ -118,7 +148,10 @@ const validateField = (field, rawValue) => {
       return rawValue.trim();
 
     case "petDesc":
-      if (rawValue === null) return null; // clearable
+      // null clears it (JSON callers); multipart has no way to send a real
+      // null, so an empty string means the same thing there — the edit
+      // form already collapses a blanked-out textarea to "" either way.
+      if (rawValue === null || rawValue === "") return null;
       if (typeof rawValue !== "string" || rawValue.length > STRING_MAX.petDesc) {
         throw badRequest(
           `petDesc must be a string of at most ${STRING_MAX.petDesc} characters`,
@@ -138,6 +171,13 @@ const validateField = (field, rawValue) => {
       }
       return rawValue;
 
+    case "intakeType":
+      if (rawValue === null || rawValue === "") return null; // nullable — how a pet arrived isn't always known
+      if (!INTAKE_TYPE_VALUES.includes(rawValue)) {
+        throw badRequest(`intakeType must be one of: ${INTAKE_TYPE_VALUES.join(", ")}`);
+      }
+      return rawValue;
+
     case "petDOB":
     case "intakeDate": {
       const parsed = new Date(rawValue);
@@ -148,17 +188,30 @@ const validateField = (field, rawValue) => {
     }
 
     case "petWeight":
-    case "petHeight":
-      if (typeof rawValue !== "number" || !Number.isFinite(rawValue) || rawValue <= 0) {
+    case "petHeight": {
+      const num = coerceIfString(rawValue, Number);
+      if (typeof num !== "number" || !Number.isFinite(num) || num <= 0) {
         throw badRequest(`${field} must be a positive number`);
       }
-      return rawValue;
+      return num;
+    }
 
     case "featuredFlag":
-      if (typeof rawValue !== "boolean") {
-        throw badRequest("featuredFlag must be a boolean");
+    case "compatibleWithChildren":
+    case "compatibleWithPets":
+    case "specialNeeds": {
+      const flag = coerceIfString(rawValue, (v) => v === "true");
+      if (typeof flag !== "boolean") {
+        throw badRequest(`${field} must be a boolean`);
       }
-      return rawValue;
+      // A multipart "false" string must actually mean false, not just
+      // "not the string 'true'" swallowing a typo — reject anything that
+      // isn't literally "true"/"false" rather than silently coercing it.
+      if (typeof rawValue === "string" && rawValue !== "true" && rawValue !== "false") {
+        throw badRequest(`${field} must be "true" or "false"`);
+      }
+      return flag;
+    }
 
     case "adoptionStatus":
       if (!ADOPTION_STATUS_VALUES.includes(rawValue)) {
@@ -193,6 +246,13 @@ const listMyShelterPets = async (req, res, next) => {
     );
   }
 
+  // sort is closed/fixed-value, so an unrecognized value is a 400 — same
+  // convention as public GET /pets's own sort param.
+  const { sort } = req.query;
+  if (sort !== undefined && !VALID_SORTS.includes(sort)) {
+    return next(badRequest(`sort must be one of: ${VALID_SORTS.join(", ")}`));
+  }
+
   try {
     const { data, pagination } = await petsService.listMyShelterPets(
       req.user.userID,
@@ -205,6 +265,7 @@ const listMyShelterPets = async (req, res, next) => {
         size: req.query.size,
         minAge: req.query.minAge,
         maxAge: req.query.maxAge,
+        sort,
       },
     );
     return successListResponse(
@@ -213,6 +274,26 @@ const listMyShelterPets = async (req, res, next) => {
       data,
       pagination,
     );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /staff/me/pets/:id ———————————————
+// Richer than public GET /pets/:id — see petsService.getShelterPetDetail's
+// design note. Powers the Pets tab's read-only detail view.
+const getShelterPetDetail = async (req, res, next) => {
+  const petID = Number(req.params.id);
+  if (!Number.isInteger(petID) || petID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const pet = await petsService.getShelterPetDetail(petID, {
+      role: req.user.role,
+      userID: req.user.userID,
+    });
+    return successResponse(res, "Pet retrieved successfully", pet);
   } catch (err) {
     return next(err);
   }
@@ -228,11 +309,13 @@ const createPet = async (req, res, next) => {
   }
 
   const data = {};
-  // petBGroup is optional on create (defaults to "N/A" — see UPDATABLE_FIELDS
-  // comment) but still validated if the caller does send it.
-  const fieldsToValidate = body.petBGroup !== undefined
-    ? [...CREATE_REQUIRED_FIELDS, "petBGroup"]
-    : CREATE_REQUIRED_FIELDS;
+  // OPTIONAL_CREATE_FIELDS (petBGroup, intakeType) are validated only if the
+  // caller actually sent them — petBGroup then falls back to "N/A" below;
+  // intakeType just stays absent (nullable in the schema).
+  const fieldsToValidate = [
+    ...CREATE_REQUIRED_FIELDS,
+    ...OPTIONAL_CREATE_FIELDS.filter((field) => body[field] !== undefined),
+  ];
   try {
     for (const field of fieldsToValidate) {
       data[field] = validateField(field, body[field]);
@@ -268,10 +351,24 @@ const createPet = async (req, res, next) => {
 };
 
 // ——————————————— PUT /pets/:id ———————————————
+// Multipart, not JSON — the edit form's Save now sends its field changes
+// and an optional new photo in ONE request (see logic/api/staffPetsApi.ts
+// and the singleFile("file") middleware on this route), replacing what used
+// to be two independent actions (Save the form, separately click Upload).
+// The photo is optional on every save; req.file is simply absent when the
+// staff member didn't touch it.
 const updatePet = async (req, res, next) => {
   const petID = Number(req.params.id);
   if (!Number.isInteger(petID) || petID < 1) {
     return next(badRequest("id must be a positive integer"));
+  }
+
+  if (req.file && !PET_PHOTO_MIME_TYPES.has(req.file.mimetype)) {
+    return next(
+      badRequest(
+        `Unsupported file type '${req.file.mimetype}'. Allowed: JPEG, PNG, WebP`,
+      ),
+    );
   }
 
   const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -285,15 +382,24 @@ const updatePet = async (req, res, next) => {
     return next(err);
   }
 
-  if (Object.keys(data).length === 0) {
+  if (Object.keys(data).length === 0 && !req.file) {
     return next(badRequest("No updatable fields provided"));
   }
 
+  const photoFile = req.file
+    ? { buffer: req.file.buffer, mimetype: req.file.mimetype }
+    : undefined;
+
   try {
-    const pet = await petsService.updatePet(petID, data, {
-      role: req.user.role,
-      userID: req.user.userID,
-    });
+    const pet = await petsService.updatePet(
+      petID,
+      data,
+      {
+        role: req.user.role,
+        userID: req.user.userID,
+      },
+      photoFile,
+    );
     return successResponse(res, "Pet updated successfully", pet);
   } catch (err) {
     return next(err);
@@ -339,9 +445,7 @@ const getPhotos = async (req, res, next) => {
 // ——————————————— POST /pets/:id/photos ———————————————
 // The shared upload middleware (middleware/upload.js's singleFile) also
 // allows HEIC/PDF, for the government-ID use case — narrowed further here
-// since the ticket specifically scopes pet photos to JPEG/PNG/WebP.
-const PET_PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-
+// (and on PUT /pets/:id above) since pet photos are scoped to JPEG/PNG/WebP.
 const addPhoto = async (req, res, next) => {
   const petID = Number(req.params.id);
   if (!Number.isInteger(petID) || petID < 1) {
@@ -358,16 +462,11 @@ const addPhoto = async (req, res, next) => {
     );
   }
 
-  // Multipart fields arrive as strings — only the exact string "true"
-  // enables it, same convention as every other boolean query/form flag in
-  // this codebase (e.g. adopterRiskFlag).
-  const makePrimary = req.body?.primary === "true";
-
   try {
     const photos = await petsService.addPhoto(
       petID,
       { role: req.user.role, userID: req.user.userID },
-      { file: { buffer: req.file.buffer, mimetype: req.file.mimetype }, makePrimary },
+      { file: { buffer: req.file.buffer, mimetype: req.file.mimetype } },
     );
     return successResponse(res, "Photo uploaded successfully", photos, 201);
   } catch (err) {
@@ -399,6 +498,7 @@ const deletePhoto = async (req, res, next) => {
 
 module.exports = {
   listMyShelterPets,
+  getShelterPetDetail,
   createPet,
   updatePet,
   deletePet,

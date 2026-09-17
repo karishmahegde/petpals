@@ -160,6 +160,150 @@ describe("Staff pet management endpoints", () => {
       expect(res.body.error.code).toBe("BAD_REQUEST");
       expect(prisma.staff.findUnique).not.toHaveBeenCalled();
     });
+
+    test("no sort param → orderBy defaults to petID descending", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.pet.findMany.mockResolvedValueOnce([]);
+      prisma.pet.count.mockResolvedValueOnce(0);
+
+      await request(app)
+        .get("/api/v1/staff/me/pets")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(prisma.pet.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { petID: "desc" } }),
+      );
+    });
+
+    // Staff Overview's New Arrivers widget: ?adoptionStatus=incoming&sort=newest
+    test("sort=newest → orderBy intakeDate descending", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.pet.findMany.mockResolvedValueOnce([]);
+      prisma.pet.count.mockResolvedValueOnce(0);
+
+      const res = await request(app)
+        .get("/api/v1/staff/me/pets")
+        .query({ adoptionStatus: "incoming", sort: "newest" })
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.pet.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { shelterID: 9, adoptionStatus: "incoming" },
+          orderBy: { intakeDate: "desc" },
+        }),
+      );
+    });
+
+    test("invalid sort value → 400 BAD_REQUEST", async () => {
+      const res = await request(app)
+        .get("/api/v1/staff/me/pets")
+        .query({ sort: "oldest" })
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.staff.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  // ————————————————————————————— GET /api/v1/staff/me/pets/:id —————————————————————————————
+  describe("GET /api/v1/staff/me/pets/:id", () => {
+    // Matches services/staff/pets.service.js's STAFF_PET_DETAIL_SELECT shape
+    // (PET_DETAIL_SELECT + shelterID/petCode/petSize/petBGroup/microchipID/
+    // intakeDate/intakeType/featuredFlag) — the extra fields public GET
+    // /pets/:id doesn't return.
+    const buildStaffPetRow = (overrides = {}) => ({
+      petID: 10,
+      petCode: "PE000010",
+      petName: "Rex",
+      petDOB: new Date(2021, 0, 1),
+      petSex: "M",
+      petColor: "Brown",
+      petPhoto: "rex.jpg",
+      petHeight: 40,
+      petWeight: 12.5,
+      petDesc: null,
+      petSize: "Medium",
+      petBGroup: "DEA1",
+      microchipID: "985141000000010",
+      intakeDate: new Date(2024, 5, 1),
+      intakeType: "stray",
+      featuredFlag: true,
+      adoptionStatus: "available",
+      shelterID: 9,
+      breed: { breedID: 3, breedName: "Beagle", species: { speciesName: "Dog" } },
+      shelter: { shelterID: 9, shelterName: "Athens Shelter", shelterAddress: "1 Main St" },
+      compatibleWithChildren: false,
+      compatibleWithPets: false,
+      specialNeeds: false,
+      ...overrides,
+    });
+
+    test("Staff: returns the richer detail shape (petCode, microchipID, petSize, petBGroup, raw petDOB, intakeType, featuredFlag)", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce(buildStaffPetRow());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .get("/api/v1/staff/me/pets/10")
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({
+        petID: 10,
+        petCode: "PE000010",
+        petName: "Rex",
+        petSex: "Male",
+        petSize: "Medium",
+        petBGroup: "DEA1",
+        microchipID: "985141000000010",
+        intakeType: "stray",
+        featuredFlag: true,
+      });
+      expect(new Date(res.body.data.petDOB).getFullYear()).toBe(2021);
+    });
+
+    test("Staff viewing another shelter's pet → 403 FORBIDDEN", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce(buildStaffPetRow({ shelterID: 9 }));
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 3 }); // different shelter
+
+      const res = await request(app)
+        .get("/api/v1/staff/me/pets/10")
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+    });
+
+    test("pet not found → 404 NOT_FOUND", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .get("/api/v1/staff/me/pets/999")
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe("NOT_FOUND");
+    });
+
+    test("non-integer id → 400 BAD_REQUEST", async () => {
+      const res = await request(app)
+        .get("/api/v1/staff/me/pets/abc")
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
+
+    test("Admin role → 403 FORBIDDEN (this endpoint is Staff-only, same as the list)", async () => {
+      const res = await request(app)
+        .get("/api/v1/staff/me/pets/10")
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(403);
+      expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
   });
 
   // ————————————————————————————— POST /pets —————————————————————————————
@@ -252,6 +396,31 @@ describe("Staff pet management endpoints", () => {
       );
       expect(prisma.staff.findUnique).not.toHaveBeenCalled();
     });
+
+    test("intakeType is optional on create, validated when sent", async () => {
+      prisma.breed.findUnique.mockResolvedValueOnce({ breedID: 3 });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.pet.create.mockResolvedValueOnce({ petID: 10 });
+
+      const res = await request(app)
+        .post("/api/v1/pets")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ ...VALID_CREATE_BODY, intakeType: "stray" });
+
+      expect(res.status).toBe(201);
+      expect(prisma.pet.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ intakeType: "stray" }),
+        }),
+      );
+
+      const bad = await request(app)
+        .post("/api/v1/pets")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ ...VALID_CREATE_BODY, intakeType: "bogus" });
+      expect(bad.status).toBe(400);
+      expect(prisma.pet.create).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ————————————————————————————— PUT /pets/:id —————————————————————————————
@@ -336,6 +505,255 @@ describe("Staff pet management endpoints", () => {
 
       expect(res.status).toBe(400);
       expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
+
+    // Multipart requests (the edit form's Save, now that it carries an
+    // optional photo) send every field as a string — validateField must
+    // coerce numeric/boolean fields the same way it already accepts a
+    // typed JSON value.
+    describe("multipart body (numeric/boolean coercion)", () => {
+      test("numeric fields arriving as strings are accepted and coerced", async () => {
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "placeholder.jpg",
+          photos: [],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.breed.findUnique.mockResolvedValueOnce({ breedID: 3 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("breedID", "3")
+          .field("petWeight", "12.5")
+          .field("petHeight", "40");
+
+        expect(res.status).toBe(200);
+        expect(prisma.pet.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { breedID: 3, petWeight: 12.5, petHeight: 40 },
+          }),
+        );
+      });
+
+      test("non-numeric string for a numeric field → 400 BAD_REQUEST", async () => {
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("petWeight", "not-a-number");
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe("BAD_REQUEST");
+        expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+      });
+
+      test('featuredFlag "true"/"false" strings are accepted; anything else is rejected', async () => {
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "placeholder.jpg",
+          photos: [],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("featuredFlag", "false");
+
+        expect(res.status).toBe(200);
+        expect(prisma.pet.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { featuredFlag: false } }),
+        );
+
+        const bad = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("featuredFlag", "yes");
+
+        expect(bad.status).toBe(400);
+      });
+
+      test('petDesc sent as an empty string clears it to null (multipart has no real null)', async () => {
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "placeholder.jpg",
+          photos: [],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("petDesc", "");
+
+        expect(res.status).toBe(200);
+        expect(prisma.pet.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { petDesc: null } }),
+        );
+      });
+
+      test("intakeType accepts a valid enum value, rejects an invalid one, and an empty string clears it", async () => {
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "placeholder.jpg",
+          photos: [],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("intakeType", "surrendered");
+
+        expect(res.status).toBe(200);
+        expect(prisma.pet.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { intakeType: "surrendered" } }),
+        );
+
+        const bad = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("intakeType", "adopted-from-tv");
+        expect(bad.status).toBe(400);
+
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "placeholder.jpg",
+          photos: [],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const cleared = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("intakeType", "");
+        expect(cleared.status).toBe(200);
+        expect(prisma.pet.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { intakeType: null } }),
+        );
+      });
+
+      test("compatibleWithChildren/compatibleWithPets/specialNeeds accept boolean strings", async () => {
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "placeholder.jpg",
+          photos: [],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("compatibleWithChildren", "true")
+          .field("compatibleWithPets", "false")
+          .field("specialNeeds", "true");
+
+        expect(res.status).toBe(200);
+        expect(prisma.pet.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: {
+              compatibleWithChildren: true,
+              compatibleWithPets: false,
+              specialNeeds: true,
+            },
+          }),
+        );
+      });
+    });
+
+    // The edit form's Save now optionally carries a new photo — see
+    // services/staff/pets.service.js's preparePhotoReplacement/
+    // cleanupOldPhotoFiles (same replace-not-add semantics as
+    // POST /pets/:id/photos, exercised in that describe block below).
+    describe("optional photo file", () => {
+      test("field changes + a photo are saved together — old photo replaced", async () => {
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "pets/10/photo-1.jpg",
+          photos: [{ photoURL: "pets/10/photo-1.jpg" }],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("petName", "Rex Jr.")
+          .attach("file", Buffer.from("fake-photo-bytes"), {
+            filename: "photo.jpg",
+            contentType: "image/jpeg",
+          });
+
+        expect(res.status).toBe(200);
+        expect(storage.uploadPrivateFile).toHaveBeenCalledWith(
+          "pet-images",
+          expect.stringMatching(/^pets\/10\/photo-\d+\.jpg$/),
+          expect.any(Buffer),
+          "image/jpeg",
+        );
+        expect(prisma.petPhoto.deleteMany).toHaveBeenCalledWith({
+          where: { petID: 10 },
+        });
+        // The field change and the new photo path land in the SAME
+        // pet.update call — one transaction, not two round trips.
+        expect(prisma.pet.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              petName: "Rex Jr.",
+              petPhoto: expect.stringMatching(/^pets\/10\/photo-\d+\.jpg$/),
+            }),
+          }),
+        );
+        expect(storage.deletePrivateFile).toHaveBeenCalledWith(
+          "pet-images",
+          "pets/10/photo-1.jpg",
+        );
+      });
+
+      test("unsupported photo file type → 400 BAD_REQUEST, nothing written", async () => {
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("petName", "Rex Jr.")
+          .attach("file", Buffer.from("not-an-image"), {
+            filename: "doc.pdf",
+            contentType: "application/pdf",
+          });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe("BAD_REQUEST");
+        expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+        expect(storage.uploadPrivateFile).not.toHaveBeenCalled();
+      });
+
+      test("no file attached — photo untouched, only the fields change", async () => {
+        prisma.pet.findUnique.mockResolvedValueOnce({
+          shelterID: 9,
+          petPhoto: "pets/10/photo-1.jpg",
+          photos: [{ photoURL: "pets/10/photo-1.jpg" }],
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+        prisma.pet.update.mockResolvedValueOnce({});
+
+        const res = await request(app)
+          .put("/api/v1/pets/10")
+          .set("Authorization", `Bearer ${staffToken()}`)
+          .field("petName", "Rex Jr.");
+
+        expect(res.status).toBe(200);
+        expect(storage.uploadPrivateFile).not.toHaveBeenCalled();
+        expect(prisma.petPhoto.deleteMany).not.toHaveBeenCalled();
+        expect(prisma.pet.update).toHaveBeenCalledWith({
+          where: { petID: 10 },
+          data: { petName: "Rex Jr." },
+        });
+      });
     });
   });
 
@@ -424,7 +842,7 @@ describe("Staff pet management endpoints", () => {
   });
 
   describe("POST /api/v1/pets/:id/photos", () => {
-    test("first photo uploaded becomes primary", async () => {
+    test("first photo uploaded becomes primary, placeholder is never deleted", async () => {
       prisma.pet.findUnique.mockResolvedValueOnce({
         shelterID: 9,
         petPhoto: "placeholder.jpg",
@@ -450,10 +868,47 @@ describe("Staff pet management endpoints", () => {
         expect.any(Buffer),
         "image/jpeg",
       );
-      // First photo -> the pet's petPhoto is updated too, inside the same transaction.
+      // The pet's petPhoto is updated to the new upload, inside the same transaction.
       expect(prisma.pet.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { petID: 10 } }),
       );
+      // No prior photo existed and the shared placeholder must never be
+      // deleted (every photo-less pet points at it).
+      expect(storage.deletePrivateFile).not.toHaveBeenCalled();
+    });
+
+    // v1: one photo per pet, not a gallery — a second upload replaces the
+    // first, both in the DB (old PetPhoto row purged) and in Storage (old
+    // object deleted, only after the new one is safely committed).
+    test("uploading a second photo replaces the first — old row and object are removed", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        petPhoto: "pets/10/photo-1.jpg",
+        photos: [{ photoURL: "pets/10/photo-1.jpg" }],
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.petPhoto.findMany.mockResolvedValueOnce([
+        { photoID: 2, photoURL: "pets/10/photo-2.jpg", uploadedAt: new Date() },
+      ]);
+
+      const res = await request(app)
+        .post("/api/v1/pets/10/photos")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .attach("file", Buffer.from("fake-photo-bytes"), {
+          filename: "photo.jpg",
+          contentType: "image/jpeg",
+        });
+
+      expect(res.status).toBe(201);
+      expect(prisma.petPhoto.deleteMany).toHaveBeenCalledWith({
+        where: { petID: 10 },
+      });
+      expect(storage.deletePrivateFile).toHaveBeenCalledWith(
+        "pet-images",
+        "pets/10/photo-1.jpg",
+      );
+      // Only the new photo remains — never both.
+      expect(res.body.data).toHaveLength(1);
     });
 
     test("unsupported file type → 400 BAD_REQUEST, nothing uploaded", async () => {
