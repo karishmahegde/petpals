@@ -51,6 +51,19 @@ const authHeaders = () => ({
 const objectUrl = (bucket, objectPath) =>
   `${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURI(objectPath)}`;
 
+// Turns a stored PET_IMAGES_BUCKET value into something an <img src> can
+// load. New uploads (addPhoto in staff/pets.service.js) store the bare
+// Storage object path (e.g. "pets/5/photo-123.jpg"), which needs the
+// bucket's public read URL prefix — but seed.js pets already have a full
+// absolute URL in petPhoto (e.g. "https://.../1.png"), which must pass
+// through unchanged. Only ever call this for PET_IMAGES_BUCKET (public);
+// government-ids stays private and is never rendered as an <img>.
+const toPublicFileUrl = (bucket, value) => {
+  if (!value) return value;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURI(value)}`;
+};
+
 // Uploads a buffer to `bucket` at `objectPath` (no leading slash). Fails if an
 // object already exists there (x-upsert: false). Returns the stored object path.
 const uploadPrivateFile = async (bucket, objectPath, buffer, contentType) => {
@@ -94,4 +107,5 @@ module.exports = {
   PET_IMAGES_BUCKET,
   uploadPrivateFile,
   deletePrivateFile,
+  toPublicFileUrl,
 };

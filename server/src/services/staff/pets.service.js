@@ -1,6 +1,13 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
-const { getPetDetails } = require("../public/pets.service");
+const {
+  getPetDetails,
+  formatAgeFromDOBYears,
+  formatSex,
+  toArray,
+  matchFilter,
+  buildAgeFilter,
+} = require("../public/pets.service");
 
 const notFound = (petID) => {
   const err = new Error(`No pet exists with ID ${petID}`);
@@ -92,6 +99,130 @@ const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) =
     throw noShelterAssigned();
   }
   return staff.shelterID;
+};
+
+// ——————————————— LIST MY SHELTER'S PETS (GET /staff/me/pets) ———————————————
+// GET /pets (public/pets.service.js's getAvailablePets) is hardcoded to
+// adoptionStatus: "available" — fine for the public catalog, useless for a
+// staff management list that also needs to show incoming/pending/adopted/
+// etc. pets at the staff member's own shelter. Same PetCard-ish shape as
+// the public list (reuses its age/sex formatters, and its
+// toArray/matchFilter/buildAgeFilter filter-building helpers, so the two
+// can't drift), plus adoptionStatus, which the public shape omits. Accepts
+// the same species/breed/size/minAge/maxAge filters as the public catalog
+// (same query param names too) so the Staff Pets tab can reuse the exact
+// same filter bar — just scoped to this shelter instead of network-wide,
+// and with no location/shelter filter (there's only ever one shelter here).
+const listMyShelterPets = async (
+  userID,
+  {
+    page = 1,
+    limit = 20,
+    adoptionStatus,
+    species,
+    breed,
+    size,
+    minAge,
+    maxAge,
+  } = {},
+) => {
+  const staff = await prisma.staff.findUnique({
+    where: { userID },
+    select: { shelterID: true },
+  });
+  if (!staff?.shelterID) {
+    throw noShelterAssigned();
+  }
+
+  const where = { shelterID: staff.shelterID };
+  if (adoptionStatus) {
+    where.adoptionStatus = adoptionStatus;
+  }
+
+  const speciesValues = toArray(species);
+  const breedValues = toArray(breed);
+  const sizeValues = toArray(size);
+
+  const breedWhere = {};
+  if (breedValues.length > 0) {
+    breedWhere.breedName = matchFilter(breedValues);
+  }
+  if (speciesValues.length > 0) {
+    breedWhere.species = { speciesID: matchFilter(speciesValues) };
+  }
+  if (Object.keys(breedWhere).length > 0) {
+    where.breed = breedWhere;
+  }
+
+  if (sizeValues.length > 0) {
+    where.petSize = matchFilter(sizeValues);
+  }
+
+  const ageFilter = buildAgeFilter(minAge, maxAge);
+  if (ageFilter) {
+    where.petDOB = ageFilter;
+  }
+
+  const skip = (page - 1) * limit;
+  const [pets, total] = await Promise.all([
+    prisma.pet.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { petID: "desc" },
+      select: {
+        petID: true,
+        petName: true,
+        petDOB: true,
+        petPhoto: true,
+        petSex: true,
+        adoptionStatus: true,
+        breed: {
+          select: {
+            breedName: true,
+            species: { select: { speciesName: true } },
+          },
+        },
+      },
+    }),
+    prisma.pet.count({ where }),
+  ]);
+
+  const data = pets.map((pet) => ({
+    petID: pet.petID,
+    petName: pet.petName,
+    petAge: formatAgeFromDOBYears(pet.petDOB),
+    petSex: formatSex(pet.petSex),
+    petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, pet.petPhoto),
+    adoptionStatus: pet.adoptionStatus,
+    breed: {
+      breedName: pet.breed.breedName,
+      speciesName: pet.breed.species.speciesName,
+    },
+  }));
+
+  return {
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+// ——————————————— GET PHOTOS (GET /pets/:id/photos) ———————————————
+// Read-only counterpart to addPhoto/deletePhoto's shared listPhotos — lets
+// the Staff pet detail panel load the current gallery on open, without
+// needing an upload/delete round trip first.
+const getPhotos = async (petID, { role, userID }) => {
+  const existing = await prisma.pet.findUnique({
+    where: { petID },
+    select: { shelterID: true, petPhoto: true },
+  });
+  if (!existing) {
+    throw notFound(petID);
+  }
+
+  await assertStaffOwnsShelter(role, userID, existing.shelterID);
+
+  return listPhotos(petID, existing.petPhoto);
 };
 
 // ——————————————— CREATE PET (POST /pets) ———————————————
@@ -223,6 +354,10 @@ const EXT_BY_MIME = {
 // current primary (Pet.petPhoto) — there's no isPrimary column on PetPhoto
 // itself, primary-ness is just "this row's URL happens to match
 // Pet.petPhoto right now".
+// isPrimary compares the RAW stored object paths (before the public-URL
+// conversion below) — photo.photoURL and primaryPhotoURL are always both
+// either bare Storage paths (new uploads) or both absolute seed URLs, so
+// straight string equality holds either way.
 const listPhotos = async (petID, primaryPhotoURL) => {
   const photos = await prisma.petPhoto.findMany({
     where: { petID },
@@ -230,7 +365,9 @@ const listPhotos = async (petID, primaryPhotoURL) => {
     select: { photoID: true, photoURL: true, uploadedAt: true },
   });
   return photos.map((photo) => ({
-    ...photo,
+    photoID: photo.photoID,
+    photoURL: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, photo.photoURL),
+    uploadedAt: photo.uploadedAt,
     isPrimary: photo.photoURL === primaryPhotoURL,
   }));
 };
@@ -327,4 +464,12 @@ const deletePhoto = async (petID, photoID, { role, userID }) => {
   return listPhotos(petID, primaryPhotoURL);
 };
 
-module.exports = { createPet, updatePet, deletePet, addPhoto, deletePhoto };
+module.exports = {
+  listMyShelterPets,
+  createPet,
+  updatePet,
+  deletePet,
+  getPhotos,
+  addPhoto,
+  deletePhoto,
+};

@@ -227,6 +227,13 @@ const schemas = {
             type: "object",
             properties: { shelterName: { type: "string" } },
           },
+          adopter: {
+            type: "object",
+            properties: {
+              adopterName: { type: "string" },
+              adopterEmail: { type: "string" },
+            },
+          },
         },
       },
     ],

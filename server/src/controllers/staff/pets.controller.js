@@ -1,5 +1,5 @@
 const petsService = require("../../services/staff/pets.service");
-const { successResponse } = require("../../utils/response");
+const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
   const err = new Error(message);
@@ -9,6 +9,15 @@ const badRequest = (message) => {
 
 const PET_SEX_VALUES = ["M", "F"]; // live DB column is character(1) — see schema.prisma's petSex note
 const PET_SIZE_VALUES = ["Small", "Medium", "Large"];
+const ADOPTION_STATUS_VALUES = [
+  "incoming",
+  "available",
+  "pending",
+  "adopted",
+  "fostered",
+  "transferred",
+  "deceased",
+];
 
 const STRING_MAX = {
   petName: 45,
@@ -46,7 +55,11 @@ const CREATE_REQUIRED_FIELDS = [
 // also NOT NULL with no default — unlike petName/petWeight/petHeight, a
 // blood group is routinely unknown at shelter intake, so it defaults to
 // "N/A" (matching the existing seed-data convention) when omitted on
-// create, and can be filled in later via PUT.
+// create, and can be filled in later via PUT. adoptionStatus is also
+// PUT-only (create always starts a pet at "available") — lets staff
+// manually correct/override it (e.g. mark deceased or transferred)
+// alongside the automatic Pending/Accepted transitions the adoption
+// application workflow already drives.
 const UPDATABLE_FIELDS = [
   "breedID",
   "petName",
@@ -61,6 +74,7 @@ const UPDATABLE_FIELDS = [
   "petDesc",
   "microchipID",
   "featuredFlag",
+  "adoptionStatus",
 ];
 
 // Shared by create (every required field present) and update (only present
@@ -146,8 +160,61 @@ const validateField = (field, rawValue) => {
       }
       return rawValue;
 
+    case "adoptionStatus":
+      if (!ADOPTION_STATUS_VALUES.includes(rawValue)) {
+        throw badRequest(
+          `adoptionStatus must be one of: ${ADOPTION_STATUS_VALUES.join(", ")}`,
+        );
+      }
+      return rawValue;
+
     default:
       return rawValue;
+  }
+};
+
+// ——————————————— GET /staff/me/pets ———————————————
+// species/breed/size/minAge/maxAge use the exact same query param names and
+// repeatable-value convention as public GET /pets (routes/public/pets.routes.js)
+// so the frontend's staff filter bar can reuse that same request-building logic.
+const listMyShelterPets = async (req, res, next) => {
+  const page = Number(req.query.page) || 1;
+  const limit = Math.min(Number(req.query.limit) || 20, 100);
+  const adoptionStatus =
+    typeof req.query.adoptionStatus === "string"
+      ? req.query.adoptionStatus
+      : undefined;
+
+  if (adoptionStatus && !ADOPTION_STATUS_VALUES.includes(adoptionStatus)) {
+    return next(
+      badRequest(
+        `adoptionStatus must be one of: ${ADOPTION_STATUS_VALUES.join(", ")}`,
+      ),
+    );
+  }
+
+  try {
+    const { data, pagination } = await petsService.listMyShelterPets(
+      req.user.userID,
+      {
+        page,
+        limit,
+        adoptionStatus,
+        species: req.query.species,
+        breed: req.query.breed,
+        size: req.query.size,
+        minAge: req.query.minAge,
+        maxAge: req.query.maxAge,
+      },
+    );
+    return successListResponse(
+      res,
+      "Pets retrieved successfully",
+      data,
+      pagination,
+    );
+  } catch (err) {
+    return next(err);
   }
 };
 
@@ -251,6 +318,24 @@ const deletePet = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /pets/:id/photos ———————————————
+const getPhotos = async (req, res, next) => {
+  const petID = Number(req.params.id);
+  if (!Number.isInteger(petID) || petID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const photos = await petsService.getPhotos(petID, {
+      role: req.user.role,
+      userID: req.user.userID,
+    });
+    return successResponse(res, "Photos retrieved successfully", photos);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— POST /pets/:id/photos ———————————————
 // The shared upload middleware (middleware/upload.js's singleFile) also
 // allows HEIC/PDF, for the government-ID use case — narrowed further here
@@ -312,4 +397,12 @@ const deletePhoto = async (req, res, next) => {
   }
 };
 
-module.exports = { createPet, updatePet, deletePet, addPhoto, deletePhoto };
+module.exports = {
+  listMyShelterPets,
+  createPet,
+  updatePet,
+  deletePet,
+  getPhotos,
+  addPhoto,
+  deletePhoto,
+};

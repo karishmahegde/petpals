@@ -13,6 +13,87 @@ const router = express.Router();
 
 /**
  * @swagger
+ * /staff/me/pets:
+ *   get:
+ *     summary: List the staff member's own shelter's pets (Staff)
+ *     description: >
+ *       Unlike the public GET /pets (hardcoded to adoptionStatus=available
+ *       for the catalog), this returns every pet at the staff member's
+ *       shelter regardless of status, optionally filtered to one status.
+ *     tags: [Pets, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: adoptionStatus
+ *         schema: { type: string, enum: [incoming, available, pending, adopted, fostered, transferred, deceased] }
+ *       - in: query
+ *         name: species
+ *         schema: { type: array, items: { type: integer, minimum: 1 } }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable speciesID filter — same convention as public GET /pets
+ *       - in: query
+ *         name: breed
+ *         schema: { type: array, items: { type: string } }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable breedName filter — same convention as public GET /pets
+ *       - in: query
+ *         name: size
+ *         schema: { type: array, items: { type: string, enum: [Small, Medium, Large] } }
+ *         style: form
+ *         explode: true
+ *       - in: query
+ *         name: minAge
+ *         schema: { type: integer, minimum: 0 }
+ *         description: Minimum age in MONTHS (inclusive)
+ *       - in: query
+ *         name: maxAge
+ *         schema: { type: integer, minimum: 0 }
+ *         description: Maximum age in MONTHS (inclusive)
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: >
+ *           Paginated list of the shelter's pets, in the same
+ *           petID/petName/petAge/petSex/petPhoto/breed shape as public GET
+ *           /pets, plus adoptionStatus (which that public shape omits).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       400:
+ *         description: Invalid adoptionStatus value
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       409:
+ *         description: The staff member has no shelter assigned yet
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.get(
+  "/staff/me/pets",
+  authenticate,
+  authorizeRoles(ROLES.STAFF),
+  petsController.listMyShelterPets,
+);
+
+/**
+ * @swagger
  * /pets:
  *   post:
  *     summary: Create a new pet profile (Staff, Admin)
@@ -154,6 +235,51 @@ router.delete(
   authenticate,
   authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
   petsController.deletePet,
+);
+
+/**
+ * @swagger
+ * /pets/{id}/photos:
+ *   get:
+ *     summary: List a pet's photos (Staff, Admin)
+ *     description: >
+ *       Read-only counterpart to POST/DELETE .../photos — lets the pet
+ *       detail view load the current gallery without an upload/delete
+ *       round trip first. Staff may only view pets at their own shelter.
+ *     tags: [Pets, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The pet's full photo list, each flagged with isPrimary
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/PetPhoto' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Staff attempting to view photos of a pet at another shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/pets/:id/photos",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  petsController.getPhotos,
 );
 
 /**

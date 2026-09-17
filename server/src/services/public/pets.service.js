@@ -1,4 +1,8 @@
 const prisma = require("../../config/prisma");
+const storage = require("../storage");
+
+const publicPetPhoto = (petPhoto) =>
+  storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, petPhoto);
 
 // Normalizes a filter value coming from req.query to array form: undefined -> [],
 // a single value -> [value], an already-repeated query param -> passed through as-is.
@@ -153,7 +157,7 @@ const getAvailablePets = async (filters = {}, pagination = {}) => {
     petName: pet.petName,
     petAge: formatAgeFromDOBYears(pet.petDOB),
     petSex: formatSex(pet.petSex),
-    petPhoto: pet.petPhoto,
+    petPhoto: publicPetPhoto(pet.petPhoto),
     breed: {
       breedName: pet.breed.breedName,
       speciesName: pet.breed.species.speciesName,
@@ -195,7 +199,7 @@ const getFeaturedPets = async () => {
     petName: pet.petName,
     petAge: formatAgeFromDOBYears(pet.petDOB),
     petSex: formatSex(pet.petSex),
-    petPhoto: pet.petPhoto,
+    petPhoto: publicPetPhoto(pet.petPhoto),
     breed: {
       breedName: pet.breed.breedName,
       speciesName: pet.breed.species.speciesName,
@@ -238,7 +242,7 @@ const formatPetDetail = (pet) => ({
   petName: pet.petName,
   petAge: formatAgeFromDOB(pet.petDOB),
   petSex: formatSex(pet.petSex),
-  petPhoto: pet.petPhoto,
+  petPhoto: publicPetPhoto(pet.petPhoto),
   petColor: pet.petColor,
   petHeight: pet.petHeight,
   petWeight: pet.petWeight,
@@ -282,4 +286,7 @@ module.exports = {
   formatPetDetail,
   formatAgeFromDOBYears,
   formatSex,
+  toArray,
+  matchFilter,
+  buildAgeFilter,
 };

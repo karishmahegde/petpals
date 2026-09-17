@@ -237,6 +237,9 @@ const getApplicationById = async (applicationID, user) => {
       },
       shelter: { select: { shelterName: true } },
       staff: { select: { staffName: true } },
+      adopter: {
+        select: { adopterName: true, user: { select: { userEmail: true } } },
+      },
     },
   });
 
@@ -277,6 +280,14 @@ const getApplicationById = async (applicationID, user) => {
     },
     shelter: { shelterName: application.shelter.shelterName },
     assignedStaffName: application.staff ? application.staff.staffName : null,
+    // Only meaningful for Staff/Admin reviewing someone else's application —
+    // harmless for an Adopter viewing their own (it's just their own name/
+    // email reflected back), so this is unconditional rather than
+    // role-gated like assignedStaffName isn't either.
+    adopter: {
+      adopterName: application.adopter.adopterName,
+      adopterEmail: application.adopter.user.userEmail,
+    },
   };
 };
 
@@ -409,6 +420,12 @@ const STAFF_LIST_SELECT = {
   },
 };
 
+// Pending (needs review) first, then Rejected, then Accepted, then
+// Withdrawn — not a plain createdAt sort, so it can't be expressed as a
+// single Prisma `orderBy` without leaning on the ApplicationStatus enum's
+// declaration order (fragile/coincidental, and not this priority anyway).
+const STATUS_SORT_PRIORITY = { Pending: 0, Rejected: 1, Accepted: 2, Withdrawn: 3 };
+
 const listApplicationsForStaff = async (
   { role, userID },
   { status, shelterID, page = 1, limit = 20 } = {},
@@ -433,16 +450,25 @@ const listApplicationsForStaff = async (
     where.shelterID = shelterID;
   }
 
-  const [rows, total] = await Promise.all([
-    prisma.adoptionApplication.findMany({
-      where,
-      select: STAFF_LIST_SELECT,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.adoptionApplication.count({ where }),
-  ]);
+  // The status-priority sort can't be pushed into the DB query without raw
+  // SQL, so this fetches every matching row (a single shelter's queue,
+  // never network-wide) and sorts/paginates in memory instead.
+  const allRows = await prisma.adoptionApplication.findMany({
+    where,
+    select: STAFF_LIST_SELECT,
+    orderBy: { createdAt: "desc" },
+  });
+
+  allRows.sort((a, b) => {
+    const priorityDiff =
+      STATUS_SORT_PRIORITY[a.applicationStatus] -
+      STATUS_SORT_PRIORITY[b.applicationStatus];
+    if (priorityDiff !== 0) return priorityDiff;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  const total = allRows.length;
+  const rows = allRows.slice((page - 1) * limit, (page - 1) * limit + limit);
 
   const data = rows.map((app) => ({
     applicationID: app.applicationID,
