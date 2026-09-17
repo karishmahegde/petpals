@@ -1,5 +1,5 @@
 const visitsService = require("../../services/adopter/visits.service");
-const { successResponse } = require("../../utils/response");
+const { successResponse, successListResponse } = require("../../utils/response");
 
 const REMARKS_MAX = 300; // schema.prisma: remarks is VarChar(300)
 
@@ -69,6 +69,61 @@ const createVisit = async (req, res, next) => {
   }
 };
 
+// ——————————————— GET /visits (staff queue) ———————————————
+// Staff/Admin-scoped, paginated shelter-wide visit queue — distinct from
+// GET /adopters/me/visits (one adopter's own visits). Same page/limit/
+// ?upcoming= conventions as GET /adopters/me/visits and the staff-facing
+// GET /adoption-applications queue.
+const listVisits = async (req, res, next) => {
+  const {
+    upcoming,
+    shelterID: shelterIDRaw,
+    page: pageRaw,
+    limit: limitRaw,
+  } = req.query;
+
+  let page = 1;
+  if (pageRaw !== undefined) {
+    page = Number(pageRaw);
+    if (!Number.isInteger(page) || page < 1) {
+      return next(badRequest("page must be an integer >= 1"));
+    }
+  }
+
+  let limit = 20;
+  if (limitRaw !== undefined) {
+    limit = Number(limitRaw);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return next(badRequest("limit must be an integer between 1 and 100"));
+    }
+  }
+
+  // Only meaningful for Admin — a Staff caller's shelter is always their
+  // own, resolved server-side in the service, never from a query param.
+  let shelterID;
+  if (req.user.role === "Admin" && shelterIDRaw !== undefined) {
+    shelterID = Number(shelterIDRaw);
+    if (!Number.isInteger(shelterID) || shelterID < 1) {
+      return next(badRequest("shelterID must be a positive integer"));
+    }
+  }
+
+  try {
+    const result = await visitsService.listVisitsForStaff(
+      { role: req.user.role, userID: req.user.userID },
+      { upcomingOnly: upcoming === "true", shelterID, page, limit },
+    );
+    return successListResponse(
+      res,
+      "Visits retrieved successfully",
+      result.data,
+      result.pagination,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— GET /visits/:id ———————————————
 const getVisitDetail = async (req, res, next) => {
   let visitID;
@@ -90,7 +145,16 @@ const getVisitDetail = async (req, res, next) => {
 };
 
 // ——————————————— PATCH /visits/:id ———————————————
-const cancelVisit = async (req, res, next) => {
+// Adopter (Cancel) or Staff/Admin (Confirm/Complete) — which transitions are
+// valid depends on the caller's role, not a shared enum. Matches
+// adoptionApplications.controller.js's updateApplicationStatus design: an
+// Adopter reaching for a Staff-only value gets the same generic 400 any
+// other bogus value would, not a 403 that leaks that it's valid for someone
+// else.
+const VALID_ADOPTER_VISIT_STATUS_CHANGES = ["Cancelled"];
+const VALID_STAFF_VISIT_STATUS_CHANGES = ["Confirmed", "Completed"];
+
+const updateVisitStatus = async (req, res, next) => {
   let visitID;
   try {
     visitID = parseId(req.params.id);
@@ -98,17 +162,28 @@ const cancelVisit = async (req, res, next) => {
     return next(err);
   }
 
-  // Adopters may only cancel — no other status transition is exposed here.
-  if (req.body?.visitStatus !== "Cancelled") {
-    return next(badRequest('visitStatus is required and must be "Cancelled"'));
+  const isStaffActor = req.user.role === "Staff" || req.user.role === "Admin";
+  const allowedStatuses = isStaffActor
+    ? VALID_STAFF_VISIT_STATUS_CHANGES
+    : VALID_ADOPTER_VISIT_STATUS_CHANGES;
+
+  const { visitStatus } = req.body ?? {};
+  if (!allowedStatuses.includes(visitStatus)) {
+    return next(
+      badRequest(`visitStatus is required and must be one of: ${allowedStatuses.join(", ")}`),
+    );
   }
 
   try {
-    const visit = await visitsService.cancelVisit(visitID, req.user.userID);
-    return successResponse(res, "Visit cancelled successfully", visit);
+    const visit = await visitsService.updateVisitStatus(
+      visitID,
+      { visitStatus },
+      { role: req.user.role, userID: req.user.userID },
+    );
+    return successResponse(res, `Visit ${visitStatus.toLowerCase()} successfully`, visit);
   } catch (err) {
     return next(err);
   }
 };
 
-module.exports = { createVisit, getVisitDetail, cancelVisit };
+module.exports = { createVisit, listVisits, getVisitDetail, updateVisitStatus };

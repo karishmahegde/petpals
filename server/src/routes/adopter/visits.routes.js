@@ -61,6 +61,58 @@ router.post(
 
 /**
  * @swagger
+ * /visits:
+ *   get:
+ *     summary: Shelter-wide visit queue (Staff, Admin)
+ *     description: >
+ *       Paginated. Staff sees only their own shelter's visits (shelterID
+ *       re-fetched fresh from the STAFF table, never a query param); Admin
+ *       sees all, optionally filtered by ?shelterID=. ?upcoming=true limits
+ *       to visits still in the future.
+ *     tags: [Visits, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: upcoming
+ *         schema: { type: string, enum: ["true"] }
+ *       - in: query
+ *         name: shelterID
+ *         schema: { type: integer }
+ *         description: Admin branch only — Staff is always scoped to their own shelter.
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Paginated list of visits, with adopter and pet summary fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/VisitQueueItem' }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get(
+  "/",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  controller.listVisits,
+);
+
+/**
+ * @swagger
  * /visits/{id}:
  *   get:
  *     summary: Full detail for one of the adopter's visits (Visits detail panel)
@@ -93,12 +145,16 @@ router.post(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *   patch:
- *     summary: Cancel a scheduled visit
+ *     summary: Cancel (Adopter) or Confirm/Complete (Staff, Admin) a visit
  *     description: >
- *       Adopter-only. The adopter may cancel their own visit, provided it
- *       hasn't already passed and isn't already Cancelled or Completed.
- *       Staff confirming or completing a visit is not handled here yet.
- *     tags: [Visits]
+ *       Which transitions are valid depends on the caller's role, not a
+ *       shared enum: Adopter may cancel their own visit, provided it hasn't
+ *       already passed and isn't already Cancelled or Completed. Staff/Admin
+ *       may confirm an unconfirmed (null-status) visit, then complete a
+ *       Confirmed one — Staff only at their own shelter (403 otherwise);
+ *       Admin any shelter. Confirming/completing sets staffID to the acting
+ *       Staff member (never set for an Admin actor).
+ *     tags: [Visits, Staff]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -117,10 +173,11 @@ router.post(
  *             properties:
  *               visitStatus:
  *                 type: string
- *                 enum: [Cancelled]
+ *                 description: Cancelled (Adopter) or Confirmed/Completed (Staff, Admin)
+ *                 enum: [Cancelled, Confirmed, Completed]
  *     responses:
  *       200:
- *         description: The cancelled visit, with shelter name and (when set) pet name
+ *         description: The updated visit, with shelter name and (when set) pet name
  *         content:
  *           application/json:
  *             schema:
@@ -132,13 +189,13 @@ router.post(
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403:
- *         description: Role not permitted, or an adopter acting on another adopter's visit
+ *         description: Role not permitted, an adopter acting on another adopter's visit, or Staff acting on another shelter's visit
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: The visit has already passed, or is already Cancelled/Completed
+ *         description: The visit isn't in a status the requested transition allows (e.g. completing an already-Cancelled visit)
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -153,8 +210,8 @@ router.get(
 router.patch(
   "/:id",
   authenticate,
-  authorizeRoles(ROLES.ADOPTER),
-  controller.cancelVisit,
+  authorizeRoles(ROLES.ADOPTER, ROLES.STAFF, ROLES.ADMIN),
+  controller.updateVisitStatus,
 );
 
 module.exports = router;
