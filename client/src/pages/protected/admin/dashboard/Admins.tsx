@@ -17,8 +17,8 @@ import {
   type AdminAccountStatus,
 } from "../../../../logic/api/adminsApi";
 import useAuthStore from "../../../../logic/store/useAuthStore";
-import AdminDetailPanel from "./admins/AdminDetailPanel";
-import AdminApprovalPanel from "./admins/AdminApprovalPanel";
+import AdminDetailPanel from "./sections/admins/AdminDetailPanel";
+import AdminApprovalPanel from "./sections/admins/AdminApprovalPanel";
 
 const PAGE_SIZE = 10;
 

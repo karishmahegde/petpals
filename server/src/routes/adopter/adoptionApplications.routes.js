@@ -81,42 +81,67 @@ router.post(
  * @swagger
  * /adoption-applications:
  *   get:
- *     summary: Look up the logged-in adopter's application by Stripe Checkout Session ID
+ *     summary: >
+ *       Look up an adopter's application by Stripe Checkout Session ID
+ *       (Adopter), OR list the shelter's application queue (Staff, Admin)
  *     description: >
- *       Used by the post-payment confirmation page to poll for the
- *       AdoptionApplication row the webhook creates. Returns data: null
- *       (not a 404) while the webhook hasn't landed yet — that's the
- *       expected common answer for a poll, not an error.
- *     tags: [Adoption Applications]
+ *       One path, two purposes, distinguished by whether checkoutSessionId
+ *       is present in the query — matches the original API design.
+ *
+ *       With checkoutSessionId (Adopter only): used by the post-payment
+ *       confirmation page to poll for the AdoptionApplication row the
+ *       webhook creates. Returns data: null (not a 404) while the webhook
+ *       hasn't landed yet — that's the expected common answer for a poll,
+ *       not an error.
+ *
+ *       Without it (Staff, Admin only): a paginated, filterable queue.
+ *       Staff sees only their own shelter's applications (shelterID
+ *       re-fetched fresh from the STAFF table, never the JWT, never a query
+ *       param); Admin sees all, optionally filtered by ?shelterID=. Both
+ *       support ?status=.
+ *     tags: [Adoption Applications, Staff]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: checkoutSessionId
- *         required: true
  *         schema: { type: string }
+ *         description: Adopter-only branch. Required to trigger it.
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [Pending, Accepted, Rejected, Withdrawn] }
+ *         description: Staff/Admin branch only.
+ *       - in: query
+ *         name: shelterID
+ *         schema: { type: integer }
+ *         description: Admin branch only — Staff is always scoped to their own shelter.
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *         description: Staff/Admin branch only.
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *         description: Staff/Admin branch only.
  *     responses:
  *       200:
- *         description: The application record if found yet, otherwise null
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/ApiEnvelope'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       nullable: true
- *                       $ref: '#/components/schemas/AdoptionApplicationDetail'
+ *         description: >
+ *           Either the single application record (or null) for the
+ *           checkoutSessionId branch, or a paginated list for the
+ *           Staff/Admin branch
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
- *       403: { $ref: '#/components/responses/Forbidden' }
+ *       403:
+ *         description: Adopter without checkoutSessionId, or Staff/Admin with it
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.get(
   "/",
   authenticate,
-  authorizeRoles(ROLES.ADOPTER),
-  controller.getByCheckoutSession,
+  authorizeRoles(ROLES.ADOPTER, ROLES.STAFF, ROLES.ADMIN),
+  controller.getApplications,
 );
 
 /**
@@ -168,15 +193,22 @@ router.get(
  * @swagger
  * /adoption-applications/{id}/status:
  *   patch:
- *     summary: Withdraw an adoption application
+ *     summary: Withdraw (Adopter) or Accept/Reject (Staff, Admin) an adoption application
  *     description: >
- *       Adopter-only. The adopter may move their own application to
- *       'Withdrawn', and only from 'Pending' or 'Accepted'. The $15
- *       processing fee is not refunded. Withdrawing clears the active
+ *       Which transitions are valid depends on the caller's role, not a
+ *       shared enum: Adopter may move their own application to 'Withdrawn'
+ *       from 'Pending' or 'Accepted' (the $15 processing fee is not
+ *       refunded). Staff/Admin may move a 'Pending' application to
+ *       'Accepted' or 'Rejected' — Staff only at their own shelter (403
+ *       otherwise); Admin any shelter. Accepting sets staffID to the acting
+ *       Staff member (never set for an Admin actor — the column FKs
+ *       Staff.userID, which an Admin doesn't have) and sets the pet's
+ *       adoptionStatus to 'adopted'; Rejecting leaves the pet's
+ *       adoptionStatus untouched, still available for other applicants.
+ *       Moving to 'Withdrawn' or 'Rejected' clears the active
  *       (adopterID, petID) uniqueness constraint, so the adopter can
- *       re-apply for the same pet afterwards. Staff-driven status
- *       transitions are not handled here yet.
- *     tags: [Adoption Applications]
+ *       re-apply for the same pet afterwards.
+ *     tags: [Adoption Applications, Staff]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -195,7 +227,13 @@ router.get(
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [Withdrawn]
+ *                 description: Withdrawn (Adopter) or Accepted/Rejected (Staff, Admin)
+ *                 enum: [Withdrawn, Accepted, Rejected]
+ *               staffRemark:
+ *                 type: string
+ *                 maxLength: 500
+ *                 nullable: true
+ *                 description: Staff/Admin only — ignored for an Adopter caller
  *     responses:
  *       200:
  *         description: The updated application, with nested pet.petName and shelter.shelterName
@@ -210,13 +248,13 @@ router.get(
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403:
- *         description: Role not permitted, or an adopter acting on another adopter's application
+ *         description: Role not permitted, an adopter acting on another adopter's application, or Staff acting on another shelter's application
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: The application is already Rejected or Withdrawn, so it can't be withdrawn
+ *         description: The application isn't in a status the requested transition allows
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -224,7 +262,7 @@ router.get(
 router.patch(
   "/:id/status",
   authenticate,
-  authorizeRoles(ROLES.ADOPTER),
+  authorizeRoles(ROLES.ADOPTER, ROLES.STAFF, ROLES.ADMIN),
   controller.updateApplicationStatus,
 );
 

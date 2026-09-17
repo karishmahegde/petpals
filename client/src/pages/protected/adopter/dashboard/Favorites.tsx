@@ -8,7 +8,7 @@ import PetDetailsModal from "../../../../components/ui/pets/PetDetailsModal";
 import { getMyFavorites } from "../../../../logic/api/adoptersApi";
 import FavoritesFilterBar, {
   type FavoritesFilters,
-} from "./favorites/FavoritesFilterBar";
+} from "./sections/favorites/FavoritesFilterBar";
 
 const INITIAL_FILTERS: FavoritesFilters = {
   species: [],

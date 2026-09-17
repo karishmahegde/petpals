@@ -237,6 +237,9 @@ const getApplicationById = async (applicationID, user) => {
       },
       shelter: { select: { shelterName: true } },
       staff: { select: { staffName: true } },
+      adopter: {
+        select: { adopterName: true, user: { select: { userEmail: true } } },
+      },
     },
   });
 
@@ -277,6 +280,14 @@ const getApplicationById = async (applicationID, user) => {
     },
     shelter: { shelterName: application.shelter.shelterName },
     assignedStaffName: application.staff ? application.staff.staffName : null,
+    // Only meaningful for Staff/Admin reviewing someone else's application —
+    // harmless for an Adopter viewing their own (it's just their own name/
+    // email reflected back), so this is unconditional rather than
+    // role-gated like assignedStaffName isn't either.
+    adopter: {
+      adopterName: application.adopter.adopterName,
+      adopterEmail: application.adopter.user.userEmail,
+    },
   };
 };
 
@@ -374,18 +385,139 @@ const listAdoptedPetsByAdopter = async (adopterID) => {
   }));
 };
 
-// ——————————————— WITHDRAW APPLICATION (PATCH /adoption-applications/:id/status) ———————————————
-// Adopter-initiated only, and only to 'Withdrawn'. Staff-driven transitions
-// (Pending → Accepted/Rejected) are separate, later work — this handles just
-// the adopter withdrawing their own application. Moving to 'Withdrawn' also
-// clears the partial unique index on (adopterID, petID), so re-applying for
-// the same pet stays possible.
-const WITHDRAWABLE_STATUSES = ["Pending", "Accepted"];
+// ——————————————— LIST APPLICATIONS FOR STAFF/ADMIN (GET /adoption-applications) ———————————————
+// Staff/Admin-scoped queue, distinct from listApplicationsByAdopter above
+// (which is a single adopter's own applications). Includes pet AND adopter
+// summary fields, since staff are reviewing applications submitted by many
+// different adopters, not just one.
+const STAFF_LIST_SELECT = {
+  applicationID: true,
+  applicationCode: true,
+  petID: true,
+  adopterID: true,
+  shelterID: true,
+  staffID: true,
+  applicationStatus: true,
+  applicationType: true,
+  createdAt: true,
+  pet: {
+    select: {
+      petName: true,
+      petPhoto: true,
+      breed: {
+        select: {
+          breedName: true,
+          species: { select: { speciesName: true } },
+        },
+      },
+    },
+  },
+  adopter: {
+    select: {
+      adopterName: true,
+      user: { select: { userEmail: true } },
+    },
+  },
+};
 
-const withdrawApplication = async (applicationID, adopterID) => {
+// Pending (needs review) first, then Rejected, then Accepted, then
+// Withdrawn — not a plain createdAt sort, so it can't be expressed as a
+// single Prisma `orderBy` without leaning on the ApplicationStatus enum's
+// declaration order (fragile/coincidental, and not this priority anyway).
+const STATUS_SORT_PRIORITY = { Pending: 0, Rejected: 1, Accepted: 2, Withdrawn: 3 };
+
+const listApplicationsForStaff = async (
+  { role, userID },
+  { status, shelterID, page = 1, limit = 20 } = {},
+) => {
+  const where = {};
+  if (status) {
+    where.applicationStatus = status;
+  }
+
+  if (role === "Staff") {
+    // Re-fetched fresh from the STAFF table on every call — shelterID is
+    // not in the JWT payload (see 06-Auth System's design note). No shelter
+    // assigned yet -> a sentinel that can never match, so the result is an
+    // empty list rather than an error (same "searched, found nothing"
+    // convention the public catalog's location filter uses).
+    const staff = await prisma.staff.findUnique({
+      where: { userID },
+      select: { shelterID: true },
+    });
+    where.shelterID = staff?.shelterID ?? -1;
+  } else if (shelterID !== undefined) {
+    where.shelterID = shelterID;
+  }
+
+  // The status-priority sort can't be pushed into the DB query without raw
+  // SQL, so this fetches every matching row (a single shelter's queue,
+  // never network-wide) and sorts/paginates in memory instead.
+  const allRows = await prisma.adoptionApplication.findMany({
+    where,
+    select: STAFF_LIST_SELECT,
+    orderBy: { createdAt: "desc" },
+  });
+
+  allRows.sort((a, b) => {
+    const priorityDiff =
+      STATUS_SORT_PRIORITY[a.applicationStatus] -
+      STATUS_SORT_PRIORITY[b.applicationStatus];
+    if (priorityDiff !== 0) return priorityDiff;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  const total = allRows.length;
+  const rows = allRows.slice((page - 1) * limit, (page - 1) * limit + limit);
+
+  const data = rows.map((app) => ({
+    applicationID: app.applicationID,
+    applicationCode: app.applicationCode,
+    petID: app.petID,
+    adopterID: app.adopterID,
+    shelterID: app.shelterID,
+    staffID: app.staffID,
+    applicationStatus: app.applicationStatus,
+    applicationType: app.applicationType,
+    createdAt: app.createdAt,
+    pet: {
+      petName: app.pet.petName,
+      petPhoto: app.pet.petPhoto,
+      breedName: app.pet.breed.breedName,
+      speciesName: app.pet.breed.species.speciesName,
+    },
+    adopter: {
+      adopterName: app.adopter.adopterName,
+      adopterEmail: app.adopter.user.userEmail,
+    },
+  }));
+
+  return {
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+// ——————————————— UPDATE APPLICATION STATUS (PATCH /adoption-applications/:id/status) ———————————————
+// Single entry point for every status transition on an application —
+// adopter Withdraw and staff/admin Accept/Reject all go through here rather
+// than duplicating the fetch/validate/update/reshape skeleton per actor
+// type. Moving to 'Withdrawn' or 'Rejected' also clears the partial unique
+// index on (adopterID, petID) (scoped to Pending/Accepted only), so the
+// adopter can re-apply for the same pet afterwards.
+const WITHDRAWABLE_STATUSES = ["Pending", "Accepted"];
+const STAFF_TARGET_STATUSES = ["Accepted", "Rejected"];
+
+const updateApplicationStatus = async (applicationID, { status, staffRemark }, actor) => {
   const application = await prisma.adoptionApplication.findUnique({
     where: { applicationID },
-    select: { applicationID: true, adopterID: true, applicationStatus: true },
+    select: {
+      applicationID: true,
+      adopterID: true,
+      shelterID: true,
+      petID: true,
+      applicationStatus: true,
+    },
   });
 
   if (!application) {
@@ -396,30 +528,83 @@ const withdrawApplication = async (applicationID, adopterID) => {
     throw err;
   }
 
-  if (application.adopterID !== adopterID) {
-    const err = new Error(
-      "You can only withdraw your own adoption applications",
-    );
-    err.code = "FORBIDDEN";
-    throw err;
+  // staffID is only ever set when the actor is a genuine Staff member — it
+  // FKs to Staff.userID specifically, and an Admin's userID has no
+  // corresponding Staff row, so setting it for an Admin actor would either
+  // violate that FK or (worse, if the IDs coincidentally overlapped)
+  // attribute the decision to the wrong person entirely.
+  let actingStaffID = null;
+
+  if (actor.role === "Adopter") {
+    if (application.adopterID !== actor.userID) {
+      const err = new Error(
+        "You can only withdraw your own adoption applications",
+      );
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+    if (!WITHDRAWABLE_STATUSES.includes(application.applicationStatus)) {
+      throw conflict(
+        `A ${application.applicationStatus.toLowerCase()} application can't be withdrawn`,
+      );
+    }
+  } else {
+    // Staff or Admin — Accept/Reject. Controller has already restricted
+    // `status` to STAFF_TARGET_STATUSES for this branch.
+    if (actor.role === "Staff") {
+      const staff = await prisma.staff.findUnique({
+        where: { userID: actor.userID },
+        select: { shelterID: true },
+      });
+      if (application.shelterID !== staff?.shelterID) {
+        const err = new Error(
+          "You may only act on applications at your own shelter",
+        );
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      actingStaffID = actor.userID;
+    }
+    // Admin: no shelter restriction.
+
+    if (application.applicationStatus !== "Pending") {
+      throw conflict(
+        `A ${application.applicationStatus.toLowerCase()} application can't be ${status.toLowerCase()}`,
+      );
+    }
   }
 
-  if (!WITHDRAWABLE_STATUSES.includes(application.applicationStatus)) {
-    throw conflict(
-      `A ${application.applicationStatus.toLowerCase()} application can't be withdrawn`,
+  const data = { applicationStatus: status };
+  if (status === "Accepted" && actingStaffID !== null) {
+    data.staffID = actingStaffID;
+  }
+  if (staffRemark !== undefined) {
+    data.staffRemark = staffRemark;
+  }
+
+  const operations = [
+    prisma.adoptionApplication.update({
+      where: { applicationID },
+      data,
+      select: {
+        ...APPLICATION_SELECT,
+        pet: { select: { petName: true } },
+        shelter: { select: { shelterName: true } },
+      },
+    }),
+  ];
+  // Accept marks the pet adopted; Reject deliberately leaves the pet's
+  // adoptionStatus untouched — still 'available' for other applicants.
+  if (status === "Accepted") {
+    operations.push(
+      prisma.pet.update({
+        where: { petID: application.petID },
+        data: { adoptionStatus: "adopted" },
+      }),
     );
   }
 
-  const updated = await prisma.adoptionApplication.update({
-    where: { applicationID },
-    data: { applicationStatus: "Withdrawn" },
-    select: {
-      ...APPLICATION_SELECT,
-      pet: { select: { petName: true } },
-      shelter: { select: { shelterName: true } },
-    },
-  });
-
+  const [updated] = await prisma.$transaction(operations);
   return toClientShape(updated);
 };
 
@@ -431,6 +616,7 @@ module.exports = {
   getApplicationByCheckoutSession,
   getApplicationById,
   listApplicationsByAdopter,
+  listApplicationsForStaff,
   listAdoptedPetsByAdopter,
-  withdrawApplication,
+  updateApplicationStatus,
 };

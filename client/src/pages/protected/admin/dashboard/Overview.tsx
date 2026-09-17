@@ -1,10 +1,10 @@
 import useAuthStore from "../../../../logic/store/useAuthStore";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
-import StatsWidget from "./overview/StatsWidget";
-import MonthlyStatsWidget from "./overview/MonthlyStatsWidget";
-import SheltersWidget from "./overview/SheltersWidget";
-import CapacityAlertsWidget from "./overview/CapacityAlertsWidget";
-import StaffApprovalsWidget from "./overview/StaffApprovalsWidget";
+import StatsWidget from "./sections/overview/StatsWidget";
+import MonthlyStatsWidget from "./sections/overview/MonthlyStatsWidget";
+import SheltersWidget from "./sections/overview/SheltersWidget";
+import CapacityAlertsWidget from "./sections/overview/CapacityAlertsWidget";
+import StaffApprovalsWidget from "./sections/overview/StaffApprovalsWidget";
 import { getGreeting, getGreetingEmoji } from "../../../../logic/utils/datetime";
 
 // Landing / overview section of the admin dashboard.

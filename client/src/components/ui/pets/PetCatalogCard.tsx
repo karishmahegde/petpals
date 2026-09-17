@@ -24,6 +24,10 @@ interface CardComponentProps {
   // with an "Unavailable" chip instead of the CTA. The heart stays live so the
   // adopter can still unfavorite them.
   unavailable?: boolean;
+  // Staff's pet management view reuses this card for its grid but has no
+  // favoriting concept — hides the heart entirely rather than rendering a
+  // control that only ever shows the "requires an Adopter account" toast.
+  showFavorite?: boolean;
 }
 
 const CardComponent = ({
@@ -32,6 +36,7 @@ const CardComponent = ({
   onKnowMore,
   ctaLabel = "Know More",
   unavailable = false,
+  showFavorite = true,
 }: CardComponentProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -110,20 +115,22 @@ const CardComponent = ({
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleHeartClick}
-          aria-label={
-            isFavorited ? "Remove from favorites" : "Add to favorites"
-          }
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/60 shadow"
-        >
-          {isFavorited ? (
-            <FaHeart className="text-rose-md" />
-          ) : (
-            <FaRegHeart className="text-neutral-gray" />
-          )}
-        </button>
+        {showFavorite && (
+          <button
+            type="button"
+            onClick={handleHeartClick}
+            aria-label={
+              isFavorited ? "Remove from favorites" : "Add to favorites"
+            }
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/60 shadow"
+          >
+            {isFavorited ? (
+              <FaHeart className="text-rose-md" />
+            ) : (
+              <FaRegHeart className="text-neutral-gray" />
+            )}
+          </button>
+        )}
       </div>
       <div className={`flex flex-col p-4 ${unavailable ? "opacity-60" : ""}`}>
         <p className="truncate text-md font-bold text-neutral-charcoal">

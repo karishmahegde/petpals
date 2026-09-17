@@ -159,7 +159,11 @@ model Pet {
   petColor               String                @db.VarChar(45)
   petSize                PetSize?
   petPhoto               String                @db.VarChar(300)
-  petSex                 String                @db.Char(2)
+  // Live DB column is character(1) (verified via information_schema — the
+  // CLAUDE.md known-issues note "petSex was fixed CHAR(2)→CHAR(1)" refers to
+  // this), this line was just never updated to match. Metadata-only fix, no
+  // DB change — see CLAUDE.md's CHAR(n) padding warning.
+  petSex                 String                @db.Char(1)
   petDesc                String?               @db.VarChar(500)
   microchipID            String?               @db.VarChar(45)
   intakeDate             DateTime

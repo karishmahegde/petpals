@@ -47,6 +47,8 @@ const authRouter = require("./routes/auth/auth.routes");
 app.use("/api/v1/auth", authRouter);
 const petsRouter = require("./routes/public/pets.routes");
 app.use("/api/v1", petsRouter);
+const staffPetsRouter = require("./routes/staff/pets.routes");
+app.use("/api/v1", staffPetsRouter);
 const sheltersRouter = require("./routes/public/shelters.routes");
 app.use("/api/v1", sheltersRouter);
 const adminSheltersRouter = require("./routes/admin/shelters.routes");
@@ -61,6 +63,11 @@ const visitsRouter = require("./routes/adopter/visits.routes");
 app.use("/api/v1/visits", visitsRouter);
 const favoritesRouter = require("./routes/adopter/favorites.routes");
 app.use("/api/v1", favoritesRouter);
+// Staff self-service routes (/staff/me) must be mounted BEFORE the admin
+// staff router below — its GET /staff/:id would otherwise swallow
+// "/staff/me" first (:id="me").
+const staffSelfRouter = require("./routes/staff/staff.routes");
+app.use("/api/v1", staffSelfRouter);
 const staffRouter = require("./routes/admin/staff.routes");
 app.use("/api/v1", staffRouter);
 const adminsRouter = require("./routes/admin/admins.routes");
