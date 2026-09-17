@@ -332,6 +332,82 @@ const schemas = {
       assignedStaffName: { type: "string", nullable: true },
     },
   },
+  // One row of the Staff/Admin shelter-wide visit queue (GET /visits) —
+  // distinct from VisitListItem (an adopter's own visits), since staff are
+  // managing visits booked by many different adopters.
+  VisitQueueItem: {
+    allOf: [
+      { $ref: "#/components/schemas/Visit" },
+      {
+        type: "object",
+        properties: {
+          pet: {
+            type: "object",
+            nullable: true,
+            properties: { petName: { type: "string" } },
+          },
+          adopter: {
+            type: "object",
+            properties: {
+              adopterName: { type: "string" },
+              user: {
+                type: "object",
+                properties: { userEmail: { type: "string" } },
+              },
+            },
+          },
+        },
+      },
+    ],
+  },
+
+  Event: {
+    type: "object",
+    description:
+      "eventLocation is a snapshot of the hosting shelter's name at event-creation time, not client-editable.",
+    properties: {
+      eventID: { type: "integer" },
+      eventName: { type: "string", maxLength: 45 },
+      eventDate: { type: "string", format: "date-time" },
+      eventDesc: { type: "string", maxLength: 300 },
+      eventLocation: { type: "string" },
+    },
+  },
+  EventListItem: {
+    allOf: [
+      { $ref: "#/components/schemas/Event" },
+      {
+        type: "object",
+        properties: {
+          shelter: {
+            type: "object",
+            properties: {
+              shelterID: { type: "integer" },
+              shelterName: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
+  EventDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/Event" },
+      {
+        type: "object",
+        properties: {
+          shelter: {
+            type: "object",
+            properties: {
+              shelterID: { type: "integer" },
+              shelterName: { type: "string" },
+              shelterAddress: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
 
   AppointmentListItem: {
     type: "object",
