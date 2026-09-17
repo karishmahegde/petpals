@@ -14,15 +14,16 @@ import WorkerRegister from "./pages/public/auth/WorkerRegister";
 import Adopt from "./pages/public/adopt/Adopt";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
-import DashboardLayout from "./pages/protected/adopter/dashboard/DashboardLayout";
+import DashboardLayout from "./components/layout/DashboardLayout";
+import AdopterDashboardRoutes from "./pages/protected/adopter/dashboard/DashboardRoutes";
 import AdoptApply from "./pages/protected/adopter/apply/AdoptApply";
 import AdoptApplyConfirmation from "./pages/protected/adopter/apply/AdoptApplyConfirmation";
 import OnboardingWizard from "./pages/protected/adopter/onboarding/OnboardingWizard";
-import StaffDashboard from "./pages/protected/staff/StaffDashboard";
+import StaffDashboardRoutes from "./pages/protected/staff/dashboard/DashboardRoutes";
 import VetDashboard from "./pages/protected/vet/VetDashboard";
 import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
 import DonorDashboard from "./pages/protected/donor/DonorDashboard";
-import AdminDashboardLayout from "./pages/protected/admin/dashboard/DashboardLayout";
+import AdminDashboardRoutes from "./pages/protected/admin/dashboard/DashboardRoutes";
 import { refreshToken } from "./logic/api/authApi";
 import useAuthStore from "./logic/store/useAuthStore";
 import { useScrollToTop } from "./logic/hooks/useScrollToTop";
@@ -108,17 +109,21 @@ const App = () => {
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Adopter"]}>
-                <DashboardLayout />
+                <DashboardLayout>
+                  <AdopterDashboardRoutes />
+                </DashboardLayout>
               </RoleRoute>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/staff"
+          path="/staff/*"
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Staff"]}>
-                <StaffDashboard />
+                <DashboardLayout>
+                  <StaffDashboardRoutes />
+                </DashboardLayout>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -158,7 +163,9 @@ const App = () => {
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Admin"]}>
-                <AdminDashboardLayout />
+                <DashboardLayout>
+                  <AdminDashboardRoutes />
+                </DashboardLayout>
               </RoleRoute>
             </ProtectedRoute>
           }

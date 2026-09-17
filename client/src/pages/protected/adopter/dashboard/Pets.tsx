@@ -6,7 +6,7 @@ import Card from "../../../../components/ui/Card";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 import PetCatalogCard from "../../../../components/ui/pets/PetCatalogCard";
-import PetDetailPanel from "./pets/PetDetailPanel";
+import PetDetailPanel from "./sections/pets/PetDetailPanel";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import { getMyAdoptedPets } from "../../../../logic/api/adoptersApi";
 

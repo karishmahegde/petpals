@@ -12,8 +12,8 @@ import {
   type VisitListItem,
 } from "../../../../logic/api/adoptersApi";
 import VisitsList from "./shared/VisitsList";
-import VisitDetailPanel from "./visits/VisitDetailPanel";
-import ScheduleVisitPanel from "./visits/ScheduleVisitPanel";
+import VisitDetailPanel from "./sections/visits/VisitDetailPanel";
+import ScheduleVisitPanel from "./sections/visits/ScheduleVisitPanel";
 
 const isUpcoming = (visit: VisitListItem): boolean =>
   visit.visitStatus !== "Cancelled" &&

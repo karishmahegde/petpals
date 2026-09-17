@@ -14,7 +14,7 @@ import {
 } from "../../../../logic/api/adoptersApi";
 import { APPLICATION_STATUS_META } from "../../../../logic/adopter/applicationStatus";
 import ApplicationsList from "./shared/ApplicationsList";
-import ApplicationDetailPanel from "./applications/ApplicationDetailPanel";
+import ApplicationDetailPanel from "./sections/applications/ApplicationDetailPanel";
 
 const PAGE_SIZE = 10;
 

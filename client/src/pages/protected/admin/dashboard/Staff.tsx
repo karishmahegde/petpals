@@ -19,8 +19,8 @@ import {
   type StaffDesignation,
 } from "../../../../logic/api/staffApi";
 import { getShelterAnalytics } from "../../../../logic/api/analyticsApi";
-import StaffDetailPanel from "./staff/StaffDetailPanel";
-import StaffApprovalPanel from "./staff/StaffApprovalPanel";
+import StaffDetailPanel from "./sections/staff/StaffDetailPanel";
+import StaffApprovalPanel from "./sections/staff/StaffApprovalPanel";
 
 const PAGE_SIZE = 10;
 

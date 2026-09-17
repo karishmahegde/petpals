@@ -11,7 +11,7 @@ import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeadi
 import Avatar from "../../../../components/ui/Avatar";
 import PhoneInputField from "../../../../components/ui/PhoneInputField";
 import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
-import CloseAccountModal from "./CloseAccountModal";
+import CloseAccountModal from "./shared/CloseAccountModal";
 import GovernmentIdSection from "../shared/GovernmentIdSection";
 import {
   getAdopterProfile,
