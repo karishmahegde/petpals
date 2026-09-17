@@ -160,6 +160,7 @@ const STAFF_LIST_SELECT = {
       user: { select: { userEmail: true } },
     },
   },
+  staff: { select: { staffName: true } }, // null until Confirmed/Completed
 };
 
 const listVisitsForStaff = async (

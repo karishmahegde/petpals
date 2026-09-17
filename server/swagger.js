@@ -356,6 +356,12 @@ const schemas = {
               },
             },
           },
+          staff: {
+            type: "object",
+            nullable: true,
+            description: "null until a staff member Confirms or Completes the visit.",
+            properties: { staffName: { type: "string" } },
+          },
         },
       },
     ],

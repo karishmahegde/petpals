@@ -45,6 +45,7 @@ const buildListRow = (overrides = {}) => ({
     adopterName: "Emilie",
     user: { userEmail: "emilie@example.com" },
   },
+  staff: null,
   ...overrides,
 });
 

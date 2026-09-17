@@ -3,6 +3,7 @@
 // adoptionApplicationsApi.ts.
 import axiosInstance from "./axiosInstance";
 import type { VisitListItem, VisitStatus } from "./adoptersApi";
+import type { Pagination } from "./petsApi";
 
 // Full record behind one Visits row — for the detail slide-over
 // (GET /visits/:id). Adopter-owned only (403 otherwise).
@@ -68,6 +69,63 @@ export const cancelVisit = async (
 ): Promise<VisitListItem> => {
   const response = await axiosInstance.patch(`/visits/${visitID}`, {
     visitStatus: "Cancelled",
+  });
+  return response.data.data;
+};
+
+// ———————————————— STAFF/ADMIN VISIT QUEUE (Sprint 5.2) ————————————————
+// Row shape for the shelter-wide queue (GET /visits, no shelterID param for
+// Staff — resolved server-side to their own shelter). Distinct from
+// VisitListItem (an adopter's own visits), since staff review visits booked
+// by many different adopters and need the adopter/staff summary fields the
+// adopter's own list has no reason to include.
+export interface VisitQueueItem {
+  visitID: number;
+  adopterID: number;
+  petID: number | null;
+  staffID: number | null;
+  shelterID: number;
+  visitTime: string;
+  remarks: string | null;
+  visitStatus: VisitStatus | null;
+  pet: { petName: string } | null;
+  adopter: { adopterName: string; user: { userEmail: string } };
+  // null until a staff member Confirms or Completes the visit.
+  staff: { staffName: string } | null;
+}
+
+interface VisitsQueueParams {
+  upcoming?: boolean;
+  shelterID?: number; // Admin only — Staff is always scoped server-side to their own shelter
+  page?: number;
+  limit?: number;
+}
+
+export const getVisitsQueue = async (
+  params?: VisitsQueueParams,
+): Promise<{ data: VisitQueueItem[]; pagination: Pagination }> => {
+  const { upcoming, ...rest } = params ?? {};
+  const response = await axiosInstance.get("/visits", {
+    params: { ...rest, ...(upcoming ? { upcoming: "true" } : {}) },
+  });
+  return { data: response.data.data, pagination: response.data.pagination };
+};
+
+// Staff/Admin transition — Confirmed is only valid from an unconfirmed
+// (null-status) visit; Completed is only valid from Confirmed (409
+// otherwise). Staff may only act on their own shelter's visits (403
+// otherwise) — server-enforced, not repeated here. Returns the updated
+// visit in the same (adopter-list) shape as GET /adopters/me/visits, not a
+// VisitQueueItem (no adopter/staff join) — callers invalidate the staff
+// queue query rather than rendering this response directly.
+export type StaffVisitTransition = "Confirmed" | "Completed";
+
+export const updateVisitStatus = async (
+  visitID: number,
+  visitStatus: StaffVisitTransition,
+): Promise<VisitListItem> => {
+  const response = await axiosInstance.patch(`/visits/${visitID}`, {
+    visitStatus,
   });
   return response.data.data;
 };
