@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { PiHeartbeatBold } from "react-icons/pi";
 import SegmentedControl from "../../../../../components/ui/SegmentedControl";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import OnboardingStepHeader from "../OnboardingStepHeader";
 import {
   updateAdopterProfile,
@@ -170,22 +171,22 @@ const LifestyleStep = ({ profile, onContinue, onBack }: LifestyleStepProps) => {
 
       <div className="mt-6 flex gap-3">
         {onBack && (
-          <button
-            type="button"
+          <ButtonElement
             onClick={onBack}
-            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+            size="panel"
+            className="flex-1 bg-gold hover:brightness-90 disabled:cursor-not-allowed"
           >
             Back
-          </button>
+          </ButtonElement>
         )}
-        <button
-          type="button"
+        <ButtonElement
           onClick={handleContinue}
           disabled={mutation.isPending}
-          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+          size="panel"
+          className="flex-1 bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? "Saving…" : "Continue"}
-        </button>
+        </ButtonElement>
       </div>
     </div>
   );

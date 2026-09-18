@@ -2,6 +2,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { carouselSlides } from "../../../../static/content/home";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 
 const Carousel = () => {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
@@ -22,23 +23,25 @@ const Carousel = () => {
         ))}
       </div>
 
-      <button
-        type="button"
+      <ButtonElement
         onClick={() => emblaApi?.scrollPrev()}
         aria-label="Previous slide"
+        size="bare"
+        variant="outline"
         className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/60 text-neutral-charcoal hover:bg-white"
       >
         <FaChevronLeft />
-      </button>
+      </ButtonElement>
 
-      <button
-        type="button"
+      <ButtonElement
         onClick={() => emblaApi?.scrollNext()}
         aria-label="Next slide"
+        size="bare"
+        variant="outline"
         className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/60 text-neutral-charcoal hover:bg-white"
       >
         <FaChevronRight />
-      </button>
+      </ButtonElement>
     </div>
   );
 };

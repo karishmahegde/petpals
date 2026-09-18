@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import Card from "../../../../components/ui/Card";
 import { getApplicationByCheckoutSession } from "../../../../logic/api/adoptionApplicationsApi";
 import { clearApplyDraft } from "../../../../logic/adoptApplyDraft";
@@ -84,13 +85,13 @@ const AdoptApplyConfirmation = () => {
               {application.pet ? ` for ${application.pet.petName}` : ""} is in.
               We'll be in touch soon.
             </p>
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => navigate("/adopter", { replace: true })}
-              className="mt-6 w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
+              size="panel"
+              className="mt-6 w-full bg-teal-dark hover:brightness-90"
             >
               Go to Dashboard
-            </button>
+            </ButtonElement>
           </>
         ) : timedOut ? (
           <>
@@ -101,13 +102,13 @@ const AdoptApplyConfirmation = () => {
               Your payment is being finalized - this can take a minute. Check
               your dashboard shortly for your application.
             </p>
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => navigate("/adopter", { replace: true })}
-              className="mt-6 w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
+              size="panel"
+              className="mt-6 w-full bg-teal-dark hover:brightness-90"
             >
               Go to Dashboard
-            </button>
+            </ButtonElement>
           </>
         ) : (
           <>

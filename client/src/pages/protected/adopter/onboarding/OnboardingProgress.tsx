@@ -4,6 +4,7 @@
 // the step being viewed, and muted teal-light circles for the rest. Step 1
 // (Account) is never actually routed to — it's always shown complete.
 import { PiCheckBold } from "react-icons/pi";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 
 interface OnboardingProgressProps {
   currentStep: number; // 2-7, the step being displayed
@@ -89,13 +90,14 @@ const OnboardingProgress = ({
           </span>
           {onSkip && (
             <>
-              <button
-                type="button"
+              <ButtonElement
                 onClick={onSkip}
+                size="bare"
+                variant="outline"
                 className="font-body text-sm text-rose-dark hover:underline"
               >
                 Skip for now
-              </button>
+              </ButtonElement>
               <span className="max-w-[160px] font-body text-xs italic text-neutral-gray">
                 These details are required for adoption applications.
               </span>
@@ -147,13 +149,14 @@ const OnboardingProgress = ({
             <span>{percent}% Completed</span>
             {onSkip && (
               <>
-                <button
-                  type="button"
+                <ButtonElement
                   onClick={onSkip}
+                  size="bare"
+                  variant="outline"
                   className="font-body text-sm text-rose-dark hover:underline"
                 >
                   Skip for now
-                </button>
+                </ButtonElement>
                 <span className="max-w-[220px] text-right font-body text-xs italic text-neutral-gray">
                   These details are required for adoption applications.
                 </span>

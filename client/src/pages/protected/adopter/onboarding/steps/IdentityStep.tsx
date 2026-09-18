@@ -7,6 +7,7 @@ import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
 import { PiIdentificationCardBold } from "react-icons/pi";
 import GovernmentIdSection from "../../shared/GovernmentIdSection";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import { getGovernmentId } from "../../../../../logic/api/adoptersApi";
 import OnboardingStepHeader from "../OnboardingStepHeader";
 
@@ -39,22 +40,22 @@ const IdentityStep = ({ onContinue, onBack }: IdentityStepProps) => {
 
       <div className="mt-6 flex gap-3">
         {onBack && (
-          <button
-            type="button"
+          <ButtonElement
             onClick={onBack}
-            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+            size="panel"
+            className="flex-1 bg-gold hover:brightness-90 disabled:cursor-not-allowed"
           >
             Back
-          </button>
+          </ButtonElement>
         )}
-        <button
-          type="button"
+        <ButtonElement
           onClick={onContinue}
           disabled={!hasSubmission}
-          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+          size="panel"
+          className="flex-1 bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
         >
           Continue
-        </button>
+        </ButtonElement>
       </div>
     </div>
   );

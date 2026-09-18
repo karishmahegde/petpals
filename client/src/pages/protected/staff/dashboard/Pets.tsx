@@ -2,6 +2,7 @@ import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { FaPlus } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
 import PetCatalogCard from "../../../../components/ui/pets/PetCatalogCard";
@@ -192,25 +193,27 @@ const Pets = () => {
 
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-center gap-4">
-              <button
-                type="button"
+              <ButtonElement
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
+                size="bare"
+                variant="outline"
+                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
               >
                 Previous
-              </button>
+              </ButtonElement>
               <span className="font-body text-sm text-neutral-gray">
                 Page {page} of {totalPages}
               </span>
-              <button
-                type="button"
+              <ButtonElement
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
+                size="bare"
+                variant="outline"
+                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
               >
                 Next
-              </button>
+              </ButtonElement>
             </div>
           )}
         </Card>

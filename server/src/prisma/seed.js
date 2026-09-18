@@ -361,6 +361,24 @@ async function main() {
     data: { speciesID: rabbit.speciesID, breedName: "Holland Lop" },
   });
 
+  // ── VACCINES ─────────────────────────────────────────────────
+  console.log("Creating vaccines...");
+  const dhpp = await prisma.vaccine.upsert({
+    where: { vaccineID: 1 },
+    update: {},
+    create: { vaccineName: "DHPP", manufacturer: "Zoetis" },
+  });
+  const rabiesVaccine = await prisma.vaccine.upsert({
+    where: { vaccineID: 2 },
+    update: {},
+    create: { vaccineName: "Rabies", manufacturer: "Boehringer" },
+  });
+  const bordetella = await prisma.vaccine.upsert({
+    where: { vaccineID: 3 },
+    update: {},
+    create: { vaccineName: "Bordetella", manufacturer: "Merck" },
+  });
+
   // ── PETS ─────────────────────────────────────────────────────
   console.log("Creating pets...");
   const pets = [
@@ -467,7 +485,10 @@ async function main() {
         "Rocky is a laid-back senior Bulldog who asks for little more than a comfy sofa and a patient owner. He has a mild heart condition that requires monthly vet visits but is otherwise healthy and full of personality.",
       intakeDate: intakeDateMonthsAgo(15, 5), // Rocky
       intakeType: "surrendered",
-      adoptionStatus: "available",
+      // "transferred" rather than "available" — an In_Progress TransferHistory
+      // row is seeded for Rocky below (Downtown -> Brooklyn), same invariant
+      // note as Zeus above.
+      adoptionStatus: "transferred",
       shelterID: shelter1.shelterID,
       staffID: staff.userID,
       compatibleWithChildren: false,
@@ -489,7 +510,10 @@ async function main() {
         "Zeus is a powerful and disciplined Rottweiler who is deeply loyal to those he trusts. He requires an experienced handler and a home without other animals. With the right owner, he is an incredibly devoted companion.",
       intakeDate: intakeDateMonthsAgo(10, 22), // Zeus
       intakeType: "surrendered",
-      adoptionStatus: "available",
+      // "transferred" rather than "available" — an In_Progress TransferHistory
+      // row is seeded for Zeus below (Brooklyn -> Downtown), and that's the
+      // invariant a real transfer holds the pet at until it resolves.
+      adoptionStatus: "transferred",
       shelterID: shelter2.shelterID,
       staffID: staff.userID,
       compatibleWithChildren: false,
@@ -740,9 +764,107 @@ async function main() {
     },
   ];
 
+  // Keyed by petName so the Transfers seed below can reference the specific
+  // pets it needs by their freshly-created petID (create() doesn't expose
+  // that until the row exists).
+  const createdPets = {};
   for (const pet of pets) {
-    await prisma.pet.create({ data: pet });
+    createdPets[pet.petName] = await prisma.pet.create({ data: pet });
   }
+
+  // ── TRANSFERS ────────────────────────────────────────────────
+  // Populates both Transfers-tab sections for staff@petpals.com (shelter1 —
+  // PetPals Downtown): one incoming (Pending Transfers) and one outgoing
+  // (Ongoing Transfers), both In_Progress. See the adoptionStatus notes on
+  // Zeus/Rocky above — both pets are held at "transferred" while these are open.
+  console.log("Creating transfers...");
+  await prisma.transferHistory.create({
+    data: {
+      petID: createdPets["Zeus"].petID,
+      transferDate: new Date(),
+      fromShelterID: shelter2.shelterID,
+      toShelterID: shelter1.shelterID,
+      fromShelterStaff: null, // no staff seeded at shelter2 to attribute it to
+      transferReason:
+        "Requested transfer to Downtown — a Rottweiler-experienced foster family is interested there.",
+      transferStatus: "In_Progress",
+    },
+  });
+  await prisma.transferHistory.create({
+    data: {
+      petID: createdPets["Rocky"].petID,
+      transferDate: new Date(),
+      fromShelterID: shelter1.shelterID,
+      toShelterID: shelter2.shelterID,
+      fromShelterStaff: staff.userID,
+      transferReason:
+        "Capacity transfer — Brooklyn has more space to accommodate his monthly vet visits.",
+      transferStatus: "In_Progress",
+    },
+  });
+
+  // ── HEALTH RECORDS & VACCINATIONS ───────────────────────────
+  // Populates the Health Passport page for Rocky (already has the outgoing
+  // transfer above, and his own petDesc already mentions a heart condition
+  // requiring monthly vet visits — a natural fit), attributed to the seeded
+  // vet at shelter1. One vaccination per status (Overdue/Due Soon/Up to
+  // Date — see staff/pets.service.js's vaccinationStatus, computed from
+  // dueDate) for a full demo of the status badges.
+  console.log("Creating health records and vaccinations...");
+  const rockyID = createdPets["Rocky"].petID;
+  // Precise day-offset dates for the vaccination demo below — dobFromAge/
+  // intakeDateMonthsAgo are month-granularity (built for pet age/intake, not
+  // this), which risks landing on the wrong side of the 30-day Due Soon
+  // window depending on how long the current month is.
+  const daysFromNow = (days) => new Date(Date.now() + days * 86400000);
+  await prisma.healthRecord.create({
+    data: {
+      petID: rockyID,
+      vetID: vet.userID,
+      createdAt: intakeDateMonthsAgo(6, 27),
+      recordDesc: "Routine checkup. No issues found.",
+    },
+  });
+  await prisma.healthRecord.create({
+    data: {
+      petID: rockyID,
+      vetID: vet.userID,
+      createdAt: intakeDateMonthsAgo(1, 1),
+      recordDesc:
+        "Weight loss observed. Slight breathing issues noted. Basilac (2 doses, 4 days) prescribed.",
+    },
+  });
+
+  await prisma.vaccinationRecord.create({
+    data: {
+      petID: rockyID,
+      vaccineID: rabiesVaccine.vaccineID,
+      administeredDate: daysFromNow(-730), // ~2 years ago
+      dueDate: daysFromNow(-45), // 45 days ago — Overdue
+      administeredBy: vet.userID,
+      administeredAt: shelter1.shelterID,
+    },
+  });
+  await prisma.vaccinationRecord.create({
+    data: {
+      petID: rockyID,
+      vaccineID: dhpp.vaccineID,
+      administeredDate: daysFromNow(-320), // ~10.5 months ago
+      dueDate: daysFromNow(20), // 20 days from now — Due Soon
+      administeredBy: vet.userID,
+      administeredAt: shelter1.shelterID,
+    },
+  });
+  await prisma.vaccinationRecord.create({
+    data: {
+      petID: rockyID,
+      vaccineID: bordetella.vaccineID,
+      administeredDate: daysFromNow(-30), // ~1 month ago
+      dueDate: daysFromNow(330), // ~11 months from now — Up to Date
+      administeredBy: vet.userID,
+      administeredAt: shelter1.shelterID,
+    },
+  });
 
   console.log("✅ Seeding complete!");
   console.log("");

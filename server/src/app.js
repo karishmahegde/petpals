@@ -78,12 +78,16 @@ const eventsRouter = require("./routes/public/events.routes");
 app.use("/api/v1", eventsRouter);
 const staffEventsRouter = require("./routes/staff/events.routes");
 app.use("/api/v1", staffEventsRouter);
-// app.use('/api/v1/appointments',         require('./routes/appointments'));
+const staffTransfersRouter = require("./routes/staff/transfers.routes");
+app.use("/api/v1", staffTransfersRouter);
+const staffAppointmentsRouter = require("./routes/staff/appointments.routes");
+app.use("/api/v1", staffAppointmentsRouter);
+const staffGovernmentIdsRouter = require("./routes/staff/governmentIds.routes");
+app.use("/api/v1", staffGovernmentIdsRouter);
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));
 // app.use('/api/v1/tasks',                require('./routes/tasks'));
 // app.use('/api/v1/donors',               require('./routes/donors'));
 // app.use('/api/v1/donations',            require('./routes/donations'));
-// app.use('/api/v1/transfers',            require('./routes/transfers'));
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use((req, res) => {

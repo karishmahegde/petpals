@@ -21,9 +21,11 @@ import {
   PiHandCoins,
   PiGearSix,
   PiIdentificationBadge,
+  PiIdentificationCard,
 } from "react-icons/pi";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
+import ButtonElement from "../ui/ButtonElement";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
 
@@ -152,6 +154,12 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
           label: "Visits",
           to: "/staff/visits",
           icon: PiCalendarCheck,
+        },
+        {
+          type: "link",
+          label: "ID Verification",
+          to: "/staff/id-verification",
+          icon: PiIdentificationCard,
         },
       ],
     },
@@ -339,15 +347,16 @@ const DashboardSidebar = ({
             <p className="font-body text-xs text-neutral-lightgray">{role}</p>
           )}
         </div>
-        <button
-          type="button"
+        <ButtonElement
           onClick={() => setAcctOpen((prev) => !prev)}
           aria-label="Account menu"
           aria-expanded={acctOpen}
+          size="bare"
+          variant="outline"
           className="shrink-0 text-neutral-lightgray transition-colors hover:text-white"
         >
           <PiDotsThreeVertical className="h-5 w-5" />
-        </button>
+        </ButtonElement>
       </div>
 
       {acctOpen && (
@@ -362,12 +371,14 @@ const DashboardSidebar = ({
           >
             Profile
           </Link>
-          <button
+          <ButtonElement
             onClick={handleLogout}
+            size="bare"
+            variant="outline"
             className="block w-full border-t border-neutral-offwhite px-4 py-3 text-left font-body text-sm text-rose-dark transition-colors hover:bg-gold-light"
           >
             Log out
-          </button>
+          </ButtonElement>
         </div>
       )}
     </div>

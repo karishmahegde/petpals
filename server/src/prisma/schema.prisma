@@ -88,6 +88,7 @@ model Staff {
   staffDesignation StaffDesignation?
   accountStatus    StaffAccountStatus?    @default(Pending)
   adoptionApps     AdoptionApplication[]
+  appointments     Appointment[]
   events           Event[]
   pets             Pet[]
   managedShelters  Shelter[]              @relation("ShelterManager")
@@ -386,15 +387,38 @@ model Appointment {
   //   ALTER TABLE "Appointment" ADD COLUMN "appointmentCode" TEXT
   //     GENERATED ALWAYS AS ('APT-' || lpad("appointmentID"::text, 5, '0')) STORED;
   //   CREATE UNIQUE INDEX "Appointment_appointmentCode_key" ON "Appointment" ("appointmentCode");
-  appointmentCode   String?      @unique @db.Text
+  appointmentCode   String?           @unique @db.Text
   petID             Int
   vetID             Int
   shelterID         Int
+  // Optional — never client-supplied on create; auto-set to the acting
+  // Staff member's own userID (same convention as Event.staffID), null for
+  // an Admin actor. Assigning a volunteer is independent of who created the
+  // appointment, so volunteerID is its own optional field, picked (or left
+  // unset) on the create form.
+  staffID           Int?
+  volunteerID       Int?
   appointmentDate   DateTime
-  appointmentReason String       @db.VarChar(300)
-  pet               Pet          @relation(fields: [petID], references: [petID])
-  shelter           Shelter      @relation(fields: [shelterID], references: [shelterID])
-  vet               Veterinarian @relation(fields: [vetID], references: [userID])
+  appointmentReason String            @db.VarChar(300)
+  // Only real write-transition today is Scheduled -> Cancelled (see
+  // cancelAppointment). "Completed" is never written back — it's a derived
+  // display label for a Scheduled row whose appointmentDate has passed
+  // (see staff/appointments.service.js's deriveAppointmentStatus), since
+  // there's no "mark complete" action and no cron/scheduler in this
+  // codebase to flip it automatically.
+  appointmentStatus AppointmentStatus @default(Scheduled)
+  // Hand-applied partial unique index (see CLAUDE.md — migrate dev is
+  // banned) guarding against the double-submit case (a slow/dropped
+  // response reads client-side as a failure, the caller resubmits, and
+  // both requests land): the same pet + vet + exact timestamp can only
+  // have one Scheduled appointment. A re-booked slot after a Cancelled one
+  // is unaffected — the index only matches Scheduled rows.
+  //   CREATE UNIQUE INDEX "Appointment_pet_vet_date_scheduled_key" ON "Appointment" ("petID", "vetID", "appointmentDate") WHERE "appointmentStatus" = 'Scheduled';
+  pet               Pet               @relation(fields: [petID], references: [petID])
+  shelter           Shelter           @relation(fields: [shelterID], references: [shelterID])
+  vet               Veterinarian      @relation(fields: [vetID], references: [userID])
+  staff             Staff?            @relation(fields: [staffID], references: [userID])
+  volunteer         Volunteer?        @relation(fields: [volunteerID], references: [userID])
 }
 
 model VolunteerApplication {
@@ -424,6 +448,7 @@ model Volunteer {
   accountStatus     VolunteerAccountStatus? @default(Pending)
   shelter           Shelter?                @relation(fields: [shelterID], references: [shelterID])
   user              Users                   @relation(fields: [userID], references: [userID])
+  appointments      Appointment[]
   applications      VolunteerApplication[]
   events            VolunteerEvent[]
   tasks             VolunteerTask[]
@@ -659,6 +684,14 @@ enum VisitStatus {
 enum TransferStatus {
   In_Progress
   Completed
+  Rejected
+  Cancelled
+}
+
+enum AppointmentStatus {
+  Scheduled
+  Completed
+  Cancelled
 }
 
 enum ApplicationStatus {

@@ -7,6 +7,7 @@
 import { useState, type ReactNode } from "react";
 import { FaCheck } from "react-icons/fa";
 import { Dropdown } from "./pets/FilterControls";
+import ButtonElement from "./ButtonElement";
 
 interface SelectFieldOption {
   value: string;
@@ -52,12 +53,13 @@ const SelectField = ({
             const active = option.value === value;
             return (
               <li key={option.value}>
-                <button
-                  type="button"
+                <ButtonElement
                   onClick={() => {
                     onChange(option.value);
                     setOpen(false);
                   }}
+                  size="bare"
+                  variant="outline"
                   className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-neutral-offwhite ${
                     active
                       ? "font-semibold text-teal-dark"
@@ -66,7 +68,7 @@ const SelectField = ({
                 >
                   {option.label}
                   {active && <FaCheck className="shrink-0 text-xs" />}
-                </button>
+                </ButtonElement>
               </li>
             );
           })}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { BiFilterAlt } from "react-icons/bi";
 import Card from "../../../../components/ui/Card";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import SelectField from "../../../../components/ui/SelectField";
 import Avatar from "../../../../components/ui/Avatar";
 import Badge, { type BadgeTone } from "../../../../components/ui/Badge";
@@ -166,25 +167,29 @@ const Admins = () => {
 
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-center gap-4">
-              <button
+              <ButtonElement
                 type="button"
+                size="bare"
+                variant="outline"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
+                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
               >
                 Previous
-              </button>
+              </ButtonElement>
               <span className="font-body text-sm text-neutral-gray">
                 Page {page} of {totalPages}
               </span>
-              <button
+              <ButtonElement
                 type="button"
+                size="bare"
+                variant="outline"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
+                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
               >
                 Next
-              </button>
+              </ButtonElement>
             </div>
           )}
         </Card>

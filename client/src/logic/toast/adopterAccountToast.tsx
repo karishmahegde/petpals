@@ -5,13 +5,15 @@
 // spec's requirement that this experience not vary by session state.
 import toast from "react-hot-toast";
 import type { NavigateFunction } from "react-router-dom";
+import ButtonElement from "../../components/ui/ButtonElement";
 
 export const showAdopterAccountToast = (navigate: NavigateFunction) => {
   toast((t) => (
     <span>
       You need an adopter account to apply for adoption.{" "}
-      <button
-        type="button"
+      <ButtonElement
+        size="bare"
+        variant="outline"
         onClick={() => {
           toast.dismiss(t.id);
           navigate("/register");
@@ -19,7 +21,7 @@ export const showAdopterAccountToast = (navigate: NavigateFunction) => {
         className="font-semibold underline"
       >
         Create one here
-      </button>
+      </ButtonElement>
     </span>
   ));
 };

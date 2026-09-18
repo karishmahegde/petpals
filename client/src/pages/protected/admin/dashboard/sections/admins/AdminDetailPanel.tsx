@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Avatar from "../../../../../../components/ui/Avatar";
 import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
@@ -99,17 +100,17 @@ const AdminDetailPanel = ({ userID, onClose }: AdminDetailPanelProps) => {
         footer={
           data &&
           canToggleStatus && (
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => setConfirmingStatusChange(true)}
-              className={`w-full rounded-xl px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 ${
+              size="panel"
+              className={`w-full hover:brightness-90 ${
                 data.accountStatus === "Active" ? "bg-red" : "bg-green"
               }`}
             >
               {data.accountStatus === "Active"
                 ? "Deactivate Admin"
                 : "Activate Admin"}
-            </button>
+            </ButtonElement>
           )
         }
       >

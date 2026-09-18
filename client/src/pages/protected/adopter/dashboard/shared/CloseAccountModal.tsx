@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FaTimes } from "react-icons/fa";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import useAuthStore from "../../../../../logic/store/useAuthStore";
 import {
   closeAccount,
@@ -71,23 +72,25 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
       >
         <div className="mb-4 flex items-start justify-between">
           <h2 className="font-display text-xl text-rose-dark">Close account</h2>
-          <button
-            type="button"
+          <ButtonElement
             onClick={handleClose}
             aria-label="Close"
+            size="bare"
+            variant="outline"
             className="text-neutral-gray hover:text-neutral-dark"
           >
             <FaTimes />
-          </button>
+          </ButtonElement>
         </div>
 
         {/* Step 1: choice */}
         {mode === null && (
           <div className="flex flex-col gap-3">
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => setMode("deactivate")}
-              className="rounded-xl border border-neutral-gray p-4 text-left transition-colors hover:border-rose-dark hover:bg-rose-light"
+              size="bare"
+              variant="outline"
+              className="rounded-xl border border-neutral-gray p-4 text-left hover:border-rose-dark hover:bg-rose-light"
             >
               <p className="font-body text-sm font-bold text-neutral-dark">
                 Deactivate
@@ -97,11 +100,12 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
                 <strong>no self-service reactivation</strong> - you'll need to
                 contact support to reactivate it.
               </p>
-            </button>
-            <button
-              type="button"
+            </ButtonElement>
+            <ButtonElement
               onClick={() => setMode("delete")}
-              className="rounded-xl border border-rose-md p-4 text-left transition-colors hover:border-rose-dark hover:bg-rose-light"
+              size="bare"
+              variant="outline"
+              className="rounded-xl border border-rose-md p-4 text-left hover:border-rose-dark hover:bg-rose-light"
             >
               <p className="font-body text-sm font-bold text-rose-dark">
                 Permanently delete
@@ -110,7 +114,7 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
                 Your favorites, visits, applications, and profile are removed
                 for good. This can't be undone.
               </p>
-            </button>
+            </ButtonElement>
           </div>
         )}
 
@@ -149,29 +153,30 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
             )}
 
             <div className="mt-2 flex justify-end gap-3">
-              <button
-                type="button"
+              <ButtonElement
                 onClick={() => {
                   setMode(null);
                   setConfirmText("");
                 }}
                 disabled={mutation.isPending}
-                className="rounded-xl border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-50"
+                size="bare"
+                variant="outline"
+                className="rounded-xl border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray"
               >
                 Back
-              </button>
-              <button
-                type="button"
+              </ButtonElement>
+              <ButtonElement
                 onClick={() => mutation.mutate(mode)}
                 disabled={!canConfirm}
-                className="rounded-xl bg-red px-4 py-2 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
+                size="bare"
+                className="rounded-xl bg-red px-4 py-2 font-body text-sm font-medium hover:brightness-90"
               >
                 {mutation.isPending
                   ? "Working…"
                   : mode === "delete"
                     ? "Delete my account"
                     : "Deactivate my account"}
-              </button>
+              </ButtonElement>
             </div>
           </div>
         )}

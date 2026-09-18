@@ -13,6 +13,7 @@ import SectionHeadingCenter from "../../../components/ui/marketing/SectionHeadin
 import { getEvents } from "../../../logic/api/eventsApi";
 import EventCard from "./EventCard";
 import EventDetailsModal from "./EventDetailsModal";
+import ButtonElement from "../../../components/ui/ButtonElement";
 
 const LIMIT = 12;
 
@@ -81,25 +82,27 @@ const Events = () => {
 
             {pagination && pagination.totalPages > 1 && (
               <div className="mt-8 flex items-center justify-center gap-4">
-                <button
+                <ButtonElement
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={pagination.page <= 1}
-                  className="rounded-md bg-teal-dark px-4 py-2 text-white disabled:opacity-50"
+                  size="bare"
+                  className="rounded-md bg-teal-dark px-4 py-2"
                 >
                   Previous
-                </button>
+                </ButtonElement>
                 <span className="text-sm text-neutral-charcoal">
                   Page {pagination.page} of {pagination.totalPages}
                 </span>
-                <button
+                <ButtonElement
                   onClick={() =>
                     setPage((p) => Math.min(pagination.totalPages, p + 1))
                   }
                   disabled={pagination.page >= pagination.totalPages}
-                  className="rounded-md bg-teal-dark px-4 py-2 text-white disabled:opacity-50"
+                  size="bare"
+                  className="rounded-md bg-teal-dark px-4 py-2"
                 >
                   Next
-                </button>
+                </ButtonElement>
               </div>
             )}
           </>

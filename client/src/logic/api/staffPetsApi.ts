@@ -139,6 +139,53 @@ export const getShelterPetDetail = async (
   return response.data.data;
 };
 
+// ——————————————— HEALTH PASSPORT (GET /staff/me/pets/:id/health-passport) ———————————————
+export interface HealthRecordItem {
+  recordID: number;
+  createdAt: string;
+  recordDesc: string;
+  vetName: string | null;
+  shelterName: string | null;
+}
+
+export type VaccinationStatus = "Overdue" | "Due Soon" | "Up to Date";
+
+export interface VaccinationItem {
+  recordID: number;
+  vaccineName: string;
+  administeredDate: string;
+  dueDate: string;
+  status: VaccinationStatus;
+}
+
+export interface PetTransferHistoryItem {
+  recordID: number;
+  transferDate: string;
+  transferReason: string;
+  transferStatus: "In_Progress" | "Completed" | "Rejected" | "Cancelled";
+  fromShelterName: string;
+  toShelterName: string;
+  fromStaffName: string | null;
+  toStaffName: string | null;
+}
+
+// transferHistory here is the pet's full cross-shelter history, NOT scoped
+// to the caller's own shelter — see transfersApi.ts's getTransfersQueue for
+// the (shelter-scoped) Transfers tab's own version of transfer history.
+export interface HealthPassportData {
+  pet: StaffPetFullDetail;
+  healthRecords: HealthRecordItem[];
+  vaccinations: VaccinationItem[];
+  transferHistory: PetTransferHistoryItem[];
+}
+
+export const getHealthPassport = async (
+  petID: number,
+): Promise<HealthPassportData> => {
+  const response = await axiosInstance.get(`/staff/me/pets/${petID}/health-passport`);
+  return response.data.data;
+};
+
 // Required fields on create — see server/src/controllers/staff/pets.controller.js's
 // CREATE_REQUIRED_FIELDS for why petName/petWeight/petHeight are required
 // here despite the ticket framing them as PUT-only (all three are NOT NULL

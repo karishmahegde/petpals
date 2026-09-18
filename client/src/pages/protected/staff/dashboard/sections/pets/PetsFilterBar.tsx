@@ -13,6 +13,7 @@ import { TbCake } from "react-icons/tb";
 import type { Species, Breed } from "../../../../../../logic/api/petsApi";
 import type { PetAdoptionStatus } from "../../../../../../logic/api/staffPetsApi";
 import Card from "../../../../../../components/ui/Card";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import SelectField from "../../../../../../components/ui/SelectField";
 import {
   CheckboxDropdown,
@@ -97,19 +98,23 @@ const PetsFilterBar = ({
           ? `Up to ${filters.maxAge} mo`
           : "";
 
+  const statusPillLabel = statusOptions.find((o) => o.value === statusFilter)?.label;
+
   const hasPills =
     filters.speciesIDs.length > 0 ||
     filters.breedNames.length > 0 ||
     filters.size.length > 0 ||
     filters.minAge !== "" ||
-    filters.maxAge !== "";
+    filters.maxAge !== "" ||
+    statusFilter !== "all";
 
   return (
     <Card className="mb-6 p-5">
-      <button
-        type="button"
+      <ButtonElement
         onClick={() => setIsOpen((o) => !o)}
         aria-expanded={isOpen}
+        size="bare"
+        variant="outline"
         className="flex w-full items-center justify-between"
       >
         <span className="flex items-center gap-2">
@@ -121,7 +126,7 @@ const PetsFilterBar = ({
         <FaChevronDown
           className={`text-neutral-gray transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
-      </button>
+      </ButtonElement>
 
       <div className={isOpen ? "" : "hidden"}>
         <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -228,6 +233,13 @@ const PetsFilterBar = ({
             ))}
             {(filters.minAge !== "" || filters.maxAge !== "") && (
               <Pill label={agePillLabel} variant="age" onRemove={clearAge} />
+            )}
+            {statusFilter !== "all" && statusPillLabel && (
+              <Pill
+                label={statusPillLabel}
+                variant="status"
+                onRemove={() => onStatusFilterChange("all")}
+              />
             )}
           </div>
         )}

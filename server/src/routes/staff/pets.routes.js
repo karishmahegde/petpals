@@ -149,6 +149,59 @@ router.get(
 
 /**
  * @swagger
+ * /staff/me/pets/{id}/health-passport:
+ *   get:
+ *     summary: Full health passport for one of the staff member's own shelter's pets (Staff)
+ *     description: >
+ *       Combines the pet's own detail (same shape as GET
+ *       /staff/me/pets/:id) with its full HealthRecord/VaccinationRecord
+ *       history and its complete cross-shelter TransferHistory — the
+ *       transfer history is NOT scoped to the caller's own shelter, since a
+ *       passport is meant to show the pet's full network-wide history
+ *       regardless of which shelter currently holds it. Each vaccination
+ *       gets a computed status (Overdue/Due Soon/Up to Date) based on how
+ *       close its dueDate is.
+ *     tags: [Pets, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The pet's full health passport
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/HealthPassport' }
+ *       400:
+ *         description: id is not a positive integer
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Staff attempting to view a pet at another shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/staff/me/pets/:id/health-passport",
+  authenticate,
+  authorizeRoles(ROLES.STAFF),
+  petsController.getHealthPassport,
+);
+
+/**
+ * @swagger
  * /pets:
  *   post:
  *     summary: Create a new pet profile (Staff, Admin)

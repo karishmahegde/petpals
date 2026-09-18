@@ -13,6 +13,7 @@ import {
 import CardComponent from "../../../../components/ui/pets/PetCatalogCard";
 import PetDetailsModal from "../../../../components/ui/pets/PetDetailsModal";
 import PetFilterBar from "./PetFilterBar";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 
 const LIMIT = 20;
 
@@ -312,13 +313,14 @@ const PetCatalog = () => {
               {nearbySearchEmpty && filters.selectedShelterIDs.length === 0 ? (
                 <>
                   No shelters found near that location — try a wider radius or{" "}
-                  <button
-                    type="button"
+                  <ButtonElement
                     onClick={resetLocationFilter}
+                    size="bare"
+                    variant="outline"
                     className="underline"
                   >
                     reset the location filter
-                  </button>
+                  </ButtonElement>
                   .
                 </>
               ) : (
@@ -340,25 +342,27 @@ const PetCatalog = () => {
 
               {pagination && pagination.totalPages > 1 && (
                 <div className="flex items-center justify-center gap-4 mt-8">
-                  <button
+                  <ButtonElement
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={pagination.page <= 1}
-                    className="rounded-md bg-teal-dark px-4 py-2 text-white disabled:opacity-50"
+                    size="bare"
+                    className="rounded-md bg-teal-dark px-4 py-2"
                   >
                     Previous
-                  </button>
+                  </ButtonElement>
                   <span className="text-sm text-neutral-charcoal">
                     Page {pagination.page} of {pagination.totalPages}
                   </span>
-                  <button
+                  <ButtonElement
                     onClick={() =>
                       setPage((p) => Math.min(pagination.totalPages, p + 1))
                     }
                     disabled={pagination.page >= pagination.totalPages}
-                    className="rounded-md bg-teal-dark px-4 py-2 text-white disabled:opacity-50"
+                    size="bare"
+                    className="rounded-md bg-teal-dark px-4 py-2"
                   >
                     Next
-                  </button>
+                  </ButtonElement>
                 </div>
               )}
             </>

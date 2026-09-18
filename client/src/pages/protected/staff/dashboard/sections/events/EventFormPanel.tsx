@@ -13,6 +13,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import { createEvent, updateEvent } from "../../../../../../logic/api/staffEventsApi";
 import type { EventListItem } from "../../../../../../logic/api/eventsApi";
 
@@ -160,10 +161,11 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
           />
         </div>
 
-        <button
+        <ButtonElement
           type="submit"
           disabled={!canSubmit}
-          className="mt-2 rounded-xl bg-green px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          size="panel"
+          className="mt-2 bg-green hover:brightness-95 disabled:cursor-not-allowed"
         >
           {saveMutation.isPending
             ? isEdit
@@ -172,7 +174,7 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
             : isEdit
               ? "Save"
               : "Create Event"}
-        </button>
+        </ButtonElement>
       </form>
     </SlideOver>
   );

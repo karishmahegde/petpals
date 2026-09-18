@@ -17,6 +17,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { FaPaw } from "react-icons/fa";
 import Badge from "../../../../components/ui/Badge";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import Card from "../../../../components/ui/Card";
 import SegmentedControl from "../../../../components/ui/SegmentedControl";
 import ConfirmActionModal from "../../../../components/ui/ConfirmActionModal";
@@ -290,23 +291,24 @@ const AdoptApply = () => {
             </p>
           </div>
 
-          <button
-            type="button"
+          <ButtonElement
             onClick={handleSubmit}
             disabled={applicationType === null || mutation.isPending}
-            className="w-full rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+            size="panel"
+            className="w-full bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
           >
             {mutation.isPending
               ? "Redirecting to payment…"
               : "Continue to Payment"}
-          </button>
-          <button
-            type="button"
+          </ButtonElement>
+          <ButtonElement
             onClick={handleCancelClick}
+            size="bare"
+            variant="outline"
             className="mt-3 w-full text-center font-body text-sm text-neutral-gray hover:text-neutral-dark"
           >
             Cancel
-          </button>
+          </ButtonElement>
         </Card>
       </div>
 

@@ -4,6 +4,7 @@
 // Route: /forbidden
 import { useNavigate } from "react-router-dom";
 import Card from "../../components/ui/Card";
+import ButtonElement from "../../components/ui/ButtonElement";
 import backgroundImg from "../../static/assets/images/background.png";
 
 const Forbidden = () => {
@@ -23,13 +24,13 @@ const Forbidden = () => {
           Looks like you sniffed out a page that isn&apos;t meant for you. You
           don&apos;t have permission to view this one.
         </p>
-        <button
-          type="button"
+        <ButtonElement
           onClick={() => navigate("/")}
-          className="w-full bg-teal-dark text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all"
+          size="bare"
+          className="w-full bg-teal-dark text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all"
         >
           go back home
-        </button>
+        </ButtonElement>
       </Card>
     </div>
   );

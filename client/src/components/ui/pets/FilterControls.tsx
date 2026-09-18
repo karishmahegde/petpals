@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FaChevronDown, FaTimes } from "react-icons/fa";
+import ButtonElement from "../ButtonElement";
 
 export interface FilterOption {
   value: string | number;
@@ -58,16 +59,17 @@ export const Dropdown = ({
       </label>
 
       <div className="relative" ref={containerRef}>
-        <button
-          type="button"
+        <ButtonElement
           onClick={() => setOpen(!open)}
+          size="bare"
+          variant="outline"
           className="flex w-full items-center justify-between rounded-md border border-neutral-lightgray bg-white px-3 py-2.5 text-sm text-neutral-charcoal"
         >
           <span className={isPlaceholder ? "italic text-neutral-gray" : ""}>
             {triggerText}
           </span>
           <FaChevronDown className="text-xs text-neutral-gray" />
-        </button>
+        </ButtonElement>
 
         {open && (
           <div className="absolute left-0 z-10 mt-1 w-full min-w-[12rem] rounded-md border border-neutral-lightgray bg-white p-2 shadow-lg">
@@ -166,6 +168,7 @@ const PILL_STYLES = {
   age: "border-neutral-lightgray bg-neutral-offwhite text-neutral-charcoal",
   shelter: "border-teal-md bg-teal-light text-teal-dark",
   location: "border-gold-md bg-gold-light text-neutral-charcoal",
+  status: "border-green bg-green/10 text-green",
 };
 
 export const Pill = ({
@@ -181,13 +184,14 @@ export const Pill = ({
     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs italic ${PILL_STYLES[variant]}`}
   >
     {label}
-    <button
-      type="button"
+    <ButtonElement
       onClick={onRemove}
       aria-label={`Remove ${label} filter`}
+      size="bare"
+      variant="outline"
       className="not-italic opacity-70 hover:opacity-100"
     >
       <FaTimes className="text-[10px]" />
-    </button>
+    </ButtonElement>
   </span>
 );

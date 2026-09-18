@@ -7,6 +7,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Avatar from "../../../../../../components/ui/Avatar";
 import {
   getStaffDetail,
@@ -65,22 +66,22 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
       footer={
         data && (
           <div className="flex gap-3">
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => mutation.mutate("Active")}
               disabled={mutation.isPending}
-              className="flex-1 rounded-xl bg-green px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              size="panel"
+              className="flex-1 bg-green hover:brightness-95 disabled:cursor-not-allowed"
             >
               {mutation.isPending ? "Working…" : "Approve"}
-            </button>
-            <button
-              type="button"
+            </ButtonElement>
+            <ButtonElement
               onClick={() => mutation.mutate("Deactivated")}
               disabled={mutation.isPending}
-              className="flex-1 rounded-xl bg-red px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              size="panel"
+              className="flex-1 bg-red hover:brightness-95 disabled:cursor-not-allowed"
             >
               {mutation.isPending ? "Working…" : "Decline"}
-            </button>
+            </ButtonElement>
           </div>
         )
       }

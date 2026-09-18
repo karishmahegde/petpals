@@ -13,6 +13,7 @@ import {
   withdrawApplication,
 } from "../../../../../../logic/api/adoptionApplicationsApi";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Badge from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
@@ -82,13 +83,13 @@ const ApplicationDetailPanel = ({
         title="Application Details"
         footer={
           showWithdraw && (
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => setConfirmOpen(true)}
-              className="w-full rounded-xl bg-red px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95"
+              size="panel"
+              className="w-full bg-red hover:brightness-95"
             >
               Withdraw Application
-            </button>
+            </ButtonElement>
           )
         }
       >

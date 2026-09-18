@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { useQuery } from "@tanstack/react-query";
 import { getEventById } from "../../../logic/api/eventsApi";
+import ButtonElement from "../../../components/ui/ButtonElement";
 import { formatFullDate, formatTime } from "../../../logic/utils/datetime";
 
 interface EventDetailsModalProps {
@@ -51,14 +52,15 @@ const EventDetailsModal = ({ eventID, onClose }: EventDetailsModalProps) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-3 z-20 flex h-0 justify-end pr-3">
-          <button
-            type="button"
+          <ButtonElement
             onClick={onClose}
             aria-label="Close"
+            size="bare"
+            variant="outline"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-neutral-dark hover:bg-white"
           >
             <FaTimes />
-          </button>
+          </ButtonElement>
         </div>
 
         <div className="flex flex-col gap-4 p-6 pt-10">

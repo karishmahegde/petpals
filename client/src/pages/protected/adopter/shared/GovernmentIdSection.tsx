@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { PiClock, PiSealCheck, PiXCircle } from "react-icons/pi";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import {
   getGovernmentId,
   uploadGovernmentId,
@@ -246,13 +247,14 @@ const GovernmentIdSection = ({ isEditing }: GovernmentIdSectionProps) => {
             </p>
           )}
 
-          <button
+          <ButtonElement
             type="submit"
             disabled={mutation.isPending}
-            className="self-start rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
+            size="bare"
+            className="self-start rounded-xl bg-rose-dark px-5 py-2 text-sm font-medium hover:brightness-90"
           >
             {mutation.isPending ? "Submitting…" : "Submit"}
-          </button>
+          </ButtonElement>
         </form>
       )}
     </div>

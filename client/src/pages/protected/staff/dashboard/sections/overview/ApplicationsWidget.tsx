@@ -23,10 +23,10 @@ const ApplicationsWidget = () => {
     queryKey: [
       "staff",
       "applications-queue",
-      { status: "Pending", limit: PREVIEW_LIMIT },
+      { section: "active", limit: PREVIEW_LIMIT },
     ],
     queryFn: () =>
-      getApplicationsQueue({ status: "Pending", limit: PREVIEW_LIMIT }),
+      getApplicationsQueue({ section: "active", limit: PREVIEW_LIMIT }),
   });
 
   const applications = data?.data ?? [];

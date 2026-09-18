@@ -232,7 +232,20 @@ const schemas = {
             properties: {
               adopterName: { type: "string" },
               adopterEmail: { type: "string" },
+              adopterPhone: { type: "string", nullable: true },
+              housingType: { type: "string", nullable: true },
+              ownsOrRents: { type: "string", nullable: true },
+              landlordContact: { type: "string", nullable: true },
+              householdSize: { type: "integer", nullable: true },
+              numChildren: { type: "integer", nullable: true },
+              preQualifyFlag: { type: "boolean" },
             },
+          },
+          governmentIdStatus: {
+            type: "string",
+            enum: ["Pending", "Verified", "Rejected"],
+            nullable: true,
+            description: "Staff/Admin only — null for an Adopter viewing their own application, or if no government ID has been submitted yet. No idType/idNumber here; the full record lives in the dedicated ID Verification tab.",
           },
         },
       },
@@ -408,6 +421,229 @@ const schemas = {
               shelterID: { type: "integer" },
               shelterName: { type: "string" },
               shelterAddress: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
+
+  AppointmentQueueItem: {
+    type: "object",
+    properties: {
+      appointmentID: { type: "integer" },
+      appointmentDate: { type: "string", format: "date-time" },
+      appointmentReason: { type: "string", maxLength: 300 },
+      status: {
+        type: "string",
+        enum: ["Scheduled", "Completed", "Cancelled"],
+      },
+      pet: {
+        type: "object",
+        properties: {
+          petID: { type: "integer" },
+          petName: { type: "string" },
+          petPhoto: { type: "string", nullable: true },
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
+      vetName: { type: "string" },
+    },
+  },
+  AppointmentDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/AppointmentQueueItem" },
+      {
+        type: "object",
+        properties: {
+          appointmentCode: { type: "string", example: "APT-00123" },
+          shelterName: { type: "string" },
+          staffName: { type: "string", nullable: true },
+          volunteerName: { type: "string", nullable: true },
+          vaccinesAdministered: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                recordID: { type: "integer" },
+                vaccineName: { type: "string" },
+                dueDate: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          adopter: {
+            type: "object",
+            nullable: true,
+            properties: {
+              adopterName: { type: "string" },
+              adopterPhone: { type: "string", nullable: true },
+              adopterEmail: { type: "string" },
+              address: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
+
+  GovernmentIdQueueItem: {
+    type: "object",
+    description:
+      "One row in the ID Verification queue. Scoped to Adopters + Volunteers only.",
+    properties: {
+      governmentIDID: { type: "integer" },
+      userID: { type: "integer" },
+      userType: { type: "string", enum: ["Adopter", "Volunteer"] },
+      personName: { type: "string" },
+      personEmail: { type: "string", nullable: true },
+      personAvatarSeed: {
+        type: "string",
+        nullable: true,
+        description: "Passed to the DiceBear Avatar component client-side, same as every other role's avatarSeed.",
+      },
+      idType: { type: "string" },
+      verificationStatus: {
+        type: "string",
+        enum: ["Pending", "Verified", "Rejected"],
+      },
+    },
+  },
+  GovernmentIdDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/GovernmentIdQueueItem" },
+      {
+        type: "object",
+        properties: {
+          idNumber: {
+            type: "string",
+            description:
+              "Unmasked, unlike every other place GovernmentID is exposed (e.g. the Applications detail panel) — this is the dedicated, authorized verification workflow.",
+          },
+          documentURL: {
+            type: "string",
+            nullable: true,
+            description:
+              "Short-lived (5 min) signed URL for the document image, generated fresh on every read — never cached or persisted.",
+          },
+        },
+      },
+    ],
+  },
+
+  HealthPassport: {
+    type: "object",
+    description:
+      "Read-only aggregate for the Health Passport page — pet is the same shape as GET /staff/me/pets/:id's data.",
+    properties: {
+      pet: { type: "object" },
+      healthRecords: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            recordID: { type: "integer" },
+            createdAt: { type: "string", format: "date-time" },
+            recordDesc: { type: "string", maxLength: 500 },
+            vetName: { type: "string", nullable: true },
+            shelterName: { type: "string", nullable: true },
+          },
+        },
+      },
+      vaccinations: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            recordID: { type: "integer" },
+            vaccineName: { type: "string" },
+            administeredDate: { type: "string", format: "date-time" },
+            dueDate: { type: "string", format: "date-time" },
+            status: {
+              type: "string",
+              enum: ["Overdue", "Due Soon", "Up to Date"],
+            },
+          },
+        },
+      },
+      transferHistory: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            recordID: { type: "integer" },
+            transferDate: { type: "string", format: "date-time" },
+            transferReason: { type: "string", maxLength: 300 },
+            transferStatus: {
+              type: "string",
+              enum: ["In_Progress", "Completed", "Rejected", "Cancelled"],
+            },
+            fromShelterName: { type: "string" },
+            toShelterName: { type: "string" },
+            fromStaffName: { type: "string", nullable: true },
+            toStaffName: { type: "string", nullable: true },
+          },
+        },
+      },
+    },
+  },
+
+  TransferQueueItem: {
+    type: "object",
+    properties: {
+      recordID: { type: "integer" },
+      petID: { type: "integer" },
+      transferDate: { type: "string", format: "date-time" },
+      fromShelterID: { type: "integer" },
+      toShelterID: { type: "integer" },
+      transferStatus: {
+        type: "string",
+        enum: ["In_Progress", "Completed", "Rejected", "Cancelled"],
+      },
+      transferReason: { type: "string", maxLength: 300 },
+      pet: {
+        type: "object",
+        properties: {
+          petName: { type: "string" },
+          petPhoto: { type: "string", nullable: true },
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
+      fromShelter: {
+        type: "object",
+        properties: { shelterName: { type: "string" } },
+      },
+      toShelter: {
+        type: "object",
+        properties: { shelterName: { type: "string" } },
+      },
+    },
+  },
+  TransferDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/TransferQueueItem" },
+      {
+        type: "object",
+        properties: {
+          fromShelterStaff: { type: "integer", nullable: true },
+          toShelterStaff: { type: "integer", nullable: true },
+          fromStaff: {
+            type: "object",
+            nullable: true,
+            properties: { staffName: { type: "string" } },
+          },
+          toStaff: {
+            type: "object",
+            nullable: true,
+            properties: { staffName: { type: "string" } },
+          },
+          pet: {
+            type: "object",
+            properties: {
+              petAge: { type: "string", example: "~4 yrs" },
+              petSex: { type: "string" },
+              petColor: { type: "string" },
             },
           },
         },

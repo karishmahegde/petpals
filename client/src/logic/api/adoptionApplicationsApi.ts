@@ -57,7 +57,22 @@ export interface AdoptionApplicationFullDetail {
   assignedStaffName: string | null;
   // Only meaningful when Staff/Admin views someone else's application (it's
   // otherwise just an adopter's own name/email reflected back to them).
-  adopter: { adopterName: string; adopterEmail: string };
+  adopter: {
+    adopterName: string;
+    adopterEmail: string;
+    adopterPhone: string | null;
+    housingType: string | null;
+    ownsOrRents: string | null;
+    landlordContact: string | null;
+    householdSize: number | null;
+    numChildren: number | null;
+    preQualifyFlag: boolean;
+  };
+  // Staff/Admin only — null for an Adopter viewing their own application, or
+  // if no government ID has been submitted yet. No idType/idNumber here
+  // (see CLAUDE.md's "Never expose ... governmentID" rule) — the full
+  // record lives in the dedicated ID Verification tab.
+  governmentIdStatus: "Pending" | "Verified" | "Rejected" | null;
 }
 
 // Starts payment — creates a Stripe Checkout Session and returns its URL.
@@ -119,7 +134,12 @@ export interface AdoptionApplicationQueueItem {
 }
 
 interface ApplicationsQueueParams {
-  status?: string;
+  // "active" = Pending (needs a decision); "past" = Accepted/Rejected/
+  // Withdrawn — same Active/Past split as the Transfers/Appointments tabs.
+  section: "active" | "past";
+  species?: number[];
+  adopterName?: string;
+  petName?: string;
   shelterID?: number; // Admin only — Staff is always scoped server-side to their own shelter
   page?: number;
   limit?: number;
@@ -131,7 +151,7 @@ interface ApplicationsQueueParams {
 // (e.g. the Overview stat tile just needs pagination.total) — the full
 // Applications tab reuses this same function.
 export const getApplicationsQueue = async (
-  params?: ApplicationsQueueParams,
+  params: ApplicationsQueueParams,
 ): Promise<{ data: AdoptionApplicationQueueItem[]; pagination: Pagination }> => {
   const response = await axiosInstance.get("/adoption-applications", {
     params,

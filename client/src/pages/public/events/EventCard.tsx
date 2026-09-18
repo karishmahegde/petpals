@@ -6,6 +6,7 @@
 // the Staff dashboard's Visits/Events lists.
 import type { EventListItem } from "../../../logic/api/eventsApi";
 import { formatTime } from "../../../logic/utils/datetime";
+import ButtonElement from "../../../components/ui/ButtonElement";
 
 interface EventCardProps {
   event: EventListItem;
@@ -46,13 +47,13 @@ const EventCard = ({ event, openId, onKnowMore }: EventCardProps) => {
         {event.eventDesc}
       </p>
 
-      <button
-        type="button"
+      <ButtonElement
         onClick={() => onKnowMore(event.eventID)}
-        className="mt-4 rounded-xl bg-black px-2 py-3 text-xs text-white"
+        size="bare"
+        className="mt-4 rounded-xl bg-black px-2 py-3 text-xs"
       >
         Know More
-      </button>
+      </ButtonElement>
     </div>
   );
 };

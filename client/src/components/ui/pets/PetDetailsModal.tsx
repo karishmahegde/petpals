@@ -163,14 +163,15 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
                 the top of the scrollable sheet (not just the photo) without
                 adding to the layout flow, staying visible on scroll. */}
             <div className="sticky top-3 z-20 flex h-0 justify-end pr-3">
-              <button
-                type="button"
+              <ButtonElement
                 onClick={onClose}
                 aria-label="Close"
+                size="bare"
+                variant="outline"
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-neutral-dark hover:bg-white"
               >
                 <FaTimes />
-              </button>
+              </ButtonElement>
             </div>
 
             {/* Photo */}
@@ -276,8 +277,7 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
+                <ButtonElement
                   onClick={handleFavoriteClick}
                   aria-label={
                     isFavorited ? "Remove from favorites" : "Save to favorites"
@@ -285,6 +285,8 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
                   title={
                     isFavorited ? "Remove from favorites" : "Save to favorites"
                   }
+                  size="bare"
+                  variant="outline"
                   className="my-5 flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 border-neutral-lightgray"
                 >
                   {isFavorited ? (
@@ -292,7 +294,7 @@ const PetDetailsModal = ({ petID, onClose }: PetDetailsModalProps) => {
                   ) : (
                     <FaRegHeart className="text-neutral-gray" />
                   )}
-                </button>
+                </ButtonElement>
                 <ButtonElement
                   onClick={handleAdoptClick}
                   className="flex-1 bg-teal-dark text-center"

@@ -4,6 +4,7 @@
 // the title, button labels, body copy, and handlers. Same shell as
 // CloseAccountModal.
 import { FaTimes } from "react-icons/fa";
+import ButtonElement from "./ButtonElement";
 
 interface ConfirmActionModalProps {
   isOpen: boolean;
@@ -42,36 +43,38 @@ const ConfirmActionModal = ({
       >
         <div className="mb-4 flex items-start justify-between">
           <h2 className="font-display text-xl text-rose-dark">{title}</h2>
-          <button
-            type="button"
+          <ButtonElement
             onClick={onCancel}
             disabled={isPending}
             aria-label="Close"
-            className="text-neutral-gray hover:text-neutral-dark disabled:opacity-50"
+            size="bare"
+            variant="outline"
+            className="text-neutral-gray hover:text-neutral-dark"
           >
             <FaTimes />
-          </button>
+          </ButtonElement>
         </div>
 
         <p className="font-body text-sm text-neutral-charcoal">{children}</p>
 
         <div className="mt-5 flex justify-end gap-3">
-          <button
-            type="button"
+          <ButtonElement
             onClick={onCancel}
             disabled={isPending}
+            size="bare"
+            variant="outline"
             className="rounded-xl border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-50"
           >
             {cancelLabel}
-          </button>
-          <button
-            type="button"
+          </ButtonElement>
+          <ButtonElement
             onClick={onConfirm}
             disabled={isPending}
-            className="rounded-xl bg-red px-4 py-2 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
+            size="bare"
+            className="rounded-xl bg-red px-4 py-2 font-body text-sm font-medium transition-colors hover:brightness-90 disabled:opacity-50"
           >
             {isPending ? "Working…" : confirmLabel}
-          </button>
+          </ButtonElement>
         </div>
       </div>
     </div>

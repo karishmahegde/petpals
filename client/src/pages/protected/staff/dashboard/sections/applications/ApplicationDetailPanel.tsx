@@ -18,6 +18,7 @@ import {
   type StaffReviewStatus,
 } from "../../../../../../logic/api/adoptionApplicationsApi";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
@@ -34,6 +35,12 @@ const STATUS_TONE: Record<ApplicationStatus, BadgeTone> = {
   Accepted: "green",
   Rejected: "red",
   Withdrawn: "gray",
+};
+
+const GOVERNMENT_ID_TONE: Record<"Pending" | "Verified" | "Rejected", BadgeTone> = {
+  Pending: "gold",
+  Verified: "green",
+  Rejected: "red",
 };
 
 const MAX_REMARK_LEN = 500; // schema.prisma: staffRemark is VarChar(500)
@@ -113,21 +120,22 @@ const ApplicationDetailPanel = ({
         title="Application Details"
         footer={
           showActions && (
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingAction("Rejected")}
-                className="flex-1 rounded-xl border border-rose-dark px-4 py-3 font-body text-sm font-medium text-rose-dark transition-colors hover:bg-rose-dark hover:text-white"
-              >
-                Reject
-              </button>
-              <button
-                type="button"
+            <div className="flex flex-col gap-3">
+              <ButtonElement
                 onClick={() => setPendingAction("Accepted")}
-                className="flex-1 rounded-xl bg-green px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95"
+                size="panel"
+                className="bg-green hover:brightness-95"
               >
                 Accept
-              </button>
+              </ButtonElement>
+              <ButtonElement
+                onClick={() => setPendingAction("Rejected")}
+                size="panel"
+                variant="outline"
+                className="border border-rose-dark text-rose-dark hover:bg-rose-dark hover:text-white"
+              >
+                Reject
+              </ButtonElement>
             </div>
           )
         }
@@ -168,12 +176,33 @@ const ApplicationDetailPanel = ({
               </div>
             </div>
 
-            {/* Adopter info */}
-            <h3 className={sectionHeading}>Adopter</h3>
+            {/* Adopter details */}
+            <h3 className={sectionHeading}>Adopter Details</h3>
             <dl className="mt-2 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
               <InfoRow k="Name" v={data.adopter.adopterName} />
               <InfoRow k="Email" v={data.adopter.adopterEmail} />
+              <InfoRow k="Phone" v={data.adopter.adopterPhone ?? "—"} />
+              <InfoRow k="Housing Type" v={data.adopter.housingType ?? "—"} />
+              <InfoRow k="Ownership Type" v={data.adopter.ownsOrRents ?? "—"} />
+              <InfoRow k="Landlord Contact" v={data.adopter.landlordContact ?? "—"} />
+              <InfoRow k="Household Size" v={data.adopter.householdSize ?? "—"} />
+              <InfoRow k="No. of Children" v={data.adopter.numChildren ?? "—"} />
+              <dt className={label}>Government ID</dt>
+              <dd>
+                {data.governmentIdStatus ? (
+                  <Badge tone={GOVERNMENT_ID_TONE[data.governmentIdStatus]}>
+                    {data.governmentIdStatus}
+                  </Badge>
+                ) : (
+                  <Badge tone="gray">Not Submitted</Badge>
+                )}
+              </dd>
             </dl>
+            {data.adopter.preQualifyFlag && (
+              <Badge tone="green" className="mt-3">
+                Pre Approved
+              </Badge>
+            )}
 
             {/* Application info */}
             <div className={divider} />
@@ -207,8 +236,8 @@ const ApplicationDetailPanel = ({
 
             {/* Remarks from shelter */}
             <h3 className={sectionHeading}>Remarks from Shelter</h3>
-            <p className={quoteBlock}>
-              {data.staffRemark ? `"${data.staffRemark}"` : "No remarks yet."}
+            <p className="mt-1 rounded-lg border border-neutral-lightgray bg-neutral-offwhite p-3 font-body text-sm text-neutral-charcoal">
+              {data.staffRemark || "No remarks yet."}
             </p>
           </div>
         )}

@@ -5,6 +5,7 @@ import axios from "axios";
 import { Country, State, City } from "country-state-city";
 import { PiUserBold, PiArrowsClockwiseBold } from "react-icons/pi";
 import Avatar from "../../../../../components/ui/Avatar";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import PhoneInputField from "../../../../../components/ui/PhoneInputField";
 import OnboardingStepHeader from "../OnboardingStepHeader";
 import {
@@ -182,15 +183,15 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
             size={72}
             className="h-16 w-16 shrink-0 rounded-full border border-rose-light bg-white"
           />
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => setAvatarSeed(crypto.randomUUID())}
             aria-label="Randomize avatar"
             title="Randomize avatar"
-            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm transition-colors hover:brightness-90"
+            size="bare"
+            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark shadow-sm hover:brightness-90"
           >
             <PiArrowsClockwiseBold className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </ButtonElement>
         </div>
         <p className="font-body text-sm text-rose-dark">
           Your avatar, randomize until you find one you like!
@@ -359,22 +360,22 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
 
       <div className="mt-6 flex gap-3">
         {onBack && (
-          <button
-            type="button"
+          <ButtonElement
             onClick={onBack}
-            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+            size="panel"
+            className="flex-1 bg-gold hover:brightness-90 disabled:cursor-not-allowed"
           >
             Back
-          </button>
+          </ButtonElement>
         )}
-        <button
-          type="button"
+        <ButtonElement
           onClick={handleContinue}
           disabled={mutation.isPending}
-          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+          size="panel"
+          className="flex-1 bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? "Saving…" : "Continue"}
-        </button>
+        </ButtonElement>
       </div>
     </div>
   );

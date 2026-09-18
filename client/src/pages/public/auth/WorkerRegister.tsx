@@ -13,6 +13,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
+import ButtonElement from "../../../components/ui/ButtonElement";
 import { register as registerApi } from "../../../logic/api/authApi";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background-admin.png";
@@ -168,19 +169,17 @@ const WorkerRegister = () => {
 
         {/* Sign in / Sign up tabs */}
         <div className="flex rounded-xl overflow-hidden mb-8">
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => navigate("/staff-portal/login")}
-            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-teal-md hover:brightness-95 transition-colors"
+            size="bare"
+            variant="outline"
+            className="flex-1 py-2.5 text-sm text-neutral-dark bg-teal-md hover:brightness-95"
           >
             Sign in
-          </button>
-          <button
-            type="button"
-            className="flex-1 py-2.5 font-body text-sm text-white bg-teal-dark transition-colors"
-          >
+          </ButtonElement>
+          <ButtonElement size="bare" className="flex-1 py-2.5 text-sm bg-teal-dark">
             Sign up
-          </button>
+          </ButtonElement>
         </div>
 
         {/* Form */}
@@ -289,11 +288,12 @@ const WorkerRegister = () => {
               {ROLE_OPTIONS.map((option) => {
                 const selected = role === option.value;
                 return (
-                  <button
+                  <ButtonElement
                     key={option.value}
-                    type="button"
                     onClick={() => setRole(option.value)}
-                    className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+                    size="bare"
+                    variant="outline"
+                    className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left ${
                       option.bg
                     } ${selected ? option.border : "border-transparent"}`}
                   >
@@ -307,7 +307,7 @@ const WorkerRegister = () => {
                       <span className="font-bold">{option.label}</span> -{" "}
                       {option.description}
                     </span>
-                  </button>
+                  </ButtonElement>
                 );
               })}
             </div>
@@ -352,24 +352,26 @@ const WorkerRegister = () => {
           </div>
 
           {/* Submit button */}
-          <button
+          <ButtonElement
             type="submit"
             disabled={loading}
-            className="w-full bg-gold-md text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            size="bare"
+            className="w-full bg-gold-md text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing up..." : "sign up"}
-          </button>
+          </ButtonElement>
         </form>
 
         <p className="mt-6 text-center font-body text-xs text-neutral-gray">
           Looking to adopt, volunteer, or donate?{" "}
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => navigate("/register")}
+            size="bare"
+            variant="outline"
             className="font-semibold text-teal-dark underline"
           >
             Register here
-          </button>
+          </ButtonElement>
         </p>
       </Card>
     </div>

@@ -3,6 +3,8 @@
 // unselected = rose-light fill. Used throughout the onboarding wizard
 // (Housing Type, Own/Rent) and reusable as-is for the adoption application
 // form's Adopter Type (Adopt/Foster) later.
+import ButtonElement from "./ButtonElement";
+
 interface SegmentedOption {
   value: string;
   label: string;
@@ -28,11 +30,12 @@ const SegmentedControl = ({
     {options.map((option) => {
       const selected = option.value === value;
       return (
-        <button
+        <ButtonElement
           key={option.value}
-          type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={selected}
+          size="bare"
+          variant="outline"
           className={`flex-1 px-4 py-2.5 font-body text-sm font-medium transition-colors ${
             selected
               ? "bg-rose text-white"
@@ -41,7 +44,7 @@ const SegmentedControl = ({
         >
           {option.icon && <span className="mr-1.5">{option.icon}</span>}
           {option.label}
-        </button>
+        </ButtonElement>
       );
     })}
   </div>

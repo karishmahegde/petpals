@@ -21,6 +21,13 @@ const parseId = (value, field) => {
   return n;
 };
 
+// req.query gives a single string for one occurrence of a param, or an array
+// when the param is repeated (?species=1&species=2) — normalize to array either way.
+const toArray = (value) => {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
 const VALID_APPLICATION_TYPES = ["Adopt", "Foster"];
 const MAX_SHELTER_MESSAGE_LEN = 500; // schema.prisma: shelterMessage is VarChar(500)
 
@@ -89,7 +96,7 @@ const createApplication = async (req, res, next) => {
 // the actual role restriction per branch is enforced here, since each
 // branch needs a different one and the middleware only supports one static
 // list.
-const VALID_APPLICATION_STATUSES = ["Pending", "Accepted", "Rejected", "Withdrawn"];
+const VALID_SECTIONS = ["active", "past"];
 
 // ?checkoutSessionId= — Adopter-only. Used by the post-payment confirmation
 // page to poll for the row the webhook creates asynchronously.
@@ -129,7 +136,10 @@ const listApplications = async (req, res, next) => {
   }
 
   const {
-    status,
+    section,
+    species,
+    adopterName,
+    petName,
     shelterID: shelterIDRaw,
     page: pageRaw,
     limit: limitRaw,
@@ -151,10 +161,16 @@ const listApplications = async (req, res, next) => {
     }
   }
 
-  if (status !== undefined && !VALID_APPLICATION_STATUSES.includes(status)) {
-    return next(
-      badRequest(`status must be one of: ${VALID_APPLICATION_STATUSES.join(", ")}`),
-    );
+  if (!VALID_SECTIONS.includes(section)) {
+    return next(badRequest(`section is required and must be one of: ${VALID_SECTIONS.join(", ")}`));
+  }
+
+  // species is numeric (speciesID) — same conversion/validation as public
+  // GET /pets's own species param. Without this, Prisma rejects the string
+  // query-param values matchFilter passes through.
+  const speciesValues = toArray(species).map((raw) => Number(raw));
+  if (speciesValues.some((s) => !Number.isInteger(s))) {
+    return next(badRequest("species must be an array of integers (speciesID)"));
   }
 
   // Only meaningful for Admin — a Staff caller's shelter is always their
@@ -170,7 +186,7 @@ const listApplications = async (req, res, next) => {
   try {
     const result = await adoptionApplicationsService.listApplicationsForStaff(
       { role: req.user.role, userID: req.user.userID },
-      { status, shelterID, page, limit },
+      { section, species: speciesValues, adopterName, petName, shelterID, page, limit },
     );
     return successListResponse(
       res,

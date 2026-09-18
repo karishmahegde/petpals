@@ -7,6 +7,13 @@ const badRequest = (message) => {
   return err;
 };
 
+// req.query gives a single string for one occurrence of a param, or an array
+// when the param is repeated (?species=1&species=2) — normalize to array either way.
+const toArray = (value) => {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
 const PET_SEX_VALUES = ["M", "F"]; // live DB column is character(1) — see schema.prisma's petSex note
 const PET_SIZE_VALUES = ["Small", "Medium", "Large"];
 const INTAKE_TYPE_VALUES = ["stray", "surrendered", "transferred"];
@@ -253,6 +260,14 @@ const listMyShelterPets = async (req, res, next) => {
     return next(badRequest(`sort must be one of: ${VALID_SORTS.join(", ")}`));
   }
 
+  // species is numeric (speciesID) — same conversion/validation as public
+  // GET /pets's own species param (public/pets.controller.js). Without this,
+  // Prisma rejects the string query-param values matchFilter passes through.
+  const speciesValues = toArray(req.query.species).map((raw) => Number(raw));
+  if (speciesValues.some((s) => !Number.isInteger(s))) {
+    return next(badRequest("species must be an array of integers (speciesID)"));
+  }
+
   try {
     const { data, pagination } = await petsService.listMyShelterPets(
       req.user.userID,
@@ -260,7 +275,7 @@ const listMyShelterPets = async (req, res, next) => {
         page,
         limit,
         adoptionStatus,
-        species: req.query.species,
+        species: speciesValues,
         breed: req.query.breed,
         size: req.query.size,
         minAge: req.query.minAge,
@@ -294,6 +309,24 @@ const getShelterPetDetail = async (req, res, next) => {
       userID: req.user.userID,
     });
     return successResponse(res, "Pet retrieved successfully", pet);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /staff/me/pets/:id/health-passport ———————————————
+const getHealthPassport = async (req, res, next) => {
+  const petID = Number(req.params.id);
+  if (!Number.isInteger(petID) || petID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const passport = await petsService.getHealthPassport(petID, {
+      role: req.user.role,
+      userID: req.user.userID,
+    });
+    return successResponse(res, "Health passport retrieved successfully", passport);
   } catch (err) {
     return next(err);
   }
@@ -499,6 +532,7 @@ const deletePhoto = async (req, res, next) => {
 module.exports = {
   listMyShelterPets,
   getShelterPetDetail,
+  getHealthPassport,
   createPet,
   updatePet,
   deletePet,

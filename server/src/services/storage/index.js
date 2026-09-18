@@ -102,10 +102,42 @@ const deletePrivateFile = async (bucket, objectPath) => {
   }
 };
 
+// Generates a short-lived signed URL for a private object (government-ids
+// staff verification view — the only place a private-bucket file is ever
+// rendered as an image, so this is the only caller). Never cache/persist the
+// result; call it fresh every time the detail panel opens.
+const createSignedUrl = async (bucket, objectPath, expiresInSeconds = 300) => {
+  assertConfigured();
+
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${encodeURI(objectPath)}`,
+    {
+      method: "POST",
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn: expiresInSeconds }),
+    },
+  );
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw storageError(`Failed to sign storage URL (${res.status}): ${detail}`);
+  }
+
+  // Supabase returns signedURL as "/object/sign/bucket/path?token=..." —
+  // relative to /storage/v1, not to the bucket root. Confirmed by hitting
+  // the naively-prefixed URL and getting a 404.
+  const { signedURL } = await res.json();
+  return `${SUPABASE_URL}/storage/v1${signedURL}`;
+};
+
 module.exports = {
   GOVERNMENT_IDS_BUCKET,
   PET_IMAGES_BUCKET,
   uploadPrivateFile,
   deletePrivateFile,
+  createSignedUrl,
   toPublicFileUrl,
 };

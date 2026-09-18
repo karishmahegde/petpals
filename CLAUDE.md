@@ -185,7 +185,7 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 ## Database Notes
 
 - `Pet.petDOB` replaced static `petAge` (age computed at request time). `Pet.featuredFlag BOOLEAN DEFAULT FALSE` powers `/pets/featured` (set via SQL for now, staff toggle planned).
-- Hand-applied constraints (PostGIS column, partial unique indexes) live only in Supabase and must be re-added after any reset — see Known Issues. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`.
+- Hand-applied constraints (PostGIS column, partial unique indexes) live only in Supabase and must be re-added after any reset — see Known Issues. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`. Double-submit guard on Appointment: `UNIQUE (petID, vetID, appointmentDate) WHERE appointmentStatus = 'Scheduled'` — same pet+vet+timestamp can't have two Scheduled rows (a resubmitted create after a perceived failure).
 
 ---
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
+import ButtonElement from "../ui/ButtonElement";
 import logoNav from "../../static/assets/images/branding/logoNav.png";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
@@ -89,8 +90,10 @@ const Navbar = () => {
           {user ? (
             // Logged-in: user chip + dropdown
             <div className="relative" ref={dropdownRef}>
-              <button
+              <ButtonElement
                 onClick={() => setDropdownOpen((prev) => !prev)}
+                size="bare"
+                variant="outline"
                 className="flex items-center gap-2 font-body text-sm font-medium text-neutral-dark bg-gold-md px-4 py-2 rounded-xl hover:brightness-95 transition-colors"
               >
                 {user.avatarSeed ? (
@@ -117,25 +120,29 @@ const Navbar = () => {
                     d="m19 9-7 7-7-7"
                   />
                 </svg>
-              </button>
+              </ButtonElement>
 
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg border border-neutral-offwhite overflow-hidden">
-                  <button
+                  <ButtonElement
                     onClick={() => {
                       navigate(dashboardRoute);
                       setDropdownOpen(false);
                     }}
+                    size="bare"
+                    variant="outline"
                     className="w-full text-left px-4 py-3 font-body text-sm text-neutral-dark hover:bg-gold-light transition-colors"
                   >
                     Dashboard
-                  </button>
-                  <button
+                  </ButtonElement>
+                  <ButtonElement
                     onClick={handleLogout}
+                    size="bare"
+                    variant="outline"
                     className="w-full text-left px-4 py-3 font-body text-sm text-rose-dark hover:bg-gold-light transition-colors border-t border-neutral-offwhite"
                   >
                     Logout
-                  </button>
+                  </ButtonElement>
                 </div>
               )}
             </div>
@@ -152,7 +159,9 @@ const Navbar = () => {
 
         {/* Hamburger button (mobile) */}
         <div className="md:hidden flex items-center gap-2">
-          <button
+          <ButtonElement
+            size="bare"
+            variant="outline"
             className="text-rose-dark"
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label="Toggle menu"
@@ -188,7 +197,7 @@ const Navbar = () => {
                 />
               </svg>
             )}
-          </button>
+          </ButtonElement>
         </div>
       </div>
 
@@ -228,21 +237,23 @@ const Navbar = () => {
                   {firstName}
                 </span>
               </div>
-              <button
+              <ButtonElement
+                size="bare"
                 onClick={() => {
                   navigate(dashboardRoute);
                   setMenuOpen(false);
                 }}
-                className="text-left font-body text-sm font-medium text-white bg-gold-md/80 px-4 py-2.5 rounded-lg"
+                className="text-left font-body text-sm font-medium bg-gold-md/80 px-4 py-2.5 rounded-lg"
               >
                 Dashboard
-              </button>
-              <button
+              </ButtonElement>
+              <ButtonElement
+                size="bare"
                 onClick={handleLogout}
-                className="text-left font-body text-sm font-medium text-white bg-rose-dark/80 px-4 py-2.5 rounded-lg"
+                className="text-left font-body text-sm font-medium bg-rose-dark/80 px-4 py-2.5 rounded-lg"
               >
                 Logout
-              </button>
+              </ButtonElement>
             </div>
           ) : (
             <NavLink

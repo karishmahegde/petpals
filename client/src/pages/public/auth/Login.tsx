@@ -10,6 +10,7 @@ import { useState } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import Card from "../../../components/ui/Card";
+import ButtonElement from "../../../components/ui/ButtonElement";
 import axios from "axios";
 import { login as loginApi } from "../../../logic/api/authApi";
 import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
@@ -117,19 +118,20 @@ const Login = () => {
 
         {/* Sign in / Sign up tabs */}
         <div className="flex rounded-xl overflow-hidden mb-8">
-          <button
-            type="button"
-            className="flex-1 py-2.5 font-body text-sm text-white bg-rose-dark transition-colors"
+          <ButtonElement
+            size="bare"
+            className="flex-1 py-2.5 text-sm bg-rose-dark"
           >
             Sign in
-          </button>
-          <button
-            type="button"
+          </ButtonElement>
+          <ButtonElement
             onClick={() => navigate("/register")}
-            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-rose-md hover:brightness-95 transition-colors"
+            size="bare"
+            variant="outline"
+            className="flex-1 py-2.5 text-sm text-neutral-dark bg-rose-md hover:brightness-95"
           >
             Sign up
-          </button>
+          </ButtonElement>
         </div>
 
         {/* Form */}
@@ -184,13 +186,14 @@ const Login = () => {
           </div>
 
           {/* Submit button */}
-          <button
+          <ButtonElement
             type="submit"
             disabled={loading}
-            className="w-full bg-teal-dark text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            size="bare"
+            className="w-full bg-teal-dark text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing in..." : "sign in"}
-          </button>
+          </ButtonElement>
         </form>
       </Card>
     </div>

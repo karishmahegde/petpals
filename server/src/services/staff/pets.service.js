@@ -263,6 +263,102 @@ const getShelterPetDetail = async (petID, { role, userID }) => {
   };
 };
 
+// ——————————————— GET HEALTH PASSPORT (GET /staff/me/pets/:id/health-passport) ———————————————
+// Read-only aggregate view for the pet's own full-page "passport" — reuses
+// getShelterPetDetail for identity (and its ownership check — a Staff caller
+// may only view a passport for a pet at their own shelter) and reads
+// HealthRecord/VaccinationRecord/TransferHistory fresh alongside it. Unlike
+// staff/transfers.service.js's listTransfers, transferHistory here is NOT
+// scoped to the caller's own shelter — a passport is meant to show the
+// pet's full cross-shelter history regardless of which shelter currently
+// holds it or which shelter the viewing staff member belongs to.
+const DUE_SOON_WINDOW_DAYS = 30;
+
+// administeredDate/dueDate are both non-nullable in the schema — every row
+// represents a dose that WAS given, with a next-dose dueDate to track. So
+// status is driven purely by how soon/overdue that next dose is, not by
+// whether the pet has ever been vaccinated at all.
+const vaccinationStatus = (dueDate) => {
+  const daysUntilDue = (new Date(dueDate) - Date.now()) / 86400000;
+  if (daysUntilDue < 0) return "Overdue";
+  if (daysUntilDue <= DUE_SOON_WINDOW_DAYS) return "Due Soon";
+  return "Up to Date";
+};
+
+const getHealthPassport = async (petID, { role, userID }) => {
+  const pet = await getShelterPetDetail(petID, { role, userID });
+
+  const [healthRecordRows, vaccinationRows, transferRows] = await Promise.all([
+    prisma.healthRecord.findMany({
+      where: { petID },
+      orderBy: { createdAt: "desc" },
+      select: {
+        recordID: true,
+        createdAt: true,
+        recordDesc: true,
+        vet: {
+          select: {
+            vetName: true,
+            shelter: { select: { shelterName: true } },
+          },
+        },
+      },
+    }),
+    prisma.vaccinationRecord.findMany({
+      where: { petID },
+      orderBy: { dueDate: "asc" },
+      select: {
+        recordID: true,
+        administeredDate: true,
+        dueDate: true,
+        vaccine: { select: { vaccineName: true } },
+      },
+    }),
+    prisma.transferHistory.findMany({
+      where: { petID },
+      orderBy: { transferDate: "desc" },
+      select: {
+        recordID: true,
+        transferDate: true,
+        transferReason: true,
+        transferStatus: true,
+        fromShelter: { select: { shelterName: true } },
+        toShelter: { select: { shelterName: true } },
+        fromStaff: { select: { staffName: true } },
+        toStaff: { select: { staffName: true } },
+      },
+    }),
+  ]);
+
+  return {
+    pet,
+    healthRecords: healthRecordRows.map((r) => ({
+      recordID: r.recordID,
+      createdAt: r.createdAt,
+      recordDesc: r.recordDesc,
+      vetName: r.vet?.vetName ?? null,
+      shelterName: r.vet?.shelter?.shelterName ?? null,
+    })),
+    vaccinations: vaccinationRows.map((r) => ({
+      recordID: r.recordID,
+      vaccineName: r.vaccine.vaccineName,
+      administeredDate: r.administeredDate,
+      dueDate: r.dueDate,
+      status: vaccinationStatus(r.dueDate),
+    })),
+    transferHistory: transferRows.map((r) => ({
+      recordID: r.recordID,
+      transferDate: r.transferDate,
+      transferReason: r.transferReason,
+      transferStatus: r.transferStatus,
+      fromShelterName: r.fromShelter.shelterName,
+      toShelterName: r.toShelter.shelterName,
+      fromStaffName: r.fromStaff?.staffName ?? null,
+      toStaffName: r.toStaff?.staffName ?? null,
+    })),
+  };
+};
+
 // ——————————————— GET PHOTOS (GET /pets/:id/photos) ———————————————
 // Read-only counterpart to addPhoto/deletePhoto's shared listPhotos — lets
 // the Staff pet detail panel load the current gallery on open, without
@@ -600,6 +696,7 @@ const deletePhoto = async (petID, photoID, { role, userID }) => {
 module.exports = {
   listMyShelterPets,
   getShelterPetDetail,
+  getHealthPassport,
   createPet,
   updatePet,
   deletePet,

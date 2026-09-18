@@ -56,9 +56,9 @@ const StatsWidget = () => {
   });
 
   const { data } = useQuery({
-    queryKey: ["staff", "applications-queue", { status: "Pending", limit: 1 }],
+    queryKey: ["staff", "applications-queue", { section: "active", limit: 1 }],
     // limit: 1 — this tile only needs pagination.total, not the rows.
-    queryFn: () => getApplicationsQueue({ status: "Pending", limit: 1 }),
+    queryFn: () => getApplicationsQueue({ section: "active", limit: 1 }),
   });
 
   const { data: visitsData } = useQuery({

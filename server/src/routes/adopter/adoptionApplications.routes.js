@@ -94,11 +94,14 @@ router.post(
  *       hasn't landed yet — that's the expected common answer for a poll,
  *       not an error.
  *
- *       Without it (Staff, Admin only): a paginated, filterable queue.
- *       Staff sees only their own shelter's applications (shelterID
- *       re-fetched fresh from the STAFF table, never the JWT, never a query
- *       param); Admin sees all, optionally filtered by ?shelterID=. Both
- *       support ?status=.
+ *       Without it (Staff, Admin only): a paginated, filterable queue, split
+ *       into two sections by ?section= — "active" (Pending, needs a
+ *       decision) or "past" (Accepted/Rejected/Withdrawn, already
+ *       resolved), mirroring the Transfers/Appointments tabs' own
+ *       Active/Past split. Staff sees only their own shelter's applications
+ *       (shelterID re-fetched fresh from the STAFF table, never the JWT,
+ *       never a query param); Admin sees all, optionally filtered by
+ *       ?shelterID=.
  *     tags: [Adoption Applications, Staff]
  *     security:
  *       - bearerAuth: []
@@ -108,9 +111,21 @@ router.post(
  *         schema: { type: string }
  *         description: Adopter-only branch. Required to trigger it.
  *       - in: query
- *         name: status
- *         schema: { type: string, enum: [Pending, Accepted, Rejected, Withdrawn] }
- *         description: Staff/Admin branch only.
+ *         name: section
+ *         schema: { type: string, enum: [active, past] }
+ *         description: Staff/Admin branch only. Required for that branch.
+ *       - in: query
+ *         name: species
+ *         schema: { type: array, items: { type: integer } }
+ *         description: Staff/Admin branch only. Repeatable speciesID filter.
+ *       - in: query
+ *         name: adopterName
+ *         schema: { type: string }
+ *         description: Staff/Admin branch only. Contains match on the adopter's name.
+ *       - in: query
+ *         name: petName
+ *         schema: { type: string }
+ *         description: Staff/Admin branch only. Contains match on the pet's name.
  *       - in: query
  *         name: shelterID
  *         schema: { type: integer }

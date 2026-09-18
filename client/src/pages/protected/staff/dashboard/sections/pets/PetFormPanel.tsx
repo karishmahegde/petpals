@@ -14,11 +14,13 @@
 // needs to pre-fill with real values instead of leaving them blank for
 // staff to re-enter. `petID` absent/null -> create mode.
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FaPaw, FaTimes } from "react-icons/fa";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import { getSpecies, getBreeds } from "../../../../../../logic/api/petsApi";
@@ -63,10 +65,11 @@ interface PetFormState {
   petHeight: string;
   petBGroup: string;
   petDesc: string;
-  // Edit-only — the pet's own record isn't created until after intake, and
-  // these are all judgment calls a shelter typically only makes once it's
-  // had a chance to observe the pet (matching petDesc/adoptionStatus's own
-  // edit-only treatment). Never sent (or shown) in create mode.
+  // Shown in both modes (same fields/order as the edit form), but POST
+  // /pets doesn't accept any of these — the backend always creates a pet at
+  // adoptionStatus "available" with no profile fields set. So on create,
+  // saveMutation sends these via a follow-up PUT once the pet exists,
+  // rather than in the create request itself.
   microchipID: string;
   compatibleWithChildren: boolean;
   compatibleWithPets: boolean;
@@ -94,7 +97,9 @@ const EMPTY_FORM: PetFormState = {
   compatibleWithPets: false,
   specialNeeds: false,
   featuredFlag: false,
-  adoptionStatus: "",
+  // Matches what POST /pets always sets server-side, so a create that
+  // leaves this untouched needs no follow-up PUT just for this field.
+  adoptionStatus: "available",
 };
 
 const PET_SEX_OPTIONS: { value: PetSex; label: string }[] = [
@@ -168,6 +173,7 @@ const extractError = (err: unknown): string =>
 
 const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const isEdit = petID != null;
 
   const [mode, setMode] = useState<PanelMode>("edit");
@@ -289,7 +295,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
   };
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload: CreatePetPayload = {
         breedID: Number(form.breedID),
         petName: form.petName.trim(),
@@ -304,25 +310,44 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
       if (form.petBGroup.trim()) payload.petBGroup = form.petBGroup.trim();
       if (form.intakeType) payload.intakeType = form.intakeType;
 
-      if (!isEdit) return createPet(payload);
+      const profileFields = {
+        petDesc: form.petDesc.trim() || null,
+        microchipID: form.microchipID.trim() || null,
+        compatibleWithChildren: form.compatibleWithChildren,
+        compatibleWithPets: form.compatibleWithPets,
+        specialNeeds: form.specialNeeds,
+        featuredFlag: form.featuredFlag,
+        adoptionStatus: form.adoptionStatus as PetAdoptionStatus,
+      };
+
+      if (!isEdit) {
+        const created = await createPet(payload);
+        // POST /pets ignores all of the above (it always creates at
+        // "available" with no profile fields, and is plain JSON — no file
+        // support) — only follow up with a PUT if the staff member actually
+        // set one of these or staged a photo, to skip a no-op request on
+        // the common case of leaving them all at their defaults.
+        const hasProfileFields =
+          profileFields.petDesc !== null ||
+          profileFields.microchipID !== null ||
+          profileFields.compatibleWithChildren ||
+          profileFields.compatibleWithPets ||
+          profileFields.specialNeeds ||
+          profileFields.featuredFlag ||
+          profileFields.adoptionStatus !== "available";
+        return hasProfileFields || photoFile
+          ? updatePet(
+              created.petID,
+              hasProfileFields ? profileFields : {},
+              photoFile,
+            )
+          : created;
+      }
 
       // photoFile rides along in the same request as the field changes —
       // see staffPetsApi.ts's updatePet. undefined (nothing staged) leaves
       // the pet's existing photo untouched server-side.
-      return updatePet(
-        petID!,
-        {
-          ...payload,
-          petDesc: form.petDesc.trim() || null,
-          microchipID: form.microchipID.trim() || null,
-          compatibleWithChildren: form.compatibleWithChildren,
-          compatibleWithPets: form.compatibleWithPets,
-          specialNeeds: form.specialNeeds,
-          featuredFlag: form.featuredFlag,
-          adoptionStatus: form.adoptionStatus as PetAdoptionStatus,
-        },
-        photoFile,
-      );
+      return updatePet(petID!, { ...payload, ...profileFields }, photoFile);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "shelter-pets"] });
@@ -398,7 +423,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
     form.intakeDate !== "" &&
     form.petWeight !== "" &&
     form.petHeight !== "" &&
-    (!isEdit || form.adoptionStatus !== "") &&
+    form.adoptionStatus !== "" &&
     !saveMutation.isPending;
 
   const photos = photosQuery.data ?? [];
@@ -406,7 +431,11 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
   const showView = isEdit && mode === "view" && pet;
   const showForm = mode === "edit" && (!isEdit || pet);
 
-  const title = !isEdit ? "Add Pet" : mode === "view" ? "Pet Details" : "Edit Pet";
+  const title = !isEdit
+    ? "Add Pet"
+    : mode === "view"
+      ? "Pet Details"
+      : "Edit Pet";
 
   return (
     <>
@@ -415,14 +444,27 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
         onClose={closeAndReset}
         title={title}
         footer={
-          showView ? (
-            <button
-              type="button"
-              onClick={() => setMode("edit")}
-              className="w-full rounded-xl bg-teal-dark px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95"
-            >
-              Edit
-            </button>
+          showView && pet ? (
+            <div className="flex flex-col gap-3">
+              <ButtonElement
+                onClick={() => {
+                  closeAndReset();
+                  navigate(`/staff/pets/${pet.petID}/health-passport`);
+                }}
+                size="panel"
+                variant="outline"
+                className="w-full bg-gold-md text-white hover:brightness-95"
+              >
+                View Health Passport
+              </ButtonElement>
+              <ButtonElement
+                onClick={() => setMode("edit")}
+                size="panel"
+                className="w-full bg-teal-dark hover:brightness-95"
+              >
+                Edit
+              </ButtonElement>
+            </div>
           ) : undefined
         }
       >
@@ -460,7 +502,10 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                   {pet.breed.breedName} · {pet.shelter.shelterName}
                 </p>
               </div>
-              <Badge tone={STATUS_TONE[pet.adoptionStatus]} className="shrink-0">
+              <Badge
+                tone={STATUS_TONE[pet.adoptionStatus]}
+                className="shrink-0"
+              >
                 {ADOPTION_STATUS_LABEL[pet.adoptionStatus]}
               </Badge>
             </div>
@@ -470,7 +515,10 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
               <InfoRow k="ID" v={pet.petCode} />
               <InfoRow k="Microchip ID" v={pet.microchipID || "—"} />
               <InfoRow k="Age" v={pet.petAge} />
-              <InfoRow k="Date of Birth" v={formatShortDate(new Date(pet.petDOB))} />
+              <InfoRow
+                k="Date of Birth"
+                v={formatShortDate(new Date(pet.petDOB))}
+              />
               <InfoRow k="Sex" v={pet.petSex} />
               <InfoRow k="Color" v={pet.petColor} />
               <InfoRow k="Size" v={pet.petSize ?? "—"} />
@@ -562,7 +610,9 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                 className={`${fieldClass} disabled:opacity-50`}
               >
                 <option value="">
-                  {speciesIDNum === null ? "Select a species first" : "- Select -"}
+                  {speciesIDNum === null
+                    ? "Select a species first"
+                    : "- Select -"}
                 </option>
                 {breeds?.map((b) => (
                   <option key={b.breedID} value={b.breedID}>
@@ -737,96 +787,92 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
               />
             </div>
 
-            {isEdit && (
-              <>
-                <div className={divider} />
-                <h3 className={sectionTitle}>Profile</h3>
+            <div className={divider} />
+            <h3 className={sectionTitle}>Profile</h3>
 
-                <div>
-                  <label className={labelClass} htmlFor="pet-desc">
-                    Description
-                  </label>
-                  <textarea
-                    id="pet-desc"
-                    rows={3}
-                    maxLength={500}
-                    value={form.petDesc}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, petDesc: e.target.value }))
-                    }
-                    className={fieldClass}
-                  />
-                </div>
+            <div>
+              <label className={labelClass} htmlFor="pet-desc">
+                Description
+              </label>
+              <textarea
+                id="pet-desc"
+                rows={3}
+                maxLength={500}
+                value={form.petDesc}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, petDesc: e.target.value }))
+                }
+                className={fieldClass}
+              />
+            </div>
 
-                <div>
-                  <label className={labelClass} htmlFor="pet-microchip">
-                    Microchip ID
-                  </label>
-                  <input
-                    id="pet-microchip"
-                    maxLength={45}
-                    value={form.microchipID}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, microchipID: e.target.value }))
-                    }
-                    className={fieldClass}
-                  />
-                </div>
+            <div>
+              <label className={labelClass} htmlFor="pet-microchip">
+                Microchip ID
+              </label>
+              <input
+                id="pet-microchip"
+                maxLength={45}
+                value={form.microchipID}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, microchipID: e.target.value }))
+                }
+                className={fieldClass}
+              />
+            </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-center gap-2 font-body text-sm text-neutral-charcoal">
-                    <input
-                      type="checkbox"
-                      checked={form.compatibleWithChildren}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          compatibleWithChildren: e.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
-                    />
-                    Good with children
-                  </label>
-                  <label className="flex items-center gap-2 font-body text-sm text-neutral-charcoal">
-                    <input
-                      type="checkbox"
-                      checked={form.compatibleWithPets}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          compatibleWithPets: e.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
-                    />
-                    Good with other pets
-                  </label>
-                  <label className="flex items-center gap-2 font-body text-sm text-neutral-charcoal">
-                    <input
-                      type="checkbox"
-                      checked={form.specialNeeds}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, specialNeeds: e.target.checked }))
-                      }
-                      className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
-                    />
-                    Has special needs
-                  </label>
-                  <label className="flex items-center gap-2 font-body text-sm text-neutral-charcoal">
-                    <input
-                      type="checkbox"
-                      checked={form.featuredFlag}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, featuredFlag: e.target.checked }))
-                      }
-                      className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
-                    />
-                    Featured on public catalog
-                  </label>
-                </div>
-              </>
-            )}
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 font-body text-sm text-neutral-charcoal">
+                <input
+                  type="checkbox"
+                  checked={form.compatibleWithChildren}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      compatibleWithChildren: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
+                />
+                Good with children
+              </label>
+              <label className="flex items-center gap-2 font-body text-sm text-neutral-charcoal">
+                <input
+                  type="checkbox"
+                  checked={form.compatibleWithPets}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      compatibleWithPets: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
+                />
+                Good with other pets
+              </label>
+              <label className="flex items-center gap-2 font-body text-sm text-neutral-charcoal">
+                <input
+                  type="checkbox"
+                  checked={form.specialNeeds}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, specialNeeds: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
+                />
+                Has special needs
+              </label>
+              <label className="mt-3 flex items-center gap-2 font-body text-sm text-neutral-charcoal">
+                <input
+                  type="checkbox"
+                  checked={form.featuredFlag}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, featuredFlag: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-neutral-lightgray text-teal-dark focus:ring-teal-dark"
+                />
+                ⭐️ Feature on home page
+              </label>
+            </div>
 
             <div className={divider} />
             <h3 className={sectionTitle}>Shelter &amp; Adoption</h3>
@@ -876,32 +922,113 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
               </div>
             </div>
 
-            {isEdit && (
-              <div>
-                <label className={labelClass} htmlFor="pet-status">
-                  Status
-                  <Required />
-                </label>
-                <select
-                  id="pet-status"
-                  required
-                  value={form.adoptionStatus}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      adoptionStatus: e.target.value as PetAdoptionStatus,
-                    }))
-                  }
-                  className={fieldClass}
-                >
-                  {PET_ADOPTION_STATUS_VALUES.map((status) => (
-                    <option key={status} value={status}>
-                      {ADOPTION_STATUS_LABEL[status]}
-                    </option>
+            <div>
+              <label className={labelClass} htmlFor="pet-status">
+                Status
+                <Required />
+              </label>
+              <select
+                id="pet-status"
+                required
+                value={form.adoptionStatus}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    adoptionStatus: e.target.value as PetAdoptionStatus,
+                  }))
+                }
+                className={fieldClass}
+              >
+                {PET_ADOPTION_STATUS_VALUES.map((status) => (
+                  <option key={status} value={status}>
+                    {ADOPTION_STATUS_LABEL[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={divider} />
+            <h3 className={sectionTitle}>Photo</h3>
+
+            <div>
+              {photoFile ? (
+                // Staged — not uploaded yet. Saved together with the rest
+                // of the form; "Remove selection" only discards the local
+                // pick, it never touches the server.
+                <div className="mb-4 flex items-center gap-3">
+                  <img
+                    src={photoPreviewUrl ?? undefined}
+                    alt=""
+                    className="h-20 w-20 rounded-lg object-cover ring-2 ring-gold-md"
+                  />
+                  <div>
+                    <p className="font-body text-xs font-medium text-gold-dark">
+                      Pending — saved with your changes
+                    </p>
+                    <ButtonElement
+                      onClick={() => setPhotoFile(null)}
+                      size="bare"
+                      variant="outline"
+                      className="mt-1 text-xs text-rose-dark underline"
+                    >
+                      Remove selection
+                    </ButtonElement>
+                  </div>
+                </div>
+              ) : photos.length > 0 ? (
+                <div className="mb-4 flex flex-wrap gap-3">
+                  {photos.map((photo) => (
+                    <div key={photo.photoID} className="relative">
+                      <img
+                        src={photo.photoURL}
+                        alt=""
+                        className="h-20 w-20 rounded-lg object-cover ring-2 ring-gold-md"
+                      />
+                      <ButtonElement
+                        onClick={() =>
+                          deletePhotoMutation.mutate(photo.photoID)
+                        }
+                        disabled={deletePhotoMutation.isPending}
+                        aria-label="Remove photo"
+                        title="Remove photo"
+                        size="bare"
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-dark shadow-sm hover:brightness-90"
+                      >
+                        <FaTimes className="h-2.5 w-2.5" />
+                      </ButtonElement>
+                    </div>
                   ))}
-                </select>
-              </div>
-            )}
+                </div>
+              ) : (
+                !photosQuery.isLoading && (
+                  <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-lg bg-neutral-offwhite">
+                    <FaPaw className="h-8 w-8 text-rose-md" aria-hidden />
+                  </div>
+                )
+              )}
+
+              <label
+                htmlFor="pet-photo-file"
+                className="font-body text-xs text-neutral-gray"
+              >
+                {photos.length > 0 || photoFile
+                  ? "Replace photo"
+                  : "Add a photo"}{" "}
+                (JPEG, PNG, or WebP - max 5 MB)
+              </label>
+              <input
+                id="pet-photo-file"
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp"
+                onChange={handlePhotoSelect}
+                className="mt-1 w-full font-body text-xs text-neutral-charcoal file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-light file:px-3 file:py-1.5 file:font-body file:text-sm file:font-medium file:text-neutral-dark hover:file:bg-rose-light"
+              />
+              {photoError && (
+                <p className="mt-2 rounded-lg bg-rose-lightest px-4 py-2 font-body text-sm text-rose-dark">
+                  {photoError}
+                </p>
+              )}
+            </div>
 
             <p className="text-xs text-neutral-gray">
               <span className="text-rose-dark">*</span> Required fields
@@ -909,18 +1036,20 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
 
             <div className="flex gap-3">
               {isEdit && (
-                <button
-                  type="button"
+                <ButtonElement
                   onClick={cancelEdit}
-                  className="flex-1 rounded-xl border border-neutral-lightgray px-4 py-3 font-body text-sm font-medium text-neutral-charcoal transition-colors hover:bg-neutral-lightgray"
+                  size="panel"
+                  variant="outline"
+                  className="flex-1 border border-neutral-lightgray text-neutral-charcoal hover:bg-neutral-lightgray"
                 >
                   Cancel
-                </button>
+                </ButtonElement>
               )}
-              <button
+              <ButtonElement
                 type="submit"
                 disabled={!canSubmit}
-                className="flex-1 rounded-xl bg-green px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                size="panel"
+                className="flex-1 bg-green hover:brightness-95 disabled:cursor-not-allowed"
               >
                 {saveMutation.isPending
                   ? isEdit
@@ -929,89 +1058,30 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                   : isEdit
                     ? "Save"
                     : "Create Pet"}
-              </button>
+              </ButtonElement>
             </div>
           </form>
         )}
 
         {isEdit && mode === "edit" && pet && (
           <div className="border-t border-neutral-lightgray p-6">
-            <h3 className="mb-4 font-display text-lg text-neutral-dark">
-              Photo
-            </h3>
-
-            {photoFile ? (
-              // Staged — not uploaded yet. Saved together with the rest of
-              // the form; "Remove selection" only discards the local pick,
-              // it never touches the server.
-              <div className="mb-4 flex items-center gap-3">
-                <img
-                  src={photoPreviewUrl ?? undefined}
-                  alt=""
-                  className="h-20 w-20 rounded-lg object-cover ring-2 ring-gold-md"
-                />
-                <div>
-                  <p className="font-body text-xs font-medium text-gold-dark">
-                    Pending — saved with your changes
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setPhotoFile(null)}
-                    className="mt-1 font-body text-xs text-rose-dark underline"
-                  >
-                    Remove selection
-                  </button>
-                </div>
-              </div>
-            ) : photos.length > 0 ? (
-              <div className="mb-4 flex flex-wrap gap-3">
-                {photos.map((photo) => (
-                  <div key={photo.photoID} className="relative">
-                    <img
-                      src={photo.photoURL}
-                      alt=""
-                      className="h-20 w-20 rounded-lg object-cover ring-2 ring-gold-md"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => deletePhotoMutation.mutate(photo.photoID)}
-                      disabled={deletePhotoMutation.isPending}
-                      aria-label="Remove photo"
-                      title="Remove photo"
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-dark text-white shadow-sm hover:brightness-90 disabled:opacity-50"
-                    >
-                      <FaTimes className="h-2.5 w-2.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              !photosQuery.isLoading && (
-                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-lg bg-neutral-offwhite">
-                  <FaPaw className="h-8 w-8 text-rose-md" aria-hidden />
-                </div>
-              )
-            )}
-
-            <label
-              htmlFor="pet-photo-file"
-              className="font-body text-xs text-neutral-gray"
-            >
-              {photos.length > 0 || photoFile ? "Replace photo" : "Add a photo"}{" "}
-              (JPEG, PNG, or WebP - max 5 MB)
-            </label>
-            <input
-              id="pet-photo-file"
-              type="file"
-              accept=".jpg,.jpeg,.png,.webp"
-              onChange={handlePhotoSelect}
-              className="mt-1 w-full font-body text-xs text-neutral-charcoal file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-light file:px-3 file:py-1.5 file:font-body file:text-sm file:font-medium file:text-neutral-dark hover:file:bg-rose-light"
-            />
-            {photoError && (
-              <p className="mt-2 rounded-lg bg-rose-lightest px-4 py-2 font-body text-sm text-rose-dark">
-                {photoError}
+            <div className="rounded-2xl border border-teal-md bg-teal-light p-4">
+              <p className="font-body text-sm text-neutral-charcoal">
+                Moving {pet.petName} to another shelter?{" "}
+                <ButtonElement
+                  onClick={() => {
+                    closeAndReset();
+                    navigate(`/staff/transfers?petID=${pet.petID}`);
+                  }}
+                  size="bare"
+                  variant="outline"
+                  className="font-semibold text-teal-dark underline hover:brightness-90"
+                >
+                  Initiate a transfer
+                </ButtonElement>{" "}
+                in the Transfers tab.
               </p>
-            )}
+            </div>
           </div>
         )}
 
@@ -1022,16 +1092,17 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                 Danger zone
               </h3>
               <p className="mt-1 font-body text-sm text-neutral-charcoal">
-                Deleting a pet removes its profile and photos for good. This
-                is blocked while it has a Pending or Accepted application.
+                Deleting a pet removes its profile and photos for good. This is
+                blocked while it has a Pending or Accepted application.
               </p>
-              <button
-                type="button"
+              <ButtonElement
                 onClick={() => setIsDeleteOpen(true)}
-                className="mt-3 rounded-xl border border-rose-dark px-4 py-2 font-body text-sm font-medium text-rose-dark transition-colors hover:bg-rose-dark hover:text-white"
+                size="panel"
+                variant="outline"
+                className="mt-3 border border-rose-dark text-rose-dark hover:bg-rose-dark hover:text-white"
               >
                 Delete pet
-              </button>
+              </ButtonElement>
             </div>
           </div>
         )}

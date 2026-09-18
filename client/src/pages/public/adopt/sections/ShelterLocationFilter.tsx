@@ -10,6 +10,7 @@ import {
   Pill,
   type FilterOption,
 } from "../../../../components/ui/pets/FilterControls";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250];
 const DEFAULT_RADIUS = 25;
@@ -183,11 +184,12 @@ const ShelterLocationFilter = ({
             ))}
 
             <div className="mt-1 flex items-center gap-1">
-              <button
-                type="button"
+              <ButtonElement
                 onClick={handleGeolocateClick}
                 aria-label="Use current location"
                 title="Use current location"
+                size="bare"
+                variant="outline"
                 className="flex flex-1 shrink-0 items-center justify-center rounded-md ext-xs bg-teal p-2 text-teal-dark hover:bg-teal-dark hover:text-white"
               >
                 <HiOutlineLocationMarker className="mx-1" />
@@ -201,7 +203,7 @@ const ShelterLocationFilter = ({
                     "Use current location"
                   )}
                 </span>
-              </button>
+              </ButtonElement>
 
               <p className="text-xs mx-2">OR</p>
               <input
@@ -219,23 +221,25 @@ const ShelterLocationFilter = ({
             {zipError && <p className="text-xs text-rose-dark">{zipError}</p>}
 
             <div className="mt-1 flex items-center gap-2">
-              <button
-                type="button"
+              <ButtonElement
                 onClick={handleFindNearby}
                 disabled={
                   !(coords !== null || /^\d{5}$/.test(zipInput)) || isSearching
                 }
+                size="bare"
+                variant="outline"
                 className="w-full rounded-md bg-gold px-3 py-1.5 text-xs font-light text-black disabled:bg-neutral-gray"
               >
                 {isSearching ? "Searching…" : "Find Nearby Shelters"}
-              </button>
-              <button
-                type="button"
+              </ButtonElement>
+              <ButtonElement
                 onClick={handleResetFilter}
+                size="bare"
+                variant="outline"
                 className="w-full rounded-md bg-neutral-offwhite border border-neutral-lightgray px-3 py-1.5 text-xs font-light text-neutral-charcoal hover:bg-neutral-lightgray"
               >
                 Reset Filter
-              </button>
+              </ButtonElement>
             </div>
           </div>
         </Dropdown>

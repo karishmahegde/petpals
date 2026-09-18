@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import { getShelters, getPets, getPetById } from "../../../../../../logic/api/petsApi";
 import { createVisit } from "../../../../../../logic/api/visitsApi";
 
@@ -195,13 +196,14 @@ const ScheduleVisitPanel = ({
           </p>
         </div>
 
-        <button
+        <ButtonElement
           type="submit"
           disabled={!canSubmit}
-          className="mt-2 rounded-xl bg-teal-dark px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          size="panel"
+          className="mt-2 bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? "Scheduling…" : "Schedule Visit"}
-        </button>
+        </ButtonElement>
       </form>
     </SlideOver>
   );

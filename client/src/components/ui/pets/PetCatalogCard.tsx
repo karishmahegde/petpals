@@ -11,6 +11,7 @@ import { getMyFavorites } from "../../../logic/api/adoptersApi";
 import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
 import { showLoginRequiredToast } from "../../../logic/toast/loginRequiredToast";
 import useAuthStore from "../../../logic/store/useAuthStore";
+import ButtonElement from "../ButtonElement";
 
 interface CardComponentProps {
   pet: PetCard;
@@ -116,12 +117,13 @@ const CardComponent = ({
           )}
         </div>
         {showFavorite && (
-          <button
-            type="button"
+          <ButtonElement
             onClick={handleHeartClick}
             aria-label={
               isFavorited ? "Remove from favorites" : "Add to favorites"
             }
+            size="bare"
+            variant="outline"
             className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/60 shadow"
           >
             {isFavorited ? (
@@ -129,7 +131,7 @@ const CardComponent = ({
             ) : (
               <FaRegHeart className="text-neutral-gray" />
             )}
-          </button>
+          </ButtonElement>
         )}
       </div>
       <div className={`flex flex-col p-4 ${unavailable ? "opacity-60" : ""}`}>
@@ -148,12 +150,13 @@ const CardComponent = ({
             Unavailable
           </span>
         ) : (
-          <button
-            className="my-2 rounded-xl bg-black px-2 py-3 text-xs text-white"
+          <ButtonElement
+            size="bare"
+            className="my-2 rounded-xl bg-black px-2 py-3 text-xs"
             onClick={() => onKnowMore(pet.petID)}
           >
             {ctaLabel}
-          </button>
+          </ButtonElement>
         )}
       </div>
     </div>

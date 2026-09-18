@@ -19,6 +19,7 @@ import {
   type VisitQueueItem,
 } from "../../../../../../logic/api/visitsApi";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import {
@@ -95,13 +96,13 @@ const VisitDetailPanel = ({ visit, onClose }: VisitDetailPanelProps) => {
         title="Visit Details"
         footer={
           action && (
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => setPendingAction(action)}
-              className="w-full rounded-xl bg-teal-dark px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95"
+              size="panel"
+              className="w-full bg-teal-dark hover:brightness-95"
             >
               {action === "Confirmed" ? "Confirm Visit" : "Mark Completed"}
-            </button>
+            </ButtonElement>
           )
         }
       >
