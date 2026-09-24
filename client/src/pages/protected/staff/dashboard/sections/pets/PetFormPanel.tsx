@@ -554,6 +554,44 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
               <InfoRow k="Special Needs?" v={yesNo(pet.specialNeeds)} />
               <InfoRow k="Featured" v={yesNo(pet.featuredFlag)} />
             </dl>
+
+            {/* Adopter — adopted pets only. */}
+            {pet.adoptionStatus === "adopted" && pet.adopter && (
+              <>
+                <div className={divider} />
+                <h2 className={sectionTitle}>Adopter</h2>
+                <dl className="mt-2 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
+                  <InfoRow k="Name" v={pet.adopter.adopterName} />
+                  <InfoRow
+                    k="Email"
+                    v={
+                      <a
+                        href={`mailto:${pet.adopter.adopterEmail}`}
+                        className="break-all text-teal-dark underline hover:brightness-90"
+                      >
+                        {pet.adopter.adopterEmail}
+                      </a>
+                    }
+                  />
+                </dl>
+                <ButtonElement
+                  onClick={() => {
+                    const adopterID = pet.adopter!.adopterID;
+                    closeAndReset();
+                    // TODO: placeholder — the Staff Adopters section isn't
+                    // built yet (no /staff/adopters route, so this currently
+                    // falls through to the catch-all → /staff). Point it at
+                    // the real adopter detail route once that section exists.
+                    navigate(`/staff/adopters?adopterID=${adopterID}`);
+                  }}
+                  size="panel"
+                  variant="outline"
+                  className="mt-4 w-full border bg-rose-md text-white hover:brightness-95"
+                >
+                  View Details
+                </ButtonElement>
+              </>
+            )}
           </div>
         )}
 
@@ -773,7 +811,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
               <label className={labelClass} htmlFor="pet-bgroup">
                 Blood group{" "}
                 <span className="font-normal text-neutral-gray">
-                  (optional — defaults to "N/A")
+                  (optional)
                 </span>
               </label>
               <input

@@ -250,6 +250,26 @@ const getShelterPetDetail = async (petID, { role, userID }) => {
 
   await assertStaffOwnsShelter(role, userID, pet.shelterID);
 
+  // Adopted pets carry their adopter (from the Accepted application) so the
+  // detail panel can show who took them home and link to the adopter's full
+  // details. Skipped for every other status.
+  const acceptedApplication =
+    pet.adoptionStatus === "adopted"
+      ? await prisma.adoptionApplication.findFirst({
+          where: { petID, applicationStatus: "Accepted" },
+          orderBy: { createdAt: "desc" },
+          select: {
+            adopterID: true,
+            adopter: {
+              select: {
+                adopterName: true,
+                user: { select: { userEmail: true } },
+              },
+            },
+          },
+        })
+      : null;
+
   return {
     ...formatPetDetail(pet),
     petCode: pet.petCode,
@@ -260,6 +280,13 @@ const getShelterPetDetail = async (petID, { role, userID }) => {
     intakeDate: pet.intakeDate,
     intakeType: pet.intakeType,
     featuredFlag: pet.featuredFlag,
+    adopter: acceptedApplication
+      ? {
+          adopterID: acceptedApplication.adopterID,
+          adopterName: acceptedApplication.adopter.adopterName,
+          adopterEmail: acceptedApplication.adopter.user.userEmail,
+        }
+      : null,
   };
 };
 

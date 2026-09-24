@@ -69,6 +69,7 @@ export interface CreateAppointmentPayload {
   petID: number;
   vetID: number;
   volunteerID?: number;
+  staffID?: number; // omitted -> defaults to the acting Staff member
   appointmentDate: string;
   appointmentReason: string;
   shelterID?: number; // Admin only
@@ -101,6 +102,11 @@ export interface VolunteerOption {
   volunteerName: string;
 }
 
+export interface StaffOption {
+  staffID: number;
+  staffName: string;
+}
+
 export const getShelterVets = async (): Promise<VetOption[]> => {
   const response = await axiosInstance.get("/appointments/vets");
   return response.data.data;
@@ -108,5 +114,10 @@ export const getShelterVets = async (): Promise<VetOption[]> => {
 
 export const getShelterVolunteers = async (): Promise<VolunteerOption[]> => {
   const response = await axiosInstance.get("/appointments/volunteers");
+  return response.data.data;
+};
+
+export const getShelterStaff = async (): Promise<StaffOption[]> => {
+  const response = await axiosInstance.get("/appointments/staff");
   return response.data.data;
 };

@@ -39,6 +39,15 @@ const createAppointment = async (req, res, next) => {
     }
   }
 
+  let staffID;
+  if (body.staffID !== undefined && body.staffID !== null && body.staffID !== "") {
+    try {
+      staffID = parseId(body.staffID, "staffID");
+    } catch (err) {
+      return next(err);
+    }
+  }
+
   const { appointmentReason: reasonRaw, appointmentDate: dateRaw } = body;
   if (
     typeof reasonRaw !== "string" ||
@@ -77,6 +86,7 @@ const createAppointment = async (req, res, next) => {
         petID,
         vetID,
         volunteerID,
+        staffID,
         appointmentDate,
         appointmentReason: reasonRaw.trim(),
       },
@@ -192,7 +202,7 @@ const cancelAppointment = async (req, res, next) => {
   }
 };
 
-// ——————————————— GET /appointments/vets, /appointments/volunteers ———————————————
+// ——————————————— GET /appointments/vets, /appointments/volunteers, /appointments/staff ———————————————
 const parseOptionalShelterID = (req, next) => {
   const { shelterID: shelterIDRaw } = req.query;
   if (req.user.role !== "Admin" || shelterIDRaw === undefined) return undefined;
@@ -232,6 +242,20 @@ const listVolunteers = async (req, res, next) => {
   }
 };
 
+const listStaff = async (req, res, next) => {
+  const shelterID = parseOptionalShelterID(req, next);
+  if (shelterID === null) return;
+  try {
+    const staff = await appointmentsService.listShelterStaff(
+      { role: req.user.role, userID: req.user.userID },
+      shelterID,
+    );
+    return successResponse(res, "Staff retrieved successfully", staff);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   createAppointment,
   listAppointments,
@@ -239,4 +263,5 @@ module.exports = {
   cancelAppointment,
   listVets,
   listVolunteers,
+  listStaff,
 };

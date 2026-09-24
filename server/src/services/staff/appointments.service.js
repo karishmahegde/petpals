@@ -30,6 +30,14 @@ const volunteerNotFound = () => {
   return err;
 };
 
+const staffNotFound = () => {
+  const err = new Error(
+    "staffID does not reference an active staff member at this shelter",
+  );
+  err.code = "BAD_REQUEST";
+  return err;
+};
+
 const shelterNotFound = (shelterID) => {
   const err = new Error(`No shelter exists with ID ${shelterID}`);
   err.code = "NOT_FOUND";
@@ -344,6 +352,19 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
     }
   }
 
+  // Optional — falls back to the acting Staff member (null for an Admin
+  // actor), same as before this field was client-selectable.
+  if (data.staffID !== undefined && data.staffID !== null) {
+    const staff = await prisma.staff.findUnique({
+      where: { userID: data.staffID },
+      select: { shelterID: true, accountStatus: true },
+    });
+    if (!staff || staff.shelterID !== shelterID || staff.accountStatus !== "Active") {
+      throw staffNotFound();
+    }
+  }
+  const staffID = data.staffID ?? (actor.role === "Staff" ? actor.userID : null);
+
   // Guards against the double-submit case (a slow/dropped response reads as
   // a failure, the caller resubmits, and both requests land) — same pet +
   // vet + exact timestamp is never a legitimate second booking, Scheduled
@@ -373,7 +394,7 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
         shelterID,
         appointmentDate: data.appointmentDate,
         appointmentReason: data.appointmentReason,
-        staffID: actor.role === "Staff" ? actor.userID : null,
+        staffID,
       },
       select: { appointmentID: true },
     });
@@ -416,7 +437,7 @@ const cancelAppointment = async (appointmentID, actor) => {
   return getShelterAppointmentDetail(appointmentID, actor);
 };
 
-// ——————————————— VET/VOLUNTEER ROSTERS (GET /appointments/vets, /appointments/volunteers) ———————————————
+// ——————————————— VET/VOLUNTEER/STAFF ROSTERS (GET /appointments/vets, /appointments/volunteers, /appointments/staff) ———————————————
 // Minimal roster listings to populate the appointment form's/filter bar's
 // dropdowns — not a general vet/volunteer management API (that's a later
 // sprint). Staff is scoped to their own shelter; Admin must pass shelterID
@@ -456,6 +477,16 @@ const listShelterVolunteers = async (actor, shelterIDParam) => {
   return volunteers.map((v) => ({ volunteerID: v.userID, volunteerName: v.volunteerName }));
 };
 
+const listShelterStaff = async (actor, shelterIDParam) => {
+  const shelterID = await resolveShelterIDForRead(actor, shelterIDParam);
+  const staff = await prisma.staff.findMany({
+    where: { shelterID, accountStatus: "Active" },
+    select: { userID: true, staffName: true },
+    orderBy: { staffName: "asc" },
+  });
+  return staff.map((s) => ({ staffID: s.userID, staffName: s.staffName }));
+};
+
 module.exports = {
   listShelterAppointments,
   getShelterAppointmentDetail,
@@ -463,4 +494,5 @@ module.exports = {
   cancelAppointment,
   listShelterVets,
   listShelterVolunteers,
+  listShelterStaff,
 };

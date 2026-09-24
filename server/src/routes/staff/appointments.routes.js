@@ -20,9 +20,9 @@ const router = express.Router();
  *       shelter, so shelterID is required in the body instead. petID must
  *       belong to that shelter, vetID must be an Active vet at that shelter,
  *       and volunteerID (optional) must be a volunteer at that shelter.
- *       appointmentDate must not be in the past. staffID is never
- *       client-supplied — it's auto-set to the acting Staff member (null for
- *       an Admin actor).
+ *       appointmentDate must not be in the past. staffID (optional) must be
+ *       an Active staff member at that shelter; omitted, it defaults to the
+ *       acting Staff member (null for an Admin actor).
  *     tags: [Appointments, Staff]
  *     security:
  *       - bearerAuth: []
@@ -37,6 +37,7 @@ const router = express.Router();
  *               petID: { type: integer }
  *               vetID: { type: integer }
  *               volunteerID: { type: integer, description: Optional }
+ *               staffID: { type: integer, description: Optional — defaults to the acting Staff member }
  *               appointmentDate: { type: string, format: date-time, description: Must not be in the past }
  *               appointmentReason: { type: string, maxLength: 300 }
  *               shelterID: { type: integer, description: Admin only — required for that role }
@@ -52,7 +53,7 @@ const router = express.Router();
  *                   properties:
  *                     data: { $ref: '#/components/schemas/AppointmentDetail' }
  *       400:
- *         description: Missing/invalid field, or petID/vetID/volunteerID don't belong to the resolved shelter
+ *         description: Missing/invalid field, or petID/vetID/volunteerID/staffID don't belong to the resolved shelter
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -211,6 +212,45 @@ router.get(
   authenticate,
   authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
   appointmentsController.listVolunteers,
+);
+
+/**
+ * @swagger
+ * /appointments/staff:
+ *   get:
+ *     summary: List this shelter's active staff (Staff, Admin)
+ *     description: >
+ *       Minimal roster for the appointment form's staff dropdown — not a
+ *       general staff-management API. Staff is scoped to their own shelter;
+ *       Admin must pass shelterID explicitly.
+ *     tags: [Appointments, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: shelterID
+ *         schema: { type: integer, description: Required for Admin }
+ *     responses:
+ *       200:
+ *         description: Active staff at the shelter
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *       400:
+ *         description: shelterID missing/invalid (Admin)
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get(
+  "/appointments/staff",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  appointmentsController.listStaff,
 );
 
 /**

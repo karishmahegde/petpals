@@ -1,9 +1,10 @@
 // AppointmentFormPanel.tsx
 // "New Appointment" form — same shape as the Transfers tab's own
 // TransferFormPanel.tsx (SlideOver, a couple of <select>s + a reason
-// <textarea>, submit -> create + close). Pet/vet/volunteer options are all
-// scoped to this shelter server-side (staffAppointmentsApi.ts's
-// getShelterVets/getShelterVolunteers, and the existing getMyShelterPets).
+// <textarea>, submit -> create + close). Pet/vet/staff/volunteer options are
+// all scoped to this shelter server-side (staffAppointmentsApi.ts's
+// getShelterVets/getShelterStaff/getShelterVolunteers, and the existing
+// getMyShelterPets). Staff defaults to the logged-in staff member.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -13,9 +14,11 @@ import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import { getMyShelterPets } from "../../../../../../logic/api/staffPetsApi";
 import {
   createAppointment,
+  getShelterStaff,
   getShelterVets,
   getShelterVolunteers,
 } from "../../../../../../logic/api/staffAppointmentsApi";
+import useAuthStore from "../../../../../../logic/store/useAuthStore";
 
 interface AppointmentFormPanelProps {
   open: boolean;
@@ -36,8 +39,11 @@ const extractError = (err: unknown): string =>
 
 const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
   const queryClient = useQueryClient();
+  const currentUserID = useAuthStore((s) => s.user?.userID);
+  const defaultStaffID = currentUserID ? String(currentUserID) : "";
   const [petID, setPetID] = useState("");
   const [vetID, setVetID] = useState("");
+  const [staffID, setStaffID] = useState(defaultStaffID);
   const [volunteerID, setVolunteerID] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [reason, setReason] = useState("");
@@ -55,6 +61,12 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
     enabled: open,
   });
 
+  const { data: staffMembers = [] } = useQuery({
+    queryKey: ["staff", "shelter-staff"],
+    queryFn: getShelterStaff,
+    enabled: open,
+  });
+
   const { data: volunteers = [] } = useQuery({
     queryKey: ["staff", "shelter-volunteers"],
     queryFn: getShelterVolunteers,
@@ -64,6 +76,7 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
   const resetForm = () => {
     setPetID("");
     setVetID("");
+    setStaffID(defaultStaffID);
     setVolunteerID("");
     setAppointmentDate("");
     setReason("");
@@ -79,6 +92,7 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
       createAppointment({
         petID: Number(petID),
         vetID: Number(vetID),
+        staffID: Number(staffID),
         volunteerID: volunteerID ? Number(volunteerID) : undefined,
         appointmentDate,
         appointmentReason: reason.trim(),
@@ -94,6 +108,7 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
   const canSubmit =
     petID !== "" &&
     vetID !== "" &&
+    staffID !== "" &&
     appointmentDate !== "" &&
     reason.trim() !== "" &&
     reason.length <= MAX_REASON_LEN &&
@@ -143,6 +158,26 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
             {vets.map((vet) => (
               <option key={vet.vetID} value={vet.vetID}>
                 {vet.vetName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass} htmlFor="appointment-staff">
+            Staff
+          </label>
+          <select
+            id="appointment-staff"
+            required
+            value={staffID}
+            onChange={(e) => setStaffID(e.target.value)}
+            className={fieldClass}
+          >
+            <option value="">- Select -</option>
+            {staffMembers.map((member) => (
+              <option key={member.staffID} value={member.staffID}>
+                {member.staffName}
               </option>
             ))}
           </select>

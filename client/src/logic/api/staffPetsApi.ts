@@ -130,6 +130,12 @@ export interface StaffPetFullDetail extends StaffPetDetail {
   intakeDate: string; // ISO date-time
   intakeType: IntakeType | null;
   featuredFlag: boolean;
+  /** Only for adopted pets — from the Accepted application; null otherwise. */
+  adopter: {
+    adopterID: number;
+    adopterName: string;
+    adopterEmail: string;
+  } | null;
 }
 
 export const getShelterPetDetail = async (
