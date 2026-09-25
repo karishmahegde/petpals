@@ -623,6 +623,47 @@ const schemas = {
       },
     },
   },
+  Task: {
+    type: "object",
+    properties: {
+      taskID: { type: "integer" },
+      taskName: {
+        type: "string",
+        enum: [
+          "Animal_Care",
+          "Vet_Assistance",
+          "Cleaning",
+          "Feeding",
+          "Events",
+          "Admin",
+          "Other",
+        ],
+      },
+      taskDesc: { type: "string", maxLength: 300 },
+      taskDate: { type: "string", format: "date-time", nullable: true },
+      taskDue: { type: "string", format: "date-time", nullable: true },
+      taskStatus: {
+        type: "string",
+        enum: ["In_progress", "Completed", "Cancelled"],
+      },
+      status: {
+        type: "string",
+        enum: ["In_progress", "Overdue", "Completed", "Cancelled"],
+        description: "taskStatus, or Overdue for an In_progress task past due",
+      },
+      staffName: { type: "string", nullable: true },
+      volunteers: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            volunteerID: { type: "integer" },
+            volunteerName: { type: "string" },
+          },
+        },
+      },
+    },
+  },
   VolunteerListItem: {
     type: "object",
     properties: {

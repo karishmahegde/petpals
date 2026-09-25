@@ -107,3 +107,27 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('government-ids', 'government-ids', false)
 ON CONFLICT (id) DO NOTHING;
+
+-- ── Task.taskName VarChar(100) → "TaskName" enum ────────────────
+-- Existing free-text values that match a category (by its label, e.g.
+-- 'Animal Care') convert to that enum value; anything else becomes 'Other'.
+-- Check what's there first if you care about unmatched values:
+--   SELECT DISTINCT "taskName" FROM "Task";
+DO $$ BEGIN
+  CREATE TYPE "TaskName" AS ENUM (
+    'Animal_Care', 'Vet_Assistance', 'Cleaning', 'Feeding', 'Events', 'Admin', 'Other'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE "Task" ALTER COLUMN "taskName" TYPE "TaskName" USING (
+  CASE replace("taskName"::text, ' ', '_')
+    WHEN 'Animal_Care' THEN 'Animal_Care'
+    WHEN 'Vet_Assistance' THEN 'Vet_Assistance'
+    WHEN 'Cleaning' THEN 'Cleaning'
+    WHEN 'Feeding' THEN 'Feeding'
+    WHEN 'Events' THEN 'Events'
+    WHEN 'Admin' THEN 'Admin'
+    ELSE 'Other'
+  END
+)::"TaskName";

@@ -476,7 +476,10 @@ model GovernmentID {
 
 model Task {
   taskID     Int             @id @default(autoincrement())
-  taskName   String          @db.VarChar(100)
+  // Enum since 2026-09-25 (was VarChar(100)) — hand-applied SQL, see
+  // setup/manual-constraints.sql. Labels for display live client-side
+  // (client/src/logic/staff/tasks.ts).
+  taskName   TaskName
   shelterID  Int
   taskDesc   String          @db.VarChar(300)
   taskDate   DateTime?
@@ -746,6 +749,16 @@ enum VerificationStatus {
   Pending
   Verified
   Rejected
+}
+
+enum TaskName {
+  Animal_Care
+  Vet_Assistance
+  Cleaning
+  Feeding
+  Events
+  Admin
+  Other
 }
 
 enum TaskStatus {
