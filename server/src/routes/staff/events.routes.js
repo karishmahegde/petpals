@@ -19,9 +19,7 @@ const router = express.Router();
  *       shelterID is taken from the acting staff member's own shelter and is
  *       never read from the request body for that role; Admin has no home
  *       shelter, so shelterID is required in the body instead. eventDate
- *       must not be in the past. eventLocation has no input of its own — it's
- *       auto-assigned from that resolved shelter's name and stored on the
- *       event, not accepted from the client.
+ *       must not be in the past.
  *     tags: [Events, Staff]
  *     security:
  *       - bearerAuth: []
@@ -31,10 +29,11 @@ const router = express.Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required: [eventName, eventDesc, eventDate]
+ *             required: [eventName, eventDesc, eventDate, eventCategory]
  *             properties:
  *               eventName: { type: string, maxLength: 45 }
  *               eventDesc: { type: string, maxLength: 300 }
+ *               eventCategory: { type: string, enum: [Adoption_Event, Fundraiser, Volunteer_Orientation, Vaccination_Clinic, Community_Outreach, Workshop, Donation_Drive, Other] }
  *               eventDate: { type: string, format: date-time, description: Must not be in the past }
  *               shelterID: { type: integer, description: Admin only — required for that role }
  *     responses:
@@ -94,6 +93,7 @@ router.post(
  *             properties:
  *               eventName: { type: string, maxLength: 45 }
  *               eventDesc: { type: string, maxLength: 300 }
+ *               eventCategory: { type: string, enum: [Adoption_Event, Fundraiser, Volunteer_Orientation, Vaccination_Clinic, Community_Outreach, Workshop, Donation_Drive, Other] }
  *               eventDate: { type: string, format: date-time }
  *     responses:
  *       200:

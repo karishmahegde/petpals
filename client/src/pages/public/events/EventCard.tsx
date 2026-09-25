@@ -1,12 +1,15 @@
 // EventCard.tsx
 // One grid tile on the public Events page — page-specific (only used there),
 // same placement convention as PetFilterBar living beside PetCatalog.tsx.
-// No photo exists for events, so the tile leads with a date block instead
-// of an image, mirroring the date-block leading visual already used across
-// the Staff dashboard's Visits/Events lists.
+// Top: the event category's cover image (EventImage), laid out like
+// PetCatalogCard's photo. Below: a date block, mirroring the one on the
+// Staff dashboard's Visits/Events lists.
 import type { EventListItem } from "../../../logic/api/eventsApi";
 import { formatTime } from "../../../logic/utils/datetime";
 import ButtonElement from "../../../components/ui/ButtonElement";
+import Badge from "../../../components/ui/Badge";
+import { EVENT_CATEGORY_LABEL } from "../../../logic/eventCategory";
+import EventImage from "./EventImage";
 
 interface EventCardProps {
   event: EventListItem;
@@ -20,40 +23,47 @@ const EventCard = ({ event, openId, onKnowMore }: EventCardProps) => {
 
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-2xl bg-white p-5 font-body shadow-md ${
+      className={`flex flex-col overflow-hidden rounded-2xl bg-white font-body shadow-md ${
         isDeepLinked ? "ring-4 ring-gold-md ring-offset-2" : ""
       }`}
     >
-      <div className="flex items-start gap-4">
-        <div className="w-14 shrink-0 rounded-xl bg-gold-lightest py-2 text-center">
-          <p className="text-xs font-bold uppercase text-rose-dark">
-            {when.toLocaleDateString("en-US", { month: "short" })}
-          </p>
-          <p className="text-2xl font-bold text-neutral-charcoal">
-            {when.getDate()}
-          </p>
+      <EventImage category={event.eventCategory} />
+
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-14 shrink-0 rounded-xl bg-gold-lightest py-2 text-center">
+            <p className="text-xs font-bold uppercase text-rose-dark">
+              {when.toLocaleDateString("en-US", { month: "short" })}
+            </p>
+            <p className="text-2xl font-bold text-neutral-charcoal">
+              {when.getDate()}
+            </p>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-bold text-neutral-charcoal">
+              {event.eventName}
+            </p>
+            <p className="text-xs font-light text-teal-dark">
+              {formatTime(when)} · {event.shelter.shelterName}
+            </p>
+            <Badge tone="teal" variant="outline" className="mt-2">
+              {EVENT_CATEGORY_LABEL[event.eventCategory]}
+            </Badge>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold text-neutral-charcoal">
-            {event.eventName}
-          </p>
-          <p className="text-xs font-light text-teal-dark">
-            {formatTime(when)} · {event.eventLocation}
-          </p>
-        </div>
+
+        <p className="mt-4 line-clamp-3 flex-1 text-sm font-light text-neutral-gray">
+          {event.eventDesc}
+        </p>
+
+        <ButtonElement
+          onClick={() => onKnowMore(event.eventID)}
+          size="bare"
+          className="mt-4 rounded-xl bg-black px-2 py-3 text-xs"
+        >
+          Know More
+        </ButtonElement>
       </div>
-
-      <p className="mt-4 line-clamp-3 flex-1 text-sm font-light text-neutral-gray">
-        {event.eventDesc}
-      </p>
-
-      <ButtonElement
-        onClick={() => onKnowMore(event.eventID)}
-        size="bare"
-        className="mt-4 rounded-xl bg-black px-2 py-3 text-xs"
-      >
-        Know More
-      </ButtonElement>
     </div>
   );
 };

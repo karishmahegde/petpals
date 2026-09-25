@@ -20,6 +20,7 @@ import useAuthStore from "../../../../logic/store/useAuthStore";
 import AdminDetailPanel from "./sections/admins/AdminDetailPanel";
 import AdminApprovalPanel from "./sections/admins/AdminApprovalPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 10;
 
@@ -171,9 +172,7 @@ const Admins = () => {
 
       {/* Admin Approvals */}
       <Card className="mt-6 p-6">
-        <h2 className="mb-4 flex items-center gap-2 font-display text-2xl text-neutral-dark">
-          🛡️ Admin Approvals
-        </h2>
+        <DashboardWidgetHeader icon="🛡️" title="Admin Approvals" className="mb-4" />
 
         {pendingLoading ? (
           <p className="py-6 text-center font-body text-sm text-neutral-gray">

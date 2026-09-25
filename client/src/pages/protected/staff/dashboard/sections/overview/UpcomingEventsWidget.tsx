@@ -1,9 +1,7 @@
 // UpcomingEventsWidget.tsx
 // "Upcoming Events" preview widget on the Staff Overview page — the
-// nearest upcoming event(s) at the staff member's shelter. GET /events has
-// no "upcoming only" filter (it just orders by eventDate ascending across
-// all events, past included), so "upcoming" is a client-side filter on top
-// of a shelter-scoped fetch — see logic/api/eventsApi.ts. "View All" leads
+// nearest upcoming event(s) at the staff member's shelter (GET /events with
+// upcoming=true, soonest first). "View All" leads
 // to /staff/events (still a placeholder tab — a later sprint card builds it
 // out).
 import { useQuery } from "@tanstack/react-query";
@@ -19,9 +17,6 @@ import { getEvents } from "../../../../../../logic/api/eventsApi";
 import { formatTime, relativeDateBadge } from "../../../../../../logic/utils/datetime";
 
 const PREVIEW_LIMIT = 3;
-// Large enough to cover a single shelter's whole event calendar without
-// paginating — this is a preview widget, not the full Events tab.
-const FETCH_LIMIT = 100;
 
 const BADGE_TONE: Record<string, BadgeTone> = {
   Soon: "gold",
@@ -38,15 +33,14 @@ const UpcomingEventsWidget = () => {
   const shelterID = profile?.shelterID;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["staff", "upcoming-events", { shelterID, limit: FETCH_LIMIT }],
-    queryFn: () => getEvents({ shelterID: shelterID as number, limit: FETCH_LIMIT }),
+    queryKey: ["staff", "upcoming-events", { shelterID, limit: PREVIEW_LIMIT }],
+    queryFn: () =>
+      getEvents({ shelterID: shelterID as number, upcoming: true, limit: PREVIEW_LIMIT }),
     enabled: shelterID != null,
   });
 
   const loading = isLoading || shelterID == null;
-  const events = (data?.data ?? [])
-    .filter((event) => new Date(event.eventDate).getTime() > Date.now())
-    .slice(0, PREVIEW_LIMIT);
+  const events = data?.data ?? [];
 
   return (
     <OverviewWidgetCard
@@ -77,7 +71,7 @@ const UpcomingEventsWidget = () => {
                   </div>
                 }
                 title={event.eventName}
-                lines={[{ text: `${formatTime(when)} | ${event.eventLocation}` }]}
+                lines={[{ text: `${formatTime(when)} | ${event.shelter.shelterName}` }]}
                 badge={{
                   label: badgeLabel,
                   tone: BADGE_TONE[badgeLabel] ?? "teal",

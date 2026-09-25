@@ -18,6 +18,7 @@ import {
 } from "../../../../logic/api/staffGovernmentIdsApi";
 import GovernmentIdDetailPanel from "./sections/idVerification/GovernmentIdDetailPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 20;
 
@@ -142,9 +143,7 @@ const IdVerification = () => {
       />
 
       <Card className="mb-6 p-6">
-        <h2 className="mb-4 font-display text-xl text-neutral-dark">
-          Pending Verification
-        </h2>
+        <DashboardWidgetHeader icon="⏳" title="Pending Verification" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SelectField
@@ -209,7 +208,7 @@ const IdVerification = () => {
       </Card>
 
       <Card className="p-6">
-        <h2 className="mb-4 font-display text-xl text-neutral-dark">Reviewed</h2>
+        <DashboardWidgetHeader icon="📁" title="Reviewed" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SelectField

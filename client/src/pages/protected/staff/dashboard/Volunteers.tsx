@@ -41,6 +41,7 @@ import VolunteerDetailPanel from "./sections/volunteers/VolunteerDetailPanel";
 import TaskFormPanel from "./sections/volunteers/tasks/TaskFormPanel";
 import TaskDetailPanel from "./sections/volunteers/tasks/TaskDetailPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 20;
 
@@ -59,9 +60,6 @@ const filterInputClass =
   "w-full rounded-md border border-neutral-lightgray bg-white px-3 py-2.5 font-body text-sm text-neutral-charcoal focus:outline-none focus:ring-1 focus:ring-teal-dark";
 const filterLabelClass =
   "mb-1.5 block font-body text-sm font-semibold text-neutral-charcoal";
-const sectionHeadingClass =
-  "mb-4 flex items-center gap-2 font-display text-2xl text-neutral-dark";
-
 type TaskStatusFilter = TaskStatus | "all";
 
 const TASK_STATUS_OPTIONS: { value: TaskStatusFilter; label: string }[] = [
@@ -201,7 +199,7 @@ const Volunteers = () => {
       />
 
       <Card className="mb-6 p-6">
-        <h2 className={sectionHeadingClass}>🧑‍💼 Volunteer Approvals</h2>
+        <DashboardWidgetHeader icon="🧑‍💼" title="Volunteer Approvals" className="mb-4" />
 
         {pendingQuery.isLoading && (
           <p className="font-body text-sm text-neutral-gray">Loading…</p>
@@ -262,7 +260,7 @@ const Volunteers = () => {
       </Card>
 
       <Card className="p-6">
-        <h2 className={sectionHeadingClass}>🧑‍💼 All Volunteers</h2>
+        <DashboardWidgetHeader icon="🧑‍💼" title="All Volunteers" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SelectField
@@ -333,7 +331,7 @@ const Volunteers = () => {
       </Card>
 
       <Card className="mt-6 p-6">
-        <h2 className={sectionHeadingClass}>✅ Tasks</h2>
+        <DashboardWidgetHeader icon="✅" title="Tasks" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <SelectField

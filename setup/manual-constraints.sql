@@ -131,3 +131,23 @@ ALTER TABLE "Task" ALTER COLUMN "taskName" TYPE "TaskName" USING (
     ELSE 'Other'
   END
 )::"TaskName";
+
+-- ── Event.eventLocation dropped (2026-09-25) ────────────────────
+-- It only ever held the hosting shelter's name, which every read already
+-- gets via the shelter relation.
+ALTER TABLE "Event" DROP COLUMN IF EXISTS "eventLocation";
+
+-- ── Event.eventCategory (2026-09-25) ────────────────────────────
+-- Required on every event. Existing rows are backfilled as Adoption_Event,
+-- then the default is dropped so the app must always supply one.
+DO $$ BEGIN
+  CREATE TYPE "EventCategory" AS ENUM (
+    'Adoption_Event', 'Fundraiser', 'Volunteer_Orientation', 'Vaccination_Clinic',
+    'Community_Outreach', 'Workshop', 'Donation_Drive', 'Other'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE "Event" ADD COLUMN IF NOT EXISTS "eventCategory" "EventCategory"
+  NOT NULL DEFAULT 'Adoption_Event';
+ALTER TABLE "Event" ALTER COLUMN "eventCategory" DROP DEFAULT;

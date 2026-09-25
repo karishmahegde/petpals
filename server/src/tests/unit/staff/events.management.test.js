@@ -50,18 +50,15 @@ const VALID_CREATE_BODY = {
   eventName: "Adoption Day",
   eventDesc: "Come meet our adoptable pets!",
   eventDate: new Date(Date.now() + 86400000).toISOString(),
+  eventCategory: "Adoption_Event",
 };
 
-// eventLocation has no input of its own — createEvent auto-assigns it from
-// the resolved shelter's name (see events.service.js's
-// resolveShelterForCreate), so getEventDetails' (mocked) return value here
-// is just a realistic snapshot of that, never a request-body echo.
 const buildEventDetail = (overrides = {}) => ({
   eventID: 10,
   eventName: "Adoption Day",
   eventDate: new Date(Date.now() + 86400000),
   eventDesc: "Come meet our adoptable pets!",
-  eventLocation: "Athens Shelter",
+  eventCategory: "Adoption_Event",
   shelter: { shelterID: 9, shelterName: "Athens Shelter", shelterAddress: "1 Test Way" },
   ...overrides,
 });
@@ -74,11 +71,8 @@ describe("Event management (Staff/Admin)", () => {
 
   // ————————————————————— POST /api/v1/events —————————————————————
   describe("POST /api/v1/events", () => {
-    test("Staff: creates at their own shelter, staffID set to the acting staff member, eventLocation auto-assigned from shelter name", async () => {
-      prisma.staff.findUnique.mockResolvedValueOnce({
-        shelterID: 9,
-        shelter: { shelterName: "Athens Shelter" },
-      });
+    test("Staff: creates at their own shelter, staffID set to the acting staff member", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.event.create.mockResolvedValueOnce({ eventID: 10 });
       publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
 
@@ -93,7 +87,7 @@ describe("Event management (Staff/Admin)", () => {
           data: expect.objectContaining({
             eventName: "Adoption Day",
             eventDesc: "Come meet our adoptable pets!",
-            eventLocation: "Athens Shelter",
+            eventCategory: "Adoption_Event",
             shelterID: 9,
             staffID: 42,
           }),
@@ -114,11 +108,8 @@ describe("Event management (Staff/Admin)", () => {
       expect(prisma.event.create).not.toHaveBeenCalled();
     });
 
-    test("Admin: shelterID required and validated, staffID stays null, eventLocation from that shelter's name", async () => {
-      prisma.shelter.findUnique.mockResolvedValueOnce({
-        shelterID: 3,
-        shelterName: "Brooklyn Shelter",
-      });
+    test("Admin: shelterID required and validated, staffID stays null", async () => {
+      prisma.shelter.findUnique.mockResolvedValueOnce({ shelterID: 3 });
       prisma.event.create.mockResolvedValueOnce({ eventID: 11 });
       publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail({ eventID: 11 }));
 
@@ -133,7 +124,6 @@ describe("Event management (Staff/Admin)", () => {
         expect.objectContaining({
           data: expect.objectContaining({
             shelterID: 3,
-            eventLocation: "Brooklyn Shelter",
             staffID: null,
           }),
         }),
@@ -176,11 +166,19 @@ describe("Event management (Staff/Admin)", () => {
       expect(prisma.staff.findUnique).not.toHaveBeenCalled();
     });
 
-    test("eventLocation in the body is ignored — the resolved shelter's name is used instead", async () => {
-      prisma.staff.findUnique.mockResolvedValueOnce({
-        shelterID: 9,
-        shelter: { shelterName: "Athens Shelter" },
-      });
+    test("eventCategory outside the enum -> 400 BAD_REQUEST, nothing written", async () => {
+      const res = await request(app)
+        .post("/api/v1/events")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ ...VALID_CREATE_BODY, eventCategory: "Party" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.event.create).not.toHaveBeenCalled();
+    });
+
+    test("fields outside the whitelist are ignored on create", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.event.create.mockResolvedValueOnce({ eventID: 10 });
       publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
 
@@ -190,8 +188,8 @@ describe("Event management (Staff/Admin)", () => {
         .send({ ...VALID_CREATE_BODY, eventLocation: "Main Hall" });
 
       expect(res.status).toBe(201);
-      expect(prisma.event.create.mock.calls[0][0].data.eventLocation).toBe(
-        "Athens Shelter",
+      expect(prisma.event.create.mock.calls[0][0].data).not.toHaveProperty(
+        "eventLocation",
       );
     });
 
@@ -317,7 +315,7 @@ describe("Event management (Staff/Admin)", () => {
       expect(res.body.error.code).toBe("BAD_REQUEST");
     });
 
-    test("eventLocation in the body is ignored — it's never reassigned on PUT", async () => {
+    test("fields outside the whitelist are ignored on PUT", async () => {
       prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.event.update.mockResolvedValueOnce({});

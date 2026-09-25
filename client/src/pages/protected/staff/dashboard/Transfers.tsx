@@ -21,6 +21,7 @@ import { formatShortDate } from "../../../../logic/utils/datetime";
 import TransferFormPanel from "./sections/transfers/TransferFormPanel";
 import TransferDetailPanel from "./sections/transfers/TransferDetailPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 20;
 
@@ -181,9 +182,7 @@ const Transfers = () => {
       />
 
       <Card className="mb-6 p-6">
-        <h2 className="mb-4 font-display text-xl text-neutral-dark">
-          Incoming Transfers
-        </h2>
+        <DashboardWidgetHeader icon="📥" title="Incoming Transfers" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -255,9 +254,7 @@ const Transfers = () => {
       </Card>
 
       <Card className="p-6">
-        <h2 className="mb-4 font-display text-xl text-neutral-dark">
-          Outgoing Transfers
-        </h2>
+        <DashboardWidgetHeader icon="📤" title="Outgoing Transfers" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <SelectField

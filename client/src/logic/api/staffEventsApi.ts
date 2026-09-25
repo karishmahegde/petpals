@@ -2,17 +2,16 @@
 // the Events tab. Separate file from eventsApi.ts (public read-only), same
 // convention as staffPetsApi.ts living apart from petsApi.ts.
 import axiosInstance from "./axiosInstance";
-import type { EventDetail } from "./eventsApi";
+import type { EventCategory, EventDetail } from "./eventsApi";
 
 // shelterID is never a body field for Staff — taken from the acting staff
 // member's own shelter server-side. eventDate must not be in the past on
 // create (unenforced on update — see server/.../events.controller.js).
-// eventLocation has no input of its own — it's auto-assigned from the
-// shelter's name server-side, never accepted from the client.
 export interface EventFormPayload {
   eventName: string;
   eventDesc: string;
   eventDate: string; // ISO datetime
+  eventCategory: EventCategory;
 }
 
 export const createEvent = async (

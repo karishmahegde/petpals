@@ -44,50 +44,41 @@ const assertStaffOwnsShelter = async (role, userID, eventShelterID) => {
 
 // Admin supplies shelterID explicitly (validated to exist); Staff always
 // gets their own current shelter, re-fetched fresh from the STAFF table.
-// Returns shelterName alongside shelterID — eventLocation is a snapshot of
-// it at creation time (see schema.prisma's design note on Event), not a
-// client-supplied value, so the caller needs it right here. Same convention
-// as staff/pets.service.js's resolveShelterIDForCreate otherwise.
-const resolveShelterForCreate = async ({ role, userID }, requestedShelterID) => {
+// Same convention as staff/pets.service.js's resolveShelterIDForCreate.
+const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) => {
   if (role === "Admin") {
     const shelter = await prisma.shelter.findUnique({
       where: { shelterID: requestedShelterID },
-      select: { shelterID: true, shelterName: true },
+      select: { shelterID: true },
     });
     if (!shelter) {
       throw shelterNotFound(requestedShelterID);
     }
-    return shelter;
+    return requestedShelterID;
   }
 
   const staff = await prisma.staff.findUnique({
     where: { userID },
-    select: { shelterID: true, shelter: { select: { shelterName: true } } },
+    select: { shelterID: true },
   });
   if (!staff?.shelterID) {
     throw noShelterAssigned();
   }
-  return { shelterID: staff.shelterID, shelterName: staff.shelter.shelterName };
+  return staff.shelterID;
 };
 
 // ——————————————— CREATE EVENT (POST /events) ———————————————
-// `data` is already validated and whitelisted by the controller — it never
-// contains eventLocation; that's set here from the resolved shelter's name,
-// not accepted from the client (see schema.prisma's design note). staffID
+// `data` is already validated and whitelisted by the controller. staffID
 // is set to the acting Staff member's own userID (never for an Admin actor
 // — the column FKs Staff.userID, which an Admin doesn't have), same
 // convention as staffID on AdoptionApplication/Visit.
 const createEvent = async ({ data, actor, requestedShelterID }) => {
-  const { shelterID, shelterName } = await resolveShelterForCreate(
-    actor,
-    requestedShelterID,
-  );
+  const shelterID = await resolveShelterIDForCreate(actor, requestedShelterID);
 
   const event = await prisma.event.create({
     data: {
       ...data,
       shelterID,
-      eventLocation: shelterName,
       staffID: actor.role === "Staff" ? actor.userID : null,
     },
   });

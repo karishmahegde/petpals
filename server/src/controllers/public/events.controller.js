@@ -9,7 +9,18 @@ const badRequest = (message) => {
 
 // ——————————————— GET /events ———————————————
 const getEvents = async (req, res, next) => {
-  const { page: pageRaw, limit: limitRaw, shelterID: shelterIDRaw } = req.query;
+  const {
+    page: pageRaw,
+    limit: limitRaw,
+    shelterID: shelterIDRaw,
+    upcoming,
+    past,
+    name,
+  } = req.query;
+
+  if (upcoming === "true" && past === "true") {
+    return next(badRequest("upcoming and past can't both be true"));
+  }
 
   let page = 1;
   if (pageRaw !== undefined) {
@@ -27,17 +38,27 @@ const getEvents = async (req, res, next) => {
     }
   }
 
-  // Not strictly validated, same convention as GET /pets' shelterID — a
-  // non-numeric value is coerced to an ID that can never match, so the query
-  // naturally returns 0 results instead of erroring.
-  let shelterID;
-  if (shelterIDRaw !== undefined) {
-    const parsed = Number(shelterIDRaw);
-    shelterID = Number.isInteger(parsed) ? parsed : -1;
-  }
+  // Repeatable, and not strictly validated — same convention as GET /pets'
+  // shelterID: a non-numeric value is coerced to an ID that can never match,
+  // so the query naturally returns 0 results instead of erroring.
+  const shelterIDs =
+    shelterIDRaw === undefined
+      ? []
+      : [].concat(shelterIDRaw).map((raw) => {
+          const parsed = Number(raw);
+          return Number.isInteger(parsed) ? parsed : -1;
+        });
 
   try {
-    const result = await eventsService.getEvents({ shelterID }, { page, limit });
+    const result = await eventsService.getEvents(
+      {
+        shelterIDs,
+        upcomingOnly: upcoming === "true",
+        pastOnly: past === "true",
+        name: typeof name === "string" ? name.trim() : undefined,
+      },
+      { page, limit },
+    );
     return successListResponse(
       res,
       "Events retrieved successfully",

@@ -382,14 +382,24 @@ const schemas = {
 
   Event: {
     type: "object",
-    description:
-      "eventLocation is a snapshot of the hosting shelter's name at event-creation time, not client-editable.",
     properties: {
       eventID: { type: "integer" },
       eventName: { type: "string", maxLength: 45 },
       eventDate: { type: "string", format: "date-time" },
       eventDesc: { type: "string", maxLength: 300 },
-      eventLocation: { type: "string" },
+      eventCategory: {
+        type: "string",
+        enum: [
+          "Adoption_Event",
+          "Fundraiser",
+          "Volunteer_Orientation",
+          "Vaccination_Clinic",
+          "Community_Outreach",
+          "Workshop",
+          "Donation_Drive",
+          "Other",
+        ],
+      },
     },
   },
   EventListItem: {

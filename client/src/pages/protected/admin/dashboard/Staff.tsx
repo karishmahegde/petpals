@@ -22,6 +22,7 @@ import { getShelterAnalytics } from "../../../../logic/api/analyticsApi";
 import StaffDetailPanel from "./sections/staff/StaffDetailPanel";
 import StaffApprovalPanel from "./sections/staff/StaffApprovalPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 10;
 
@@ -223,9 +224,7 @@ const Staff = () => {
 
       {/* Staff Approvals */}
       <Card className="mt-6 p-6">
-        <h2 className="mb-4 flex items-center gap-2 font-display text-2xl text-neutral-dark">
-          🧑‍💼 Staff Approvals
-        </h2>
+        <DashboardWidgetHeader icon="🧑‍💼" title="Staff Approvals" className="mb-4" />
 
         {pendingLoading ? (
           <p className="py-6 text-center font-body text-sm text-neutral-gray">

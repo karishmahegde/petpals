@@ -506,13 +506,10 @@ model Event {
   eventName     String           @db.VarChar(45)
   eventDate     DateTime
   eventDesc     String           @db.VarChar(300)
-  // Snapshot of shelter.shelterName at creation time — auto-assigned from
-  // the creating staff member's own shelter (or, for Admin, the shelterID
-  // they supply), never client-editable. See staff/events.service.js's
-  // resolveShelterForCreate. Denormalized rather than joined on every read
-  // so a later shelter rename doesn't rewrite where past events say they
-  // were held.
-  eventLocation String           @db.VarChar(45)
+  // Hand-applied SQL (see setup/manual-constraints.sql). Required, no DB
+  // default — every create must pick one. Labels live client-side
+  // (client/src/logic/eventCategory.ts).
+  eventCategory EventCategory
   staffID       Int?
   shelter       Shelter          @relation(fields: [shelterID], references: [shelterID])
   staff         Staff?           @relation(fields: [staffID], references: [userID])
@@ -749,6 +746,17 @@ enum VerificationStatus {
   Pending
   Verified
   Rejected
+}
+
+enum EventCategory {
+  Adoption_Event
+  Fundraiser
+  Volunteer_Orientation
+  Vaccination_Clinic
+  Community_Outreach
+  Workshop
+  Donation_Drive
+  Other
 }
 
 enum TaskName {

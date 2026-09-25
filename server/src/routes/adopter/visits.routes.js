@@ -76,6 +76,19 @@ router.post(
  *       - in: query
  *         name: upcoming
  *         schema: { type: string, enum: ["true"] }
+ *         description: Future visits that aren't Cancelled, soonest first.
+ *       - in: query
+ *         name: past
+ *         schema: { type: string, enum: ["true"] }
+ *         description: Visits already past OR Cancelled, newest first. Can't be combined with upcoming.
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [Unconfirmed, Confirmed, Completed, Cancelled] }
+ *         description: Unconfirmed = no visitStatus set yet.
+ *       - in: query
+ *         name: name
+ *         schema: { type: string }
+ *         description: Case-insensitive match on the adopter's OR the assigned staff member's name.
  *       - in: query
  *         name: shelterID
  *         schema: { type: integer }

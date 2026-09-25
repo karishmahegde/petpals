@@ -1,3 +1,4 @@
+const { EventCategory } = require("@prisma/client");
 const eventsService = require("../../services/staff/events.service");
 const { successResponse } = require("../../utils/response");
 
@@ -12,12 +13,10 @@ const STRING_MAX = {
   eventDesc: 300,
 };
 
-// eventLocation is not client-writable — staff/events.service.js's
-// createEvent auto-assigns it from the resolved shelter's name, and it
-// can't be reassigned on PUT since shelterID reassignment is out of scope
-// there too. Nothing here for staff to submit for it, on either route.
-const CREATE_REQUIRED_FIELDS = ["eventName", "eventDesc", "eventDate"];
-const UPDATABLE_FIELDS = ["eventName", "eventDesc", "eventDate"];
+const EVENT_CATEGORIES = Object.values(EventCategory);
+
+const CREATE_REQUIRED_FIELDS = ["eventName", "eventDesc", "eventDate", "eventCategory"];
+const UPDATABLE_FIELDS = ["eventName", "eventDesc", "eventDate", "eventCategory"];
 
 // Shared by create (every required field present) and update (only present
 // fields are checked) so the two routes can't drift on what counts as
@@ -44,6 +43,12 @@ const validateField = (field, rawValue) => {
       }
       return parsed;
     }
+
+    case "eventCategory":
+      if (!EVENT_CATEGORIES.includes(rawValue)) {
+        throw badRequest(`eventCategory must be one of: ${EVENT_CATEGORIES.join(", ")}`);
+      }
+      return rawValue;
 
     default:
       return rawValue;

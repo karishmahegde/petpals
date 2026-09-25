@@ -1,13 +1,17 @@
 // EventDetailsModal.tsx
 // Detail view for one event, opened from an EventCard's "Know More" —
 // mirrors PetDetailsModal's chrome (backdrop, mobile slide-up sheet,
-// sticky close button) exactly, minus the photo (events have none) and any
-// auth-gated actions (no auth on this page at all).
+// sticky close button, full-width image on top) exactly — the image being the
+// event category's cover (EventImage) — minus any auth-gated actions (no
+// auth on this page at all).
 import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { useQuery } from "@tanstack/react-query";
 import { getEventById } from "../../../logic/api/eventsApi";
 import ButtonElement from "../../../components/ui/ButtonElement";
+import Badge from "../../../components/ui/Badge";
+import { EVENT_CATEGORY_LABEL } from "../../../logic/eventCategory";
+import EventImage from "./EventImage";
 import { formatFullDate, formatTime } from "../../../logic/utils/datetime";
 
 interface EventDetailsModalProps {
@@ -63,7 +67,10 @@ const EventDetailsModal = ({ eventID, onClose }: EventDetailsModalProps) => {
           </ButtonElement>
         </div>
 
-        <div className="flex flex-col gap-4 p-6 pt-10">
+        {data && <EventImage category={data.eventCategory} />}
+
+        {/* pt-10 clears the close button only when no image sits under it. */}
+        <div className={`flex flex-col gap-4 p-6 ${data ? "" : "pt-10"}`}>
           {isLoading && (
             <p className="p-8 text-center text-sm text-neutral-gray">
               Loading event details...
@@ -81,7 +88,10 @@ const EventDetailsModal = ({ eventID, onClose }: EventDetailsModalProps) => {
                 <h2 className="text-xl font-bold text-neutral-charcoal">
                   {data.eventName}
                 </h2>
-                <p className="text-sm text-teal-dark">{data.eventLocation}</p>
+                <p className="text-sm text-teal-dark">{data.shelter.shelterName}</p>
+                <Badge tone="teal" variant="outline" className="mt-2">
+                  {EVENT_CATEGORY_LABEL[data.eventCategory]}
+                </Badge>
               </div>
 
               <div className={boxStyle}>

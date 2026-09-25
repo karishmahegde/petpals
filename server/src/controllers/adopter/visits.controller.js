@@ -73,14 +73,29 @@ const createVisit = async (req, res, next) => {
 // Staff/Admin-scoped, paginated shelter-wide visit queue — distinct from
 // GET /adopters/me/visits (one adopter's own visits). Same page/limit/
 // ?upcoming= conventions as GET /adopters/me/visits and the staff-facing
-// GET /adoption-applications queue.
+// GET /adoption-applications queue, plus ?past= for the Past/Cancelled list.
+const VALID_STATUS_FILTERS = ["Unconfirmed", "Confirmed", "Completed", "Cancelled"];
+
 const listVisits = async (req, res, next) => {
   const {
     upcoming,
+    past,
+    status,
+    name,
     shelterID: shelterIDRaw,
     page: pageRaw,
     limit: limitRaw,
   } = req.query;
+
+  if (upcoming === "true" && past === "true") {
+    return next(badRequest("upcoming and past can't both be true"));
+  }
+
+  if (status !== undefined && !VALID_STATUS_FILTERS.includes(status)) {
+    return next(
+      badRequest(`status must be one of: ${VALID_STATUS_FILTERS.join(", ")}`),
+    );
+  }
 
   let page = 1;
   if (pageRaw !== undefined) {
@@ -111,7 +126,15 @@ const listVisits = async (req, res, next) => {
   try {
     const result = await visitsService.listVisitsForStaff(
       { role: req.user.role, userID: req.user.userID },
-      { upcomingOnly: upcoming === "true", shelterID, page, limit },
+      {
+        upcomingOnly: upcoming === "true",
+        pastOnly: past === "true",
+        status,
+        name,
+        shelterID,
+        page,
+        limit,
+      },
     );
     return successListResponse(
       res,

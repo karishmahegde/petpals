@@ -1,7 +1,9 @@
 // components/ui/dashboard/DashboardWidgetHeader.tsx
 // The title row shared by nearly every dashboard widget: an emoji/icon + title
 // on the left, an optional "View All"-style link on the right. Role-agnostic —
-// every dashboard's widgets use the same shape. Also exports
+// every dashboard's widgets use the same shape. Also the section heading
+// inside every dashboard tab's cards (Upcoming/Past, Incoming/Outgoing, …,
+// with className="mb-4") so all tabs' subheaders match. Also exports
 // OverviewWidgetCard, the generic Card + header + loading/empty/content body
 // wrapper built on top of it — see that component's own comment below.
 import type { ReactNode } from "react";

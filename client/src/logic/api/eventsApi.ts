@@ -4,14 +4,25 @@
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
 
+// The EventCategory enum's stored values — display labels are
+// EVENT_CATEGORY_LABEL in logic/eventCategory.ts.
+export type EventCategory =
+  | "Adoption_Event"
+  | "Fundraiser"
+  | "Volunteer_Orientation"
+  | "Vaccination_Clinic"
+  | "Community_Outreach"
+  | "Workshop"
+  | "Donation_Drive"
+  | "Other";
+
 export interface EventListItem {
   eventID: number;
   eventName: string;
   eventDate: string;
   eventDesc: string;
-  // Snapshot of the hosting shelter's name at event-creation time — not
-  // client-editable, see server/.../events.service.js's design note.
-  eventLocation: string;
+  eventCategory: EventCategory;
+  // Where the event is held — shelter.shelterName.
   shelter: { shelterID: number; shelterName: string };
 }
 
@@ -20,18 +31,28 @@ export interface EventDetail extends Omit<EventListItem, "shelter"> {
 }
 
 interface EventsListParams {
-  shelterID?: number;
+  shelterID?: number | number[]; // repeatable — any of these shelters
+  upcoming?: boolean;
+  past?: boolean; // already started, most recent first
+  name?: string; // case-insensitive eventName match
   page?: number;
   limit?: number;
 }
 
-// Ordered by eventDate ascending. No "upcoming only" filter exists
-// server-side yet — callers that need nearest-upcoming (e.g. the Staff
-// Overview Upcoming Events widget) filter the returned page client-side.
+// upcoming: only events that haven't started yet, soonest first. past: only
+// events already started, most recent first. Neither: everything, soonest
+// first.
 export const getEvents = async (
   params?: EventsListParams,
 ): Promise<{ data: EventListItem[]; pagination: Pagination }> => {
-  const response = await axiosInstance.get("/events", { params });
+  const { upcoming, past, ...rest } = params ?? {};
+  const response = await axiosInstance.get("/events", {
+    params: {
+      ...rest,
+      ...(upcoming ? { upcoming: "true" } : {}),
+      ...(past ? { past: "true" } : {}),
+    },
+  });
   return { data: response.data.data, pagination: response.data.pagination };
 };
 

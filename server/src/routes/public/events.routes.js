@@ -13,7 +13,22 @@ const router = express.Router();
  *     parameters:
  *       - in: query
  *         name: shelterID
- *         schema: { type: integer }
+ *         schema: { type: array, items: { type: integer } }
+ *         style: form
+ *         explode: true
+ *         description: Repeatable — events at any of these shelters.
+ *       - in: query
+ *         name: name
+ *         schema: { type: string }
+ *         description: Case-insensitive match on eventName.
+ *       - in: query
+ *         name: upcoming
+ *         schema: { type: string, enum: ["true"] }
+ *         description: Only events that haven't started yet.
+ *       - in: query
+ *         name: past
+ *         schema: { type: string, enum: ["true"] }
+ *         description: Only events that have already started, most recent first. Can't be combined with upcoming.
  *       - in: query
  *         name: page
  *         schema: { type: integer, minimum: 1, default: 1 }

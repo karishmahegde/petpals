@@ -7,23 +7,36 @@ const notFound = (id) => {
 };
 
 // ——————————————— GET /events ———————————————
-// eventLocation is a stored snapshot of the shelter's name at event-creation
-// time (see schema.prisma's design note on Event and
-// staff/events.service.js's resolveShelterForCreate) — a plain select field,
-// not derived here.
+// Where an event is held is its shelter — shelter.shelterName.
 const LIST_SELECT = {
   eventID: true,
   eventName: true,
   eventDate: true,
   eventDesc: true,
-  eventLocation: true,
+  eventCategory: true,
   shelter: { select: { shelterID: true, shelterName: true } },
 };
 
-const getEvents = async ({ shelterID } = {}, { page = 1, limit = 20 } = {}) => {
+// upcomingOnly: events that haven't started yet, soonest first (public page,
+// staff Overview widget, staff Events tab's Upcoming section). pastOnly:
+// events already started, most recent first (staff Events tab's Past
+// section). Neither: everything, soonest first. shelterIDs: any of these
+// shelters (empty = all). name: case-insensitive match on eventName.
+const getEvents = async (
+  { shelterIDs = [], upcomingOnly = false, pastOnly = false, name } = {},
+  { page = 1, limit = 20 } = {},
+) => {
   const where = {};
-  if (shelterID !== undefined) {
-    where.shelterID = shelterID;
+  if (shelterIDs.length > 0) {
+    where.shelterID = { in: shelterIDs };
+  }
+  if (name) {
+    where.eventName = { contains: name, mode: "insensitive" };
+  }
+  if (upcomingOnly) {
+    where.eventDate = { gt: new Date() };
+  } else if (pastOnly) {
+    where.eventDate = { lte: new Date() };
   }
 
   const skip = (page - 1) * limit;
@@ -33,7 +46,7 @@ const getEvents = async ({ shelterID } = {}, { page = 1, limit = 20 } = {}) => {
       where,
       skip,
       take: limit,
-      orderBy: { eventDate: "asc" },
+      orderBy: { eventDate: pastOnly ? "desc" : "asc" },
       select: LIST_SELECT,
     }),
     prisma.event.count({ where }),
@@ -51,7 +64,7 @@ const DETAIL_SELECT = {
   eventName: true,
   eventDate: true,
   eventDesc: true,
-  eventLocation: true,
+  eventCategory: true,
   shelter: {
     select: { shelterID: true, shelterName: true, shelterAddress: true },
   },

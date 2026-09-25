@@ -17,6 +17,7 @@ import { getSpecies } from "../../../../logic/api/petsApi";
 import { formatShortDate } from "../../../../logic/utils/datetime";
 import ApplicationDetailPanel from "./sections/applications/ApplicationDetailPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 20;
 
@@ -127,9 +128,7 @@ const Applications = () => {
       />
 
       <Card className="mb-6 p-6">
-        <h2 className="mb-4 font-display text-xl text-neutral-dark">
-          Active Applications
-        </h2>
+        <DashboardWidgetHeader icon="📝" title="Active Applications" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <SelectField
@@ -226,9 +225,7 @@ const Applications = () => {
       </Card>
 
       <Card className="p-6">
-        <h2 className="mb-4 font-display text-xl text-neutral-dark">
-          Past Applications
-        </h2>
+        <DashboardWidgetHeader icon="📁" title="Past Applications" className="mb-4" />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <SelectField

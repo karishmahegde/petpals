@@ -14,16 +14,13 @@ jest.mock("../../../config/prisma", () => ({
 const prisma = require("../../../config/prisma");
 const app = require("../../../app");
 
-// Matches events.service.js's LIST_SELECT shape. eventLocation is a stored
-// snapshot of the shelter's name at creation time (see schema.prisma), not
-// derived here — the fixture sets it independently of shelter.shelterName
-// on purpose, so the assertions below prove it's a plain pass-through.
+// Matches events.service.js's LIST_SELECT shape.
 const buildListRow = (overrides = {}) => ({
   eventID: 1,
   eventName: "Adoption Day",
   eventDate: new Date("2026-06-01"),
   eventDesc: "Come meet our adoptable pets!",
-  eventLocation: "Athens Shelter",
+  eventCategory: "Adoption_Event",
   shelter: { shelterID: 9, shelterName: "Athens Shelter" },
   ...overrides,
 });
@@ -34,7 +31,7 @@ const buildDetailRow = (overrides = {}) => ({
   eventName: "Adoption Day",
   eventDate: new Date("2026-06-01"),
   eventDesc: "Come meet our adoptable pets!",
-  eventLocation: "Athens Shelter",
+  eventCategory: "Adoption_Event",
   shelter: {
     shelterID: 9,
     shelterName: "Athens Shelter",
@@ -48,6 +45,37 @@ describe("GET /api/v1/events", () => {
     jest.clearAllMocks();
   });
 
+  test("upcoming=true → only events that haven't started yet", async () => {
+    prisma.event.findMany.mockResolvedValueOnce([buildListRow()]);
+    prisma.event.count.mockResolvedValueOnce(1);
+
+    const res = await request(app).get("/api/v1/events?upcoming=true");
+
+    expect(res.status).toBe(200);
+    const { where } = prisma.event.findMany.mock.calls[0][0];
+    expect(where.eventDate.gt).toBeInstanceOf(Date);
+    expect(prisma.event.count).toHaveBeenCalledWith({ where });
+  });
+
+  test("past=true → only started events, most recent first", async () => {
+    prisma.event.findMany.mockResolvedValueOnce([]);
+    prisma.event.count.mockResolvedValueOnce(0);
+
+    const res = await request(app).get("/api/v1/events?past=true");
+
+    expect(res.status).toBe(200);
+    const args = prisma.event.findMany.mock.calls[0][0];
+    expect(args.where.eventDate.lte).toBeInstanceOf(Date);
+    expect(args.orderBy).toEqual({ eventDate: "desc" });
+  });
+
+  test("upcoming=true & past=true together → 400 BAD_REQUEST", async () => {
+    const res = await request(app).get("/api/v1/events?upcoming=true&past=true");
+
+    expect(res.status).toBe(400);
+    expect(prisma.event.findMany).not.toHaveBeenCalled();
+  });
+
   test("no filters → lists events ordered by eventDate ascending", async () => {
     prisma.event.findMany.mockResolvedValueOnce([buildListRow()]);
     prisma.event.count.mockResolvedValueOnce(1);
@@ -59,7 +87,7 @@ describe("GET /api/v1/events", () => {
       expect.objectContaining({ where: {}, orderBy: { eventDate: "asc" } }),
     );
     expect(res.body.data).toHaveLength(1);
-    expect(res.body.data[0].eventLocation).toBe("Athens Shelter");
+    expect(res.body.data[0].shelter.shelterName).toBe("Athens Shelter");
     expect(res.body.pagination).toMatchObject({ page: 1, limit: 20, total: 1 });
   });
 
@@ -70,7 +98,31 @@ describe("GET /api/v1/events", () => {
     await request(app).get("/api/v1/events").query({ shelterID: 9 });
 
     expect(prisma.event.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { shelterID: 9 } }),
+      expect.objectContaining({ where: { shelterID: { in: [9] } } }),
+    );
+  });
+
+  test("repeated ?shelterID= matches any of them", async () => {
+    prisma.event.findMany.mockResolvedValueOnce([]);
+    prisma.event.count.mockResolvedValueOnce(0);
+
+    await request(app).get("/api/v1/events?shelterID=1&shelterID=2");
+
+    expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { shelterID: { in: [1, 2] } } }),
+    );
+  });
+
+  test("?name= is a case-insensitive eventName match", async () => {
+    prisma.event.findMany.mockResolvedValueOnce([]);
+    prisma.event.count.mockResolvedValueOnce(0);
+
+    await request(app).get("/api/v1/events").query({ name: " walk " });
+
+    expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { eventName: { contains: "walk", mode: "insensitive" } },
+      }),
     );
   });
 
@@ -129,7 +181,6 @@ describe("GET /api/v1/events/:id", () => {
       eventID: 1,
       eventName: "Adoption Day",
       eventDesc: "Come meet our adoptable pets!",
-      eventLocation: "Athens Shelter",
       shelter: {
         shelterID: 9,
         shelterName: "Athens Shelter",

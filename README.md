@@ -122,6 +122,7 @@ cd server && npm run dev      # → http://localhost:5000
 # Terminal 2
 cd client && npm run dev      # → http://localhost:3000
 ```
+
 ---
 
 ## 🟤 Project Structure
@@ -185,5 +186,5 @@ Distributed under the MIT License. See [`LICENSE`](./LICENSE) for details.
 ---
 
 <div align="center">
-Made with 🐾 by <a href="https://github.com/your-username">Karishma</a>
+Made with 🐾 by <a href="https://github.com/karishmahegde">Karishma</a>
 </div>

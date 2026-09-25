@@ -866,6 +866,95 @@ async function main() {
     },
   });
 
+  // ── EVENTS ───────────────────────────────────────────────────
+  // One event per EventCategory so every category's cover image and badge
+  // shows on the public Events page. Split across both shelters (shelter1's
+  // attributed to the seeded staff member, shelter2 has no staff to
+  // attribute to), mostly upcoming, one in the past for the staff Events
+  // tab's "Past" badge.
+  console.log("Creating events...");
+  const eventAt = (days, hours, minutes = 0) => {
+    const date = daysFromNow(days);
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  };
+  await prisma.event.createMany({
+    data: [
+      {
+        shelterID: shelter1.shelterID,
+        staffID: staff.userID,
+        eventCategory: "Adoption_Event",
+        eventName: "Monthly Meet & Greet",
+        eventDate: eventAt(6, 11),
+        eventDesc:
+          "Meet our adoptable dogs, cats and rabbits in person. Adoption counsellors will be on hand to answer questions and help you find your match.",
+      },
+      {
+        shelterID: shelter2.shelterID,
+        staffID: null,
+        eventCategory: "Fundraiser",
+        eventName: "Paws in the Park Charity Walk",
+        eventDate: eventAt(20, 9),
+        eventDesc:
+          "A 5K walk through Brooklyn Bridge Park — bring your dog or walk one of ours. Every registration funds a week of food and care for a shelter pet.",
+      },
+      {
+        shelterID: shelter1.shelterID,
+        staffID: staff.userID,
+        eventCategory: "Volunteer_Orientation",
+        eventName: "New Volunteer Orientation",
+        eventDate: eventAt(9, 18),
+        eventDesc:
+          "Start here if you've just signed up to volunteer. We'll cover shelter safety, animal handling basics and how to pick up your first shifts.",
+      },
+      {
+        shelterID: shelter2.shelterID,
+        staffID: null,
+        eventCategory: "Vaccination_Clinic",
+        eventName: "Low-Cost Vaccine & Microchip Clinic",
+        eventDate: eventAt(13, 10),
+        eventDesc:
+          "Rabies, DHPP and FVRCP vaccines plus microchipping at reduced prices for community pets. Walk-ins welcome while supplies last.",
+      },
+      {
+        shelterID: shelter1.shelterID,
+        staffID: staff.userID,
+        eventCategory: "Community_Outreach",
+        eventName: "Pets at the Library Storytime",
+        eventDate: eventAt(16, 15, 30),
+        eventDesc:
+          "Kids read aloud to our calmest shelter dogs at the local library while our team talks about responsible pet ownership.",
+      },
+      {
+        shelterID: shelter2.shelterID,
+        staffID: null,
+        eventCategory: "Workshop",
+        eventName: "Puppy Training 101 Workshop",
+        eventDate: eventAt(27, 14),
+        eventDesc:
+          "A hands-on class covering house training, leash manners and basic commands. Recommended for new and soon-to-be puppy owners.",
+      },
+      {
+        shelterID: shelter1.shelterID,
+        staffID: staff.userID,
+        eventCategory: "Donation_Drive",
+        eventName: "Winter Blanket & Food Drive",
+        eventDate: eventAt(34, 10),
+        eventDesc:
+          "Drop off blankets, towels, unopened pet food and toys to keep our animals warm this winter. Donation receipts available at the desk.",
+      },
+      {
+        shelterID: shelter2.shelterID,
+        staffID: null,
+        eventCategory: "Other",
+        eventName: "Shelter Open House",
+        eventDate: eventAt(-10, 12),
+        eventDesc:
+          "Tour the shelter, meet the team and see where the animals live. Refreshments provided.",
+      },
+    ],
+  });
+
   console.log("✅ Seeding complete!");
   console.log("");
   console.log("Test accounts:");

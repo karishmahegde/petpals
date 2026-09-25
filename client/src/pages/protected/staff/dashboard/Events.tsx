@@ -4,18 +4,21 @@ import { FaPlus } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
-import type { BadgeTone } from "../../../../components/ui/Badge";
+import Badge, { type BadgeTone } from "../../../../components/ui/Badge";
 import {
   DashboardActionList,
   DashboardListRow,
   RowActionButton,
+  type ConfirmActionConfig,
 } from "../../../../components/ui/dashboard/DashboardList";
 import { getMyStaffProfile } from "../../../../logic/api/staffApi";
 import { getEvents, type EventListItem } from "../../../../logic/api/eventsApi";
 import { deleteEvent } from "../../../../logic/api/staffEventsApi";
 import { formatTime, relativeDateBadge } from "../../../../logic/utils/datetime";
+import { EVENT_CATEGORY_LABEL } from "../../../../logic/eventCategory";
 import EventFormPanel from "./sections/events/EventFormPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 20;
 
@@ -25,14 +28,109 @@ const BADGE_TONE: Record<string, BadgeTone> = {
   Past: "neutral",
 };
 
-// Events tab — the shelter's event calendar (GET /events, filtered to the
-// staff member's own shelterID — resolved from GET /staff/me, since GET
-// /events itself is the public, network-wide endpoint with no server-side
-// staff scoping). Create/Edit share one SlideOver form (EventFormPanel);
-// Delete is a per-row action via the generic DashboardActionList, which
-// owns the confirm-then-mutate flow (ConfirmActionModal included).
+// Matches SelectField's own label + trigger sizing, same as Transfers.tsx.
+const filterInputClass =
+  "w-full rounded-md border border-neutral-lightgray bg-white px-3 py-2.5 font-body text-sm text-neutral-charcoal focus:outline-none focus:ring-1 focus:ring-teal-dark";
+const filterLabelClass =
+  "mb-1.5 block font-body text-sm font-semibold text-neutral-charcoal";
+
+// Shared by both sections' DashboardActionList — one confirm-then-delete flow.
+const DELETE_ACTION: ConfirmActionConfig<EventListItem> = {
+  mutationFn: (event) => deleteEvent(event.eventID),
+  invalidateKeys: [["staff", "events"]],
+  successToast: "Event deleted",
+  errorToast: "Couldn't delete the event. Please try again.",
+  modalTitle: "Delete this event?",
+  confirmLabel: "Delete",
+  renderBody: (event) => (
+    <>This permanently removes "{event.eventName}". This can't be undone.</>
+  ),
+};
+
+const EventNameFilter = ({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <div className="mb-4 sm:max-w-sm">
+    <label className={filterLabelClass} htmlFor={id}>
+      Event Name
+    </label>
+    <input
+      id={id}
+      placeholder="Search by event name"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={filterInputClass}
+    />
+  </div>
+);
+
+const EventRow = ({
+  event,
+  className,
+  onEdit,
+  onDelete,
+}: {
+  event: EventListItem;
+  className: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) => {
+  const when = new Date(event.eventDate);
+  const badgeLabel = relativeDateBadge(when);
+
+  return (
+    <DashboardListRow
+      className={className}
+      leading={
+        <div className="w-14 shrink-0 text-center">
+          <p className="font-body text-sm font-bold text-neutral-charcoal">
+            {when.toLocaleDateString("en-US", { month: "short" })}
+          </p>
+          <p className="font-display text-3xl font-light text-neutral-charcoal">
+            {when.getDate()}
+          </p>
+        </div>
+      }
+      title={
+        <>
+          {event.eventName}{" "}
+          <Badge tone="teal" variant="outline" className="ml-1">
+            {EVENT_CATEGORY_LABEL[event.eventCategory]}
+          </Badge>
+        </>
+      }
+      lines={[
+        { text: `${formatTime(when)} | ${event.shelter.shelterName}` },
+        { text: event.eventDesc },
+      ]}
+      badge={{ label: badgeLabel, tone: BADGE_TONE[badgeLabel] ?? "teal" }}
+      actions={
+        <>
+          <RowActionButton onClick={onEdit}>Edit</RowActionButton>
+          <RowActionButton variant="danger" onClick={onDelete}>
+            Delete
+          </RowActionButton>
+        </>
+      }
+    />
+  );
+};
+
+// Events tab — the shelter's event calendar, split into Upcoming Events (not
+// started yet, soonest first) and Past Events (already started, most recent
+// first), each its own paginated GET /events query with an event-name
+// search. Filtered to the staff member's own shelterID, resolved from GET
+// /staff/me, since GET /events itself is the public, network-wide endpoint
+// with no server-side staff scoping. Create/Edit share one SlideOver form
+// (EventFormPanel); Delete is a per-row action via the generic
+// DashboardActionList, which owns the confirm-then-mutate flow.
 const Events = () => {
-  const [page, setPage] = useState(1);
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventListItem | null>(null);
 
@@ -42,16 +140,44 @@ const Events = () => {
   });
   const shelterID = profile?.shelterID;
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["staff", "events", { shelterID, page }],
-    queryFn: () => getEvents({ shelterID: shelterID as number, page, limit: PAGE_SIZE }),
+  const [upcomingPage, setUpcomingPage] = useState(1);
+  const [upcomingName, setUpcomingName] = useState("");
+  const upcomingQuery = useQuery({
+    queryKey: [
+      "staff",
+      "events",
+      "upcoming",
+      { shelterID, page: upcomingPage, upcomingName },
+    ],
+    queryFn: () =>
+      getEvents({
+        shelterID: shelterID as number,
+        upcoming: true,
+        name: upcomingName.trim() || undefined,
+        page: upcomingPage,
+        limit: PAGE_SIZE,
+      }),
     enabled: shelterID != null,
     placeholderData: keepPreviousData,
   });
+  const upcomingEvents = upcomingQuery.data?.data ?? [];
 
-  const events = data?.data ?? [];
-  const totalPages = data?.pagination.totalPages ?? 1;
-  const loading = isLoading || shelterID == null;
+  const [pastPage, setPastPage] = useState(1);
+  const [pastName, setPastName] = useState("");
+  const pastQuery = useQuery({
+    queryKey: ["staff", "events", "past", { shelterID, page: pastPage, pastName }],
+    queryFn: () =>
+      getEvents({
+        shelterID: shelterID as number,
+        past: true,
+        name: pastName.trim() || undefined,
+        page: pastPage,
+        limit: PAGE_SIZE,
+      }),
+    enabled: shelterID != null,
+    placeholderData: keepPreviousData,
+  });
+  const pastEvents = pastQuery.data?.data ?? [];
 
   const openCreate = () => {
     setEditingEvent(null);
@@ -76,86 +202,105 @@ const Events = () => {
         }}
       />
 
-      {loading && (
-        <p className="font-body text-sm text-neutral-gray">Loading events…</p>
-      )}
+      <Card className="mb-6 p-6">
+        <DashboardWidgetHeader icon="🗓️" title="Upcoming Events" className="mb-4" />
 
-      {isError && (
-        <p className="font-body text-sm text-rose-dark">
-          Couldn't load events. Please try again.
-        </p>
-      )}
+        <EventNameFilter
+          id="upcoming-event-name"
+          value={upcomingName}
+          onChange={(v) => {
+            setUpcomingName(v);
+            setUpcomingPage(1);
+          }}
+        />
 
-      {data && events.length === 0 && (
-        <div className="rounded-2xl bg-white p-10 text-center shadow-md">
+        {(upcomingQuery.isLoading || shelterID == null) && (
+          <p className="font-body text-sm text-neutral-gray">Loading…</p>
+        )}
+        {upcomingQuery.isError && (
+          <p className="font-body text-sm text-rose-dark">
+            Couldn't load upcoming events. Please try again.
+          </p>
+        )}
+        {upcomingQuery.data && upcomingEvents.length === 0 && (
           <DashboardEmptyMessage>
-            No events yet — create the first one to get started.
+            {upcomingName.trim()
+              ? "No upcoming events match your search."
+              : "No upcoming events — create one to get started."}
           </DashboardEmptyMessage>
-        </div>
-      )}
+        )}
 
-      {events.length > 0 && (
-        <Card className="p-6">
+        {upcomingEvents.length > 0 && (
           <DashboardActionList
-            items={events}
+            items={upcomingEvents}
             getKey={(event) => event.eventID}
-            renderRow={(event, confirmDelete) => {
-              const when = new Date(event.eventDate);
-              const badgeLabel = relativeDateBadge(when);
-
-              return (
-                <DashboardListRow
-                  leading={
-                    <div className="w-14 shrink-0 text-center">
-                      <p className="font-body text-sm font-bold text-neutral-charcoal">
-                        {when.toLocaleDateString("en-US", { month: "short" })}
-                      </p>
-                      <p className="font-display text-3xl font-light text-neutral-charcoal">
-                        {when.getDate()}
-                      </p>
-                    </div>
-                  }
-                  title={event.eventName}
-                  lines={[
-                    { text: `${formatTime(when)} | ${event.eventLocation}` },
-                    { text: event.eventDesc },
-                  ]}
-                  badge={{ label: badgeLabel, tone: BADGE_TONE[badgeLabel] ?? "teal" }}
-                  actions={
-                    <>
-                      <RowActionButton onClick={() => openEdit(event)}>
-                        Edit
-                      </RowActionButton>
-                      <RowActionButton
-                        variant="danger"
-                        onClick={() => confirmDelete(event)}
-                      >
-                        Delete
-                      </RowActionButton>
-                    </>
-                  }
-                />
-              );
-            }}
-            confirmAction={{
-              mutationFn: (event) => deleteEvent(event.eventID),
-              invalidateKeys: [["staff", "events"]],
-              successToast: "Event deleted",
-              errorToast: "Couldn't delete the event. Please try again.",
-              modalTitle: "Delete this event?",
-              confirmLabel: "Delete",
-              renderBody: (event) => (
-                <>
-                  This permanently removes "{event.eventName}". This can't be
-                  undone.
-                </>
-              ),
-            }}
+            renderRow={(event, confirmDelete) => (
+              <EventRow
+                event={event}
+                className="bg-gold-lightest"
+                onEdit={() => openEdit(event)}
+                onDelete={() => confirmDelete(event)}
+              />
+            )}
+            confirmAction={DELETE_ACTION}
           />
+        )}
 
-          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
-        </Card>
-      )}
+        <PaginationControls
+          page={upcomingPage}
+          totalPages={upcomingQuery.data?.pagination.totalPages ?? 1}
+          onChange={setUpcomingPage}
+        />
+      </Card>
+
+      <Card className="p-6">
+        <DashboardWidgetHeader icon="📁" title="Past Events" className="mb-4" />
+
+        <EventNameFilter
+          id="past-event-name"
+          value={pastName}
+          onChange={(v) => {
+            setPastName(v);
+            setPastPage(1);
+          }}
+        />
+
+        {(pastQuery.isLoading || shelterID == null) && (
+          <p className="font-body text-sm text-neutral-gray">Loading…</p>
+        )}
+        {pastQuery.isError && (
+          <p className="font-body text-sm text-rose-dark">
+            Couldn't load past events. Please try again.
+          </p>
+        )}
+        {pastQuery.data && pastEvents.length === 0 && (
+          <DashboardEmptyMessage>
+            {pastName.trim() ? "No past events match your search." : "No past events yet."}
+          </DashboardEmptyMessage>
+        )}
+
+        {pastEvents.length > 0 && (
+          <DashboardActionList
+            items={pastEvents}
+            getKey={(event) => event.eventID}
+            renderRow={(event, confirmDelete) => (
+              <EventRow
+                event={event}
+                className="bg-neutral-lightgray"
+                onEdit={() => openEdit(event)}
+                onDelete={() => confirmDelete(event)}
+              />
+            )}
+            confirmAction={DELETE_ACTION}
+          />
+        )}
+
+        <PaginationControls
+          page={pastPage}
+          totalPages={pastQuery.data?.pagination.totalPages ?? 1}
+          onChange={setPastPage}
+        />
+      </Card>
 
       <EventFormPanel
         open={panelOpen}

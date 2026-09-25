@@ -6,8 +6,6 @@
 // the full row (eventName/eventDesc/eventDate) needed to pre-fill the form,
 // so the already-loaded row is passed down directly instead of duplicating
 // the fetch (same reasoning as the Visits tab's VisitDetailPanel).
-// eventLocation isn't a form field at all — it's auto-assigned server-side
-// from the shelter's name, never client-editable.
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -15,7 +13,8 @@ import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import { createEvent, updateEvent } from "../../../../../../logic/api/staffEventsApi";
-import type { EventListItem } from "../../../../../../logic/api/eventsApi";
+import type { EventCategory, EventListItem } from "../../../../../../logic/api/eventsApi";
+import { EVENT_CATEGORY_LABEL } from "../../../../../../logic/eventCategory";
 
 interface EventFormPanelProps {
   open: boolean;
@@ -28,9 +27,15 @@ interface EventFormState {
   eventName: string;
   eventDesc: string;
   eventDate: string; // <input type="datetime-local"> value
+  eventCategory: EventCategory | "";
 }
 
-const EMPTY_FORM: EventFormState = { eventName: "", eventDesc: "", eventDate: "" };
+const EMPTY_FORM: EventFormState = {
+  eventName: "",
+  eventDesc: "",
+  eventDate: "",
+  eventCategory: "",
+};
 
 const MAX_NAME_LEN = 45; // schema.prisma: eventName is VarChar(45)
 const MAX_DESC_LEN = 300; // schema.prisma: eventDesc is VarChar(300)
@@ -82,6 +87,7 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
       eventName: event.eventName,
       eventDesc: event.eventDesc,
       eventDate: toDatetimeLocalValue(event.eventDate),
+      eventCategory: event.eventCategory,
     });
   }, [open, event]);
 
@@ -91,6 +97,7 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
         eventName: form.eventName.trim(),
         eventDesc: form.eventDesc.trim(),
         eventDate: new Date(form.eventDate).toISOString(),
+        eventCategory: form.eventCategory as EventCategory,
       };
       return isEdit ? updateEvent(event!.eventID, payload) : createEvent(payload);
     },
@@ -106,6 +113,7 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
     form.eventName.trim() !== "" &&
     form.eventDesc.trim() !== "" &&
     form.eventDate !== "" &&
+    form.eventCategory !== "" &&
     !saveMutation.isPending;
 
   return (
@@ -129,6 +137,28 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
             onChange={(e) => setForm((f) => ({ ...f, eventName: e.target.value }))}
             className={fieldClass}
           />
+        </div>
+
+        <div>
+          <label className={labelClass} htmlFor="event-category">
+            Category
+          </label>
+          <select
+            id="event-category"
+            required
+            value={form.eventCategory}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, eventCategory: e.target.value as EventCategory }))
+            }
+            className={fieldClass}
+          >
+            <option value="">- Select -</option>
+            {Object.entries(EVENT_CATEGORY_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>

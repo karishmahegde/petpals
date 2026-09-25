@@ -94,8 +94,14 @@ export interface VisitQueueItem {
   staff: { staffName: string } | null;
 }
 
+// "Unconfirmed" = no visitStatus set yet (null).
+export type VisitStatusFilter = "Unconfirmed" | "Confirmed" | "Completed" | "Cancelled";
+
 interface VisitsQueueParams {
-  upcoming?: boolean;
+  upcoming?: boolean; // future and not Cancelled
+  past?: boolean; // already past OR Cancelled, newest first
+  status?: VisitStatusFilter;
+  name?: string; // adopter OR assigned staff name
   shelterID?: number; // Admin only — Staff is always scoped server-side to their own shelter
   page?: number;
   limit?: number;
@@ -104,9 +110,13 @@ interface VisitsQueueParams {
 export const getVisitsQueue = async (
   params?: VisitsQueueParams,
 ): Promise<{ data: VisitQueueItem[]; pagination: Pagination }> => {
-  const { upcoming, ...rest } = params ?? {};
+  const { upcoming, past, ...rest } = params ?? {};
   const response = await axiosInstance.get("/visits", {
-    params: { ...rest, ...(upcoming ? { upcoming: "true" } : {}) },
+    params: {
+      ...rest,
+      ...(upcoming ? { upcoming: "true" } : {}),
+      ...(past ? { past: "true" } : {}),
+    },
   });
   return { data: response.data.data, pagination: response.data.pagination };
 };

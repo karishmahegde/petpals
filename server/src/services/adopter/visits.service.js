@@ -165,11 +165,46 @@ const STAFF_LIST_SELECT = {
 
 const listVisitsForStaff = async (
   { role, userID },
-  { upcomingOnly = false, shelterID, page = 1, limit = 20 } = {},
+  {
+    upcomingOnly = false,
+    pastOnly = false,
+    status,
+    name,
+    shelterID,
+    page = 1,
+    limit = 20,
+  } = {},
 ) => {
-  const where = {};
+  // upcomingOnly / pastOnly split the queue the same way the Appointments
+  // tab does: Upcoming = still in the future and not Cancelled; Past =
+  // already happened OR Cancelled. Neither = everything (Overview widgets).
+  // visitStatus is nullable (null = unconfirmed), and `not: "Cancelled"`
+  // alone would drop the nulls, hence the explicit OR. Each filter is its
+  // own AND clause so the ORs don't collide.
+  const where = { AND: [] };
   if (upcomingOnly) {
     where.visitTime = { gt: new Date() };
+    where.AND.push({
+      OR: [{ visitStatus: null }, { visitStatus: { not: "Cancelled" } }],
+    });
+  } else if (pastOnly) {
+    where.AND.push({
+      OR: [{ visitTime: { lte: new Date() } }, { visitStatus: "Cancelled" }],
+    });
+  }
+
+  // status "Unconfirmed" is the null visitStatus.
+  if (status) {
+    where.visitStatus = status === "Unconfirmed" ? null : status;
+  }
+
+  // One search box for either side of the visit: the adopter or the
+  // assigned staff member.
+  if (name) {
+    const contains = { contains: name, mode: "insensitive" };
+    where.AND.push({
+      OR: [{ adopter: { adopterName: contains } }, { staff: { staffName: contains } }],
+    });
   }
 
   if (role === "Staff") {
@@ -191,7 +226,7 @@ const listVisitsForStaff = async (
     prisma.visit.findMany({
       where,
       select: STAFF_LIST_SELECT,
-      orderBy: { visitTime: "asc" },
+      orderBy: { visitTime: pastOnly ? "desc" : "asc" },
       skip: (page - 1) * limit,
       take: limit,
     }),
