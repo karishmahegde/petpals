@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import type { IconType } from "react-icons";
 import {
   PiHouse,
@@ -28,6 +29,7 @@ import Avatar from "../ui/Avatar";
 import ButtonElement from "../ui/ButtonElement";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
+import { getMyStaffProfile } from "../../logic/api/staffApi";
 
 // A flat entry is a single clickable link. A group is a non-clickable
 // section header (label + icon) followed by its own links, indented one
@@ -47,6 +49,8 @@ interface NavGroupItem {
   label: string;
   icon: IconType;
   items: NavLinkItem[];
+  /** Staff only: shown just to the shelter's manager. */
+  managerOnly?: boolean;
 }
 
 type NavEntry = NavLinkItem | NavGroupItem;
@@ -186,6 +190,7 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
       type: "group",
       label: "Management",
       icon: PiGearSix,
+      managerOnly: true,
       items: [
         {
           type: "link",
@@ -227,9 +232,20 @@ const DashboardSidebar = ({
 
   const [acctOpen, setAcctOpen] = useState(false);
 
+  // Staff: whether this user manages their shelter (same cached query as the
+  // staff pages) — hides managerOnly groups otherwise.
+  const { data: staffProfile } = useQuery({
+    queryKey: ["staff", "me"],
+    queryFn: getMyStaffProfile,
+    enabled: role === "Staff",
+  });
+  const isManager = staffProfile?.staffDesignation === "Manager";
+
   const items: NavEntry[] =
     role && ROLE_NAV[role]
-      ? ROLE_NAV[role]
+      ? ROLE_NAV[role].filter(
+          (entry) => !(entry.type === "group" && entry.managerOnly && !isManager),
+        )
       : [
           {
             type: "link",
@@ -270,10 +286,13 @@ const DashboardSidebar = ({
     try {
       await logoutApi();
     } finally {
+      // Leave the protected page before clearing the session — otherwise
+      // ProtectedRoute sees the token vanish first and redirects to
+      // /login?redirect=<this page>, which the next login would follow.
+      navigate("/");
       storeLogout();
       setAcctOpen(false);
       onClose?.();
-      navigate("/");
     }
   };
 

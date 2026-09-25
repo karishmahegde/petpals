@@ -68,6 +68,9 @@ app.use("/api/v1", favoritesRouter);
 // "/staff/me" first (:id="me").
 const staffSelfRouter = require("./routes/staff/staff.routes");
 app.use("/api/v1", staffSelfRouter);
+// Also before the Admin /staff/:id router — see routes/staff/team.routes.js.
+const staffTeamRouter = require("./routes/staff/team.routes");
+app.use("/api/v1", staffTeamRouter);
 const staffRouter = require("./routes/admin/staff.routes");
 app.use("/api/v1", staffRouter);
 const adminsRouter = require("./routes/admin/admins.routes");

@@ -32,13 +32,18 @@ const ROLE_CONFIG = {
 // Volunteer is approved by staff at the shelter picked at registration.
 const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet", "volunteer"]);
 
+// Roles that pick the shelter they're joining at registration.
+const SHELTER_ROLES = new Set(["volunteer", "staff"]);
+
 // ——————————————— REGISTER ———————————————
 const register = async ({ name, email, password, role, shelterID }) => {
   const { roleEnum, model, nameField } = ROLE_CONFIG[role];
 
-  // Volunteers apply to one shelter, whose staff approve them — must be a
-  // shelter the public /shelters list offers (Open).
-  if (role === "volunteer") {
+  // Volunteers and staff join one shelter, whose staff (volunteers) or
+  // manager (staff) approve them — must be a shelter the public /shelters
+  // list offers (Open).
+  const joinsShelter = SHELTER_ROLES.has(role);
+  if (joinsShelter) {
     const shelter = await prisma.shelter.findUnique({
       where: { shelterID },
       select: { shelterStatus: true },
@@ -89,7 +94,7 @@ const register = async ({ name, email, password, role, shelterID }) => {
         [nameField]: name,
         avatarSeed: crypto.randomUUID(),
         ...(accountStatus ? { accountStatus } : {}),
-        ...(role === "volunteer" ? { shelterID } : {}),
+        ...(joinsShelter ? { shelterID } : {}),
       },
     });
 

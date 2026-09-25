@@ -6,6 +6,7 @@ import ButtonElement from "../ui/ButtonElement";
 import logoNav from "../../static/assets/images/branding/logoNav.png";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
+import { dashboardPathFor } from "../../logic/route/resolveDestination";
 
 const navLinks = [
   { label: "home", to: "/" },
@@ -14,16 +15,6 @@ const navLinks = [
   { label: "adopt", to: "/adopt" },
   { label: "events", to: "/events" },
 ];
-
-// DB role enum → client route
-const ROLE_ROUTES: Record<string, string> = {
-  Admin: "/admin",
-  Adopter: "/adopter",
-  Staff: "/staff",
-  Veterinarian: "/vet",
-  Volunteer: "/volunteer",
-  Donor: "/donor",
-};
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `font-body font-light text-md px-5 py-1.5 rounded-lg transition-colors ${
@@ -42,9 +33,7 @@ const Navbar = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const firstName = user?.name?.split(" ")[0] ?? "";
-  const dashboardRoute = role
-    ? (ROLE_ROUTES[role] ?? `/${role.toLowerCase()}`)
-    : "/";
+  const dashboardRoute = role ? dashboardPathFor(role) : "/";
 
   // Close desktop dropdown on outside click
   useEffect(() => {
@@ -64,8 +53,9 @@ const Navbar = () => {
     try {
       await logoutApi();
     } finally {
-      storeLogout();
+      // Navigate first — see DashboardSidebar's handleLogout.
       navigate("/");
+      storeLogout();
       setMenuOpen(false);
       setDropdownOpen(false);
     }

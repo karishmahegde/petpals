@@ -34,7 +34,7 @@ const router = express.Router();
  *                 example: adopter
  *               shelterID:
  *                 type: integer
- *                 description: Required when role is volunteer — an Open shelter whose staff will approve the account
+ *                 description: Required when role is volunteer or staff — an Open shelter whose staff (volunteer) or manager (staff) will approve the account
  *     responses:
  *       201:
  *         description: User registered successfully

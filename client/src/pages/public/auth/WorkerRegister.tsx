@@ -6,15 +6,19 @@
 // (self-registered, awaiting approval) except the very first Admin ever
 // created, which auto-activates (see auth.service.js's register()) —
 // Staff/Admin approvals have a review UI (Staff tab / Admins tab); Vet
-// approval doesn't yet (no Staff dashboard to host it).
+// approval doesn't yet (no Staff dashboard to host it). Staff also pick the
+// shelter they're joining — its manager approves them (Management → Staff).
 // Route: /staff-portal/register
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { register as registerApi } from "../../../logic/api/authApi";
+import { getShelters } from "../../../logic/api/petsApi";
+import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background-admin.png";
 
@@ -85,13 +89,21 @@ const WorkerRegister = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const [shelterID, setShelterID] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [confirmAge, setConfirmAge] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const isStaff = role === "staff";
+  const { data: shelters = [] } = useQuery({
+    queryKey: ["shelters"],
+    queryFn: getShelters,
+    enabled: isStaff,
+  });
+
   if (token && sessionRole) {
-    return <Navigate to={`/${sessionRole.toLowerCase()}`} replace />;
+    return <Navigate to={dashboardPathFor(sessionRole)} replace />;
   }
 
   const validate = (): string => {
@@ -115,6 +127,7 @@ const WorkerRegister = () => {
       return "Password does not meet all requirements";
 
     if (!role) return "Please select your role";
+    if (isStaff && !shelterID) return "Please select the shelter you work at";
     if (!agreeTerms)
       return "Please agree to the Terms of Service and Privacy Policy";
     if (!confirmAge) return "Please confirm you are 18 or older";
@@ -137,6 +150,7 @@ const WorkerRegister = () => {
         email,
         password,
         role,
+        shelterID: isStaff ? Number(shelterID) : undefined,
       });
       toast.success(
         "Registered! Your account needs approval before you can sign in.",
@@ -315,6 +329,31 @@ const WorkerRegister = () => {
               New accounts need approval before they can sign in.
             </p>
           </div>
+
+          {/* Shelter — staff only */}
+          {isStaff && (
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="shelterID"
+                className="font-body text-sm font-bold text-neutral-black"
+              >
+                Shelter
+              </label>
+              <select
+                id="shelterID"
+                value={shelterID}
+                onChange={(e) => setShelterID(e.target.value)}
+                className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark bg-white focus:outline-none focus:border-teal-dark"
+              >
+                <option value="">Select a shelter</option>
+                {shelters.map((shelter) => (
+                  <option key={shelter.shelterID} value={shelter.shelterID}>
+                    {shelter.shelterName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Consent checkboxes */}
           <div className="flex flex-col gap-2">

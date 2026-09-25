@@ -22,12 +22,15 @@ const register = async (req, res, next) => {
     return next(err);
   }
 
-  // Volunteers must pick the shelter they're applying to (its staff approve them)
+  // Volunteers and staff must pick the shelter they're joining (its staff /
+  // manager approve them)
   let shelterID;
-  if (role === "volunteer") {
+  if (role === "volunteer" || role === "staff") {
     shelterID = Number(req.body.shelterID);
     if (!Number.isInteger(shelterID) || shelterID < 1) {
-      const err = new Error("shelterID is required for volunteers and must be a positive integer");
+      const err = new Error(
+        `shelterID is required for ${role} accounts and must be a positive integer`,
+      );
       err.code = "VALIDATION_ERROR";
       return next(err);
     }

@@ -16,6 +16,7 @@ import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { register as registerApi } from "../../../logic/api/authApi";
 import { getShelters } from "../../../logic/api/petsApi";
+import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
 
@@ -101,7 +102,7 @@ const Register = () => {
   });
 
   if (token && sessionRole) {
-    return <Navigate to={`/${sessionRole.toLowerCase()}`} replace />;
+    return <Navigate to={dashboardPathFor(sessionRole)} replace />;
   }
 
   const validate = (): string => {

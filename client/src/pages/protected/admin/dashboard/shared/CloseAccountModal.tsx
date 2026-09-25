@@ -58,8 +58,9 @@ const CloseAccountModal = ({
       toast.success(
         mode === "delete" ? "Account deleted" : "Account deactivated",
       );
-      useAuthStore.getState().logout();
+      // Navigate first — see DashboardSidebar's handleLogout.
       navigate("/", { replace: true });
+      useAuthStore.getState().logout();
     },
   });
 

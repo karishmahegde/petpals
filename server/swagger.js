@@ -674,6 +674,22 @@ const schemas = {
       },
     },
   },
+  TeamMember: {
+    type: "object",
+    properties: {
+      userID: { type: "integer" },
+      staffName: { type: "string" },
+      staffEmail: { type: "string" },
+      staffPhone: { type: "string", nullable: true },
+      staffDesignation: {
+        type: "string",
+        enum: ["Manager", "Senior", "Associate"],
+        nullable: true,
+      },
+      staffDOJ: { type: "string", format: "date-time", nullable: true },
+      accountStatus: { type: "string", enum: ["Pending", "Active", "Deactivated"] },
+    },
+  },
   VolunteerListItem: {
     type: "object",
     properties: {
