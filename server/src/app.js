@@ -88,9 +88,10 @@ const staffVolunteersRouter = require("./routes/staff/volunteers.routes");
 app.use("/api/v1", staffVolunteersRouter);
 const staffTasksRouter = require("./routes/staff/tasks.routes");
 app.use("/api/v1", staffTasksRouter);
+const staffDonationsRouter = require("./routes/staff/donations.routes");
+app.use("/api/v1", staffDonationsRouter);
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));
 // app.use('/api/v1/donors',               require('./routes/donors'));
-// app.use('/api/v1/donations',            require('./routes/donations'));
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use((req, res) => {

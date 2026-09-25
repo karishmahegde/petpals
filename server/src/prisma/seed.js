@@ -285,6 +285,37 @@ async function main() {
     },
   });
 
+  // Two more donors so the staff Donations tab has more than one name
+  // (Total Donors tile, donor-name search). Same password as the main one.
+  const extraDonors = [];
+  for (const donor of [
+    { email: "jane.smith@petpals.com", name: "Jane Smith", phone: "+12125550108" },
+    { email: "tammy.sings@petpals.com", name: "Tammy Sings", phone: "+17185550109" },
+  ]) {
+    const user = await prisma.users.upsert({
+      where: { userEmail: donor.email },
+      update: {},
+      create: {
+        userEmail: donor.email,
+        userPassword: await bcrypt.hash("Donor@123", 10),
+        role: "Donor",
+      },
+    });
+    await prisma.donor.upsert({
+      where: { userID: user.userID },
+      update: {},
+      create: {
+        userID: user.userID,
+        donorName: donor.name,
+        avatarSeed: crypto.randomUUID(),
+        donorPhone: donor.phone,
+        accountStatus: "Active",
+      },
+    });
+    extraDonors.push(user);
+  }
+  const [janeUser, tammyUser] = extraDonors;
+
   // ── SPECIES ──────────────────────────────────────────────────
   console.log("Creating species and breeds...");
   const dog = await prisma.species.upsert({
@@ -955,6 +986,66 @@ async function main() {
     ],
   });
 
+  // ── DONATIONS ────────────────────────────────────────────────
+  // Spread across both shelters and the past year — a few in the last couple
+  // of weeks so the staff Donations tab's "This Month" tile and date filter
+  // have something to show for staff@petpals.com (shelter1).
+  console.log("Creating donations...");
+  await prisma.donation.createMany({
+    data: [
+      {
+        donorID: donorUser.userID,
+        shelterID: shelter1.shelterID,
+        donationDate: daysFromNow(-3),
+        donationAmt: 500,
+        donationDesc:
+          "On the special occasion of my birthday, for the animals at PetPals Downtown.",
+      },
+      {
+        donorID: janeUser.userID,
+        shelterID: shelter1.shelterID,
+        donationDate: daysFromNow(-12),
+        donationAmt: 120,
+        donationDesc: "Monthly gift for food and litter.",
+      },
+      {
+        donorID: tammyUser.userID,
+        shelterID: shelter1.shelterID,
+        donationDate: daysFromNow(-45),
+        donationAmt: 250,
+        donationDesc: null,
+      },
+      {
+        donorID: janeUser.userID,
+        shelterID: shelter1.shelterID,
+        donationDate: daysFromNow(-75),
+        donationAmt: 240,
+        donationDesc: "In memory of Biscuit, adopted from you in 2019.",
+      },
+      {
+        donorID: donorUser.userID,
+        shelterID: shelter1.shelterID,
+        donationDate: daysFromNow(-200),
+        donationAmt: 1000,
+        donationDesc: "Towards the new cat enclosure.",
+      },
+      {
+        donorID: tammyUser.userID,
+        shelterID: shelter2.shelterID,
+        donationDate: daysFromNow(-8),
+        donationAmt: 75,
+        donationDesc: null,
+      },
+      {
+        donorID: donorUser.userID,
+        shelterID: shelter2.shelterID,
+        donationDate: daysFromNow(-150),
+        donationAmt: 300,
+        donationDesc: "For vaccines and vet care.",
+      },
+    ],
+  });
+
   console.log("✅ Seeding complete!");
   console.log("");
   console.log("Test accounts:");
@@ -964,6 +1055,7 @@ async function main() {
   console.log("  Adopter:   adopter@petpals.com   / Adopter@123");
   console.log("  Volunteer: volunteer@petpals.com / Volunteer@123");
   console.log("  Donor:     donor@petpals.com     / Donor@123");
+  console.log("             (also jane.smith@ / tammy.sings@petpals.com, same password)");
 }
 
 main()

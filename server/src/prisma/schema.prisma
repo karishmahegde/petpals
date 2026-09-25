@@ -542,6 +542,14 @@ model Donor {
 
 model Donation {
   donationID   Int      @id @default(autoincrement())
+  // Human-facing reference, e.g. "DON-00123". Postgres GENERATED ALWAYS STORED
+  // column computed from donationID — READ-ONLY, never set in a
+  // create()/update(). Same manual-migration pattern as Pet.petCode (see
+  // CLAUDE.md — migrate dev is banned):
+  //   ALTER TABLE "Donation" ADD COLUMN "donationCode" TEXT
+  //     GENERATED ALWAYS AS ('DON-' || lpad("donationID"::text, 5, '0')) STORED;
+  //   CREATE UNIQUE INDEX "Donation_donationCode_key" ON "Donation" ("donationCode");
+  donationCode String?  @unique @db.Text
   donorID      Int
   shelterID    Int
   donationDate DateTime @default(now())

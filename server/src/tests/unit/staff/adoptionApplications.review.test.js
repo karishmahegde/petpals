@@ -85,6 +85,10 @@ describe("Application review workflow (Staff/Admin)", () => {
   });
 
   // ————————————————————— GET /api/v1/adoption-applications —————————————————————
+  // section is required: "active" = Pending, "past" = Accepted/Rejected/Withdrawn.
+  const ACTIVE_WHERE = { applicationStatus: { in: ["Pending"] } };
+  const PAST_WHERE = { applicationStatus: { in: ["Accepted", "Rejected", "Withdrawn"] } };
+
   describe("GET /api/v1/adoption-applications (staff queue)", () => {
     test("Staff: scoped to their own shelter even with no filter applied", async () => {
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
@@ -93,11 +97,12 @@ describe("Application review workflow (Staff/Admin)", () => {
 
       const res = await request(app)
         .get("/api/v1/adoption-applications")
+        .query({ section: "active" })
         .set("Authorization", `Bearer ${staffToken(42)}`);
 
       expect(res.status).toBe(200);
       expect(prisma.adoptionApplication.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { shelterID: 9 } }),
+        expect.objectContaining({ where: { ...ACTIVE_WHERE, shelterID: 9 } }),
       );
       expect(res.body.data).toHaveLength(1);
     });
@@ -109,29 +114,28 @@ describe("Application review workflow (Staff/Admin)", () => {
 
       const res = await request(app)
         .get("/api/v1/adoption-applications")
+        .query({ section: "active" })
         .set("Authorization", `Bearer ${staffToken(42)}`);
 
       expect(res.status).toBe(200);
       expect(prisma.adoptionApplication.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { shelterID: -1 } }),
+        expect.objectContaining({ where: { ...ACTIVE_WHERE, shelterID: -1 } }),
       );
       expect(res.body.data).toEqual([]);
     });
 
-    test("Staff: status filter is applied alongside the shelter scope", async () => {
+    test("Staff: section=past is applied alongside the shelter scope", async () => {
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.adoptionApplication.findMany.mockResolvedValueOnce([]);
       prisma.adoptionApplication.count.mockResolvedValueOnce(0);
 
       await request(app)
         .get("/api/v1/adoption-applications")
-        .query({ status: "Pending" })
+        .query({ section: "past" })
         .set("Authorization", `Bearer ${staffToken(42)}`);
 
       expect(prisma.adoptionApplication.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { shelterID: 9, applicationStatus: "Pending" },
-        }),
+        expect.objectContaining({ where: { ...PAST_WHERE, shelterID: 9 } }),
       );
     });
 
@@ -141,11 +145,11 @@ describe("Application review workflow (Staff/Admin)", () => {
 
       await request(app)
         .get("/api/v1/adoption-applications")
-        .query({ shelterID: 3 })
+        .query({ section: "active", shelterID: 3 })
         .set("Authorization", `Bearer ${adminToken()}`);
 
       expect(prisma.adoptionApplication.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { shelterID: 3 } }),
+        expect.objectContaining({ where: { ...ACTIVE_WHERE, shelterID: 3 } }),
       );
       expect(prisma.staff.findUnique).not.toHaveBeenCalled();
     });
@@ -156,17 +160,28 @@ describe("Application review workflow (Staff/Admin)", () => {
 
       await request(app)
         .get("/api/v1/adoption-applications")
+        .query({ section: "active" })
         .set("Authorization", `Bearer ${adminToken()}`);
 
       expect(prisma.adoptionApplication.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: {} }),
+        expect.objectContaining({ where: ACTIVE_WHERE }),
       );
     });
 
-    test("invalid status value → 400 BAD_REQUEST", async () => {
+    test("missing section → 400 BAD_REQUEST", async () => {
       const res = await request(app)
         .get("/api/v1/adoption-applications")
-        .query({ status: "Bogus" })
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.adoptionApplication.findMany).not.toHaveBeenCalled();
+    });
+
+    test("invalid section value → 400 BAD_REQUEST", async () => {
+      const res = await request(app)
+        .get("/api/v1/adoption-applications")
+        .query({ section: "Bogus" })
         .set("Authorization", `Bearer ${staffToken(42)}`);
 
       expect(res.status).toBe(400);

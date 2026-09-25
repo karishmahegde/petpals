@@ -13,7 +13,8 @@ jest.mock("../../../config/prisma", () => ({
     findUnique: jest.fn(),
     delete: jest.fn(),
   },
-  volunteerEvent: { deleteMany: jest.fn() },
+  volunteer: { count: jest.fn() },
+  volunteerEvent: { deleteMany: jest.fn(), createMany: jest.fn() },
   // The service always passes an array of already-invoked prisma calls
   // (each already a Promise) — Promise.all is a faithful enough stand-in for
   // the real transaction batching.
@@ -233,6 +234,113 @@ describe("Event management (Staff/Admin)", () => {
   });
 
   // ————————————————————— PUT /api/v1/events/:id —————————————————————
+  describe("Event volunteers", () => {
+    test("POST: volunteerIDs are validated at the shelter and created as VolunteerEvent rows", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(2);
+      prisma.event.create.mockResolvedValueOnce({ eventID: 10 });
+      publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
+
+      const res = await request(app)
+        .post("/api/v1/events")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ ...VALID_CREATE_BODY, volunteerIDs: [5, 6, 5] });
+
+      expect(res.status).toBe(201);
+      expect(prisma.volunteer.count).toHaveBeenCalledWith({
+        where: { userID: { in: [5, 6] }, shelterID: 9, accountStatus: "Active" },
+      });
+      expect(prisma.event.create.mock.calls[0][0].data.volunteers).toEqual({
+        create: [{ volunteerID: 5 }, { volunteerID: 6 }],
+      });
+    });
+
+    test("POST: a volunteer not active at the shelter -> 400, nothing written", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(1);
+
+      const res = await request(app)
+        .post("/api/v1/events")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ ...VALID_CREATE_BODY, volunteerIDs: [5, 99] });
+
+      expect(res.status).toBe(400);
+      expect(prisma.event.create).not.toHaveBeenCalled();
+    });
+
+    test("POST: volunteerIDs not an array -> 400", async () => {
+      const res = await request(app)
+        .post("/api/v1/events")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ ...VALID_CREATE_BODY, volunteerIDs: "5" });
+
+      expect(res.status).toBe(400);
+      expect(prisma.event.create).not.toHaveBeenCalled();
+    });
+
+    test("PUT: volunteerIDs replaces the assigned set", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(1);
+      prisma.event.update.mockResolvedValueOnce({});
+      prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });
+      prisma.volunteerEvent.createMany.mockResolvedValueOnce({ count: 1 });
+      publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
+
+      const res = await request(app)
+        .put("/api/v1/events/10")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ volunteerIDs: [7] });
+
+      expect(res.status).toBe(200);
+      expect(prisma.volunteerEvent.deleteMany).toHaveBeenCalledWith({ where: { eventID: 10 } });
+      expect(prisma.volunteerEvent.createMany).toHaveBeenCalledWith({
+        data: [{ eventID: 10, volunteerID: 7 }],
+      });
+    });
+
+    test("PUT without volunteerIDs leaves assignments untouched", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.event.update.mockResolvedValueOnce({});
+      publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
+
+      await request(app)
+        .put("/api/v1/events/10")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ eventName: "Renamed" });
+
+      expect(prisma.volunteerEvent.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.volunteerEvent.createMany).not.toHaveBeenCalled();
+    });
+
+    test("GET /events/:id/volunteers returns names for the staff's own shelter", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        volunteers: [{ volunteer: { userID: 5, volunteerName: "Bryan Smith" } }],
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .get("/api/v1/events/10/volunteers")
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual([{ volunteerID: 5, volunteerName: "Bryan Smith" }]);
+    });
+
+    test("GET /events/:id/volunteers at another shelter -> 403", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 3, volunteers: [] });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .get("/api/v1/events/10/volunteers")
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
   describe("PUT /api/v1/events/:id", () => {
     test("Staff: partial update at their own shelter", async () => {
       prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 9 });

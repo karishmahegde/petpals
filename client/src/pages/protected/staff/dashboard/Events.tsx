@@ -17,6 +17,7 @@ import { deleteEvent } from "../../../../logic/api/staffEventsApi";
 import { formatTime, relativeDateBadge } from "../../../../logic/utils/datetime";
 import { EVENT_CATEGORY_LABEL } from "../../../../logic/eventCategory";
 import EventFormPanel from "./sections/events/EventFormPanel";
+import EventDetailPanel from "./sections/events/EventDetailPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
@@ -34,7 +35,7 @@ const filterInputClass =
 const filterLabelClass =
   "mb-1.5 block font-body text-sm font-semibold text-neutral-charcoal";
 
-// Shared by both sections' DashboardActionList — one confirm-then-delete flow.
+// Past Events' confirm-then-delete (Upcoming cancels from EventDetailPanel).
 const DELETE_ACTION: ConfirmActionConfig<EventListItem> = {
   mutationFn: (event) => deleteEvent(event.eventID),
   invalidateKeys: [["staff", "events"]],
@@ -73,13 +74,11 @@ const EventNameFilter = ({
 const EventRow = ({
   event,
   className,
-  onEdit,
-  onDelete,
+  actions,
 }: {
   event: EventListItem;
   className: string;
-  onEdit: () => void;
-  onDelete: () => void;
+  actions: React.ReactNode;
 }) => {
   const when = new Date(event.eventDate);
   const badgeLabel = relativeDateBadge(when);
@@ -110,29 +109,29 @@ const EventRow = ({
         { text: event.eventDesc },
       ]}
       badge={{ label: badgeLabel, tone: BADGE_TONE[badgeLabel] ?? "teal" }}
-      actions={
-        <>
-          <RowActionButton onClick={onEdit}>Edit</RowActionButton>
-          <RowActionButton variant="danger" onClick={onDelete}>
-            Delete
-          </RowActionButton>
-        </>
-      }
+      actions={actions}
     />
   );
 };
 
+// fromDetail: opened via EventDetailPanel's Edit Event — closing the form
+// returns to that event's details (same flow as Appointments.tsx).
+type FormState =
+  | { mode: "create" }
+  | { mode: "edit"; event: EventListItem; fromDetail: boolean };
+
 // Events tab — the shelter's event calendar, split into Upcoming Events (not
 // started yet, soonest first) and Past Events (already started, most recent
 // first), each its own paginated GET /events query with an event-name
-// search. Filtered to the staff member's own shelterID, resolved from GET
+// search. Upcoming rows open EventDetailPanel (assigned volunteers, Edit
+// Event, Cancel Event); Past rows keep inline Edit/Delete. Filtered to the staff member's own shelterID, resolved from GET
 // /staff/me, since GET /events itself is the public, network-wide endpoint
 // with no server-side staff scoping. Create/Edit share one SlideOver form
 // (EventFormPanel); Delete is a per-row action via the generic
 // DashboardActionList, which owns the confirm-then-mutate flow.
 const Events = () => {
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<EventListItem | null>(null);
+  const [formState, setFormState] = useState<FormState | null>(null);
+  const [detailID, setDetailID] = useState<number | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ["staff", "me"],
@@ -179,14 +178,11 @@ const Events = () => {
   });
   const pastEvents = pastQuery.data?.data ?? [];
 
-  const openCreate = () => {
-    setEditingEvent(null);
-    setPanelOpen(true);
-  };
-
-  const openEdit = (event: EventListItem) => {
-    setEditingEvent(event);
-    setPanelOpen(true);
+  const closeForm = () => {
+    if (formState?.mode === "edit" && formState.fromDetail) {
+      setDetailID(formState.event.eventID);
+    }
+    setFormState(null);
   };
 
   return (
@@ -198,7 +194,7 @@ const Events = () => {
         action={{
           label: "Create Event",
           icon: <FaPlus aria-hidden />,
-          onClick: openCreate,
+          onClick: () => setFormState({ mode: "create" }),
         }}
       />
 
@@ -231,19 +227,21 @@ const Events = () => {
         )}
 
         {upcomingEvents.length > 0 && (
-          <DashboardActionList
-            items={upcomingEvents}
-            getKey={(event) => event.eventID}
-            renderRow={(event, confirmDelete) => (
-              <EventRow
-                event={event}
-                className="bg-gold-lightest"
-                onEdit={() => openEdit(event)}
-                onDelete={() => confirmDelete(event)}
-              />
-            )}
-            confirmAction={DELETE_ACTION}
-          />
+          <ul className="flex flex-col gap-4">
+            {upcomingEvents.map((event) => (
+              <li key={event.eventID}>
+                <EventRow
+                  event={event}
+                  className="bg-gold-lightest"
+                  actions={
+                    <RowActionButton onClick={() => setDetailID(event.eventID)}>
+                      View Details
+                    </RowActionButton>
+                  }
+                />
+              </li>
+            ))}
+          </ul>
         )}
 
         <PaginationControls
@@ -287,8 +285,23 @@ const Events = () => {
               <EventRow
                 event={event}
                 className="bg-neutral-lightgray"
-                onEdit={() => openEdit(event)}
-                onDelete={() => confirmDelete(event)}
+                actions={
+                  <>
+                    <RowActionButton
+                      onClick={() =>
+                        setFormState({ mode: "edit", event, fromDetail: false })
+                      }
+                    >
+                      Edit
+                    </RowActionButton>
+                    <RowActionButton
+                      variant="danger"
+                      onClick={() => confirmDelete(event)}
+                    >
+                      Delete
+                    </RowActionButton>
+                  </>
+                }
               />
             )}
             confirmAction={DELETE_ACTION}
@@ -303,9 +316,18 @@ const Events = () => {
       </Card>
 
       <EventFormPanel
-        open={panelOpen}
-        onClose={() => setPanelOpen(false)}
-        event={editingEvent}
+        open={formState !== null}
+        onClose={closeForm}
+        event={formState?.mode === "edit" ? formState.event : null}
+      />
+
+      <EventDetailPanel
+        eventID={detailID}
+        onClose={() => setDetailID(null)}
+        onEdit={(event) => {
+          setDetailID(null);
+          setFormState({ mode: "edit", event, fromDetail: true });
+        }}
       />
     </div>
   );

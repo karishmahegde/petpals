@@ -40,6 +40,10 @@ ALTER TABLE "Volunteer" ADD COLUMN IF NOT EXISTS "volunteerCode" TEXT
   GENERATED ALWAYS AS ('VOL-' || lpad("userID"::text, 5, '0')) STORED;
 CREATE UNIQUE INDEX IF NOT EXISTS "Volunteer_volunteerCode_key" ON "Volunteer" ("volunteerCode");
 
+ALTER TABLE "Donation" ADD COLUMN IF NOT EXISTS "donationCode" TEXT
+  GENERATED ALWAYS AS ('DON-' || lpad("donationID"::text, 5, '0')) STORED;
+CREATE UNIQUE INDEX IF NOT EXISTS "Donation_donationCode_key" ON "Donation" ("donationCode");
+
 -- ── Staff closing note on an application ────────────────────────
 -- Plain nullable column — not generated, just added by hand alongside the
 -- codes above.

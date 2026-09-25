@@ -179,16 +179,17 @@ const listVisitsForStaff = async (
   // tab does: Upcoming = still in the future and not Cancelled; Past =
   // already happened OR Cancelled. Neither = everything (Overview widgets).
   // visitStatus is nullable (null = unconfirmed), and `not: "Cancelled"`
-  // alone would drop the nulls, hence the explicit OR. Each filter is its
-  // own AND clause so the ORs don't collide.
-  const where = { AND: [] };
+  // alone would drop the nulls, hence the explicit OR. Each OR filter is its
+  // own AND clause so the ORs don't collide (AND only set when non-empty).
+  const where = {};
+  const and = [];
   if (upcomingOnly) {
     where.visitTime = { gt: new Date() };
-    where.AND.push({
+    and.push({
       OR: [{ visitStatus: null }, { visitStatus: { not: "Cancelled" } }],
     });
   } else if (pastOnly) {
-    where.AND.push({
+    and.push({
       OR: [{ visitTime: { lte: new Date() } }, { visitStatus: "Cancelled" }],
     });
   }
@@ -202,10 +203,11 @@ const listVisitsForStaff = async (
   // assigned staff member.
   if (name) {
     const contains = { contains: name, mode: "insensitive" };
-    where.AND.push({
+    and.push({
       OR: [{ adopter: { adopterName: contains } }, { staff: { staffName: contains } }],
     });
   }
+  if (and.length > 0) where.AND = and;
 
   if (role === "Staff") {
     // Re-fetched fresh from the STAFF table on every call — shelterID is not

@@ -5,14 +5,22 @@
 // single-event endpoint need here, since the Events tab's list already has
 // the full row (eventName/eventDesc/eventDate) needed to pre-fill the form,
 // so the already-loaded row is passed down directly instead of duplicating
-// the fetch (same reasoning as the Visits tab's VisitDetailPanel).
+// the fetch (same reasoning as the Visits tab's VisitDetailPanel). Assigned
+// volunteers are the exception — staff-only, so not on the row — and are
+// fetched here in edit mode (same query/cache as EventDetailPanel).
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
-import { createEvent, updateEvent } from "../../../../../../logic/api/staffEventsApi";
+import { CheckboxDropdown } from "../../../../../../components/ui/pets/FilterControls";
+import {
+  createEvent,
+  getEventVolunteers,
+  updateEvent,
+} from "../../../../../../logic/api/staffEventsApi";
+import { getShelterVolunteers } from "../../../../../../logic/api/staffAppointmentsApi";
 import type { EventCategory, EventListItem } from "../../../../../../logic/api/eventsApi";
 import { EVENT_CATEGORY_LABEL } from "../../../../../../logic/eventCategory";
 
@@ -28,6 +36,7 @@ interface EventFormState {
   eventDesc: string;
   eventDate: string; // <input type="datetime-local"> value
   eventCategory: EventCategory | "";
+  volunteerIDs: number[];
 }
 
 const EMPTY_FORM: EventFormState = {
@@ -35,6 +44,7 @@ const EMPTY_FORM: EventFormState = {
   eventDesc: "",
   eventDate: "",
   eventCategory: "",
+  volunteerIDs: [],
 };
 
 const MAX_NAME_LEN = 45; // schema.prisma: eventName is VarChar(45)
@@ -75,6 +85,20 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
 
   const [form, setForm] = useState<EventFormState>(EMPTY_FORM);
 
+  // This shelter's active volunteers — the same roster the Tasks and
+  // Appointments forms use.
+  const { data: volunteerOptions = [] } = useQuery({
+    queryKey: ["staff", "shelter-volunteers"],
+    queryFn: getShelterVolunteers,
+    enabled: open,
+  });
+
+  const { data: assignedVolunteers } = useQuery({
+    queryKey: ["staff", "events", "volunteers", event?.eventID],
+    queryFn: () => getEventVolunteers(event!.eventID),
+    enabled: open && isEdit,
+  });
+
   // Re-seed on every open: create mode -> blank form; edit mode -> pre-fill
   // from the row already loaded by the Events tab's list.
   useEffect(() => {
@@ -88,8 +112,26 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
       eventDesc: event.eventDesc,
       eventDate: toDatetimeLocalValue(event.eventDate),
       eventCategory: event.eventCategory,
+      volunteerIDs: [],
     });
   }, [open, event]);
+
+  // Edit mode: tick the already-assigned volunteers once they've loaded.
+  useEffect(() => {
+    if (!open || !assignedVolunteers) return;
+    setForm((f) => ({
+      ...f,
+      volunteerIDs: assignedVolunteers.map((v) => v.volunteerID),
+    }));
+  }, [open, assignedVolunteers]);
+
+  const toggleVolunteer = (id: string | number) =>
+    setForm((f) => ({
+      ...f,
+      volunteerIDs: f.volunteerIDs.includes(Number(id))
+        ? f.volunteerIDs.filter((v) => v !== Number(id))
+        : [...f.volunteerIDs, Number(id)],
+    }));
 
   const saveMutation = useMutation({
     mutationFn: () => {
@@ -98,6 +140,7 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
         eventDesc: form.eventDesc.trim(),
         eventDate: new Date(form.eventDate).toISOString(),
         eventCategory: form.eventCategory as EventCategory,
+        volunteerIDs: form.volunteerIDs,
       };
       return isEdit ? updateEvent(event!.eventID, payload) : createEvent(payload);
     },
@@ -114,6 +157,8 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
     form.eventDesc.trim() !== "" &&
     form.eventDate !== "" &&
     form.eventCategory !== "" &&
+    // Edit: wait for the current assignments, or saving would clear them.
+    (!isEdit || assignedVolunteers !== undefined) &&
     !saveMutation.isPending;
 
   return (
@@ -175,6 +220,18 @@ const EventFormPanel = ({ open, onClose, event }: EventFormPanelProps) => {
             className={fieldClass}
           />
         </div>
+
+        <CheckboxDropdown
+          icon={null}
+          label="Volunteers"
+          placeholder="- Select -"
+          options={volunteerOptions.map((v) => ({
+            value: v.volunteerID,
+            label: v.volunteerName,
+          }))}
+          selectedValues={form.volunteerIDs}
+          onToggle={toggleVolunteer}
+        />
 
         <div>
           <label className={labelClass} htmlFor="event-desc">

@@ -34,6 +34,7 @@ const router = express.Router();
  *               eventName: { type: string, maxLength: 45 }
  *               eventDesc: { type: string, maxLength: 300 }
  *               eventCategory: { type: string, enum: [Adoption_Event, Fundraiser, Volunteer_Orientation, Vaccination_Clinic, Community_Outreach, Workshop, Donation_Drive, Other] }
+ *               volunteerIDs: { type: array, items: { type: integer }, description: "Active volunteers at the event's shelter. Optional on create; on update replaces the assigned set (empty array = none)." }
  *               eventDate: { type: string, format: date-time, description: Must not be in the past }
  *               shelterID: { type: integer, description: Admin only — required for that role }
  *     responses:
@@ -94,6 +95,7 @@ router.post(
  *               eventName: { type: string, maxLength: 45 }
  *               eventDesc: { type: string, maxLength: 300 }
  *               eventCategory: { type: string, enum: [Adoption_Event, Fundraiser, Volunteer_Orientation, Vaccination_Clinic, Community_Outreach, Workshop, Donation_Drive, Other] }
+ *               volunteerIDs: { type: array, items: { type: integer }, description: "Active volunteers at the event's shelter. Optional on create; on update replaces the assigned set (empty array = none)." }
  *               eventDate: { type: string, format: date-time }
  *     responses:
  *       200:
@@ -164,6 +166,59 @@ router.delete(
   authenticate,
   authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
   eventsController.deleteEvent,
+);
+
+/**
+ * @swagger
+ * /events/{id}/volunteers:
+ *   get:
+ *     summary: List the volunteers assigned to an event (Staff, Admin)
+ *     description: >
+ *       Staff-only — kept out of the public GET /events/:id. Staff may only
+ *       view events at their own shelter; Admin may view any. Sorted by name.
+ *     tags: [Events, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The assigned volunteers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           volunteerID: { type: integer }
+ *                           volunteerName: { type: string }
+ *       400:
+ *         description: id is not a positive integer
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Staff attempting to view an event at another shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/events/:id/volunteers",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  eventsController.getEventVolunteers,
 );
 
 module.exports = router;

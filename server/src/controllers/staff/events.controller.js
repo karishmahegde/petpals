@@ -16,7 +16,13 @@ const STRING_MAX = {
 const EVENT_CATEGORIES = Object.values(EventCategory);
 
 const CREATE_REQUIRED_FIELDS = ["eventName", "eventDesc", "eventDate", "eventCategory"];
-const UPDATABLE_FIELDS = ["eventName", "eventDesc", "eventDate", "eventCategory"];
+const UPDATABLE_FIELDS = [
+  "eventName",
+  "eventDesc",
+  "eventDate",
+  "eventCategory",
+  "volunteerIDs",
+];
 
 // Shared by create (every required field present) and update (only present
 // fields are checked) so the two routes can't drift on what counts as
@@ -50,6 +56,19 @@ const validateField = (field, rawValue) => {
       }
       return rawValue;
 
+    // Assigned volunteers — optional on create, replaces the set on update.
+    // May be empty (no volunteers); duplicates are dropped.
+    case "volunteerIDs": {
+      if (!Array.isArray(rawValue)) {
+        throw badRequest("volunteerIDs must be an array");
+      }
+      const ids = rawValue.map(Number);
+      if (!ids.every((id) => Number.isInteger(id) && id > 0)) {
+        throw badRequest("volunteerIDs must contain only positive integers");
+      }
+      return [...new Set(ids)];
+    }
+
     default:
       return rawValue;
   }
@@ -68,6 +87,9 @@ const createEvent = async (req, res, next) => {
   try {
     for (const field of CREATE_REQUIRED_FIELDS) {
       data[field] = validateField(field, body[field]);
+    }
+    if (body.volunteerIDs !== undefined) {
+      data.volunteerIDs = validateField("volunteerIDs", body.volunteerIDs);
     }
   } catch (err) {
     return next(err);
@@ -151,4 +173,22 @@ const deleteEvent = async (req, res, next) => {
   }
 };
 
-module.exports = { createEvent, updateEvent, deleteEvent };
+// ——————————————— GET /events/:id/volunteers ———————————————
+const getEventVolunteers = async (req, res, next) => {
+  const eventID = Number(req.params.id);
+  if (!Number.isInteger(eventID) || eventID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const volunteers = await eventsService.getEventVolunteers(eventID, {
+      role: req.user.role,
+      userID: req.user.userID,
+    });
+    return successResponse(res, "Event volunteers retrieved successfully", volunteers);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { createEvent, updateEvent, deleteEvent, getEventVolunteers };

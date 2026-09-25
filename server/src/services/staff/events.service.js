@@ -21,6 +21,26 @@ const noShelterAssigned = () => {
   return err;
 };
 
+const badRequest = (message) => {
+  const err = new Error(message);
+  err.code = "BAD_REQUEST";
+  return err;
+};
+
+// Every assigned volunteer must be Active at the event's shelter — same
+// rule as staff/tasks.service.js's assertVolunteersAtShelter.
+const assertVolunteersAtShelter = async (shelterID, volunteerIDs) => {
+  if (volunteerIDs.length === 0) return;
+  const count = await prisma.volunteer.count({
+    where: { userID: { in: volunteerIDs }, shelterID, accountStatus: "Active" },
+  });
+  if (count !== volunteerIDs.length) {
+    throw badRequest(
+      "volunteerIDs must all reference active volunteers at this shelter",
+    );
+  }
+};
+
 const forbiddenShelter = () => {
   const err = new Error("You may only act on events at your own shelter");
   err.code = "FORBIDDEN";
@@ -71,15 +91,21 @@ const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) =
 // `data` is already validated and whitelisted by the controller. staffID
 // is set to the acting Staff member's own userID (never for an Admin actor
 // — the column FKs Staff.userID, which an Admin doesn't have), same
-// convention as staffID on AdoptionApplication/Visit.
+// convention as staffID on AdoptionApplication/Visit. volunteerIDs (optional)
+// become VolunteerEvent rows.
 const createEvent = async ({ data, actor, requestedShelterID }) => {
   const shelterID = await resolveShelterIDForCreate(actor, requestedShelterID);
+  const { volunteerIDs = [], ...fields } = data;
+  await assertVolunteersAtShelter(shelterID, volunteerIDs);
 
   const event = await prisma.event.create({
     data: {
-      ...data,
+      ...fields,
       shelterID,
       staffID: actor.role === "Staff" ? actor.userID : null,
+      volunteers: {
+        create: volunteerIDs.map((volunteerID) => ({ volunteerID })),
+      },
     },
   });
 
@@ -90,6 +116,7 @@ const createEvent = async ({ data, actor, requestedShelterID }) => {
 // `data` is already validated, whitelisted, and non-empty by the
 // controller. shelterID/staffID reassignment is out of scope here — Staff
 // is scoped to their own shelter's events only, Admin may edit any.
+// volunteerIDs, when sent, replaces the whole assigned set.
 const updateEvent = async (eventID, data, { role, userID }) => {
   const existing = await prisma.event.findUnique({
     where: { eventID },
@@ -101,8 +128,23 @@ const updateEvent = async (eventID, data, { role, userID }) => {
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
 
+  const { volunteerIDs, ...fields } = data;
+  if (volunteerIDs) {
+    await assertVolunteersAtShelter(existing.shelterID, volunteerIDs);
+  }
+
   try {
-    await prisma.event.update({ where: { eventID }, data });
+    await prisma.$transaction([
+      prisma.event.update({ where: { eventID }, data: fields }),
+      ...(volunteerIDs
+        ? [
+            prisma.volunteerEvent.deleteMany({ where: { eventID } }),
+            prisma.volunteerEvent.createMany({
+              data: volunteerIDs.map((volunteerID) => ({ eventID, volunteerID })),
+            }),
+          ]
+        : []),
+    ]);
   } catch (err) {
     if (err.code === "P2025") {
       throw notFound(eventID);
@@ -143,4 +185,30 @@ const deleteEvent = async (eventID, { role, userID }) => {
   }
 };
 
-module.exports = { createEvent, updateEvent, deleteEvent };
+// ——————————————— EVENT VOLUNTEERS (GET /events/:id/volunteers) ———————————————
+// Staff-only — who's assigned to an event. Kept out of the public GET
+// /events/:id so volunteer names aren't exposed on the public site.
+const getEventVolunteers = async (eventID, { role, userID }) => {
+  const event = await prisma.event.findUnique({
+    where: { eventID },
+    select: {
+      shelterID: true,
+      volunteers: {
+        select: { volunteer: { select: { userID: true, volunteerName: true } } },
+        orderBy: { volunteer: { volunteerName: "asc" } },
+      },
+    },
+  });
+  if (!event) {
+    throw notFound(eventID);
+  }
+
+  await assertStaffOwnsShelter(role, userID, event.shelterID);
+
+  return event.volunteers.map((v) => ({
+    volunteerID: v.volunteer.userID,
+    volunteerName: v.volunteer.volunteerName,
+  }));
+};
+
+module.exports = { createEvent, updateEvent, deleteEvent, getEventVolunteers };

@@ -1,5 +1,5 @@
-// What it does: Staff/Admin event-management API — create/update/delete for
-// the Events tab. Separate file from eventsApi.ts (public read-only), same
+// What it does: Staff/Admin event-management API — create/update/delete and
+// assigned volunteers for the Events tab. Separate file from eventsApi.ts (public read-only), same
 // convention as staffPetsApi.ts living apart from petsApi.ts.
 import axiosInstance from "./axiosInstance";
 import type { EventCategory, EventDetail } from "./eventsApi";
@@ -12,7 +12,23 @@ export interface EventFormPayload {
   eventDesc: string;
   eventDate: string; // ISO datetime
   eventCategory: EventCategory;
+  // Active volunteers at this shelter. Optional on create; on update replaces
+  // the whole assigned set ([] = none).
+  volunteerIDs?: number[];
 }
+
+export interface EventVolunteer {
+  volunteerID: number;
+  volunteerName: string;
+}
+
+// Staff-only (not part of the public GET /events/:id), sorted by name.
+export const getEventVolunteers = async (
+  eventID: number,
+): Promise<EventVolunteer[]> => {
+  const response = await axiosInstance.get(`/events/${eventID}/volunteers`);
+  return response.data.data;
+};
 
 export const createEvent = async (
   payload: EventFormPayload,

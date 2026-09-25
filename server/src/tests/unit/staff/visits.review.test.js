@@ -116,7 +116,12 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
 
       expect(prisma.visit.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { shelterID: 9, visitTime: { gt: expect.any(Date) } },
+          where: {
+            shelterID: 9,
+            visitTime: { gt: expect.any(Date) },
+            // Upcoming excludes Cancelled; null (unconfirmed) must stay in.
+            AND: [{ OR: [{ visitStatus: null }, { visitStatus: { not: "Cancelled" } }] }],
+          },
         }),
       );
     });
