@@ -46,6 +46,12 @@ const conflict = (message) => {
   return err;
 };
 
+const forbidden = (message) => {
+  const err = new Error(message);
+  err.code = "FORBIDDEN";
+  return err;
+};
+
 // Same convention as staff/pets.service.js's/staff/events.service.js's own
 // copies — duplicated locally rather than shared, since each file's error
 // factories (and thus the message a mismatch throws) are its own.
@@ -115,9 +121,18 @@ const TRANSFER_DETAIL_SELECT = {
   },
   fromShelterStaff: true,
   toShelterStaff: true,
+  toShelter: { select: { shelterName: true, managerStaffID: true } },
   fromStaff: { select: { staffName: true } },
   toStaff: { select: { staffName: true } },
 };
+
+// Only the destination shelter's manager (Shelter.managerStaffID — kept in
+// sync with staffDesignation 'Manager' by admin/staff.service.js) may
+// reassign toShelterStaff, and only while the transfer is still open. Admin
+// may too, same as every other Staff-side action here.
+const canReassignToShelterStaff = (row, actor) =>
+  row.transferStatus === "In_Progress" &&
+  (actor.role === "Admin" || row.toShelter.managerStaffID === actor.userID);
 
 const formatTransferListItem = (row) => ({
   recordID: row.recordID,
@@ -137,7 +152,7 @@ const formatTransferListItem = (row) => ({
   toShelter: { shelterName: row.toShelter.shelterName },
 });
 
-const formatTransferDetail = (row) => {
+const formatTransferDetail = (row, actor) => {
   const base = formatTransferListItem(row);
   return {
     ...base,
@@ -151,6 +166,7 @@ const formatTransferDetail = (row) => {
     toShelterStaff: row.toShelterStaff,
     fromStaff: row.fromStaff ? { staffName: row.fromStaff.staffName } : null,
     toStaff: row.toStaff ? { staffName: row.toStaff.staffName } : null,
+    canReassignToShelterStaff: canReassignToShelterStaff(row, actor),
   };
 };
 
@@ -162,6 +178,10 @@ const formatTransferDetail = (row) => {
 // 'transferred', outside the normal available/pending/adopted flow, and only
 // reverts (to 'available', win or lose) once the transfer resolves — see
 // updateTransferStatus.
+// Assigned staff on both sides is fixed at creation: fromShelterStaff is the
+// initiating staff member, toShelterStaff the destination shelter's manager
+// (null if it has none yet). Only that manager may later reassign
+// toShelterStaff — see reassignToShelterStaff.
 const initiateTransfer = async ({ petID, data, actor, requestedShelterID }) => {
   const fromShelterID = await resolveShelterIDForCreate(actor, requestedShelterID);
 
@@ -194,7 +214,7 @@ const initiateTransfer = async ({ petID, data, actor, requestedShelterID }) => {
   }
   const toShelter = await prisma.shelter.findUnique({
     where: { shelterID: data.toShelterID },
-    select: { shelterID: true },
+    select: { shelterID: true, managerStaffID: true },
   });
   if (!toShelter) {
     throw shelterNotFound(data.toShelterID);
@@ -210,13 +230,45 @@ const initiateTransfer = async ({ petID, data, actor, requestedShelterID }) => {
         transferDate: new Date(),
         transferStatus: "In_Progress",
         fromShelterStaff: actor.role === "Staff" ? actor.userID : null,
+        toShelterStaff: toShelter.managerStaffID,
       },
       select: TRANSFER_DETAIL_SELECT,
     }),
     prisma.pet.update({ where: { petID }, data: { adoptionStatus: "transferred" } }),
   ]);
 
-  return formatTransferDetail(record);
+  return formatTransferDetail(record, actor);
+};
+
+// ——————————————— ASSIGNEES PREVIEW (GET /transfers/assignees) ———————————————
+// What initiateTransfer WILL assign for a given destination, so the Initiate
+// Transfer form can show both (read-only) staff fields before submitting —
+// same resolution rules as the create itself, so the preview can't drift.
+const getTransferAssignees = async (actor, toShelterID) => {
+  const [fromStaff, toShelter] = await Promise.all([
+    actor.role === "Staff"
+      ? prisma.staff.findUnique({
+          where: { userID: actor.userID },
+          select: { userID: true, staffName: true },
+        })
+      : null,
+    toShelterID === undefined
+      ? null
+      : prisma.shelter.findUnique({
+          where: { shelterID: toShelterID },
+          select: { manager: { select: { userID: true, staffName: true } } },
+        }),
+  ]);
+  if (toShelterID !== undefined && !toShelter) {
+    throw shelterNotFound(toShelterID);
+  }
+
+  const toOption = (staff) =>
+    staff ? { staffID: staff.userID, staffName: staff.staffName } : null;
+  return {
+    fromShelterStaff: toOption(fromStaff),
+    toShelterStaff: toOption(toShelter?.manager),
+  };
 };
 
 // ——————————————— LIST TRANSFERS (GET /transfers) ———————————————
@@ -316,7 +368,7 @@ const getTransferById = async (recordID, actor) => {
     }
   }
 
-  return formatTransferDetail(transfer);
+  return formatTransferDetail(transfer, actor);
 };
 
 // ——————————————— UPDATE TRANSFER STATUS (PATCH /transfers/:id/status) ———————————————
@@ -329,7 +381,9 @@ const getTransferById = async (recordID, actor) => {
 //   - Cancelled: only the ORIGIN shelter (fromShelterID) may retract.
 // Completed reassigns the pet to its new shelter and clears staffID (the new
 // shelter hasn't assigned anyone yet); Rejected/Cancelled leave the pet
-// where it was. Both paths flip adoptionStatus back to 'available'.
+// where it was. Both paths flip adoptionStatus back to 'available'. The
+// assigned from/to staff are left untouched — they're set at creation (and
+// by the destination manager's reassign), not by whoever resolves it.
 const updateTransferStatus = async (recordID, { status }, actor) => {
   const transfer = await prisma.transferHistory.findUnique({
     where: { recordID },
@@ -357,14 +411,6 @@ const updateTransferStatus = async (recordID, { status }, actor) => {
     );
   }
 
-  const actingStaffID = actor.role === "Staff" ? actor.userID : null;
-  const historyData = { transferStatus: status };
-  if (isDestinationAction) {
-    historyData.toShelterStaff = actingStaffID;
-  } else {
-    historyData.fromShelterStaff = actingStaffID;
-  }
-
   const petData =
     status === "Completed"
       ? { shelterID: transfer.toShelterID, adoptionStatus: "available", staffID: null }
@@ -373,18 +419,65 @@ const updateTransferStatus = async (recordID, { status }, actor) => {
   const [updated] = await prisma.$transaction([
     prisma.transferHistory.update({
       where: { recordID },
-      data: historyData,
+      data: { transferStatus: status },
       select: TRANSFER_DETAIL_SELECT,
     }),
     prisma.pet.update({ where: { petID: transfer.petID }, data: petData }),
   ]);
 
-  return formatTransferDetail(updated);
+  return formatTransferDetail(updated, actor);
+};
+
+// ——————————————— REASSIGN DESTINATION STAFF (PATCH /transfers/:id) ———————————————
+// The only editable field on a transfer. The new assignee must be an Active
+// staff member at the destination shelter.
+const reassignToShelterStaff = async (recordID, { toShelterStaff }, actor) => {
+  const transfer = await prisma.transferHistory.findUnique({
+    where: { recordID },
+    select: {
+      toShelterID: true,
+      transferStatus: true,
+      toShelter: { select: { managerStaffID: true } },
+    },
+  });
+  if (!transfer) {
+    throw notFound(recordID);
+  }
+
+  if (actor.role === "Staff" && transfer.toShelter.managerStaffID !== actor.userID) {
+    throw forbidden(
+      "Only the destination shelter's manager may reassign this transfer's staff",
+    );
+  }
+
+  if (transfer.transferStatus !== "In_Progress") {
+    throw conflict(`A ${transfer.transferStatus} transfer can't be reassigned`);
+  }
+
+  const assignee = await prisma.staff.findUnique({
+    where: { userID: toShelterStaff },
+    select: { shelterID: true, accountStatus: true },
+  });
+  if (assignee?.shelterID !== transfer.toShelterID || assignee.accountStatus !== "Active") {
+    throw badRequest(
+      "toShelterStaff must be an active staff member at the destination shelter",
+    );
+  }
+
+  const updated = await prisma.transferHistory.update({
+    where: { recordID },
+    data: { toShelterStaff },
+    select: TRANSFER_DETAIL_SELECT,
+  });
+
+  return formatTransferDetail(updated, actor);
 };
 
 module.exports = {
   initiateTransfer,
+  getTransferAssignees,
   listTransfers,
   getTransferById,
   updateTransferStatus,
+  reassignToShelterStaff,
 };

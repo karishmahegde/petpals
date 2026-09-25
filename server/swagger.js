@@ -459,6 +459,9 @@ const schemas = {
         properties: {
           appointmentCode: { type: "string", example: "APT-00123" },
           shelterName: { type: "string" },
+          vetID: { type: "integer" },
+          staffID: { type: "integer", nullable: true },
+          volunteerID: { type: "integer", nullable: true },
           staffName: { type: "string", nullable: true },
           volunteerName: { type: "string", nullable: true },
           vaccinesAdministered: {
@@ -620,6 +623,57 @@ const schemas = {
       },
     },
   },
+  VolunteerListItem: {
+    type: "object",
+    properties: {
+      userID: { type: "integer" },
+      volunteerName: { type: "string" },
+      volunteerPhone: { type: "string", nullable: true },
+      volunteerEmail: { type: "string" },
+      accountStatus: {
+        type: "string",
+        enum: ["Pending", "Active", "Banned", "Deactivated"],
+      },
+    },
+  },
+  VolunteerDetail: {
+    type: "object",
+    properties: {
+      userID: { type: "integer" },
+      volunteerCode: { type: "string", example: "VOL-00012" },
+      avatarSeed: { type: "string" },
+      volunteerName: { type: "string" },
+      volunteerAddress: { type: "string", nullable: true },
+      volunteerPhone: { type: "string", nullable: true },
+      volunteerDOB: { type: "string", format: "date-time", nullable: true },
+      volunteerSex: { type: "string", nullable: true },
+      volunteerSchedule: { type: "string", nullable: true },
+      shelterID: { type: "integer", nullable: true },
+      shelterName: { type: "string", nullable: true },
+      createdAt: { type: "string", format: "date-time" },
+      accountStatus: {
+        type: "string",
+        enum: ["Pending", "Active", "Banned", "Deactivated"],
+      },
+      volunteerEmail: { type: "string" },
+      governmentID: {
+        type: "object",
+        nullable: true,
+        properties: {
+          idType: { type: "string" },
+          idNumber: { type: "string" },
+        },
+      },
+    },
+  },
+  TransferStaffOption: {
+    type: "object",
+    nullable: true,
+    properties: {
+      staffID: { type: "integer" },
+      staffName: { type: "string" },
+    },
+  },
   TransferDetail: {
     allOf: [
       { $ref: "#/components/schemas/TransferQueueItem" },
@@ -637,6 +691,11 @@ const schemas = {
             type: "object",
             nullable: true,
             properties: { staffName: { type: "string" } },
+          },
+          canReassignToShelterStaff: {
+            type: "boolean",
+            description:
+              "True when the caller may PATCH toShelterStaff (destination manager or Admin, In_Progress only)",
           },
           pet: {
             type: "object",

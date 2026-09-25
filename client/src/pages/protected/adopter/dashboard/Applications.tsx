@@ -15,6 +15,7 @@ import {
 import { APPLICATION_STATUS_META } from "../../../../logic/adopter/applicationStatus";
 import ApplicationsList from "./shared/ApplicationsList";
 import ApplicationDetailPanel from "./sections/applications/ApplicationDetailPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 10;
 
@@ -130,31 +131,7 @@ const Applications = () => {
             onViewDetails={setOpenId}
           />
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <ButtonElement
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Previous
-              </ButtonElement>
-              <span className="font-body text-sm text-neutral-gray">
-                Page {page} of {totalPages}
-              </span>
-              <ButtonElement
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Next
-              </ButtonElement>
-            </div>
-          )}
+          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
         </Card>
       )}
 

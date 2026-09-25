@@ -234,6 +234,9 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
       appointmentReason: true,
       appointmentStatus: true,
       shelterID: true,
+      vetID: true,
+      staffID: true,
+      volunteerID: true,
       pet: { select: PET_SELECT },
       vet: { select: { vetName: true } },
       shelter: { select: { shelterName: true } },
@@ -290,6 +293,9 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
     appointmentReason: appointment.appointmentReason,
     status: deriveAppointmentStatus(appointment),
     pet: formatPetSummary(appointment.pet),
+    vetID: appointment.vetID,
+    staffID: appointment.staffID,
+    volunteerID: appointment.volunteerID,
     vetName: appointment.vet.vetName,
     shelterName: appointment.shelter.shelterName,
     staffName: appointment.staff ? appointment.staff.staffName : null,
@@ -319,6 +325,71 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
   };
 };
 
+// Shared by create + update — each ID is checked only when present, so a
+// partial update validates just what it changes.
+const assertAssigneesAtShelter = async (shelterID, { vetID, staffID, volunteerID }) => {
+  if (vetID !== undefined) {
+    const vet = await prisma.veterinarian.findUnique({
+      where: { userID: vetID },
+      select: { shelterID: true, accountStatus: true },
+    });
+    if (!vet || vet.shelterID !== shelterID || vet.accountStatus !== "Active") {
+      throw vetNotFound();
+    }
+  }
+
+  if (volunteerID !== undefined && volunteerID !== null) {
+    const volunteer = await prisma.volunteer.findUnique({
+      where: { userID: volunteerID },
+      select: { shelterID: true },
+    });
+    if (!volunteer || volunteer.shelterID !== shelterID) {
+      throw volunteerNotFound();
+    }
+  }
+
+  if (staffID !== undefined && staffID !== null) {
+    const staff = await prisma.staff.findUnique({
+      where: { userID: staffID },
+      select: { shelterID: true, accountStatus: true },
+    });
+    if (!staff || staff.shelterID !== shelterID || staff.accountStatus !== "Active") {
+      throw staffNotFound();
+    }
+  }
+};
+
+const DUPLICATE_SLOT_MESSAGE =
+  "An appointment for this pet with this vet at this date/time already exists";
+
+// Guards against the double-submit case (a slow/dropped response reads as
+// a failure, the caller resubmits, and both requests land) — same pet +
+// vet + exact timestamp is never a legitimate second booking, Scheduled
+// rows only (a re-booked slot after a Cancelled one is fine). On update,
+// the appointment being edited is excluded so saving it unchanged is fine.
+const assertNoDuplicateSlot = async ({
+  petID,
+  vetID,
+  appointmentDate,
+  excludeAppointmentID,
+}) => {
+  const duplicate = await prisma.appointment.findFirst({
+    where: {
+      petID,
+      vetID,
+      appointmentDate,
+      appointmentStatus: "Scheduled",
+      ...(excludeAppointmentID !== undefined && {
+        NOT: { appointmentID: excludeAppointmentID },
+      }),
+    },
+    select: { appointmentID: true },
+  });
+  if (duplicate) {
+    throw conflict(DUPLICATE_SLOT_MESSAGE);
+  }
+};
+
 // ——————————————— CREATE APPOINTMENT (POST /appointments) ———————————————
 const createAppointment = async ({ data, actor, requestedShelterID }) => {
   const shelterID = await resolveShelterIDForCreate(actor, requestedShelterID);
@@ -334,55 +405,12 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
     throw badRequest("petID does not belong to this shelter");
   }
 
-  const vet = await prisma.veterinarian.findUnique({
-    where: { userID: data.vetID },
-    select: { userID: true, shelterID: true, accountStatus: true },
-  });
-  if (!vet || vet.shelterID !== shelterID || vet.accountStatus !== "Active") {
-    throw vetNotFound();
-  }
-
-  if (data.volunteerID !== undefined && data.volunteerID !== null) {
-    const volunteer = await prisma.volunteer.findUnique({
-      where: { userID: data.volunteerID },
-      select: { userID: true, shelterID: true },
-    });
-    if (!volunteer || volunteer.shelterID !== shelterID) {
-      throw volunteerNotFound();
-    }
-  }
-
+  await assertAssigneesAtShelter(shelterID, data);
   // Optional — falls back to the acting Staff member (null for an Admin
   // actor), same as before this field was client-selectable.
-  if (data.staffID !== undefined && data.staffID !== null) {
-    const staff = await prisma.staff.findUnique({
-      where: { userID: data.staffID },
-      select: { shelterID: true, accountStatus: true },
-    });
-    if (!staff || staff.shelterID !== shelterID || staff.accountStatus !== "Active") {
-      throw staffNotFound();
-    }
-  }
   const staffID = data.staffID ?? (actor.role === "Staff" ? actor.userID : null);
 
-  // Guards against the double-submit case (a slow/dropped response reads as
-  // a failure, the caller resubmits, and both requests land) — same pet +
-  // vet + exact timestamp is never a legitimate second booking, Scheduled
-  // rows only (a re-booked slot after a Cancelled one is fine).
-  const duplicate = await prisma.appointment.findFirst({
-    where: {
-      petID: data.petID,
-      vetID: data.vetID,
-      appointmentDate: data.appointmentDate,
-      appointmentStatus: "Scheduled",
-    },
-    select: { appointmentID: true },
-  });
-  if (duplicate) {
-    throw conflict(
-      "An appointment for this pet with this vet at this date/time already exists",
-    );
-  }
+  await assertNoDuplicateSlot(data);
 
   let appointment;
   try {
@@ -403,14 +431,60 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
     // partial unique index (see schema.prisma's design note) rejects a
     // near-simultaneous duplicate that slipped past the pre-check.
     if (isUniqueViolation(err)) {
-      throw conflict(
-        "An appointment for this pet with this vet at this date/time already exists",
-      );
+      throw conflict(DUPLICATE_SLOT_MESSAGE);
     }
     throw err;
   }
 
   return getShelterAppointmentDetail(appointment.appointmentID, actor);
+};
+
+// ——————————————— UPDATE APPOINTMENT (PATCH /appointments/:id) ———————————————
+// Reschedule/reassign an appointment that is still Scheduled and upcoming —
+// same rule as cancelAppointment. petID, shelterID and status are never
+// editable (a different pet is a different appointment; status has its own
+// Cancel flow, and completion is the vet's, Sprint 5). Partial: only fields
+// present in `data` change; volunteerID may be null to unassign. Re-runs
+// every create-time check against the MERGED values.
+const updateAppointment = async (appointmentID, data, actor) => {
+  const existing = await prisma.appointment.findUnique({
+    where: { appointmentID },
+    select: {
+      petID: true,
+      vetID: true,
+      shelterID: true,
+      appointmentDate: true,
+      appointmentStatus: true,
+    },
+  });
+  if (!existing) {
+    throw notFound(appointmentID);
+  }
+
+  await assertStaffOwnsShelter(actor.role, actor.userID, existing.shelterID);
+
+  if (deriveAppointmentStatus(existing) !== "Scheduled") {
+    throw conflict("Only a Scheduled, upcoming appointment can be edited");
+  }
+
+  await assertAssigneesAtShelter(existing.shelterID, data);
+  await assertNoDuplicateSlot({
+    petID: existing.petID,
+    vetID: data.vetID ?? existing.vetID,
+    appointmentDate: data.appointmentDate ?? existing.appointmentDate,
+    excludeAppointmentID: appointmentID,
+  });
+
+  try {
+    await prisma.appointment.update({ where: { appointmentID }, data });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      throw conflict(DUPLICATE_SLOT_MESSAGE);
+    }
+    throw err;
+  }
+
+  return getShelterAppointmentDetail(appointmentID, actor);
 };
 
 // ——————————————— CANCEL APPOINTMENT (PATCH /appointments/:id/cancel) ———————————————
@@ -491,6 +565,7 @@ module.exports = {
   listShelterAppointments,
   getShelterAppointmentDetail,
   createAppointment,
+  updateAppointment,
   cancelAppointment,
   listShelterVets,
   listShelterVolunteers,

@@ -5,6 +5,10 @@
 // all scoped to this shelter server-side (staffAppointmentsApi.ts's
 // getShelterVets/getShelterStaff/getShelterVolunteers, and the existing
 // getMyShelterPets). Staff defaults to the logged-in staff member.
+// Also the Edit form: pass `appointment` (from AppointmentDetailPanel's Edit)
+// and every field is seeded from it, with Pet locked — the caller remounts
+// this per target via `key`, so the useState initialisers below are the only
+// seeding needed. Edit sends just the changed fields to PATCH.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -17,12 +21,18 @@ import {
   getShelterStaff,
   getShelterVets,
   getShelterVolunteers,
+  updateAppointment,
+  type AppointmentDetail,
+  type UpdateAppointmentPayload,
 } from "../../../../../../logic/api/staffAppointmentsApi";
 import useAuthStore from "../../../../../../logic/store/useAuthStore";
+import { toDateTimeLocalValue } from "../../../../../../logic/utils/datetime";
 
 interface AppointmentFormPanelProps {
   open: boolean;
   onClose: () => void;
+  /** Present → edit mode, seeded from this appointment. */
+  appointment?: AppointmentDetail | null;
 }
 
 const MAX_REASON_LEN = 300; // schema.prisma: appointmentReason is VarChar(300)
@@ -32,26 +42,50 @@ const labelClass =
 const fieldClass =
   "w-full rounded-md border border-neutral-lightgray bg-white px-3 py-2.5 font-body text-sm text-neutral-charcoal focus:outline-none focus:ring-1 focus:ring-teal-dark";
 
+const readOnlyFieldClass =
+  "w-full rounded-md border border-neutral-lightgray bg-neutral-offwhite px-3 py-2.5 font-body text-sm text-neutral-gray focus:outline-none";
+
 const extractError = (err: unknown): string =>
   axios.isAxiosError(err) && err.response?.data?.message
     ? String(err.response.data.message)
     : "Something went wrong. Please try again.";
 
-const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
+const idToString = (id: number | null | undefined) =>
+  id === null || id === undefined ? "" : String(id);
+
+const AppointmentFormPanel = ({
+  open,
+  onClose,
+  appointment = null,
+}: AppointmentFormPanelProps) => {
   const queryClient = useQueryClient();
+  const isEdit = appointment !== null;
   const currentUserID = useAuthStore((s) => s.user?.userID);
   const defaultStaffID = currentUserID ? String(currentUserID) : "";
-  const [petID, setPetID] = useState("");
-  const [vetID, setVetID] = useState("");
-  const [staffID, setStaffID] = useState(defaultStaffID);
-  const [volunteerID, setVolunteerID] = useState("");
-  const [appointmentDate, setAppointmentDate] = useState("");
-  const [reason, setReason] = useState("");
+
+  // Seed values — the create defaults, or the appointment being edited.
+  const initial = {
+    petID: idToString(appointment?.pet.petID),
+    vetID: idToString(appointment?.vetID),
+    staffID: isEdit ? idToString(appointment.staffID) : defaultStaffID,
+    volunteerID: idToString(appointment?.volunteerID),
+    appointmentDate: appointment
+      ? toDateTimeLocalValue(new Date(appointment.appointmentDate))
+      : "",
+    reason: appointment?.appointmentReason ?? "",
+  };
+
+  const [petID, setPetID] = useState(initial.petID);
+  const [vetID, setVetID] = useState(initial.vetID);
+  const [staffID, setStaffID] = useState(initial.staffID);
+  const [volunteerID, setVolunteerID] = useState(initial.volunteerID);
+  const [appointmentDate, setAppointmentDate] = useState(initial.appointmentDate);
+  const [reason, setReason] = useState(initial.reason);
 
   const { data: petsResult } = useQuery({
     queryKey: ["staff", "shelter-pets", "for-appointment"],
     queryFn: () => getMyShelterPets({ limit: 200 }),
-    enabled: open,
+    enabled: open && !isEdit,
   });
   const pets = petsResult?.data ?? [];
 
@@ -74,12 +108,12 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
   });
 
   const resetForm = () => {
-    setPetID("");
-    setVetID("");
-    setStaffID(defaultStaffID);
-    setVolunteerID("");
-    setAppointmentDate("");
-    setReason("");
+    setPetID(initial.petID);
+    setVetID(initial.vetID);
+    setStaffID(initial.staffID);
+    setVolunteerID(initial.volunteerID);
+    setAppointmentDate(initial.appointmentDate);
+    setReason(initial.reason);
   };
 
   const closeAndReset = () => {
@@ -87,25 +121,49 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
     onClose();
   };
 
+  // Only what actually changed goes to PATCH.
+  const buildChanges = (): UpdateAppointmentPayload => {
+    const changes: UpdateAppointmentPayload = {};
+    if (vetID !== initial.vetID) changes.vetID = Number(vetID);
+    if (staffID !== initial.staffID) changes.staffID = Number(staffID);
+    if (volunteerID !== initial.volunteerID) {
+      changes.volunteerID = volunteerID ? Number(volunteerID) : null;
+    }
+    if (appointmentDate !== initial.appointmentDate) {
+      changes.appointmentDate = new Date(appointmentDate).toISOString();
+    }
+    if (reason.trim() !== initial.reason) changes.appointmentReason = reason.trim();
+    return changes;
+  };
+  const hasChanges = !isEdit || Object.keys(buildChanges()).length > 0;
+
   const submit = useMutation({
     mutationFn: () =>
-      createAppointment({
-        petID: Number(petID),
-        vetID: Number(vetID),
-        staffID: Number(staffID),
-        volunteerID: volunteerID ? Number(volunteerID) : undefined,
-        appointmentDate,
-        appointmentReason: reason.trim(),
-      }),
-    onSuccess: () => {
+      isEdit
+        ? updateAppointment(appointment.appointmentID, buildChanges())
+        : createAppointment({
+            petID: Number(petID),
+            vetID: Number(vetID),
+            staffID: Number(staffID),
+            volunteerID: volunteerID ? Number(volunteerID) : undefined,
+            // Explicit ISO so the server doesn't read the naive
+            // datetime-local string in its own timezone.
+            appointmentDate: new Date(appointmentDate).toISOString(),
+            appointmentReason: reason.trim(),
+          }),
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["staff", "appointments-queue"] });
-      toast.success("Appointment created");
+      if (isEdit) {
+        queryClient.setQueryData(["staff", "appointment", saved.appointmentID], saved);
+      }
+      toast.success(isEdit ? "Appointment updated" : "Appointment created");
       closeAndReset();
     },
     onError: (err) => toast.error(extractError(err)),
   });
 
   const canSubmit =
+    hasChanges &&
     petID !== "" &&
     vetID !== "" &&
     staffID !== "" &&
@@ -115,7 +173,11 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
     !submit.isPending;
 
   return (
-    <SlideOver open={open} onClose={closeAndReset} title="New Appointment">
+    <SlideOver
+      open={open}
+      onClose={closeAndReset}
+      title={isEdit ? "Edit Appointment" : "New Appointment"}
+    >
       <form
         className="flex flex-col gap-4 p-6"
         onSubmit={(e) => {
@@ -127,20 +189,30 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
           <label className={labelClass} htmlFor="appointment-pet">
             Pet
           </label>
-          <select
-            id="appointment-pet"
-            required
-            value={petID}
-            onChange={(e) => setPetID(e.target.value)}
-            className={fieldClass}
-          >
-            <option value="">- Select -</option>
-            {pets.map((pet) => (
-              <option key={pet.petID} value={pet.petID}>
-                {pet.petName}
-              </option>
-            ))}
-          </select>
+          {isEdit ? (
+            // A different pet is a different appointment — cancel + create.
+            <input
+              id="appointment-pet"
+              readOnly
+              value={appointment.pet.petName}
+              className={readOnlyFieldClass}
+            />
+          ) : (
+            <select
+              id="appointment-pet"
+              required
+              value={petID}
+              onChange={(e) => setPetID(e.target.value)}
+              className={fieldClass}
+            >
+              <option value="">- Select -</option>
+              {pets.map((pet) => (
+                <option key={pet.petID} value={pet.petID}>
+                  {pet.petName}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div>
@@ -238,7 +310,13 @@ const AppointmentFormPanel = ({ open, onClose }: AppointmentFormPanelProps) => {
           size="panel"
           className="w-full bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
         >
-          {submit.isPending ? "Creating…" : "Create Appointment"}
+          {isEdit
+            ? submit.isPending
+              ? "Saving…"
+              : "Save Changes"
+            : submit.isPending
+              ? "Creating…"
+              : "Create Appointment"}
         </ButtonElement>
       </form>
     </SlideOver>

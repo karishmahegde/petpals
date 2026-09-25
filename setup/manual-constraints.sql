@@ -36,6 +36,10 @@ ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "appointmentCode" TEXT
   GENERATED ALWAYS AS ('APT-' || lpad("appointmentID"::text, 5, '0')) STORED;
 CREATE UNIQUE INDEX IF NOT EXISTS "Appointment_appointmentCode_key" ON "Appointment" ("appointmentCode");
 
+ALTER TABLE "Volunteer" ADD COLUMN IF NOT EXISTS "volunteerCode" TEXT
+  GENERATED ALWAYS AS ('VOL-' || lpad("userID"::text, 5, '0')) STORED;
+CREATE UNIQUE INDEX IF NOT EXISTS "Volunteer_volunteerCode_key" ON "Volunteer" ("volunteerCode");
+
 -- ── Staff closing note on an application ────────────────────────
 -- Plain nullable column — not generated, just added by hand alongside the
 -- codes above.

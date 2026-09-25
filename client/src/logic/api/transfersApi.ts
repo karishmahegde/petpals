@@ -31,6 +31,9 @@ export interface TransferDetail extends TransferQueueItem {
   toShelterStaff: number | null;
   fromStaff: { staffName: string } | null;
   toStaff: { staffName: string } | null;
+  // True when the caller is the destination shelter's manager (or Admin) and
+  // the transfer is still In_Progress — gates the To-staff reassign select.
+  canReassignToShelterStaff: boolean;
   pet: TransferQueueItem["pet"] & {
     petAge: string;
     petSex: string;
@@ -52,6 +55,28 @@ export const initiateTransfer = async (
   payload: InitiateTransferPayload,
 ): Promise<TransferDetail> => {
   const response = await axiosInstance.post("/transfers", payload);
+  return response.data.data;
+};
+
+export interface TransferStaffOption {
+  staffID: number;
+  staffName: string;
+}
+
+export interface TransferAssignees {
+  fromShelterStaff: TransferStaffOption | null;
+  toShelterStaff: TransferStaffOption | null;
+}
+
+// Preview of what POST /transfers will assign: fromShelterStaff = the
+// caller, toShelterStaff = toShelterID's manager (null if it has none, or if
+// toShelterID is omitted).
+export const getTransferAssignees = async (
+  toShelterID?: number,
+): Promise<TransferAssignees> => {
+  const response = await axiosInstance.get("/transfers/assignees", {
+    params: { toShelterID },
+  });
   return response.data.data;
 };
 
@@ -91,6 +116,18 @@ export const reviewTransfer = async (
 ): Promise<TransferDetail> => {
   const response = await axiosInstance.patch(`/transfers/${recordID}/status`, {
     status,
+  });
+  return response.data.data;
+};
+
+// Destination manager (or Admin) only, In_Progress only; the new assignee
+// must be an Active staff member at the destination shelter.
+export const reassignTransferStaff = async (
+  recordID: number,
+  toShelterStaff: number,
+): Promise<TransferDetail> => {
+  const response = await axiosInstance.patch(`/transfers/${recordID}`, {
+    toShelterStaff,
   });
   return response.data.data;
 };

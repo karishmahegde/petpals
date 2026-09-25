@@ -84,6 +84,8 @@ const staffAppointmentsRouter = require("./routes/staff/appointments.routes");
 app.use("/api/v1", staffAppointmentsRouter);
 const staffGovernmentIdsRouter = require("./routes/staff/governmentIds.routes");
 app.use("/api/v1", staffGovernmentIdsRouter);
+const staffVolunteersRouter = require("./routes/staff/volunteers.routes");
+app.use("/api/v1", staffVolunteersRouter);
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));
 // app.use('/api/v1/tasks',                require('./routes/tasks'));
 // app.use('/api/v1/donors',               require('./routes/donors'));

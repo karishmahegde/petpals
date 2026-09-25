@@ -27,6 +27,9 @@ export interface AppointmentQueueItem {
 export interface AppointmentDetail extends AppointmentQueueItem {
   appointmentCode: string | null;
   shelterName: string;
+  vetID: number;
+  staffID: number | null;
+  volunteerID: number | null;
   staffName: string | null;
   volunteerName: string | null;
   vaccinesAdministered: {
@@ -79,6 +82,27 @@ export const createAppointment = async (
   payload: CreateAppointmentPayload,
 ): Promise<AppointmentDetail> => {
   const response = await axiosInstance.post("/appointments", payload);
+  return response.data.data;
+};
+
+// Scheduled + upcoming only; the pet can't be changed. volunteerID null
+// unassigns. Same double-booking guard as create (409).
+export interface UpdateAppointmentPayload {
+  vetID?: number;
+  staffID?: number;
+  volunteerID?: number | null;
+  appointmentDate?: string;
+  appointmentReason?: string;
+}
+
+export const updateAppointment = async (
+  appointmentID: number,
+  payload: UpdateAppointmentPayload,
+): Promise<AppointmentDetail> => {
+  const response = await axiosInstance.patch(
+    `/appointments/${appointmentID}`,
+    payload,
+  );
   return response.data.data;
 };
 

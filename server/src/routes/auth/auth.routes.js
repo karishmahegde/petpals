@@ -32,6 +32,9 @@ const router = express.Router();
  *                 type: string
  *                 enum: [admin, adopter, staff, vet, volunteer, donor]
  *                 example: adopter
+ *               shelterID:
+ *                 type: integer
+ *                 description: Required when role is volunteer — an Open shelter whose staff will approve the account
  *     responses:
  *       201:
  *         description: User registered successfully

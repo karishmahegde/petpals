@@ -436,6 +436,14 @@ model VolunteerApplication {
 
 model Volunteer {
   userID            Int                     @id
+  // Human-facing reference, e.g. "VOL-00012". Postgres GENERATED ALWAYS STORED
+  // column computed from userID — READ-ONLY, never set in a create()/update().
+  // Same manual-migration pattern as Pet.petCode (see CLAUDE.md — migrate dev
+  // is banned):
+  //   ALTER TABLE "Volunteer" ADD COLUMN "volunteerCode" TEXT
+  //     GENERATED ALWAYS AS ('VOL-' || lpad("userID"::text, 5, '0')) STORED;
+  //   CREATE UNIQUE INDEX "Volunteer_volunteerCode_key" ON "Volunteer" ("volunteerCode");
+  volunteerCode     String?                 @unique @db.Text
   avatarSeed        String                  @db.VarChar(64)
   volunteerName     String                  @db.VarChar(45)
   volunteerAddress  String?                 @db.VarChar(45)

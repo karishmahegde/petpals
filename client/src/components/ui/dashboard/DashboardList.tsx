@@ -123,11 +123,12 @@ export const RowMedallion = ({
     </div>
   );
 
-type RowActionVariant = "primary" | "danger";
+type RowActionVariant = "primary" | "success" | "danger";
 
 const ACTION_VARIANT: Record<RowActionVariant, string> = {
   primary: "bg-teal-dark",
-  danger: "bg-red", // withdraw / cancel
+  success: "bg-green", // approve
+  danger: "bg-red", // withdraw / cancel / decline
 };
 
 interface RowActionButtonProps {

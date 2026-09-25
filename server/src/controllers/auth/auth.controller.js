@@ -22,9 +22,20 @@ const register = async (req, res, next) => {
     return next(err);
   }
 
+  // Volunteers must pick the shelter they're applying to (its staff approve them)
+  let shelterID;
+  if (role === "volunteer") {
+    shelterID = Number(req.body.shelterID);
+    if (!Number.isInteger(shelterID) || shelterID < 1) {
+      const err = new Error("shelterID is required for volunteers and must be a positive integer");
+      err.code = "VALIDATION_ERROR";
+      return next(err);
+    }
+  }
+
   // Wraps the service call in try/catch — success → successResponse with 201, failure → next(err) to the global error handler
   try {
-    const user = await authService.register({ name, email, password, role });
+    const user = await authService.register({ name, email, password, role, shelterID });
     return successResponse(res, "User registered successfully", user, 201);
   } catch (err) {
     return next(err);

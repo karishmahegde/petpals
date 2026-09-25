@@ -3,7 +3,9 @@
 // own sections/appointments/AppointmentDetailPanel.tsx layout exactly (pet
 // summary banner, InfoRow dl, Vaccines Administered list), adding a status
 // Badge, Staff/Volunteer rows, an Adopter Details section, and a
-// Cancel-Appointment footer action (only while still Scheduled/upcoming).
+// footer with Edit + Cancel Appointment (only while still Scheduled/upcoming).
+// Edit hands the loaded record up via onEdit — the page (Appointments.tsx)
+// swaps this panel for AppointmentFormPanel in edit mode.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -12,6 +14,7 @@ import { FaPaw } from "react-icons/fa";
 import {
   getAppointmentDetail,
   cancelAppointment,
+  type AppointmentDetail,
 } from "../../../../../../logic/api/staffAppointmentsApi";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
@@ -26,6 +29,7 @@ import {
 interface AppointmentDetailPanelProps {
   appointmentID: number | null;
   onClose: () => void;
+  onEdit: (appointment: AppointmentDetail) => void;
 }
 
 const STATUS_TONE: Record<string, BadgeTone> = {
@@ -54,6 +58,7 @@ const extractError = (err: unknown): string =>
 const AppointmentDetailPanel = ({
   appointmentID,
   onClose,
+  onEdit,
 }: AppointmentDetailPanelProps) => {
   const queryClient = useQueryClient();
   const [isCancelOpen, setIsCancelOpen] = useState(false);
@@ -67,7 +72,9 @@ const AppointmentDetailPanel = ({
   const cancel = useMutation({
     mutationFn: () => cancelAppointment(appointmentID!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "appointments-queue"] });
+      queryClient.invalidateQueries({
+        queryKey: ["staff", "appointments-queue"],
+      });
       queryClient.invalidateQueries({
         queryKey: ["staff", "appointment", appointmentID],
       });
@@ -86,14 +93,22 @@ const AppointmentDetailPanel = ({
         title="Appointment Details"
         footer={
           data?.status === "Scheduled" ? (
-            <ButtonElement
-              onClick={() => setIsCancelOpen(true)}
-              size="panel"
-              variant="outline"
-              className="w-full border border-rose-dark text-rose-dark hover:bg-rose-dark hover:text-white"
-            >
-              Cancel Appointment
-            </ButtonElement>
+            <div className="flex flex-col gap-3">
+              <ButtonElement
+                onClick={() => onEdit(data)}
+                size="panel"
+                className="w-full bg-teal-dark hover:brightness-95"
+              >
+                Edit
+              </ButtonElement>
+              <ButtonElement
+                onClick={() => setIsCancelOpen(true)}
+                size="panel"
+                className="w-full bg-red hover:brightness-90"
+              >
+                Cancel Appointment
+              </ButtonElement>
+            </div>
           ) : undefined
         }
       >

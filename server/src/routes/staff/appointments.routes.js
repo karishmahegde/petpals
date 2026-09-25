@@ -304,6 +304,74 @@ router.get(
 
 /**
  * @swagger
+ * /appointments/{id}:
+ *   patch:
+ *     summary: Edit a Scheduled, upcoming appointment (Staff, Admin)
+ *     description: >
+ *       Partial update — send only the fields that change. Only a Scheduled
+ *       appointment whose date hasn't passed can be edited. petID, shelterID
+ *       and status are not editable (400 if sent). vetID/staffID must be
+ *       active at the appointment's shelter; volunteerID may be null to
+ *       unassign. The same pet+vet+time double-booking guard as create
+ *       applies (409), excluding this appointment itself.
+ *     tags: [Appointments, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               vetID: { type: integer }
+ *               staffID: { type: integer }
+ *               volunteerID: { type: integer, nullable: true }
+ *               appointmentDate: { type: string, format: date-time }
+ *               appointmentReason: { type: string, maxLength: 300 }
+ *     responses:
+ *       200:
+ *         description: The updated appointment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AppointmentDetail' }
+ *       400:
+ *         description: Invalid/locked/no fields, past date, or a vet/staff/volunteer not at this shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Staff attempting to edit an appointment at another shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The appointment is no longer Scheduled/upcoming, or the new slot is already booked
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.patch(
+  "/appointments/:id",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  appointmentsController.updateAppointment,
+);
+
+/**
+ * @swagger
  * /appointments/{id}/cancel:
  *   patch:
  *     summary: Cancel a Scheduled, upcoming appointment (Staff, Admin)

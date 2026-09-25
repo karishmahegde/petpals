@@ -1,5 +1,6 @@
 // Register.tsx
 // Page: Public registration form for adopters, volunteers, and donors
+// (volunteers also pick the shelter they're applying to)
 // Responsibilities:
 //   - Renders name, email, password, role, and consent fields with client-side validation
 //   - Calls authApi.register() on submit and handles loading/error states
@@ -8,11 +9,13 @@
 // Route: /register
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { register as registerApi } from "../../../logic/api/authApi";
+import { getShelters } from "../../../logic/api/petsApi";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
 
@@ -84,10 +87,18 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const [shelterID, setShelterID] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [confirmAge, setConfirmAge] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const isVolunteer = role === "volunteer";
+  const { data: shelters = [] } = useQuery({
+    queryKey: ["shelters"],
+    queryFn: getShelters,
+    enabled: isVolunteer,
+  });
 
   if (token && sessionRole) {
     return <Navigate to={`/${sessionRole.toLowerCase()}`} replace />;
@@ -114,6 +125,8 @@ const Register = () => {
       return "Password does not meet all requirements";
 
     if (!role) return "Please select how you'd like to get involved";
+    if (isVolunteer && !shelterID)
+      return "Please select the shelter you'd like to volunteer at";
     if (!agreeTerms)
       return "Please agree to the Terms of Service and Privacy Policy";
     if (!confirmAge) return "Please confirm you are 18 or older";
@@ -136,6 +149,7 @@ const Register = () => {
         email,
         password,
         role,
+        shelterID: isVolunteer ? Number(shelterID) : undefined,
       });
       toast.success("Registered successfully");
       navigate("/login", { replace: true });
@@ -306,6 +320,31 @@ const Register = () => {
               })}
             </div>
           </div>
+
+          {/* Shelter — volunteers only */}
+          {isVolunteer && (
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="shelterID"
+                className="font-body text-sm font-bold text-neutral-black"
+              >
+                Shelter
+              </label>
+              <select
+                id="shelterID"
+                value={shelterID}
+                onChange={(e) => setShelterID(e.target.value)}
+                className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark bg-white focus:outline-none focus:border-teal-dark"
+              >
+                <option value="">Select a shelter</option>
+                {shelters.map((shelter) => (
+                  <option key={shelter.shelterID} value={shelter.shelterID}>
+                    {shelter.shelterName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Consent checkboxes */}
           <div className="flex flex-col gap-2">

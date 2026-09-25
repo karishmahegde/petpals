@@ -2,7 +2,6 @@ import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { BiFilterAlt } from "react-icons/bi";
 import Card from "../../../../components/ui/Card";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import SelectField from "../../../../components/ui/SelectField";
 import Avatar from "../../../../components/ui/Avatar";
 import Badge, { type BadgeTone } from "../../../../components/ui/Badge";
@@ -20,6 +19,7 @@ import {
 import useAuthStore from "../../../../logic/store/useAuthStore";
 import AdminDetailPanel from "./sections/admins/AdminDetailPanel";
 import AdminApprovalPanel from "./sections/admins/AdminApprovalPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 10;
 
@@ -165,33 +165,7 @@ const Admins = () => {
             ))}
           </ul>
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <ButtonElement
-                type="button"
-                size="bare"
-                variant="outline"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Previous
-              </ButtonElement>
-              <span className="font-body text-sm text-neutral-gray">
-                Page {page} of {totalPages}
-              </span>
-              <ButtonElement
-                type="button"
-                size="bare"
-                variant="outline"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Next
-              </ButtonElement>
-            </div>
-          )}
+          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
         </Card>
       )}
 

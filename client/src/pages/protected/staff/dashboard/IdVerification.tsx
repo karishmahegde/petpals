@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import SelectField from "../../../../components/ui/SelectField";
 import Avatar from "../../../../components/ui/Avatar";
 import type { BadgeTone } from "../../../../components/ui/Badge";
@@ -18,6 +17,7 @@ import {
   type GovernmentIdVerificationStatus,
 } from "../../../../logic/api/staffGovernmentIdsApi";
 import GovernmentIdDetailPanel from "./sections/idVerification/GovernmentIdDetailPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 20;
 
@@ -77,41 +77,6 @@ const IdRow = ({
     }
   />
 );
-
-const PaginationControls = ({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (page: number) => void;
-}) =>
-  totalPages > 1 ? (
-    <div className="mt-6 flex items-center justify-center gap-4">
-      <ButtonElement
-        onClick={() => onChange(Math.max(1, page - 1))}
-        disabled={page === 1}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Previous
-      </ButtonElement>
-      <span className="font-body text-sm text-neutral-gray">
-        Page {page} of {totalPages}
-      </span>
-      <ButtonElement
-        onClick={() => onChange(Math.min(totalPages, page + 1))}
-        disabled={page >= totalPages}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Next
-      </ButtonElement>
-    </div>
-  ) : null;
 
 // ID Verification tab — Pending Verification / Reviewed sections, each with
 // a userType filter + name search. A row's "Review" opens

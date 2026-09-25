@@ -2,7 +2,6 @@ import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { FaPlus } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
 import type { BadgeTone } from "../../../../components/ui/Badge";
@@ -16,6 +15,7 @@ import { getEvents, type EventListItem } from "../../../../logic/api/eventsApi";
 import { deleteEvent } from "../../../../logic/api/staffEventsApi";
 import { formatTime, relativeDateBadge } from "../../../../logic/utils/datetime";
 import EventFormPanel from "./sections/events/EventFormPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 20;
 
@@ -153,31 +153,7 @@ const Events = () => {
             }}
           />
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <ButtonElement
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Previous
-              </ButtonElement>
-              <span className="font-body text-sm text-neutral-gray">
-                Page {page} of {totalPages}
-              </span>
-              <ButtonElement
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Next
-              </ButtonElement>
-            </div>
-          )}
+          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
         </Card>
       )}
 

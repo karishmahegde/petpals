@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { BiFilterAlt } from "react-icons/bi";
 import { PiBuildingsBold, PiIdentificationBadgeBold } from "react-icons/pi";
 import Card from "../../../../components/ui/Card";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import SelectField from "../../../../components/ui/SelectField";
 import Avatar from "../../../../components/ui/Avatar";
 import type { BadgeTone } from "../../../../components/ui/Badge";
@@ -22,6 +21,7 @@ import {
 import { getShelterAnalytics } from "../../../../logic/api/analyticsApi";
 import StaffDetailPanel from "./sections/staff/StaffDetailPanel";
 import StaffApprovalPanel from "./sections/staff/StaffApprovalPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 10;
 
@@ -217,31 +217,7 @@ const Staff = () => {
             ))}
           </ul>
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <ButtonElement
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Previous
-              </ButtonElement>
-              <span className="font-body text-sm text-neutral-gray">
-                Page {page} of {totalPages}
-              </span>
-              <ButtonElement
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Next
-              </ButtonElement>
-            </div>
-          )}
+          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
         </Card>
       )}
 

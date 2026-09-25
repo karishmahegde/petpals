@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { FaPaw } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
 import SelectField from "../../../../components/ui/SelectField";
@@ -17,6 +16,7 @@ import { getApplicationsQueue } from "../../../../logic/api/adoptionApplications
 import { getSpecies } from "../../../../logic/api/petsApi";
 import { formatShortDate } from "../../../../logic/utils/datetime";
 import ApplicationDetailPanel from "./sections/applications/ApplicationDetailPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 20;
 
@@ -33,41 +33,6 @@ const filterInputClass =
   "w-full rounded-md border border-neutral-lightgray bg-white px-3 py-2.5 font-body text-sm text-neutral-charcoal focus:outline-none focus:ring-1 focus:ring-teal-dark";
 const filterLabelClass =
   "mb-1.5 block font-body text-sm font-semibold text-neutral-charcoal";
-
-const PaginationControls = ({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (page: number) => void;
-}) =>
-  totalPages > 1 ? (
-    <div className="mt-6 flex items-center justify-center gap-4">
-      <ButtonElement
-        onClick={() => onChange(Math.max(1, page - 1))}
-        disabled={page === 1}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Previous
-      </ButtonElement>
-      <span className="font-body text-sm text-neutral-gray">
-        Page {page} of {totalPages}
-      </span>
-      <ButtonElement
-        onClick={() => onChange(Math.min(totalPages, page + 1))}
-        disabled={page >= totalPages}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Next
-      </ButtonElement>
-    </div>
-  ) : null;
 
 // Applications tab — Active Applications (Pending, needs a decision) and
 // Past Applications (Accepted/Rejected/Withdrawn, already resolved), each

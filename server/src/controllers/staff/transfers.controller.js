@@ -185,4 +185,58 @@ const updateTransferStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { createTransfer, listTransfers, getTransfer, updateTransferStatus };
+// ——————————————— GET /transfers/assignees ———————————————
+// toShelterID optional — omitted, only the (from-side) acting staff member
+// is resolved; the form calls it again once a destination is picked.
+const getTransferAssignees = async (req, res, next) => {
+  let toShelterID;
+  if (req.query.toShelterID !== undefined) {
+    try {
+      toShelterID = parseId(req.query.toShelterID, "toShelterID");
+    } catch (err) {
+      return next(err);
+    }
+  }
+
+  try {
+    const assignees = await transfersService.getTransferAssignees(
+      { role: req.user.role, userID: req.user.userID },
+      toShelterID,
+    );
+    return successResponse(res, "Transfer assignees retrieved successfully", assignees);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PATCH /transfers/:id ———————————————
+const updateTransfer = async (req, res, next) => {
+  let recordID;
+  let toShelterStaff;
+  try {
+    recordID = parseId(req.params.id, "id");
+    toShelterStaff = parseId(req.body?.toShelterStaff, "toShelterStaff");
+  } catch (err) {
+    return next(err);
+  }
+
+  try {
+    const transfer = await transfersService.reassignToShelterStaff(
+      recordID,
+      { toShelterStaff },
+      { role: req.user.role, userID: req.user.userID },
+    );
+    return successResponse(res, "Transfer staff reassigned successfully", transfer);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  createTransfer,
+  getTransferAssignees,
+  listTransfers,
+  getTransfer,
+  updateTransferStatus,
+  updateTransfer,
+};

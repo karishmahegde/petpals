@@ -29,11 +29,26 @@ const ROLE_CONFIG = {
 // ALTER TYPE that added it — so a freshly-set-up DB may still be mid-way
 // through that two-step SQL. Setting accountStatus explicitly here means
 // registration behaves correctly regardless.
-const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet"]);
+// Volunteer is approved by staff at the shelter picked at registration.
+const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet", "volunteer"]);
 
 // ——————————————— REGISTER ———————————————
-const register = async ({ name, email, password, role }) => {
+const register = async ({ name, email, password, role, shelterID }) => {
   const { roleEnum, model, nameField } = ROLE_CONFIG[role];
+
+  // Volunteers apply to one shelter, whose staff approve them — must be a
+  // shelter the public /shelters list offers (Open).
+  if (role === "volunteer") {
+    const shelter = await prisma.shelter.findUnique({
+      where: { shelterID },
+      select: { shelterStatus: true },
+    });
+    if (shelter?.shelterStatus !== "Open") {
+      const err = new Error("shelterID must reference an open shelter");
+      err.code = "VALIDATION_ERROR";
+      throw err;
+    }
+  }
 
   //Check if email already exists
   const existing = await prisma.users.findUnique({
@@ -62,7 +77,7 @@ const register = async ({ name, email, password, role }) => {
     if (PENDING_GATED_ROLES.has(role)) {
       // Bootstrap: the very first Admin ever created has no one to approve
       // them, so they auto-activate. Every Admin after that — and every
-      // Staff/Vet — starts Pending.
+      // Staff/Vet/Volunteer — starts Pending.
       const isFirstAdmin =
         role === "admin" && (await tx.admin.count()) === 0;
       accountStatus = isFirstAdmin ? "Active" : "Pending";
@@ -74,6 +89,7 @@ const register = async ({ name, email, password, role }) => {
         [nameField]: name,
         avatarSeed: crypto.randomUUID(),
         ...(accountStatus ? { accountStatus } : {}),
+        ...(role === "volunteer" ? { shelterID } : {}),
       },
     });
 

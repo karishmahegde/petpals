@@ -182,6 +182,87 @@ const getAppointment = async (req, res, next) => {
   }
 };
 
+// ——————————————— PATCH /appointments/:id ———————————————
+// Partial update of a Scheduled, upcoming appointment. petID/shelterID/status
+// are rejected outright rather than silently ignored, so a caller never
+// thinks they moved an appointment to another pet or marked it done.
+const LOCKED_FIELDS = ["petID", "shelterID", "appointmentStatus", "status"];
+
+const updateAppointment = async (req, res, next) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+
+  let appointmentID;
+  try {
+    appointmentID = parseId(req.params.id, "id");
+  } catch (err) {
+    return next(err);
+  }
+
+  const locked = LOCKED_FIELDS.filter((field) => field in body);
+  if (locked.length > 0) {
+    return next(badRequest(`These fields can't be edited: ${locked.join(", ")}`));
+  }
+
+  const data = {};
+  try {
+    if (body.vetID !== undefined) data.vetID = parseId(body.vetID, "vetID");
+    if (body.staffID !== undefined) data.staffID = parseId(body.staffID, "staffID");
+    if (body.volunteerID !== undefined) {
+      data.volunteerID =
+        body.volunteerID === null || body.volunteerID === ""
+          ? null
+          : parseId(body.volunteerID, "volunteerID");
+    }
+  } catch (err) {
+    return next(err);
+  }
+
+  if (body.appointmentReason !== undefined) {
+    const reasonRaw = body.appointmentReason;
+    if (
+      typeof reasonRaw !== "string" ||
+      reasonRaw.trim().length === 0 ||
+      reasonRaw.length > MAX_REASON_LEN
+    ) {
+      return next(
+        badRequest(
+          `appointmentReason must be a non-empty string of at most ${MAX_REASON_LEN} characters`,
+        ),
+      );
+    }
+    data.appointmentReason = reasonRaw.trim();
+  }
+
+  if (body.appointmentDate !== undefined) {
+    const appointmentDate = new Date(body.appointmentDate);
+    if (Number.isNaN(appointmentDate.getTime())) {
+      return next(badRequest("appointmentDate must be a valid date"));
+    }
+    if (appointmentDate.getTime() < Date.now()) {
+      return next(badRequest("appointmentDate must not be in the past"));
+    }
+    data.appointmentDate = appointmentDate;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return next(
+      badRequest(
+        "Provide at least one of: vetID, staffID, volunteerID, appointmentDate, appointmentReason",
+      ),
+    );
+  }
+
+  try {
+    const appointment = await appointmentsService.updateAppointment(appointmentID, data, {
+      role: req.user.role,
+      userID: req.user.userID,
+    });
+    return successResponse(res, "Appointment updated successfully", appointment);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— PATCH /appointments/:id/cancel ———————————————
 const cancelAppointment = async (req, res, next) => {
   let appointmentID;
@@ -260,6 +341,7 @@ module.exports = {
   createAppointment,
   listAppointments,
   getAppointment,
+  updateAppointment,
   cancelAppointment,
   listVets,
   listVolunteers,

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { FaPaw } from "react-icons/fa";
+import { FaPaw, FaPlus } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
 import SelectField from "../../../../components/ui/SelectField";
@@ -21,6 +20,7 @@ import {
 import { formatShortDate } from "../../../../logic/utils/datetime";
 import TransferFormPanel from "./sections/transfers/TransferFormPanel";
 import TransferDetailPanel from "./sections/transfers/TransferDetailPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 20;
 
@@ -86,53 +86,23 @@ const TransferRow = ({
   />
 );
 
-const PaginationControls = ({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (page: number) => void;
-}) =>
-  totalPages > 1 ? (
-    <div className="mt-6 flex items-center justify-center gap-4">
-      <ButtonElement
-        onClick={() => onChange(Math.max(1, page - 1))}
-        disabled={page === 1}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Previous
-      </ButtonElement>
-      <span className="font-body text-sm text-neutral-gray">
-        Page {page} of {totalPages}
-      </span>
-      <ButtonElement
-        onClick={() => onChange(Math.min(totalPages, page + 1))}
-        disabled={page >= totalPages}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Next
-      </ButtonElement>
-    </div>
-  ) : null;
-
 // Transfers tab — Incoming Transfers (to this shelter, always filtered to
 // In_Progress since those are the only ones awaiting this shelter's
 // decision) and Outgoing Transfers (from this shelter, every status by
 // default — it's a history/tracking list, not just the still-open ones,
 // with a Type filter to narrow it). Entry from the Pets edit panel
 // deep-links via ?petID=, read once on mount (same pattern as Applications'
-// ?applicationID=), auto-opening TransferFormPanel pre-filled with that pet.
+// ?applicationID=), auto-opening TransferFormPanel pre-filled with that pet;
+// the heading's "Initiate Transfer" button opens the same panel with no pet
+// (presetPetID null → it shows a Pet picker).
 const Transfers = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [transferPetID, setTransferPetID] = useState<number | null>(() => {
+  // null = panel closed; { presetPetID: null } = opened from the heading button.
+  const [transferForm, setTransferForm] = useState<{
+    presetPetID: number | null;
+  } | null>(() => {
     const petID = Number(searchParams.get("petID"));
-    return Number.isInteger(petID) && petID > 0 ? petID : null;
+    return Number.isInteger(petID) && petID > 0 ? { presetPetID: petID } : null;
   });
 
   useEffect(() => {
@@ -203,6 +173,11 @@ const Transfers = () => {
         title="Transfers"
         emoji="🔄"
         message="Manage inter-shelter animal transfers"
+        action={{
+          label: "Initiate Transfer",
+          icon: <FaPlus aria-hidden />,
+          onClick: () => setTransferForm({ presetPetID: null }),
+        }}
       />
 
       <Card className="mb-6 p-6">
@@ -363,8 +338,9 @@ const Transfers = () => {
       </Card>
 
       <TransferFormPanel
-        petID={transferPetID}
-        onClose={() => setTransferPetID(null)}
+        open={transferForm !== null}
+        presetPetID={transferForm?.presetPetID ?? null}
+        onClose={() => setTransferForm(null)}
       />
 
       <TransferDetailPanel

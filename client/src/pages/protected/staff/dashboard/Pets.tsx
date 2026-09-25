@@ -2,7 +2,6 @@ import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { FaPlus } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
 import PetCatalogCard from "../../../../components/ui/pets/PetCatalogCard";
@@ -16,6 +15,7 @@ import PetFormPanel from "./sections/pets/PetFormPanel";
 import PetsFilterBar, {
   type PetsCatalogFilters,
 } from "./sections/pets/PetsFilterBar";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 20;
 
@@ -191,31 +191,7 @@ const Pets = () => {
             ))}
           </div>
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <ButtonElement
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Previous
-              </ButtonElement>
-              <span className="font-body text-sm text-neutral-gray">
-                Page {page} of {totalPages}
-              </span>
-              <ButtonElement
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                size="bare"
-                variant="outline"
-                className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Next
-              </ButtonElement>
-            </div>
-          )}
+          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
         </Card>
       )}
 

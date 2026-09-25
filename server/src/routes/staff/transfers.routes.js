@@ -1,7 +1,9 @@
 // What it does: Defines the Staff/Admin inter-shelter transfer routes (POST
-// /transfers, GET /transfers, GET /transfers/:id, PATCH
-// /transfers/:id/status) — mounted at /api/v1 in app.js. No adopter-facing
-// surface exists for transfers at all, unlike adoption-applications.
+// /transfers, GET /transfers, GET /transfers/assignees, GET /transfers/:id,
+// PATCH /transfers/:id, PATCH /transfers/:id/status) — mounted at /api/v1 in
+// app.js. /transfers/assignees is registered before /transfers/:id so
+// "assignees" is never captured as an :id. No adopter-facing surface exists
+// for transfers at all, unlike adoption-applications.
 const express = require("express");
 const transfersController = require("../../controllers/staff/transfers.controller");
 const authenticate = require("../../middleware/authenticate");
@@ -142,6 +144,54 @@ router.get(
 
 /**
  * @swagger
+ * /transfers/assignees:
+ *   get:
+ *     summary: Preview the staff a new transfer will be assigned (Staff, Admin)
+ *     description: >
+ *       Resolves exactly what POST /transfers assigns — fromShelterStaff is
+ *       the acting staff member (null for Admin), toShelterStaff is the
+ *       destination shelter's manager (null if it has none, or if
+ *       toShelterID is omitted).
+ *     tags: [Transfers, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: toShelterID
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The resolved assignees
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         fromShelterStaff: { $ref: '#/components/schemas/TransferStaffOption' }
+ *                         toShelterStaff: { $ref: '#/components/schemas/TransferStaffOption' }
+ *       400:
+ *         description: toShelterID is not a positive integer
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/transfers/assignees",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  transfersController.getTransferAssignees,
+);
+
+/**
+ * @swagger
  * /transfers/{id}:
  *   get:
  *     summary: Get one transfer's full detail (Staff, Admin)
@@ -253,6 +303,69 @@ router.patch(
   authenticate,
   authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
   transfersController.updateTransferStatus,
+);
+
+/**
+ * @swagger
+ * /transfers/{id}:
+ *   patch:
+ *     summary: Reassign a transfer's destination staff (destination Manager, Admin)
+ *     description: >
+ *       toShelterStaff is the only editable field. Only the destination
+ *       shelter's manager (Shelter.managerStaffID) or an Admin may set it,
+ *       only while the transfer is In_Progress, and only to an Active staff
+ *       member at the destination shelter.
+ *     tags: [Transfers, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [toShelterStaff]
+ *             properties:
+ *               toShelterStaff: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The updated transfer
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/TransferDetail' }
+ *       400:
+ *         description: Invalid id/toShelterStaff, or the staff member isn't active at the destination shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Caller isn't the destination shelter's manager
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The transfer is no longer In_Progress
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.patch(
+  "/transfers/:id",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  transfersController.updateTransfer,
 );
 
 module.exports = router;

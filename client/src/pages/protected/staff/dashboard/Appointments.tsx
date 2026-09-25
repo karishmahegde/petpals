@@ -4,7 +4,6 @@ import { FaPlus } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import Card from "../../../../components/ui/Card";
-import ButtonElement from "../../../../components/ui/ButtonElement";
 import SelectField from "../../../../components/ui/SelectField";
 import type { BadgeTone } from "../../../../components/ui/Badge";
 import {
@@ -14,12 +13,14 @@ import {
 import {
   getAppointmentsQueue,
   getShelterVets,
+  type AppointmentDetail,
   type AppointmentQueueItem,
   type AppointmentStatus,
 } from "../../../../logic/api/staffAppointmentsApi";
 import { formatTime } from "../../../../logic/utils/datetime";
 import AppointmentFormPanel from "./sections/appointments/AppointmentFormPanel";
 import AppointmentDetailPanel from "./sections/appointments/AppointmentDetailPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 20;
 
@@ -65,49 +66,23 @@ const AppointmentRow = ({
   );
 };
 
-const PaginationControls = ({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (page: number) => void;
-}) =>
-  totalPages > 1 ? (
-    <div className="mt-6 flex items-center justify-center gap-4">
-      <ButtonElement
-        onClick={() => onChange(Math.max(1, page - 1))}
-        disabled={page === 1}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Previous
-      </ButtonElement>
-      <span className="font-body text-sm text-neutral-gray">
-        Page {page} of {totalPages}
-      </span>
-      <ButtonElement
-        onClick={() => onChange(Math.min(totalPages, page + 1))}
-        disabled={page >= totalPages}
-        size="bare"
-        variant="outline"
-        className="rounded-lg border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray disabled:opacity-40"
-      >
-        Next
-      </ButtonElement>
-    </div>
-  ) : null;
-
 // Appointments tab — Upcoming Appointments (Scheduled, still in the
 // future) and Past Appointments (everything else — naturally past-dated or
 // Cancelled), each with a Vet filter + pet-name search. "+ New Appointment"
 // opens AppointmentFormPanel; a row's "View Details" opens
-// AppointmentDetailPanel, which owns Cancel.
+// AppointmentDetailPanel, which owns Cancel and Edit. Edit closes the detail
+// panel and opens the same form in edit mode; closing the form (saved or
+// not) returns to that appointment's detail panel.
+type FormState = { mode: "create" } | { mode: "edit"; appointment: AppointmentDetail };
+
 const Appointments = () => {
-  const [createOpen, setCreateOpen] = useState(false);
+  const [formState, setFormState] = useState<FormState | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+
+  const closeForm = () => {
+    if (formState?.mode === "edit") setOpenId(formState.appointment.appointmentID);
+    setFormState(null);
+  };
 
   const { data: vets = [] } = useQuery({
     queryKey: ["staff", "shelter-vets"],
@@ -174,7 +149,7 @@ const Appointments = () => {
         action={{
           label: "New Appointment",
           icon: <FaPlus aria-hidden />,
-          onClick: () => setCreateOpen(true),
+          onClick: () => setFormState({ mode: "create" }),
         }}
       />
 
@@ -312,11 +287,21 @@ const Appointments = () => {
         />
       </Card>
 
-      <AppointmentFormPanel open={createOpen} onClose={() => setCreateOpen(false)} />
+      {/* key remounts the form per target, so it seeds fresh from `appointment`. */}
+      <AppointmentFormPanel
+        key={formState?.mode === "edit" ? formState.appointment.appointmentID : "create"}
+        open={formState !== null}
+        appointment={formState?.mode === "edit" ? formState.appointment : null}
+        onClose={closeForm}
+      />
 
       <AppointmentDetailPanel
         appointmentID={openId}
         onClose={() => setOpenId(null)}
+        onEdit={(appointment) => {
+          setOpenId(null);
+          setFormState({ mode: "edit", appointment });
+        }}
       />
     </div>
   );

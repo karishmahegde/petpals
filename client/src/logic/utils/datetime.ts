@@ -66,3 +66,12 @@ export const relativeDateBadge = (
   if (diffMs <= 0) return "Past";
   return diffMs <= 7 * 24 * 60 * 60 * 1000 ? "Soon" : "Upcoming";
 };
+
+// Date -> the "YYYY-MM-DDTHH:mm" string an <input type="datetime-local">
+// expects, in the viewer's local time (toISOString() would give UTC).
+export const toDateTimeLocalValue = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+};

@@ -37,7 +37,10 @@ const STATUS_TONE: Record<ApplicationStatus, BadgeTone> = {
   Withdrawn: "gray",
 };
 
-const GOVERNMENT_ID_TONE: Record<"Pending" | "Verified" | "Rejected", BadgeTone> = {
+const GOVERNMENT_ID_TONE: Record<
+  "Pending" | "Verified" | "Rejected",
+  BadgeTone
+> = {
   Pending: "gold",
   Verified: "green",
   Rejected: "red",
@@ -47,8 +50,7 @@ const MAX_REMARK_LEN = 500; // schema.prisma: staffRemark is VarChar(500)
 
 const label = "font-body text-sm font-semibold text-teal-dark";
 const value = "font-body text-sm text-neutral-charcoal";
-const sectionHeading =
-  "mt-4 font-body text-sm font-semibold text-neutral-dark";
+const sectionHeading = "mt-4 font-body text-sm font-semibold text-neutral-dark";
 const quoteBlock = "mt-1 font-body text-sm italic text-neutral-charcoal";
 const divider = "my-5 border-t border-neutral-lightgray";
 
@@ -132,7 +134,7 @@ const ApplicationDetailPanel = ({
                 onClick={() => setPendingAction("Rejected")}
                 size="panel"
                 variant="outline"
-                className="border border-rose-dark text-rose-dark hover:bg-rose-dark hover:text-white"
+                className="border bg-red text-white hover:brightness-95"
               >
                 Reject
               </ButtonElement>
@@ -184,9 +186,18 @@ const ApplicationDetailPanel = ({
               <InfoRow k="Phone" v={data.adopter.adopterPhone ?? "—"} />
               <InfoRow k="Housing Type" v={data.adopter.housingType ?? "—"} />
               <InfoRow k="Ownership Type" v={data.adopter.ownsOrRents ?? "—"} />
-              <InfoRow k="Landlord Contact" v={data.adopter.landlordContact ?? "—"} />
-              <InfoRow k="Household Size" v={data.adopter.householdSize ?? "—"} />
-              <InfoRow k="No. of Children" v={data.adopter.numChildren ?? "—"} />
+              <InfoRow
+                k="Landlord Contact"
+                v={data.adopter.landlordContact ?? "—"}
+              />
+              <InfoRow
+                k="Household Size"
+                v={data.adopter.householdSize ?? "—"}
+              />
+              <InfoRow
+                k="No. of Children"
+                v={data.adopter.numChildren ?? "—"}
+              />
               <dt className={label}>Government ID</dt>
               <dd>
                 {data.governmentIdStatus ? (
@@ -246,7 +257,9 @@ const ApplicationDetailPanel = ({
       <ConfirmActionModal
         isOpen={pendingAction !== null}
         title={
-          pendingAction === "Rejected" ? "Reject application?" : "Accept application?"
+          pendingAction === "Rejected"
+            ? "Reject application?"
+            : "Accept application?"
         }
         confirmLabel={pendingAction === "Rejected" ? "Reject" : "Accept"}
         isPending={review.isPending}
@@ -260,8 +273,8 @@ const ApplicationDetailPanel = ({
                 <>
                   This rejects the application for{" "}
                   <strong>{data.pet.petName}</strong> from{" "}
-                  {data.adopter.adopterName}. They'll be able to apply again
-                  for a different pet.
+                  {data.adopter.adopterName}. They'll be able to apply again for
+                  a different pet.
                 </>
               ) : (
                 <>
