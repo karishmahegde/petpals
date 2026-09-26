@@ -27,7 +27,7 @@ const Forbidden = () => {
         <ButtonElement
           onClick={() => navigate("/")}
           size="bare"
-          className="w-full bg-teal-dark text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all"
+          className="w-full bg-teal-dark text-sm font-light py-3 rounded-xl hover:brightness-95 transition-all"
         >
           go back home
         </ButtonElement>

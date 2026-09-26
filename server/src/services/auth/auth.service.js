@@ -33,23 +33,32 @@ const ROLE_CONFIG = {
 const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet", "volunteer"]);
 
 // Roles that pick the shelter they're joining at registration.
-const SHELTER_ROLES = new Set(["volunteer", "staff"]);
+const SHELTER_ROLES = new Set(["volunteer", "staff", "vet"]);
 
 // ——————————————— REGISTER ———————————————
 const register = async ({ name, email, password, role, shelterID }) => {
   const { roleEnum, model, nameField } = ROLE_CONFIG[role];
 
-  // Volunteers and staff join one shelter, whose staff (volunteers) or
-  // manager (staff) approve them — must be a shelter the public /shelters
-  // list offers (Open).
+  // Volunteers, staff, and vets join one shelter, whose staff (volunteers)
+  // or manager (staff, vets) approve them — must be a shelter the public
+  // /shelters list offers (Open). Vets additionally need one that already
+  // has a manager: a shelter is only ready to onboard vets once it has one,
+  // and that manager is who approves them (GET /shelters?hasManager=true).
   const joinsShelter = SHELTER_ROLES.has(role);
   if (joinsShelter) {
     const shelter = await prisma.shelter.findUnique({
       where: { shelterID },
-      select: { shelterStatus: true },
+      select: { shelterStatus: true, managerStaffID: true },
     });
     if (shelter?.shelterStatus !== "Open") {
       const err = new Error("shelterID must reference an open shelter");
+      err.code = "VALIDATION_ERROR";
+      throw err;
+    }
+    if (role === "vet" && shelter.managerStaffID === null) {
+      const err = new Error(
+        "This shelter isn't onboarding veterinarians yet — it has no manager assigned",
+      );
       err.code = "VALIDATION_ERROR";
       throw err;
     }
@@ -88,6 +97,27 @@ const register = async ({ name, email, password, role, shelterID }) => {
       accountStatus = isFirstAdmin ? "Active" : "Pending";
     }
 
+    // Staff: the first sign-up at a shelter with no manager (and no
+    // Manager sign-up already awaiting approval) registers as its Manager —
+    // an Admin approves them. Everyone after that signs up with no
+    // designation; their manager sets it when approving them.
+    let staffDesignation;
+    if (role === "staff") {
+      const [shelter, pendingManager] = await Promise.all([
+        tx.shelter.findUnique({
+          where: { shelterID },
+          select: { managerStaffID: true },
+        }),
+        tx.staff.findFirst({
+          where: { shelterID, staffDesignation: "Manager", accountStatus: "Pending" },
+          select: { userID: true },
+        }),
+      ]);
+      if (shelter.managerStaffID === null && !pendingManager) {
+        staffDesignation = "Manager";
+      }
+    }
+
     await tx[model].create({
       data: {
         userID: user.userID,
@@ -95,6 +125,7 @@ const register = async ({ name, email, password, role, shelterID }) => {
         avatarSeed: crypto.randomUUID(),
         ...(accountStatus ? { accountStatus } : {}),
         ...(joinsShelter ? { shelterID } : {}),
+        ...(staffDesignation ? { staffDesignation } : {}),
       },
     });
 
@@ -189,19 +220,11 @@ const login = async ({ email, password }) => {
 
   // Runs after every blocking check above, so a rejected login (wrong
   // password, Banned/Deactivated/Pending account) never counts as one.
-  // Adopter and Admin track lastLoginAt; other roles don't have the column
-  // yet.
-  if (user.role === "Adopter") {
-    await prisma.adopter.update({
-      where: { userID: user.userID },
-      data: { lastLoginAt: new Date() },
-    });
-  } else if (user.role === "Admin") {
-    await prisma.admin.update({
-      where: { userID: user.userID },
-      data: { lastLoginAt: new Date() },
-    });
-  }
+  // lastLoginAt lives on Users, so it's tracked for every role.
+  await prisma.users.update({
+    where: { userID: user.userID },
+    data: { lastLoginAt: new Date() },
+  });
 
   const { userPassword, refreshToken, ...safeUser } = user;
   return {

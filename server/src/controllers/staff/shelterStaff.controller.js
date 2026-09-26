@@ -1,4 +1,4 @@
-const teamService = require("../../services/staff/team.service");
+const shelterStaffService = require("../../services/staff/shelterStaff.service");
 const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
@@ -20,7 +20,7 @@ const VALID_DESIGNATION_FILTERS = ["Manager", "Senior", "Associate"];
 const VALID_TARGET_STATUSES = ["Active", "Deactivated"];
 
 // ——————————————— GET /staff/me/team ———————————————
-const listTeam = async (req, res, next) => {
+const listShelterStaff = async (req, res, next) => {
   const { section, staffDesignation, name, page: pageRaw, limit: limitRaw } = req.query;
 
   if (!VALID_SECTIONS.includes(section)) {
@@ -56,7 +56,7 @@ const listTeam = async (req, res, next) => {
   }
 
   try {
-    const result = await teamService.listTeam(req.user.userID, {
+    const result = await shelterStaffService.listShelterStaff(req.user.userID, {
       section,
       staffDesignation,
       name: typeof name === "string" ? name.trim() : undefined,
@@ -76,7 +76,7 @@ const listTeam = async (req, res, next) => {
 
 // ——————————————— PATCH /staff/me/team/:id ———————————————
 // Designation is the only field a manager may change.
-const updateTeamMember = async (req, res, next) => {
+const updateShelterStaffMember = async (req, res, next) => {
   let targetID;
   try {
     targetID = parseId(req.params.id);
@@ -90,7 +90,7 @@ const updateTeamMember = async (req, res, next) => {
   }
 
   try {
-    const member = await teamService.updateDesignation(
+    const member = await shelterStaffService.updateDesignation(
       req.user.userID,
       targetID,
       staffDesignation,
@@ -102,7 +102,7 @@ const updateTeamMember = async (req, res, next) => {
 };
 
 // ——————————————— PATCH /staff/me/team/:id/status ———————————————
-const updateTeamMemberStatus = async (req, res, next) => {
+const updateShelterStaffStatus = async (req, res, next) => {
   let targetID;
   try {
     targetID = parseId(req.params.id);
@@ -110,7 +110,9 @@ const updateTeamMemberStatus = async (req, res, next) => {
     return next(err);
   }
 
-  const { accountStatus } = req.body ?? {};
+  // staffDesignation is required (and only read) when approving a Pending
+  // member — the service validates it against their current status.
+  const { accountStatus, staffDesignation } = req.body ?? {};
   if (!VALID_TARGET_STATUSES.includes(accountStatus)) {
     return next(
       badRequest(
@@ -120,11 +122,16 @@ const updateTeamMemberStatus = async (req, res, next) => {
   }
 
   try {
-    const member = await teamService.updateStatus(req.user.userID, targetID, accountStatus);
+    const member = await shelterStaffService.updateStatus(
+      req.user.userID,
+      targetID,
+      accountStatus,
+      staffDesignation,
+    );
     return successResponse(res, "Staff member status updated successfully", member);
   } catch (err) {
     return next(err);
   }
 };
 
-module.exports = { listTeam, updateTeamMember, updateTeamMemberStatus };
+module.exports = { listShelterStaff, updateShelterStaffMember, updateShelterStaffStatus };

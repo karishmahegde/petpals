@@ -5,12 +5,11 @@
 // staffApi.ts (staff account domain) — this is its own feature/domain, same
 // convention as adoptionApplicationsApi.ts living apart from adoptersApi.ts.
 import axiosInstance from "./axiosInstance";
-import type { Pagination } from "./petsApi";
+import type { Breed, Pagination, Species } from "./petsApi";
 
 export type PetAdoptionStatus =
   | "incoming"
   | "available"
-  | "pending"
   | "adopted"
   | "fostered"
   | "transferred"
@@ -19,7 +18,6 @@ export type PetAdoptionStatus =
 export const PET_ADOPTION_STATUS_VALUES: PetAdoptionStatus[] = [
   "incoming",
   "available",
-  "pending",
   "adopted",
   "fostered",
   "transferred",
@@ -209,6 +207,9 @@ export interface CreatePetPayload {
   petWeight: number;
   petHeight: number;
   petBGroup?: string;
+  // Optional — the server defaults a new pet to "incoming" (out of the
+  // public catalog until staff mark it "available").
+  adoptionStatus?: PetAdoptionStatus;
 }
 
 export const createPet = async (
@@ -220,8 +221,8 @@ export const createPet = async (
 
 // Partial update — everything creatable, minus shelterID (reassignment is a
 // transfer, out of scope here), plus petDesc/microchipID/featuredFlag/
-// adoptionStatus. adoptionStatus is edit-only (create always starts a pet
-// at "available") — lets staff manually correct/override it (e.g. mark
+// adoptionStatus. Create defaults adoptionStatus to "incoming"; editing it
+// lets staff move a pet on to "available" or manually correct/override it (e.g. mark
 // deceased or transferred) alongside the Pending/Accepted transitions the
 // adoption application workflow already drives automatically.
 export type UpdatePetPayload = Partial<CreatePetPayload> & {
@@ -303,5 +304,24 @@ export const deletePetPhoto = async (
   const response = await axiosInstance.delete(
     `/pets/${petID}/photos/${photoID}`,
   );
+  return response.data.data;
+};
+
+// Staff/Admin — add a species or a breed (the read side, GET /species and
+// GET /breeds, stays in petsApi.ts). Names are unique case-insensitively
+// (per species, for breeds): a duplicate is a 409 with a readable message.
+export const createSpecies = async (speciesName: string): Promise<Species> => {
+  const response = await axiosInstance.post("/species", { speciesName });
+  return response.data.data;
+};
+
+export const createBreed = async (
+  speciesID: number,
+  breedName: string,
+): Promise<Breed> => {
+  const response = await axiosInstance.post("/breeds", {
+    speciesID,
+    breedName,
+  });
   return response.data.data;
 };

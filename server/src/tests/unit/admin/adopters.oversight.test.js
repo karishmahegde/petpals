@@ -11,6 +11,7 @@ jest.mock("../../../config/prisma", () => ({
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  governmentID: { findFirst: jest.fn() },
   // The service always passes an array of already-invoked prisma calls
   // (each already a Promise) — Promise.all is a faithful enough stand-in for
   // the real transaction batching.
@@ -53,7 +54,7 @@ const buildAdopterRow = (overrides = {}) => ({
   ...overrides,
 });
 
-describe("Admin adopter oversight endpoints", () => {
+describe("Adopter oversight endpoints", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     authService.getAccountStatus.mockResolvedValue("Active");
@@ -99,6 +100,23 @@ describe("Admin adopter oversight endpoints", () => {
       expect(res.body.data[0].adopterRiskFlag).toBe(true);
     });
 
+    test("Staff: name search → case-insensitive contains match (read-only list is Admin + Staff)", async () => {
+      prisma.adopter.findMany.mockResolvedValueOnce([buildAdopterRow()]);
+      prisma.adopter.count.mockResolvedValueOnce(1);
+
+      const res = await request(app)
+        .get("/api/v1/adopters")
+        .query({ name: " tay " })
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.adopter.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { adopterName: { contains: "tay", mode: "insensitive" } },
+        }),
+      );
+    });
+
     test("response never includes governmentID or stripeCustomerID — neither is in the select, neither is in the payload", async () => {
       prisma.adopter.findMany.mockResolvedValueOnce([buildAdopterRow()]);
       prisma.adopter.count.mockResolvedValueOnce(1);
@@ -117,6 +135,62 @@ describe("Admin adopter oversight endpoints", () => {
 
       expect(res.body.data[0]).not.toHaveProperty("governmentID");
       expect(res.body.data[0]).not.toHaveProperty("stripeCustomerID");
+    });
+  });
+
+  // ————————————————————————————— GET /adopters/:id —————————————————————————————
+  describe("GET /api/v1/adopters/:id", () => {
+    test("Staff: full profile, email flattened, breed name + ID verification status only", async () => {
+      prisma.adopter.findUnique.mockResolvedValueOnce(
+        buildAdopterRow({
+          housingType: "House",
+          preferredBreed: { breedName: "Beagle" },
+        }),
+      );
+      prisma.governmentID.findFirst.mockResolvedValueOnce({
+        verificationStatus: "Verified",
+      });
+
+      const res = await request(app)
+        .get("/api/v1/adopters/12")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({
+        userID: 12,
+        adopterEmail: "taylor@example.com",
+        housingType: "House",
+        preferredBreedName: "Beagle",
+        governmentIdStatus: "Verified",
+      });
+      expect(res.body.data).not.toHaveProperty("user");
+      expect(res.body.data).not.toHaveProperty("preferredBreed");
+
+      const select = prisma.adopter.findUnique.mock.calls[0][0].select;
+      expect(select).not.toHaveProperty("stripeCustomerID");
+      expect(prisma.governmentID.findFirst.mock.calls[0][0].select).toEqual({
+        verificationStatus: true,
+      });
+    });
+
+    test("not found → 404", async () => {
+      prisma.adopter.findUnique.mockResolvedValueOnce(null);
+      prisma.governmentID.findFirst.mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .get("/api/v1/adopters/999")
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(404);
+    });
+
+    test("Adopter role → 403", async () => {
+      const res = await request(app)
+        .get("/api/v1/adopters/12")
+        .set("Authorization", `Bearer ${signToken("Adopter", 12)}`);
+
+      expect(res.status).toBe(403);
+      expect(prisma.adopter.findUnique).not.toHaveBeenCalled();
     });
   });
 
@@ -158,8 +232,8 @@ describe("Admin adopter oversight endpoints", () => {
 
   // ————————————————————————————— ROLE ENFORCEMENT —————————————————————————————
   describe("role enforcement", () => {
+    // Status changes stay Admin-only — Staff only reads (list + detail).
     test.each([
-      ["get", "/api/v1/adopters", undefined],
       ["patch", "/api/v1/adopters/12/status", { accountStatus: "Active" }],
     ])(
       "%s %s: non-Admin role → 403 FORBIDDEN, nothing written",

@@ -29,24 +29,39 @@ const registerAndLoginAdopter = async () => {
   return { userID, token: loginRes.body.data.token };
 };
 
-// For the wrong-role (403) case — a Staff registration only needs
-// name/email/password/role (see auth.service.js register()), so no shelter
-// or other fixture rows are required just to get a valid Staff token.
-// Self-registered Staff land Pending and can't log in until approved (see
-// StaffAccountStatus / the Staff Approvals workflow) — this test only cares
-// about the wrong-role check, not the approval gate itself, so it approves
-// directly via Prisma rather than going through an admin's own login.
-const registerAndLoginStaff = async () => {
+// For the wrong-role (403) case. Staff sign-up requires picking an Open
+// shelter (see auth.service.js register()), so this seeds a throwaway one
+// first. Self-registered Staff land Pending and can't log in until
+// approved — this test only cares about the wrong-role check, not the
+// approval gate itself, so it approves directly via Prisma rather than
+// going through a manager's or admin's own login. Records each created ID
+// on `created` as soon as it exists, so the caller's cleanup still works if
+// a later step fails.
+const registerAndLoginStaff = async (created) => {
+  const shelter = await prisma.shelter.create({
+    data: {
+      shelterName: `Profile Test Shelter ${Date.now()}`,
+      shelterAddress: "1 Test Way",
+      shelterPhone: "555-0100",
+      shelterEmail: `profiletestshelter${Date.now()}@ex.com`,
+      shelterZIP: 10001,
+      shelterSize: 10,
+    },
+  });
+  created.shelterID = shelter.shelterID;
   const payload = {
     name: "Profile Test Staff",
     email: uniqueEmail(),
     password: "Secret123!",
     role: "staff",
+    shelterID: shelter.shelterID,
   };
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
+  expect(registerRes.status).toBe(201);
   const userID = registerRes.body.data.userID;
+  created.userID = userID;
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active" },
@@ -54,7 +69,20 @@ const registerAndLoginStaff = async () => {
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });
-  return { userID, token: loginRes.body.data.token };
+  return loginRes.body.data.token;
+};
+
+// Removes everything registerAndLoginStaff created — staff row first (it
+// FKs the shelter), then the user, then the shelter. Safe on a partial
+// setup: whatever wasn't created yet is simply skipped.
+const cleanUpStaff = async ({ userID, shelterID }) => {
+  if (userID !== undefined) {
+    await prisma.staff.deleteMany({ where: { userID } });
+    await prisma.users.deleteMany({ where: { userID } });
+  }
+  if (shelterID !== undefined) {
+    await prisma.shelter.deleteMany({ where: { shelterID } });
+  }
 };
 
 describe("GET /api/v1/adopters/me", () => {
@@ -93,18 +121,22 @@ describe("GET /api/v1/adopters/me", () => {
   });
 
   test("wrong role (staff) -> 403 FORBIDDEN", async () => {
-    const { userID, token } = await registerAndLoginStaff();
+    const created = {};
+    try {
+      const token = await registerAndLoginStaff(created);
 
-    const res = await request(app)
-      .get("/api/v1/adopters/me")
-      .set("Authorization", `Bearer ${token}`);
+      const res = await request(app)
+        .get("/api/v1/adopters/me")
+        .set("Authorization", `Bearer ${token}`);
 
-    expect(res.status).toBe(403);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error.code).toBe("FORBIDDEN");
-
-    await prisma.staff.deleteMany({ where: { userID } });
-    await prisma.users.deleteMany({ where: { userID } });
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+    } finally {
+      // Runs even if an assertion above fails, so a failed run can't leave
+      // a stray Pending staff account behind.
+      await cleanUpStaff(created);
+    }
   });
 });
 

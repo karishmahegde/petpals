@@ -209,21 +209,9 @@ const listShelterAppointments = async (
 };
 
 // ——————————————— APPOINTMENT DETAIL (GET /appointments/:id) ———————————————
-// "Vaccines administered" has no FK to Appointment in the schema — same
-// same-calendar-day approximation as the adopter-facing
-// adopter/appointments.service.js's getAppointmentDetailForAdopter, reused
-// verbatim rather than reinvented.
-const startOfDay = (date) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-const nextDay = (date) => {
-  const d = startOfDay(date);
-  d.setDate(d.getDate() + 1);
-  return d;
-};
-
+// "Vaccines administered" is the doses linked to this appointment via
+// VaccinationRecord.appointmentID — same as the adopter-facing
+// adopter/appointments.service.js's getAppointmentDetailForAdopter.
 const getShelterAppointmentDetail = async (appointmentID, actor) => {
   const appointment = await prisma.appointment.findUnique({
     where: { appointmentID },
@@ -242,6 +230,14 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
       shelter: { select: { shelterName: true } },
       staff: { select: { staffName: true } },
       volunteer: { select: { volunteerName: true } },
+      vaccinations: {
+        select: {
+          recordID: true,
+          dueDate: true,
+          vaccine: { select: { vaccineName: true } },
+        },
+        orderBy: { administeredDate: "asc" },
+      },
     },
   });
   if (!appointment) {
@@ -250,41 +246,24 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
 
   await assertStaffOwnsShelter(actor.role, actor.userID, appointment.shelterID);
 
-  const [vaccines, acceptedApplication] = await Promise.all([
-    prisma.vaccinationRecord.findMany({
-      where: {
-        petID: appointment.pet.petID,
-        administeredDate: {
-          gte: startOfDay(appointment.appointmentDate),
-          lt: nextDay(appointment.appointmentDate),
+  const acceptedApplication = await prisma.adoptionApplication.findFirst({
+    where: { petID: appointment.pet.petID, applicationStatus: "Accepted" },
+    select: {
+      adopter: {
+        select: {
+          adopterName: true,
+          adopterPhone: true,
+          addressLine1: true,
+          addressLine2: true,
+          city: true,
+          state: true,
+          zip: true,
+          country: true,
+          user: { select: { userEmail: true } },
         },
       },
-      select: {
-        recordID: true,
-        dueDate: true,
-        vaccine: { select: { vaccineName: true } },
-      },
-      orderBy: { administeredDate: "asc" },
-    }),
-    prisma.adoptionApplication.findFirst({
-      where: { petID: appointment.pet.petID, applicationStatus: "Accepted" },
-      select: {
-        adopter: {
-          select: {
-            adopterName: true,
-            adopterPhone: true,
-            addressLine1: true,
-            addressLine2: true,
-            city: true,
-            state: true,
-            zip: true,
-            country: true,
-            user: { select: { userEmail: true } },
-          },
-        },
-      },
-    }),
-  ]);
+    },
+  });
 
   return {
     appointmentID: appointment.appointmentID,
@@ -300,7 +279,7 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
     shelterName: appointment.shelter.shelterName,
     staffName: appointment.staff ? appointment.staff.staffName : null,
     volunteerName: appointment.volunteer ? appointment.volunteer.volunteerName : null,
-    vaccinesAdministered: vaccines.map((v) => ({
+    vaccinesAdministered: appointment.vaccinations.map((v) => ({
       recordID: v.recordID,
       vaccineName: v.vaccine.vaccineName,
       dueDate: v.dueDate,

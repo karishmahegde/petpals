@@ -116,7 +116,7 @@ const Applications = () => {
           {status === "all" && (
             <ButtonElement
               to="/adopt"
-              className="bg-teal-dark hover:bg-gold-dark"
+              className="bg-teal-dark hover:brightness-95"
             >
               Explore Pets
             </ButtonElement>

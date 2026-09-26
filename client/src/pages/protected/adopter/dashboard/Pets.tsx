@@ -74,7 +74,7 @@ const Pets = () => {
                 </DashboardEmptyMessage>
                 <ButtonElement
                   to="/adopt"
-                  className="bg-teal-dark hover:bg-gold-dark"
+                  className="bg-teal-dark hover:brightness-95"
                 >
                   Explore Pets
                 </ButtonElement>
@@ -108,7 +108,7 @@ const Pets = () => {
             </DashboardEmptyMessage>
             <ButtonElement
               to="/adopt"
-              className="bg-teal-dark hover:bg-gold-dark"
+              className="bg-teal-dark hover:brightness-95"
             >
               Explore Pets
             </ButtonElement>

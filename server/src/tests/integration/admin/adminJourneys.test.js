@@ -67,9 +67,19 @@ const registerAndLoginActiveAdmin = async (name) => {
 // Staff also start Pending; these journeys drive staff purely through the
 // Admin API, never logging in as the staff member itself, so only Active
 // (plus any caller-supplied overrides) needs forcing directly.
+// Staff sign-up requires picking a shelter (auth.service.js register()), so
+// overrides.shelterID doubles as the one they register at — every caller
+// passes one.
 const registerActiveStaff = async (name, overrides = {}) => {
-  const payload = { name, email: uniqueEmail(), password: "Secret123!", role: "staff" };
+  const payload = {
+    name,
+    email: uniqueEmail(),
+    password: "Secret123!",
+    role: "staff",
+    shelterID: overrides.shelterID,
+  };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
+  expect(registerRes.status).toBe(201);
   const userID = registerRes.body.data.userID;
   await prisma.staff.update({
     where: { userID },
@@ -133,14 +143,15 @@ describe("Admin oversight journeys", () => {
     expect(createRes.body.data.lat).toEqual(expect.any(Number));
     expect(createRes.body.data.lng).toEqual(expect.any(Number));
 
+    // Staff sign-up only accepts Open shelters, so register the manager before flipping to Full.
+    const manager = await registerActiveStaff("Lifecycle Manager", { shelterID });
+
     const statusRes = await request(app)
       .patch(`/api/v1/shelters/${shelterID}/status`)
       .set("Authorization", `Bearer ${admin.token}`)
       .send({ shelterStatus: "Full" });
     expect(statusRes.status).toBe(200);
     expect(statusRes.body.data.shelterStatus).toBe("Full");
-
-    const manager = await registerActiveStaff("Lifecycle Manager", { shelterID });
 
     const managerRes = await request(app)
       .patch(`/api/v1/shelters/${shelterID}/manager`)

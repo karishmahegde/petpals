@@ -21,12 +21,14 @@ const VALID_SORTS = ["newest"];
 const ADOPTION_STATUS_VALUES = [
   "incoming",
   "available",
-  "pending",
   "adopted",
   "fostered",
   "transferred",
   "deceased",
 ];
+
+// See staff/pets.service.js's LOCKED_STATUS_MESSAGE.
+const SYSTEM_ONLY_STATUSES = ["transferred", "adopted"];
 
 const STRING_MAX = {
   petName: 45,
@@ -72,8 +74,10 @@ const CREATE_REQUIRED_FIELDS = [
 
 // Optional on create — present-if-sent, validated the same as everywhere
 // else, but never required. petBGroup falls back to "N/A" when omitted
-// (see below); intakeType is nullable in the schema so it just stays null.
-const OPTIONAL_CREATE_FIELDS = ["petBGroup", "intakeType"];
+// (see below); intakeType is nullable in the schema so it just stays null;
+// adoptionStatus falls back to "incoming" in the service (a new arrival
+// stays out of the public catalog until staff mark it available).
+const OPTIONAL_CREATE_FIELDS = ["petBGroup", "intakeType", "adoptionStatus"];
 
 // PUT accepts a partial update of everything creatable, minus shelterID
 // (reassigning a pet to another shelter is a transfer, not a profile edit —
@@ -82,11 +86,11 @@ const OPTIONAL_CREATE_FIELDS = ["petBGroup", "intakeType"];
 // also NOT NULL with no default — unlike petName/petWeight/petHeight, a
 // blood group is routinely unknown at shelter intake, so it defaults to
 // "N/A" (matching the existing seed-data convention) when omitted on
-// create, and can be filled in later via PUT. adoptionStatus is also
-// PUT-only (create always starts a pet at "available") — lets staff
+// create, and can be filled in later via PUT. adoptionStatus is optional
+// on create (defaults to "incoming") and editable via PUT — lets staff
 // manually correct/override it (e.g. mark deceased or transferred)
-// alongside the automatic Pending/Accepted transitions the adoption
-// application workflow already drives. compatibleWithChildren/
+// alongside the automatic available → adopted transition an accepted
+// adoption application already drives. compatibleWithChildren/
 // compatibleWithPets/specialNeeds and featuredFlag are also PUT-only —
 // profile-facing judgment calls a shelter typically only makes once it's
 // had a chance to observe the pet, matching petDesc's own edit-only
@@ -226,6 +230,14 @@ const validateField = (field, rawValue) => {
           `adoptionStatus must be one of: ${ADOPTION_STATUS_VALUES.join(", ")}`,
         );
       }
+      // 'transferred' and 'adopted' are set (and undone) only by the
+      // transfer and adoption-application workflows — set by hand, the pet
+      // would be locked read-only with nothing to ever release it.
+      if (SYSTEM_ONLY_STATUSES.includes(rawValue)) {
+        throw badRequest(
+          `adoptionStatus '${rawValue}' is set only by the ${rawValue === "adopted" ? "adoption application" : "transfer"} workflow`,
+        );
+      }
       return rawValue;
 
     default:
@@ -342,9 +354,10 @@ const createPet = async (req, res, next) => {
   }
 
   const data = {};
-  // OPTIONAL_CREATE_FIELDS (petBGroup, intakeType) are validated only if the
-  // caller actually sent them — petBGroup then falls back to "N/A" below;
-  // intakeType just stays absent (nullable in the schema).
+  // OPTIONAL_CREATE_FIELDS (petBGroup, intakeType, adoptionStatus) are
+  // validated only if the caller actually sent them — petBGroup then falls
+  // back to "N/A" below; intakeType just stays absent (nullable in the
+  // schema); adoptionStatus falls back to "incoming" in the service.
   const fieldsToValidate = [
     ...CREATE_REQUIRED_FIELDS,
     ...OPTIONAL_CREATE_FIELDS.filter((field) => body[field] !== undefined),

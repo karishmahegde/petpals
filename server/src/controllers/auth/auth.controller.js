@@ -22,10 +22,10 @@ const register = async (req, res, next) => {
     return next(err);
   }
 
-  // Volunteers and staff must pick the shelter they're joining (its staff /
-  // manager approve them)
+  // Volunteers, staff, and vets must pick the shelter they're joining (its
+  // staff / manager approve them)
   let shelterID;
-  if (role === "volunteer" || role === "staff") {
+  if (role === "volunteer" || role === "staff" || role === "vet") {
     shelterID = Number(req.body.shelterID);
     if (!Number.isInteger(shelterID) || shelterID < 1) {
       const err = new Error(

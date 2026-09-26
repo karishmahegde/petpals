@@ -28,7 +28,7 @@ const ApplicationsWidget = () => {
       isEmpty={!hasApplications}
       emptyMessage="You have no active applications"
       emptyAction={
-        <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
+        <ButtonElement to="/adopt" className="bg-teal-dark hover:brightness-95">
           Explore Pets
         </ButtonElement>
       }

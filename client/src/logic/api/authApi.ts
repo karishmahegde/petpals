@@ -48,7 +48,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   role: string;
-  shelterID?: number; // volunteer only — the shelter whose staff approve them
+  shelterID?: number; // volunteer/staff/vet — the shelter that approves them
 }
 
 // ———————————————— REGISTER API ————————————————

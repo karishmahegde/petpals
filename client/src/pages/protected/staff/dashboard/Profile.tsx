@@ -1,9 +1,8 @@
 // Profile.tsx
 // Self-service profile view/edit for a staff member — mirrors the admin
-// dashboard's Profile.tsx, adapted for two schema differences: Staff has no
-// address field, and has no createdAt/lastLoginAt on the self-service
-// response (STAFF_SELF_SELECT doesn't select them) — the identity strip
-// shows designation + shelter instead.
+// dashboard's Profile.tsx (same identity strip with last login + email
+// verification, Personal and Address cards). Staff has no createdAt, so the
+// strip shows designation + shelter + joining date instead.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -21,8 +20,11 @@ import {
   getMyStaffProfile,
   updateMyStaffProfile,
   type StaffAccountStatus,
-  type StaffListItem,
+  type StaffSelfProfile,
 } from "../../../../logic/api/staffApi";
+import type { Address } from "../../../../logic/utils/address";
+import ProfileAddressSection from "../../../../components/ui/profile/ProfileAddressSection";
+import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
 import { formatShortDate } from "../../../../logic/utils/datetime";
 
 const STATUS_TONE: Record<StaffAccountStatus, BadgeTone> = {
@@ -39,7 +41,7 @@ const SEX_LABELS: Record<string, string> = {
   O: "Other",
 };
 
-interface EditableProfile {
+interface EditableProfile extends Address {
   avatarSeed: string;
   staffName: string;
   staffPhone: string | null;
@@ -47,10 +49,16 @@ interface EditableProfile {
   staffSex: string | null;
 }
 
-const toEditable = (p: StaffListItem): EditableProfile => ({
+const toEditable = (p: StaffSelfProfile): EditableProfile => ({
   avatarSeed: p.avatarSeed,
   staffName: p.staffName,
   staffPhone: p.staffPhone,
+  addressLine1: p.addressLine1,
+  addressLine2: p.addressLine2,
+  city: p.city,
+  state: p.state,
+  zip: p.zip,
+  country: p.country,
   staffDOB: p.staffDOB ? p.staffDOB.slice(0, 10) : null,
   staffSex: p.staffSex,
 });
@@ -140,9 +148,7 @@ const Profile = () => {
       />
 
       {profileQuery.isLoading && (
-        <p className="font-body text-sm text-neutral-gray">
-          Loading profile…
-        </p>
+        <p className="font-body text-sm text-neutral-gray">Loading profile…</p>
       )}
 
       {profileQuery.isError && (
@@ -173,7 +179,7 @@ const Profile = () => {
                     aria-label="Randomize avatar"
                     title="Randomize avatar"
                     size="bare"
-                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm hover:brightness-90"
+                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm hover:brightness-95"
                   >
                     <PiArrowsClockwiseBold
                       className="h-3.5 w-3.5"
@@ -194,14 +200,24 @@ const Profile = () => {
                   {profile.staffDOJ && (
                     <> · Joined {formatShortDate(new Date(profile.staffDOJ))}</>
                   )}
+                  {profile.lastLoginAt && (
+                    <>
+                      {" "}
+                      · Last login{" "}
+                      {formatShortDate(new Date(profile.lastLoginAt))}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
-            {profile.accountStatus && (
-              <Badge tone={STATUS_TONE[profile.accountStatus]}>
-                {profile.accountStatus}
-              </Badge>
-            )}
+            <div className="flex items-center gap-3">
+              <EmailVerificationStatus verified={profile.emailVerified} />
+              {profile.accountStatus && (
+                <Badge tone={STATUS_TONE[profile.accountStatus]}>
+                  {profile.accountStatus}
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Sections */}
@@ -230,16 +246,12 @@ const Profile = () => {
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-body text-xs text-neutral-gray">
-                    Phone
-                  </dt>
+                  <dt className="font-body text-xs text-neutral-gray">Phone</dt>
                   <dd className="mt-1 font-body text-sm text-neutral-dark">
                     {isEditing && formState ? (
                       <PhoneInputField
                         value={formState.staffPhone}
-                        onChange={(next) =>
-                          patch({ staffPhone: next ?? null })
-                        }
+                        onChange={(next) => patch({ staffPhone: next ?? null })}
                       />
                     ) : profile.staffPhone ? (
                       <PhoneDisplay value={profile.staffPhone} />
@@ -299,6 +311,13 @@ const Profile = () => {
               </dl>
               <GovernmentIdSection isEditing={isEditing} />
             </section>
+
+            <ProfileAddressSection
+              value={profile}
+              isEditing={isEditing}
+              draft={formState}
+              onChange={patch}
+            />
           </div>
 
           {/* Save error */}
@@ -316,8 +335,7 @@ const Profile = () => {
                   onClick={cancelEdit}
                   disabled={mutation.isPending}
                   size="bare"
-                  variant="outline"
-                  className="rounded-xl border border-neutral-gray px-5 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray"
+                  className="rounded-xl bg-red px-5 py-2 text-sm font-medium hover:brightness-95"
                 >
                   Cancel
                 </ButtonElement>
@@ -325,7 +343,7 @@ const Profile = () => {
                   onClick={handleSave}
                   disabled={mutation.isPending}
                   size="bare"
-                  className="rounded-xl bg-rose-dark px-5 py-2 text-sm font-medium hover:brightness-90"
+                  className="rounded-xl bg-teal-dark px-5 py-2 text-sm font-medium hover:brightness-95"
                 >
                   {mutation.isPending ? "Saving…" : "Save"}
                 </ButtonElement>
@@ -334,7 +352,7 @@ const Profile = () => {
               <ButtonElement
                 onClick={beginEdit}
                 size="bare"
-                className="rounded-xl bg-rose-dark px-5 py-2 text-sm font-medium hover:brightness-90"
+                className="rounded-xl bg-teal-dark px-5 py-2 text-sm font-medium hover:brightness-95"
               >
                 Edit profile
               </ButtonElement>
@@ -343,18 +361,15 @@ const Profile = () => {
 
           {/* Danger zone */}
           <div className="mt-10 rounded-2xl border border-rose-md bg-rose-lightest p-5 md:p-6">
-            <h2 className="font-display text-lg text-rose-dark">
-              Danger zone
-            </h2>
+            <h2 className="font-display text-lg text-rose-dark">Danger zone</h2>
             <p className="mt-1 font-body text-sm text-neutral-charcoal">
-              Closing your account deactivates or permanently deletes it.
-              This can't be undone.
+              Closing your account deactivates or permanently deletes it. This
+              can't be undone.
             </p>
             <ButtonElement
               onClick={() => setIsCloseAccountOpen(true)}
               size="bare"
-              variant="outline"
-              className="mt-4 rounded-xl border border-rose-dark px-4 py-2 text-sm font-medium text-rose-dark hover:bg-rose-dark hover:text-white"
+              className="mt-4 rounded-xl bg-red px-4 py-2 text-sm font-medium hover:brightness-95"
             >
               Close account
             </ButtonElement>

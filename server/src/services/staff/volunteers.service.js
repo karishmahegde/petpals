@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { ADDRESS_SELECT } = require("../../utils/address");
 
 const notFound = (userID) => {
   const err = new Error(`No volunteer exists with ID ${userID}`);
@@ -105,7 +106,7 @@ const getVolunteerDetail = async (userID, actor) => {
       volunteerCode: true,
       avatarSeed: true,
       volunteerName: true,
-      volunteerAddress: true,
+      ...ADDRESS_SELECT,
       volunteerPhone: true,
       volunteerDOB: true,
       volunteerSex: true,

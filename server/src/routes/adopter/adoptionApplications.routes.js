@@ -213,7 +213,8 @@ router.get(
  *       Which transitions are valid depends on the caller's role, not a
  *       shared enum: Adopter may move their own application to 'Withdrawn'
  *       from 'Pending' or 'Accepted' (the $15 processing fee is not
- *       refunded). Staff/Admin may move a 'Pending' application to
+ *       refunded); withdrawing an Accepted application also sets the pet
+ *       back to 'available'. Staff/Admin may move a 'Pending' application to
  *       'Accepted' or 'Rejected' — Staff only at their own shelter (403
  *       otherwise); Admin any shelter. Accepting sets staffID to the acting
  *       Staff member (never set for an Admin actor — the column FKs
@@ -279,6 +280,69 @@ router.patch(
   authenticate,
   authorizeRoles(ROLES.ADOPTER, ROLES.STAFF, ROLES.ADMIN),
   controller.updateApplicationStatus,
+);
+
+/**
+ * @swagger
+ * /adoption-applications/{id}:
+ *   patch:
+ *     summary: Assign an application's staff (shelter Manager, Admin)
+ *     description: >
+ *       staffID is the only editable field. Only the application's shelter
+ *       manager (Shelter.managerStaffID) or an Admin may set it, only while
+ *       the application is Pending, and only to an Active staff member at
+ *       that shelter.
+ *     tags: [Adoption Applications, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [staffID]
+ *             properties:
+ *               staffID: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The updated application
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AdoptionApplicationFullDetail' }
+ *       400:
+ *         description: Invalid id/staffID, or the staff member isn't active at the application's shelter
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Caller isn't the application's shelter manager
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The application is no longer Pending
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.patch(
+  "/:id",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  controller.updateApplication,
 );
 
 module.exports = router;

@@ -1,13 +1,19 @@
 // What it does: API functions for the /government-ids domain — Staff/Admin
-// only. Scoped to Adopters + Volunteers (Staff/Veterinarian/Admin account
-// approval is a separate, pre-existing flow under Admin). Unlike every
+// only. Who sees whose IDs is decided server-side: a shelter's manager →
+// Adopter/Volunteer/Staff/Veterinarian, other staff → Adopter/Volunteer, Admin →
+// Managers and other Admins. Unlike every
 // other place GovernmentID is exposed, getGovernmentIdDetail returns the
 // FULL idNumber and a real, viewable document image — this is the
 // dedicated, authorized verification workflow those fields exist for.
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
 
-export type GovernmentIdUserType = "Adopter" | "Volunteer";
+export type GovernmentIdUserType =
+  | "Adopter"
+  | "Volunteer"
+  | "Staff"
+  | "Veterinarian"
+  | "Admin";
 export type GovernmentIdVerificationStatus = "Pending" | "Verified" | "Rejected";
 
 // Row shape for GET /government-ids.

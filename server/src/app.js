@@ -49,6 +49,8 @@ const petsRouter = require("./routes/public/pets.routes");
 app.use("/api/v1", petsRouter);
 const staffPetsRouter = require("./routes/staff/pets.routes");
 app.use("/api/v1", staffPetsRouter);
+const staffSpeciesRouter = require("./routes/staff/species.routes");
+app.use("/api/v1", staffSpeciesRouter);
 const sheltersRouter = require("./routes/public/shelters.routes");
 app.use("/api/v1", sheltersRouter);
 const adminSheltersRouter = require("./routes/admin/shelters.routes");
@@ -68,9 +70,11 @@ app.use("/api/v1", favoritesRouter);
 // "/staff/me" first (:id="me").
 const staffSelfRouter = require("./routes/staff/staff.routes");
 app.use("/api/v1", staffSelfRouter);
-// Also before the Admin /staff/:id router — see routes/staff/team.routes.js.
-const staffTeamRouter = require("./routes/staff/team.routes");
-app.use("/api/v1", staffTeamRouter);
+// Also before the Admin /staff/:id router — see routes/staff/shelterStaff.routes.js.
+const shelterStaffRouter = require("./routes/staff/shelterStaff.routes");
+app.use("/api/v1", shelterStaffRouter);
+const staffVetsRouter = require("./routes/staff/vets.routes");
+app.use("/api/v1", staffVetsRouter);
 const staffRouter = require("./routes/admin/staff.routes");
 app.use("/api/v1", staffRouter);
 const adminsRouter = require("./routes/admin/admins.routes");

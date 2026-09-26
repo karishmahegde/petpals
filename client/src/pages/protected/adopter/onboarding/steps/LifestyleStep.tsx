@@ -174,7 +174,7 @@ const LifestyleStep = ({ profile, onContinue, onBack }: LifestyleStepProps) => {
           <ButtonElement
             onClick={onBack}
             size="panel"
-            className="flex-1 bg-gold hover:brightness-90 disabled:cursor-not-allowed"
+            className="flex-1 bg-gold hover:brightness-95 disabled:cursor-not-allowed"
           >
             Back
           </ButtonElement>
@@ -183,7 +183,7 @@ const LifestyleStep = ({ profile, onContinue, onBack }: LifestyleStepProps) => {
           onClick={handleContinue}
           disabled={mutation.isPending}
           size="panel"
-          className="flex-1 bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
+          className="flex-1 bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? "Saving…" : "Continue"}
         </ButtonElement>

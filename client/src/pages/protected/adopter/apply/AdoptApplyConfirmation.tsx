@@ -88,7 +88,7 @@ const AdoptApplyConfirmation = () => {
             <ButtonElement
               onClick={() => navigate("/adopter", { replace: true })}
               size="panel"
-              className="mt-6 w-full bg-teal-dark hover:brightness-90"
+              className="mt-6 w-full bg-teal-dark hover:brightness-95"
             >
               Go to Dashboard
             </ButtonElement>
@@ -105,7 +105,7 @@ const AdoptApplyConfirmation = () => {
             <ButtonElement
               onClick={() => navigate("/adopter", { replace: true })}
               size="panel"
-              className="mt-6 w-full bg-teal-dark hover:brightness-90"
+              className="mt-6 w-full bg-teal-dark hover:brightness-95"
             >
               Go to Dashboard
             </ButtonElement>

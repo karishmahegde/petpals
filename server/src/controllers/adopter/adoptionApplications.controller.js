@@ -292,9 +292,33 @@ const updateApplicationStatus = async (req, res, next) => {
   }
 };
 
+// ——————————————— PATCH /adoption-applications/:id ———————————————
+const updateApplication = async (req, res, next) => {
+  let applicationID;
+  let staffID;
+  try {
+    applicationID = parseId(req.params.id, "id");
+    staffID = parseId(req.body?.staffID, "staffID");
+  } catch (err) {
+    return next(err);
+  }
+
+  try {
+    const application = await adoptionApplicationsService.assignApplicationStaff(
+      applicationID,
+      { staffID },
+      { role: req.user.role, userID: req.user.userID },
+    );
+    return successResponse(res, "Application staff assigned successfully", application);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   createApplication,
   getApplications,
   getApplication,
   updateApplicationStatus,
+  updateApplication,
 };

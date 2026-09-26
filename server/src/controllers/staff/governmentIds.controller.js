@@ -16,7 +16,7 @@ const parseId = (value, field) => {
 };
 
 const VALID_SECTIONS = ["pending", "reviewed"];
-const VALID_USER_TYPES = ["Adopter", "Volunteer"];
+const VALID_USER_TYPES = ["Adopter", "Volunteer", "Staff", "Veterinarian", "Admin"];
 const VALID_STATUS_CHANGES = ["Verified", "Rejected"];
 
 // ——————————————— GET /government-ids ———————————————

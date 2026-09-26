@@ -20,29 +20,10 @@ import DashboardEmptyMessage from "../../../../../../components/ui/dashboard/Das
 import { formatShortDate } from "../../../../../../logic/utils/datetime";
 import {
   getHealthPassport,
-  type PetAdoptionStatus,
   type VaccinationStatus,
 } from "../../../../../../logic/api/staffPetsApi";
-
-const ADOPTION_STATUS_LABEL: Record<PetAdoptionStatus, string> = {
-  incoming: "Incoming",
-  available: "Available",
-  pending: "Pending",
-  adopted: "Adopted",
-  fostered: "Fostered",
-  transferred: "Transferred",
-  deceased: "Deceased",
-};
-
-const ADOPTION_STATUS_TONE: Record<PetAdoptionStatus, BadgeTone> = {
-  incoming: "gold",
-  available: "teal",
-  pending: "gold",
-  adopted: "green",
-  fostered: "teal",
-  transferred: "neutral",
-  deceased: "red",
-};
+import { PET_STATUS_META } from "../../../../../../logic/staff/petStatus";
+import { formatVetName } from "../../../../../../logic/utils/vetName";
 
 const VACCINATION_TONE: Record<VaccinationStatus, BadgeTone> = {
   Overdue: "red",
@@ -145,10 +126,10 @@ const HealthPassport = () => {
                 </p>
               </div>
               <Badge
-                tone={ADOPTION_STATUS_TONE[data.pet.adoptionStatus]}
+                tone={PET_STATUS_META[data.pet.adoptionStatus].tone}
                 className="shrink-0"
               >
-                {ADOPTION_STATUS_LABEL[data.pet.adoptionStatus]}
+                {PET_STATUS_META[data.pet.adoptionStatus].label}
               </Badge>
             </div>
 
@@ -204,7 +185,7 @@ const HealthPassport = () => {
                     </div>
                     {(record.vetName || record.shelterName) && (
                       <p className="mt-2 shrink-0 font-body text-xs text-neutral-gray sm:mt-0 sm:text-right">
-                        {record.vetName}
+                        {record.vetName && formatVetName(record.vetName)}
                         {record.vetName && record.shelterName ? " · " : ""}
                         {record.shelterName}
                       </p>

@@ -169,7 +169,7 @@ const PreferencesStep = ({ profile, onContinue, onBack }: PreferencesStepProps) 
           <ButtonElement
             onClick={onBack}
             size="panel"
-            className="flex-1 bg-gold hover:brightness-90 disabled:cursor-not-allowed"
+            className="flex-1 bg-gold hover:brightness-95 disabled:cursor-not-allowed"
           >
             Back
           </ButtonElement>
@@ -178,7 +178,7 @@ const PreferencesStep = ({ profile, onContinue, onBack }: PreferencesStepProps) 
           onClick={handleContinue}
           disabled={mutation.isPending}
           size="panel"
-          className="flex-1 bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
+          className="flex-1 bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? "Saving…" : "Continue"}
         </ButtonElement>

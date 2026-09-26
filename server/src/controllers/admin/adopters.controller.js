@@ -14,6 +14,7 @@ const listAdopters = async (req, res, next) => {
   const {
     accountStatus,
     adopterRiskFlag: adopterRiskFlagRaw,
+    name,
     page: pageRaw,
     limit: limitRaw,
   } = req.query;
@@ -56,6 +57,7 @@ const listAdopters = async (req, res, next) => {
     const result = await adoptersService.listAdopters({
       accountStatus,
       adopterRiskFlag,
+      name: typeof name === "string" ? name.trim() || undefined : undefined,
       page,
       limit,
     });
@@ -65,6 +67,21 @@ const listAdopters = async (req, res, next) => {
       result.data,
       result.pagination,
     );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— GET /adopters/:id ———————————————
+const getAdopter = async (req, res, next) => {
+  const userID = Number(req.params.id);
+  if (!Number.isInteger(userID) || userID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const adopter = await adoptersService.getAdopterDetail(userID);
+    return successResponse(res, "Adopter retrieved successfully", adopter);
   } catch (err) {
     return next(err);
   }
@@ -97,4 +114,4 @@ const updateAdopterStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { listAdopters, updateAdopterStatus };
+module.exports = { listAdopters, getAdopter, updateAdopterStatus };

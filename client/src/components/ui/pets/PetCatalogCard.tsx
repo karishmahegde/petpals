@@ -29,6 +29,10 @@ interface CardComponentProps {
   // favoriting concept — hides the heart entirely rather than rendering a
   // control that only ever shows the "requires an Adopter account" toast.
   showFavorite?: boolean;
+  // Overlaid on the photo's top-right corner (e.g. the staff All Pets
+  // grid's adoptionStatus Badge). Takes the heart's spot, so only pass it
+  // alongside showFavorite={false}.
+  cornerBadge?: React.ReactNode;
 }
 
 const CardComponent = ({
@@ -38,6 +42,7 @@ const CardComponent = ({
   ctaLabel = "Know More",
   unavailable = false,
   showFavorite = true,
+  cornerBadge,
 }: CardComponentProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -132,6 +137,11 @@ const CardComponent = ({
               <FaRegHeart className="text-neutral-gray" />
             )}
           </ButtonElement>
+        )}
+        {cornerBadge && (
+          <div className="absolute right-2 top-2 flex rounded-full shadow">
+            {cornerBadge}
+          </div>
         )}
       </div>
       <div className={`flex flex-col p-4 ${unavailable ? "opacity-60" : ""}`}>

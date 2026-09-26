@@ -17,7 +17,10 @@ import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { register as registerApi } from "../../../logic/api/authApi";
-import { getShelters } from "../../../logic/api/petsApi";
+import {
+  getShelters,
+  getSheltersWithManager,
+} from "../../../logic/api/petsApi";
 import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background-admin.png";
@@ -95,11 +98,14 @@ const WorkerRegister = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isStaff = role === "staff";
+  // Staff and vets both join one shelter, whose manager approves them —
+  // so vets only see shelters that already have one.
+  const isVet = role === "vet";
+  const needsShelter = role === "staff" || isVet;
   const { data: shelters = [] } = useQuery({
-    queryKey: ["shelters"],
-    queryFn: getShelters,
-    enabled: isStaff,
+    queryKey: ["shelters", { hasManager: isVet }],
+    queryFn: isVet ? getSheltersWithManager : getShelters,
+    enabled: needsShelter,
   });
 
   if (token && sessionRole) {
@@ -127,7 +133,8 @@ const WorkerRegister = () => {
       return "Password does not meet all requirements";
 
     if (!role) return "Please select your role";
-    if (isStaff && !shelterID) return "Please select the shelter you work at";
+    if (needsShelter && !shelterID)
+      return "Please select the shelter you work at";
     if (!agreeTerms)
       return "Please agree to the Terms of Service and Privacy Policy";
     if (!confirmAge) return "Please confirm you are 18 or older";
@@ -150,7 +157,7 @@ const WorkerRegister = () => {
         email,
         password,
         role,
-        shelterID: isStaff ? Number(shelterID) : undefined,
+        shelterID: needsShelter ? Number(shelterID) : undefined,
       });
       toast.success(
         "Registered! Your account needs approval before you can sign in.",
@@ -304,7 +311,11 @@ const WorkerRegister = () => {
                 return (
                   <ButtonElement
                     key={option.value}
-                    onClick={() => setRole(option.value)}
+                    onClick={() => {
+                      setRole(option.value);
+                      // The two roles offer different shelter lists.
+                      setShelterID("");
+                    }}
                     size="bare"
                     variant="outline"
                     className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left ${
@@ -330,8 +341,8 @@ const WorkerRegister = () => {
             </p>
           </div>
 
-          {/* Shelter — staff only */}
-          {isStaff && (
+          {/* Shelter — staff and vets */}
+          {needsShelter && (
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor="shelterID"
@@ -352,6 +363,11 @@ const WorkerRegister = () => {
                   </option>
                 ))}
               </select>
+              {isVet && (
+                <p className="font-body text-xs text-neutral-gray">
+                  Only shelters with a manager in place are onboarding vets.
+                </p>
+              )}
             </div>
           )}
 
@@ -395,7 +411,7 @@ const WorkerRegister = () => {
             type="submit"
             disabled={loading}
             size="bare"
-            className="w-full bg-gold-md text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            className="w-full bg-gold-md text-sm font-light py-3 rounded-xl hover:brightness-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing up..." : "sign up"}
           </ButtonElement>

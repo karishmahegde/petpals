@@ -20,6 +20,7 @@ import {
 } from "../../../../../../logic/api/volunteersApi";
 import { VOLUNTEER_STATUS_TONE } from "../../../../../../logic/staff/volunteerStatus";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
+import { formatAddress } from "../../../../../../logic/utils/address";
 
 interface VolunteerDetailPanelProps {
   userID: number | null;
@@ -75,7 +76,7 @@ const VolunteerDetailPanel = ({ userID, onClose }: VolunteerDetailPanelProps) =>
             <ButtonElement
               onClick={() => setConfirmingDeactivate(true)}
               size="panel"
-              className="w-full bg-red hover:brightness-90"
+              className="w-full bg-red hover:brightness-95"
             >
               Deactivate Account
             </ButtonElement>
@@ -130,7 +131,7 @@ const VolunteerDetailPanel = ({ userID, onClose }: VolunteerDetailPanelProps) =>
                 v={data.volunteerDOB ? formatFullDate(new Date(data.volunteerDOB)) : "—"}
               />
               <InfoRow k="Sex" v={data.volunteerSex ?? "—"} />
-              <InfoRow k="Address" v={data.volunteerAddress ?? "—"} />
+              <InfoRow k="Address" v={formatAddress(data) || "—"} />
               <InfoRow
                 k="Volunteering Since"
                 v={formatFullDate(new Date(data.createdAt))}

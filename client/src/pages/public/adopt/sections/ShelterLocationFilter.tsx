@@ -189,8 +189,7 @@ const ShelterLocationFilter = ({
                 aria-label="Use current location"
                 title="Use current location"
                 size="bare"
-                variant="outline"
-                className="flex flex-1 shrink-0 items-center justify-center rounded-md ext-xs bg-teal p-2 text-teal-dark hover:bg-teal-dark hover:text-white"
+                className="flex flex-1 shrink-0 items-center justify-center rounded-md bg-teal-dark p-2 text-xs hover:bg-gold-dark"
               >
                 <HiOutlineLocationMarker className="mx-1" />
                 <span className="text-xs font-normal">
@@ -235,8 +234,7 @@ const ShelterLocationFilter = ({
               <ButtonElement
                 onClick={handleResetFilter}
                 size="bare"
-                variant="outline"
-                className="w-full rounded-md bg-neutral-offwhite border border-neutral-lightgray px-3 py-1.5 text-xs font-light text-neutral-charcoal hover:bg-neutral-lightgray"
+                className="w-full rounded-md bg-red px-3 py-1.5 text-xs font-light hover:bg-gold-dark"
               >
                 Reset Filter
               </ButtonElement>

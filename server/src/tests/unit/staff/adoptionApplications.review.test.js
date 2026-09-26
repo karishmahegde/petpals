@@ -13,7 +13,7 @@ jest.mock("../../../config/prisma", () => ({
     findUnique: jest.fn(),
     update: jest.fn(),
   },
-  pet: { update: jest.fn() },
+  pet: { update: jest.fn(), updateMany: jest.fn() },
   // The service always passes an array of already-invoked prisma calls
   // (each already a Promise) — Promise.all is a faithful enough stand-in for
   // the real transaction batching.
@@ -377,6 +377,36 @@ describe("Application review workflow (Staff/Admin)", () => {
 
       expect(res.status).toBe(200);
       expect(prisma.pet.update).not.toHaveBeenCalled();
+      expect(prisma.pet.updateMany).not.toHaveBeenCalled();
+    });
+
+    test("Adopter withdrawing their own Accepted application → 200, pet back to 'available' in the same transaction", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce({
+        applicationID: 1,
+        adopterID: 7,
+        shelterID: 9,
+        petID: 5,
+        applicationStatus: "Accepted",
+      });
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Withdrawn" }),
+      );
+      prisma.pet.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      const res = await request(app)
+        .patch("/api/v1/adoption-applications/1/status")
+        .set("Authorization", `Bearer ${adopterToken(7)}`)
+        .send({ status: "Withdrawn" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.pet.updateMany).toHaveBeenCalledWith({
+        where: { petID: 5, adoptionStatus: "adopted" },
+        data: { adoptionStatus: "available" },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledWith([
+        expect.anything(),
+        expect.anything(),
+      ]);
     });
 
     test("Adopter withdrawing someone else's application → 403 FORBIDDEN", async () => {

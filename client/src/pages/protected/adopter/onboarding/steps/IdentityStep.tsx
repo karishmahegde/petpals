@@ -43,7 +43,7 @@ const IdentityStep = ({ onContinue, onBack }: IdentityStepProps) => {
           <ButtonElement
             onClick={onBack}
             size="panel"
-            className="flex-1 bg-gold hover:brightness-90 disabled:cursor-not-allowed"
+            className="flex-1 bg-gold hover:brightness-95 disabled:cursor-not-allowed"
           >
             Back
           </ButtonElement>
@@ -52,7 +52,7 @@ const IdentityStep = ({ onContinue, onBack }: IdentityStepProps) => {
           onClick={onContinue}
           disabled={!hasSubmission}
           size="panel"
-          className="flex-1 bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
+          className="flex-1 bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
         >
           Continue
         </ButtonElement>

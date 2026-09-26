@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import {
   PiArrowsClockwiseBold,
   PiLightningFill,
-  PiSealCheck,
 } from "react-icons/pi";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import ButtonElement from "../../../../components/ui/ButtonElement";
@@ -25,6 +24,7 @@ import {
   type Breed,
 } from "../../../../logic/api/petsApi";
 import { formatShortDate } from "../../../../logic/utils/datetime";
+import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
 
 // ——————————————————————————————————————————————————————————————
 // Field model — drives both view and edit rendering generically.
@@ -361,8 +361,6 @@ const Profile = () => {
   };
 
   // Stub — real flow is a separate task.
-  const handleVerifyEmail = () => toast("Email verification is coming soon.");
-
   const [isCloseAccountOpen, setIsCloseAccountOpen] = useState(false);
 
   // ————————————————————————————————————————————————————————————
@@ -586,7 +584,7 @@ const Profile = () => {
                     aria-label="Randomize avatar"
                     title="Randomize avatar"
                     size="bare"
-                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark shadow-sm hover:brightness-90"
+                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark shadow-sm hover:brightness-95"
                   >
                     <PiArrowsClockwiseBold
                       className="h-3.5 w-3.5"
@@ -621,21 +619,7 @@ const Profile = () => {
                   Pre-qualified
                 </span>
               )}
-              {profile.emailVerified ? (
-                <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-green">
-                  <PiSealCheck className="h-4 w-4" aria-hidden />
-                  Email verified
-                </span>
-              ) : (
-                <ButtonElement
-                  onClick={handleVerifyEmail}
-                  size="bare"
-                  variant="outline"
-                  className="rounded-xl border border-rose-dark px-4 py-1.5 font-body text-sm font-medium text-rose-dark hover:bg-rose-dark hover:text-white"
-                >
-                  Verify email
-                </ButtonElement>
-              )}
+              <EmailVerificationStatus verified={profile.emailVerified} />
             </div>
           </div>
 
@@ -683,8 +667,7 @@ const Profile = () => {
                   onClick={cancelEdit}
                   disabled={mutation.isPending}
                   size="bare"
-                  variant="outline"
-                  className="rounded-xl border border-neutral-gray px-5 py-2 font-body text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray"
+                  className="rounded-xl bg-red px-5 py-2 font-body text-sm font-medium hover:brightness-95"
                 >
                   Cancel
                 </ButtonElement>
@@ -692,7 +675,7 @@ const Profile = () => {
                   onClick={handleSave}
                   disabled={mutation.isPending}
                   size="bare"
-                  className="rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium hover:brightness-90"
+                  className="rounded-xl bg-teal-dark px-5 py-2 font-body text-sm font-medium hover:brightness-95"
                 >
                   {mutation.isPending ? "Saving…" : "Save"}
                 </ButtonElement>
@@ -701,7 +684,7 @@ const Profile = () => {
               <ButtonElement
                 onClick={() => beginEdit()}
                 size="bare"
-                className="rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium hover:brightness-90"
+                className="rounded-xl bg-teal-dark px-5 py-2 font-body text-sm font-medium hover:brightness-95"
               >
                 Edit profile
               </ButtonElement>
@@ -718,8 +701,7 @@ const Profile = () => {
             <ButtonElement
               onClick={() => setIsCloseAccountOpen(true)}
               size="bare"
-              variant="outline"
-              className="mt-4 rounded-xl border border-rose-dark px-4 py-2 font-body text-sm font-medium text-rose-dark hover:bg-rose-dark hover:text-white"
+              className="mt-4 rounded-xl bg-red px-4 py-2 font-body text-sm font-medium hover:brightness-95"
             >
               Close account
             </ButtonElement>

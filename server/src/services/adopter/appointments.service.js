@@ -37,21 +37,8 @@ const listAppointmentsByAdopter = async (
 // The full record behind one row of the Appointments section, for the detail
 // slide-over. Same access rule as the list — the adopter must hold an Accepted
 // application for the appointment's pet, otherwise 403.
-// "Vaccines administered" has no FK to Appointment in the schema, so it's
-// approximated as the pet's vaccination records dated the same calendar day as
-// the appointment.
-
-const startOfDay = (date) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-const nextDay = (date) => {
-  const d = startOfDay(date);
-  d.setDate(d.getDate() + 1);
-  return d;
-};
-
+// "Vaccines administered" is the doses linked to this appointment via
+// VaccinationRecord.appointmentID.
 const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
   const appointment = await prisma.appointment.findFirst({
     where: {
@@ -80,6 +67,14 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
       },
       vet: { select: { vetName: true } },
       shelter: { select: { shelterName: true, shelterAddress: true } },
+      vaccinations: {
+        select: {
+          recordID: true,
+          dueDate: true,
+          vaccine: { select: { vaccineName: true } },
+        },
+        orderBy: { administeredDate: "asc" },
+      },
     },
   });
 
@@ -90,22 +85,6 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
     err.code = "NOT_FOUND";
     throw err;
   }
-
-  const vaccines = await prisma.vaccinationRecord.findMany({
-    where: {
-      petID: appointment.pet.petID,
-      administeredDate: {
-        gte: startOfDay(appointment.appointmentDate),
-        lt: nextDay(appointment.appointmentDate),
-      },
-    },
-    select: {
-      recordID: true,
-      dueDate: true,
-      vaccine: { select: { vaccineName: true } },
-    },
-    orderBy: { administeredDate: "asc" },
-  });
 
   return {
     appointmentID: appointment.appointmentID,
@@ -122,7 +101,7 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
     vetName: appointment.vet ? appointment.vet.vetName : null,
     shelterName: appointment.shelter.shelterName,
     shelterAddress: appointment.shelter.shelterAddress,
-    vaccinesAdministered: vaccines.map((v) => ({
+    vaccinesAdministered: appointment.vaccinations.map((v) => ({
       recordID: v.recordID,
       vaccineName: v.vaccine.vaccineName,
       dueDate: v.dueDate,

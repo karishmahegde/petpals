@@ -1,6 +1,6 @@
 # Setup Guide
 
-Gets you from `git clone` to a running PetPals instance with 6 test logins (one per role), 2 shelters, and 17 pets. ~15 minutes, most of it waiting on installs.
+Gets you from `git clone` to a running PetPals instance with sample data covering every case the app handles — 31 test logins (every account status for every role), 4 shelters, and 21 pets. ~15 minutes, most of it waiting on installs.
 
 For architecture, folder structure, and API reference, see [`CLAUDE.md`](../CLAUDE.md). This file only covers first-time setup. Everything setup-related — this guide and the one-time SQL script it walks you through — lives in this `setup/` folder.
 
@@ -54,16 +54,18 @@ npx prisma generate
 npx prisma migrate deploy
 ```
 
-> ⚠️ **Use `migrate deploy`, not `migrate dev`, and not the `npm run prisma:migrate` script** (that script literally runs `migrate dev`). This schema has hand-applied PostGIS/generated columns that aren't in Prisma's migration history — `migrate dev` will detect that as drift and offer to reset your database. `migrate deploy` just applies the tracked migrations and never prompts. Full explanation in `CLAUDE.md` → Permanent Known Issues.
+This builds the entire schema, including the parts `schema.prisma` can't describe: PostGIS and the shelter-location column, the human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`, …) as Postgres generated columns, and the partial unique indexes. They're written directly into the baseline migration's SQL.
 
-### Apply the hand-applied pieces (one-time)
+> ⚠️ **Use `migrate deploy`, not `migrate dev`, and not the `npm run prisma:migrate` script** (that script literally runs `migrate dev`). Prisma can't model those PostGIS/generated columns, so `migrate dev` sees them as drift and offers to reset your database. `migrate deploy` just applies the tracked migrations and never prompts. Full explanation in `CLAUDE.md` → Permanent Known Issues.
 
-A handful of things aren't expressible in a Prisma migration at all — a PostGIS geography column, three human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`) backed by Postgres generated columns, a partial unique index, and the two storage buckets. They're bundled into one script:
+### Create the storage buckets (one-time)
+
+The two Supabase Storage buckets (`pet-images`, public; `government-ids`, private) live in Supabase's own `storage` schema, so they're created by a short script instead of a migration:
 
 1. Open **Supabase → SQL Editor → New query**.
 2. Paste in the contents of [`manual-constraints.sql`](./manual-constraints.sql) (in this same `setup/` folder) and run it.
 
-It's idempotent, so re-running it later (e.g. after a DB reset) is safe.
+It's idempotent, so re-running it later is safe.
 
 ### Seed sample data
 
@@ -71,7 +73,9 @@ It's idempotent, so re-running it later (e.g. after a DB reset) is safe.
 npx prisma db seed
 ```
 
-Creates 2 shelters, species/breeds, 17 pets, and one login per role. The command prints all 6 logins when it finishes — you'll also find them in the [Test accounts](#test-accounts) table below.
+> ⚠️ **The seed wipes the database first** — every table is emptied and its IDs restart at 1, so every run produces exactly the same data. Storage buckets aren't touched. It refuses to run with `NODE_ENV=production`.
+
+Creates 4 shelters (one per status), 21 pets (one per adoption status), and 31 logins covering every account status for every role, plus applications, visits, appointments, transfers, tasks, events, donations and ID verifications in every status. The command prints every login and what case it represents when it finishes — the main ones are in the [Test accounts](#test-accounts) table below.
 
 ## 4. Start the server
 
@@ -98,6 +102,8 @@ Runs at `http://localhost:3000`.
 
 <a id="test-accounts"></a>
 
+One fully-featured login per role:
+
 | Role | Email | Password |
 | --- | --- | --- |
 | Admin | `admin@petpals.com` | `Admin@123` |
@@ -107,13 +113,27 @@ Runs at `http://localhost:3000`.
 | Volunteer | `volunteer@petpals.com` | `Volunteer@123` |
 | Donor | `donor@petpals.com` | `Donor@123` |
 
-Only the **Adopter** dashboard is built so far (see `CLAUDE.md` → Sprint Plan — Sprint 3 is in progress; Staff/Vet/Volunteer/Donor/Admin dashboards are planned). The public site (home, catalog, pet details) and Adopter flows are the fully working path right now.
+Every other seeded account uses its role's password above. The ones worth knowing:
+
+| Email | Case |
+| --- | --- |
+| `brooklyn.staff@petpals.com` | Manager of the *other* shelter — check cross-shelter isolation |
+| `staff.senior@` / `staff.associate@petpals.com` | Non-manager staff at Downtown |
+| `staff.unassigned@petpals.com` | Active staff with no shelter |
+| `adopter.two@petpals.com` | Adopted Shadow, fostering Hazel, ID pending, competing application on Apollo |
+| `adopter.onboarding@petpals.com` | Onboarding stopped at step 4 |
+| `vet.brooklyn@` / `volunteer.two@` / `volunteer.brooklyn@petpals.com` | Active at Downtown or Brooklyn |
+| `*.pending@petpals.com` (admin, staff, vet, volunteer) | Awaiting approval — can't log in |
+| `staff.manager.pending@petpals.com` | Pending Manager sign-up at Queens — an Admin approves |
+| `*.deactivated@` / `*.banned@petpals.com` | Closed or banned accounts — login is refused |
+
+The public site and the Adopter, Staff and Admin dashboards are built; the Vet, Volunteer and Donor dashboards are placeholders until Sprint 5.
 
 ## Troubleshooting
 
 - **Prisma asks to reset the database / mentions drift** — you (or a script) ran `migrate dev` instead of `migrate deploy`. Don't confirm the reset; re-read the callout in step 3.
-- **Pet photos look broken** — seeding only points `petPhoto` at URLs in your `pet-images` bucket; it doesn't upload the actual image files. Fine for exercising every flow — upload real files to that bucket yourself if you want photos to render.
-- **`/shelters/nearby` returns nothing / errors** — usually means `manual-constraints.sql` wasn't run yet, or the `postgis` extension didn't enable (check **Database → Extensions** in Supabase).
+- **Pet photos look broken** — seeding only points `petPhoto` at files in your `pet-images` bucket; it doesn't upload them. Upload `1.png`–`17.png`, `hazel.png`, `pepper.png` and `oscar.png` to the bucket root, plus `pets/8/…` and `pets/771/…` (Cleo's and Mischief's photos — exact names in `seed.js`) if you want every photo to render. Everything else works without them.
+- **`/shelters/nearby` returns nothing / errors** — usually means the `postgis` extension didn't enable during `migrate deploy` (check **Database → Extensions** in Supabase, then re-run `npx prisma migrate deploy`).
 - **Adoption application never appears after "paying"** — the `AdoptionApplication` row is only created by the Stripe webhook after a successful checkout, not by the initial POST (see `CLAUDE.md`). Without Stripe configured, you can exercise everything up to checkout but the row won't be created — this is expected, not a bug.
 
 ## Docker Compose alternative

@@ -3,6 +3,7 @@
 // per-shelter manager-assignment dropdown on the Shelters tab.
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
+import type { Address } from "../utils/address";
 
 export type StaffDesignation = "Manager" | "Senior" | "Associate";
 // Pending = self-registered, awaiting admin approval. Filter-only — never a
@@ -38,6 +39,10 @@ interface StaffListParams {
   shelterID?: number;
   staffDesignation?: string;
   accountStatus?: string;
+  /** Only the Pending registrations Admin approves — at shelters with no manager. */
+  awaitingAdmin?: boolean;
+  /** Case-insensitive contains match on staffName. */
+  name?: string;
   page?: number;
   limit?: number;
 }
@@ -97,7 +102,14 @@ export const updateStaffStatus = async (
 // ———————————————— MY PROFILE API ————————————————
 // Self-service shape — same fields as StaffListItem. Update/close-account/
 // government-ID wrappers land with the Staff Profile page's own card.
-export const getMyStaffProfile = async (): Promise<StaffListItem> => {
+// The self-service shape — the list-row fields plus the address and the
+// account-level emailVerified/lastLoginAt (from Users).
+export interface StaffSelfProfile extends StaffListItem, Address {
+  emailVerified: boolean;
+  lastLoginAt: string | null;
+}
+
+export const getMyStaffProfile = async (): Promise<StaffSelfProfile> => {
   const response = await axiosInstance.get("/staff/me");
   return response.data.data;
 };
@@ -111,7 +123,7 @@ export const getMyStaffProfile = async (): Promise<StaffListItem> => {
 // to clear them.
 export const updateMyStaffProfile = async (
   payload: Record<string, unknown>,
-): Promise<StaffListItem> => {
+): Promise<StaffSelfProfile> => {
   const response = await axiosInstance.put("/staff/me", payload);
   return response.data.data;
 };

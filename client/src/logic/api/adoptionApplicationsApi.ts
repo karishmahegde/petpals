@@ -73,6 +73,9 @@ export interface AdoptionApplicationFullDetail {
   // (see CLAUDE.md's "Never expose ... governmentID" rule) — the full
   // record lives in the dedicated ID Verification tab.
   governmentIdStatus: "Pending" | "Verified" | "Rejected" | null;
+  // Server-computed: true only for the application's shelter manager (or
+  // Admin) while it's still Pending — gates assignApplicationStaff.
+  canAssignStaff: boolean;
 }
 
 // Starts payment — creates a Stripe Checkout Session and returns its URL.
@@ -185,6 +188,20 @@ export const reviewApplication = async (
   const response = await axiosInstance.patch(
     `/adoption-applications/${applicationID}/status`,
     { status, staffRemark },
+  );
+  return response.data.data;
+};
+
+// Manager-only (or Admin) — sets the application's assigned staff member.
+// Only valid on a Pending application, and only to an Active staff member
+// at its shelter. Returns the refreshed full detail.
+export const assignApplicationStaff = async (
+  applicationID: number,
+  staffID: number,
+): Promise<AdoptionApplicationFullDetail> => {
+  const response = await axiosInstance.patch(
+    `/adoption-applications/${applicationID}`,
+    { staffID },
   );
   return response.data.data;
 };

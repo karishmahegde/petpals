@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { BiFilterAlt } from "react-icons/bi";
-import { PiBuildingsBold, PiIdentificationBadgeBold } from "react-icons/pi";
 import Card from "../../../../components/ui/Card";
 import SelectField from "../../../../components/ui/SelectField";
 import Avatar from "../../../../components/ui/Avatar";
+import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import type { BadgeTone } from "../../../../components/ui/Badge";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 import {
   DashboardListRow,
   RowActionButton,
@@ -17,12 +18,11 @@ import {
   getStaffPage,
   type StaffAccountStatus,
   type StaffDesignation,
+  type StaffListItem,
 } from "../../../../logic/api/staffApi";
 import { getShelterAnalytics } from "../../../../logic/api/analyticsApi";
 import StaffDetailPanel from "./sections/staff/StaffDetailPanel";
 import StaffApprovalPanel from "./sections/staff/StaffApprovalPanel";
-import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
-import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 10;
 
@@ -31,14 +31,14 @@ type DesignationFilter = StaffDesignation | "all";
 type StatusFilter = StaffAccountStatus | "all";
 
 const DESIGNATION_OPTIONS: { value: DesignationFilter; label: string }[] = [
-  { value: "all", label: "All designations" },
+  { value: "all", label: "All Designations" },
   { value: "Manager", label: "Manager" },
   { value: "Senior", label: "Senior" },
   { value: "Associate", label: "Associate" },
 ];
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All statuses" },
+  { value: "all", label: "All Statuses" },
   { value: "Pending", label: "Pending" },
   { value: "Active", label: "Active" },
   { value: "Deactivated", label: "Deactivated" },
@@ -50,37 +50,100 @@ const STATUS_TONE: Record<StaffAccountStatus, BadgeTone> = {
   Deactivated: "gray",
 };
 
-// Staff tab — org-wide staff listing, filterable by shelter/designation/
-// status, paginated. Rows open a detail slide-over with the full profile and
-// an edit form for designation + shelter reassignment.
+// Matches SelectField's own label + trigger sizing, same as the Staff
+// dashboard's Staff.tsx.
+const filterInputClass =
+  "w-full rounded-md border border-neutral-lightgray bg-white px-3 py-2.5 font-body text-sm text-neutral-charcoal focus:outline-none focus:ring-1 focus:ring-teal-dark";
+const filterLabelClass =
+  "mb-1.5 block font-body text-sm font-semibold text-neutral-charcoal";
+
+// Shared by both sections' rows — same layout as the Staff dashboard's
+// Staff tab: avatar | name + designation + shelter | phone and email inline
+// | actions.
+const memberRowProps = (member: StaffListItem) => ({
+  leading: (
+    <Avatar
+      seed={member.avatarSeed}
+      alt={`${member.staffName} avatar`}
+      size={48}
+      className="h-12 w-12 shrink-0 rounded-full ring-2 ring-teal-dark"
+    />
+  ),
+  title: member.staffName,
+  lines: [
+    { text: member.staffDesignation ?? "No designation" },
+    { text: member.shelter?.shelterName ?? "No shelter assigned" },
+  ],
+  details: (
+    <>
+      <span className="flex items-center gap-2">
+        <span role="img" aria-label="Phone" className="shrink-0">
+          ☎️
+        </span>
+        {member.staffPhone ? (
+          <PhoneDisplay value={member.staffPhone} />
+        ) : (
+          "No phone"
+        )}
+      </span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span role="img" aria-label="Email" className="shrink-0">
+          ✉️
+        </span>
+        <span className="truncate">{member.user.userEmail}</span>
+      </span>
+    </>
+  ),
+});
+
+// Staff tab — Manager Approvals (Pending Manager sign-ups: the first staff
+// sign-up at a shelter without a manager registers as its Manager, and only
+// Admin approves those; everyone else is approved by their shelter's
+// manager) above All Staff (org-wide, filterable by shelter/designation/
+// status + name search, paginated). Same card-per-section layout as the
+// Staff dashboard's Staff tab. Rows open StaffApprovalPanel (approve/
+// decline) or StaffDetailPanel (full profile, designation + shelter edits).
 const Staff = () => {
   const [shelterFilter, setShelterFilter] = useState<ShelterFilter>("all");
   const [designationFilter, setDesignationFilter] =
     useState<DesignationFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [name, setName] = useState("");
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<number | null>(null);
   const [approvalOpenId, setApprovalOpenId] = useState<number | null>(null);
+  // Manager Approvals' own filters — independent of All Staff's. No
+  // Designation/Status here: every row is a Pending Manager sign-up.
+  const [pendingShelter, setPendingShelter] = useState<ShelterFilter>("all");
+  const [pendingName, setPendingName] = useState("");
 
   const { data: shelters } = useQuery({
     queryKey: ["admin", "shelters-analytics"],
     queryFn: () => getShelterAnalytics(),
   });
 
-  // Self-registered staff awaiting approval — a small, un-paginated list
-  // (there's no self-service Staff registration path yet, so this stays
-  // short in practice; see StaffApprovalPanel for the Approve/Decline flow).
-  const { data: pendingStaff, isLoading: pendingLoading } = useQuery({
-    queryKey: ["admin", "staff", "pending"],
-    queryFn: () => getStaff({ accountStatus: "Pending", limit: 100 }),
+  // A small, un-paginated list; see StaffApprovalPanel for Approve/Decline.
+  const pendingQuery = useQuery({
+    queryKey: ["admin", "staff", "pending", { pendingShelter, pendingName }],
+    queryFn: () =>
+      getStaff({
+        awaitingAdmin: true,
+        shelterID: pendingShelter === "all" ? undefined : pendingShelter,
+        name: pendingName.trim() || undefined,
+        limit: 100,
+      }),
+    placeholderData: keepPreviousData,
   });
+  const pendingStaff = pendingQuery.data ?? [];
+  const hasPendingFilters =
+    pendingShelter !== "all" || pendingName.trim() !== "";
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
       "admin",
       "staff",
       "page",
-      { page, shelterFilter, designationFilter, statusFilter },
+      { page, shelterFilter, designationFilter, statusFilter, name },
     ],
     queryFn: () =>
       getStaffPage({
@@ -90,17 +153,20 @@ const Staff = () => {
         staffDesignation:
           designationFilter === "all" ? undefined : designationFilter,
         accountStatus: statusFilter === "all" ? undefined : statusFilter,
+        name: name.trim() || undefined,
       }),
     placeholderData: keepPreviousData,
   });
 
   const staff = data?.data ?? [];
-  const totalPages = data?.pagination.totalPages ?? 1;
   const hasFilters =
-    shelterFilter !== "all" || designationFilter !== "all" || statusFilter !== "all";
+    shelterFilter !== "all" ||
+    designationFilter !== "all" ||
+    statusFilter !== "all" ||
+    name.trim() !== "";
 
   const shelterOptions = [
-    { value: "all", label: "All shelters" },
+    { value: "all", label: "All Shelters" },
     ...(shelters ?? []).map((s) => ({
       value: String(s.shelterID),
       label: s.shelterName,
@@ -120,134 +186,56 @@ const Staff = () => {
         message="Every staff member across the network"
       />
 
-      {/* Filters */}
-      <Card className="mb-6 p-5">
-        <div className="mb-3 flex items-center gap-2 font-body text-sm font-semibold text-neutral-charcoal">
-          <BiFilterAlt />
-          Filters
-        </div>
-        <div className="flex flex-col gap-4 sm:flex-row">
+      <Card className="mb-6 p-6">
+        <DashboardWidgetHeader
+          icon="🧑‍💼"
+          title="Manager Approvals"
+          className="mb-4"
+        />
+
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SelectField
             label="Shelter"
-            icon={<PiBuildingsBold className="text-neutral-gray" />}
-            className="flex-1"
-            value={String(shelterFilter)}
-            onChange={(v) =>
-              changeFilter(
-                setShelterFilter,
-                v === "all" ? "all" : Number(v),
-              )
-            }
+            value={String(pendingShelter)}
+            onChange={(v) => setPendingShelter(v === "all" ? "all" : Number(v))}
             options={shelterOptions}
           />
-          <SelectField
-            label="Designation"
-            icon={<PiIdentificationBadgeBold className="text-neutral-gray" />}
-            className="flex-1"
-            value={designationFilter}
-            onChange={(v) =>
-              changeFilter(setDesignationFilter, v as DesignationFilter)
-            }
-            options={DESIGNATION_OPTIONS}
-          />
-          <SelectField
-            label="Status"
-            className="flex-1"
-            value={statusFilter}
-            onChange={(v) => changeFilter(setStatusFilter, v as StatusFilter)}
-            options={STATUS_OPTIONS}
-          />
+          <div>
+            <label className={filterLabelClass} htmlFor="admin-pending-name">
+              Staff Name
+            </label>
+            <input
+              id="admin-pending-name"
+              placeholder="Search by staff name"
+              value={pendingName}
+              onChange={(e) => setPendingName(e.target.value)}
+              className={filterInputClass}
+            />
+          </div>
         </div>
-      </Card>
 
-      {isLoading && (
-        <p className="font-body text-sm text-neutral-gray">
-          Loading staff…
-        </p>
-      )}
-
-      {isError && (
-        <p className="font-body text-sm text-rose-dark">
-          Couldn't load staff. Please try again.
-        </p>
-      )}
-
-      {data && staff.length === 0 && (
-        <div className="rounded-2xl bg-white p-10 text-center shadow-md">
-          <DashboardEmptyMessage>
-            {hasFilters
-              ? "No staff match these filters."
-              : "No staff members yet."}
-          </DashboardEmptyMessage>
-        </div>
-      )}
-
-      {staff.length > 0 && (
-        <Card className="p-6">
-          <ul className="flex flex-col gap-4">
-            {staff.map((member) => (
-              <li key={member.userID}>
-                <DashboardListRow
-                  leading={
-                    <Avatar
-                      seed={member.avatarSeed}
-                      size={48}
-                      className="h-12 w-12 shrink-0 rounded-full ring-2 ring-teal-dark"
-                    />
-                  }
-                  title={member.staffName}
-                  lines={[
-                    { text: member.shelter?.shelterName ?? "No shelter assigned" },
-                    { text: member.staffDesignation ?? "No designation set" },
-                  ]}
-                  badge={
-                    member.accountStatus
-                      ? {
-                          label: member.accountStatus,
-                          tone: STATUS_TONE[member.accountStatus],
-                        }
-                      : undefined
-                  }
-                  actions={
-                    <RowActionButton onClick={() => setOpenId(member.userID)}>
-                      View
-                    </RowActionButton>
-                  }
-                />
-              </li>
-            ))}
-          </ul>
-
-          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
-        </Card>
-      )}
-
-      {/* Staff Approvals */}
-      <Card className="mt-6 p-6">
-        <DashboardWidgetHeader icon="🧑‍💼" title="Staff Approvals" className="mb-4" />
-
-        {pendingLoading ? (
-          <p className="py-6 text-center font-body text-sm text-neutral-gray">
-            Loading pending staff…
+        {pendingQuery.isLoading && (
+          <p className="font-body text-sm text-neutral-gray">Loading…</p>
+        )}
+        {pendingQuery.isError && (
+          <p className="font-body text-sm text-rose-dark">
+            Couldn't load pending managers. Please try again.
           </p>
-        ) : !pendingStaff || pendingStaff.length === 0 ? (
+        )}
+        {pendingQuery.data && pendingStaff.length === 0 && (
           <DashboardEmptyMessage>
-            No staff awaiting approval.
+            {hasPendingFilters
+              ? "No pending managers match your filters."
+              : "No managers awaiting approval. Other staff are approved by their shelter's manager."}
           </DashboardEmptyMessage>
-        ) : (
+        )}
+
+        {pendingStaff.length > 0 && (
           <ul className="flex flex-col gap-4">
             {pendingStaff.map((member) => (
               <li key={member.userID}>
                 <DashboardListRow
-                  leading={
-                    <Avatar
-                      seed={member.avatarSeed}
-                      size={48}
-                      className="h-12 w-12 shrink-0 rounded-full ring-2 ring-teal-dark"
-                    />
-                  }
-                  title={member.staffName}
-                  lines={[{ text: member.user.userEmail }]}
+                  {...memberRowProps(member)}
                   actions={
                     <RowActionButton
                       onClick={() => setApprovalOpenId(member.userID)}
@@ -260,6 +248,96 @@ const Staff = () => {
             ))}
           </ul>
         )}
+      </Card>
+
+      <Card className="p-6">
+        <DashboardWidgetHeader icon="🧑‍💼" title="All Staff" className="mb-4" />
+
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <SelectField
+            label="Shelter"
+            value={String(shelterFilter)}
+            onChange={(v) =>
+              changeFilter(setShelterFilter, v === "all" ? "all" : Number(v))
+            }
+            options={shelterOptions}
+          />
+          <SelectField
+            label="Designation"
+            value={designationFilter}
+            onChange={(v) =>
+              changeFilter(setDesignationFilter, v as DesignationFilter)
+            }
+            options={DESIGNATION_OPTIONS}
+          />
+          <SelectField
+            label="Status"
+            value={statusFilter}
+            onChange={(v) => changeFilter(setStatusFilter, v as StatusFilter)}
+            options={STATUS_OPTIONS}
+          />
+          <div>
+            <label className={filterLabelClass} htmlFor="admin-staff-name">
+              Staff Name
+            </label>
+            <input
+              id="admin-staff-name"
+              placeholder="Search by staff name"
+              value={name}
+              onChange={(e) => changeFilter(setName, e.target.value)}
+              className={filterInputClass}
+            />
+          </div>
+        </div>
+
+        {isLoading && (
+          <p className="font-body text-sm text-neutral-gray">Loading…</p>
+        )}
+        {isError && (
+          <p className="font-body text-sm text-rose-dark">
+            Couldn't load staff. Please try again.
+          </p>
+        )}
+        {data && staff.length === 0 && (
+          <DashboardEmptyMessage>
+            {hasFilters
+              ? "No staff match your filters."
+              : "No staff members yet."}
+          </DashboardEmptyMessage>
+        )}
+
+        {staff.length > 0 && (
+          <ul className="flex flex-col gap-4">
+            {staff.map((member) => (
+              <li key={member.userID}>
+                <DashboardListRow
+                  {...memberRowProps(member)}
+                  // Same as the Staff dashboard: only a non-Active account
+                  // gets a status badge.
+                  badge={
+                    member.accountStatus && member.accountStatus !== "Active"
+                      ? {
+                          label: member.accountStatus,
+                          tone: STATUS_TONE[member.accountStatus],
+                        }
+                      : undefined
+                  }
+                  actions={
+                    <RowActionButton onClick={() => setOpenId(member.userID)}>
+                      View Details
+                    </RowActionButton>
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <PaginationControls
+          page={page}
+          totalPages={data?.pagination.totalPages ?? 1}
+          onChange={setPage}
+        />
       </Card>
 
       <StaffDetailPanel userID={openId} onClose={() => setOpenId(null)} />

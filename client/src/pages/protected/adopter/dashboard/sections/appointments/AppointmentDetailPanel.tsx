@@ -12,6 +12,7 @@ import {
   formatShortDate,
   formatTime,
 } from "../../../../../../logic/utils/datetime";
+import { formatVetName } from "../../../../../../logic/utils/vetName";
 
 interface AppointmentDetailPanelProps {
   appointmentID: number | null;
@@ -92,7 +93,10 @@ const AppointmentDetailPanel = ({
               )}`}
             />
             <InfoRow k="Reason for appointment" v={data.appointmentReason} />
-            <InfoRow k="Vet" v={data.vetName ?? "—"} />
+            <InfoRow
+              k="Vet"
+              v={data.vetName ? formatVetName(data.vetName) : "—"}
+            />
             <InfoRow k="Shelter" v={data.shelterName} />
           </dl>
 

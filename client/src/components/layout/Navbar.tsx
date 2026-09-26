@@ -140,7 +140,7 @@ const Navbar = () => {
             // Logged-out: login button
             <NavLink
               to="/login"
-              className="font-body text-sm font-medium bg-rose-dark text-white px-5 py-2 rounded-xl hover:brightness-90 transition-colors"
+              className="font-body text-sm font-medium bg-rose-dark text-white px-5 py-2 rounded-xl hover:bg-gold-dark transition-colors"
             >
               login
             </NavLink>

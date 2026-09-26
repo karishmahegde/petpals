@@ -3,8 +3,10 @@
 // public catalog's PetFilterBar (reusing the same CheckboxDropdown/Pill
 // primitives so they can't visually drift), minus the location/shelter
 // filter (a staff member only ever manages their own one shelter, so
-// there's nothing to filter by there) plus a Status dropdown, which the
-// public catalog has no use for (it's hardcoded to available).
+// there's nothing to filter by there) plus an optional Status dropdown,
+// which the public catalog has no use for (it's hardcoded to available) —
+// omitted by a section whose status is already fixed (Incoming Pets).
+// Renders unboxed, inside its section's own Card.
 import { useState } from "react";
 import { FaChevronDown, FaDna } from "react-icons/fa";
 import { BiFilterAlt } from "react-icons/bi";
@@ -12,7 +14,6 @@ import { PiBirdBold, PiRuler } from "react-icons/pi";
 import { TbCake } from "react-icons/tb";
 import type { Species, Breed } from "../../../../../../logic/api/petsApi";
 import type { PetAdoptionStatus } from "../../../../../../logic/api/staffPetsApi";
-import Card from "../../../../../../components/ui/Card";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import SelectField from "../../../../../../components/ui/SelectField";
 import {
@@ -38,9 +39,10 @@ interface PetsFilterBarProps {
   updateFilters: (partial: Partial<PetsCatalogFilters>) => void;
   speciesOptions: Species[];
   breedOptions: Breed[];
-  statusFilter: StatusFilter;
-  statusOptions: { value: StatusFilter; label: string }[];
-  onStatusFilterChange: (value: StatusFilter) => void;
+  /** All three status props together, or none (no Status dropdown). */
+  statusFilter?: StatusFilter;
+  statusOptions?: { value: StatusFilter; label: string }[];
+  onStatusFilterChange?: (value: StatusFilter) => void;
   isAgeRangeInvalid: boolean;
 }
 
@@ -98,7 +100,14 @@ const PetsFilterBar = ({
           ? `Up to ${filters.maxAge} mo`
           : "";
 
-  const statusPillLabel = statusOptions.find((o) => o.value === statusFilter)?.label;
+  const hasStatusFilter =
+    statusFilter !== undefined &&
+    statusOptions !== undefined &&
+    onStatusFilterChange !== undefined;
+  const isStatusFiltered = hasStatusFilter && statusFilter !== "all";
+  const statusPillLabel = statusOptions?.find(
+    (o) => o.value === statusFilter,
+  )?.label;
 
   const hasPills =
     filters.speciesIDs.length > 0 ||
@@ -106,10 +115,10 @@ const PetsFilterBar = ({
     filters.size.length > 0 ||
     filters.minAge !== "" ||
     filters.maxAge !== "" ||
-    statusFilter !== "all";
+    isStatusFiltered;
 
   return (
-    <Card className="mb-6 p-5">
+    <div className="mb-6">
       <ButtonElement
         onClick={() => setIsOpen((o) => !o)}
         aria-expanded={isOpen}
@@ -119,9 +128,9 @@ const PetsFilterBar = ({
       >
         <span className="flex items-center gap-2">
           <BiFilterAlt className="text-neutral-charcoal" />
-          <h2 className="font-body text-lg font-bold text-neutral-dark">
+          <h3 className="font-body text-base font-bold text-neutral-dark">
             Filters
-          </h2>
+          </h3>
         </span>
         <FaChevronDown
           className={`text-neutral-gray transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -129,7 +138,9 @@ const PetsFilterBar = ({
       </ButtonElement>
 
       <div className={isOpen ? "" : "hidden"}>
-        <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
+        <div
+          className={`mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 ${hasStatusFilter ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+        >
           <CheckboxDropdown
             icon={<FaDna className="text-neutral-gray" />}
             label="Species"
@@ -192,12 +203,14 @@ const PetsFilterBar = ({
             )}
           </div>
 
-          <SelectField
-            label="Status"
-            value={statusFilter}
-            onChange={(v) => onStatusFilterChange(v as StatusFilter)}
-            options={statusOptions}
-          />
+          {hasStatusFilter && (
+            <SelectField
+              label="Status"
+              value={statusFilter}
+              onChange={(v) => onStatusFilterChange(v as StatusFilter)}
+              options={statusOptions}
+            />
+          )}
         </div>
 
         {hasPills && (
@@ -234,7 +247,7 @@ const PetsFilterBar = ({
             {(filters.minAge !== "" || filters.maxAge !== "") && (
               <Pill label={agePillLabel} variant="age" onRemove={clearAge} />
             )}
-            {statusFilter !== "all" && statusPillLabel && (
+            {isStatusFiltered && statusPillLabel && (
               <Pill
                 label={statusPillLabel}
                 variant="status"
@@ -244,7 +257,7 @@ const PetsFilterBar = ({
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 };
 

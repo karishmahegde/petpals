@@ -27,6 +27,7 @@ import {
 } from "../../../../../../logic/api/staffAppointmentsApi";
 import useAuthStore from "../../../../../../logic/store/useAuthStore";
 import { toDateTimeLocalValue } from "../../../../../../logic/utils/datetime";
+import { formatVetName } from "../../../../../../logic/utils/vetName";
 
 interface AppointmentFormPanelProps {
   open: boolean;
@@ -229,7 +230,7 @@ const AppointmentFormPanel = ({
             <option value="">- Select -</option>
             {vets.map((vet) => (
               <option key={vet.vetID} value={vet.vetID}>
-                {vet.vetName}
+                {formatVetName(vet.vetName)}
               </option>
             ))}
           </select>

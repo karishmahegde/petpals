@@ -259,7 +259,7 @@ const GovernmentIdSection = ({
             type="submit"
             disabled={mutation.isPending}
             size="bare"
-            className="self-start rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium hover:brightness-90 disabled:opacity-50"
+            className="self-start rounded-xl bg-teal-dark px-5 py-2 font-body text-sm font-medium hover:brightness-95 disabled:opacity-50"
           >
             {mutation.isPending ? "Submitting…" : "Submit"}
           </ButtonElement>

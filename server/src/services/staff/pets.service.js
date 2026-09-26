@@ -43,6 +43,41 @@ const forbiddenShelter = () => {
   return err;
 };
 
+// Statuses only the system sets — a pet in one is read-only here (edit,
+// photos, delete all 409):
+// - 'transferred': an In_Progress transfer (staff/transfers.service.js);
+//   approving, declining, or cancelling it moves the pet on.
+// - 'adopted': an Accepted application; the adopter withdrawing it puts
+//   the pet back to 'available' (adopter/adoptionApplications.service.js).
+//   Staff may still change an adopted pet's status on its own (a PUT whose
+//   only field is adoptionStatus) — e.g. back to 'incoming' when the pet is
+//   surrendered back to the shelter — but nothing else about it.
+// The controller also refuses either as a hand-set adoptionStatus.
+const LOCKED_STATUS_MESSAGE = {
+  transferred:
+    "This pet is being transferred and can't be changed until the transfer is resolved",
+  adopted: "This pet has been adopted — only its status can be changed",
+};
+
+const isStatusOnlyUpdate = (data, photoFile) =>
+  !photoFile && Object.keys(data).length === 1 && "adoptionStatus" in data;
+
+const assertPetEditable = (adoptionStatus, { statusOnly = false } = {}) => {
+  if (adoptionStatus === "adopted" && statusOnly) return;
+  const message = LOCKED_STATUS_MESSAGE[adoptionStatus];
+  if (message) {
+    const err = new Error(message);
+    err.code = "CONFLICT";
+    throw err;
+  }
+};
+
+const managerOnlyDelete = () => {
+  const err = new Error("Only the shelter's manager may delete a pet");
+  err.code = "FORBIDDEN";
+  return err;
+};
+
 const activeApplicationConflict = () => {
   const err = new Error(
     "This pet has a Pending or Accepted adoption application and cannot be deleted",
@@ -106,7 +141,7 @@ const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) =
 // ——————————————— LIST MY SHELTER'S PETS (GET /staff/me/pets) ———————————————
 // GET /pets (public/pets.service.js's getAvailablePets) is hardcoded to
 // adoptionStatus: "available" — fine for the public catalog, useless for a
-// staff management list that also needs to show incoming/pending/adopted/
+// staff management list that also needs to show incoming/adopted/fostered/
 // etc. pets at the staff member's own shelter. Same PetCard-ish shape as
 // the public list (reuses its age/sex formatters, and its
 // toArray/matchFilter/buildAgeFilter filter-building helpers, so the two
@@ -408,11 +443,12 @@ const getPhotos = async (petID, { role, userID }) => {
 // `data` is already validated and whitelisted by the controller (the
 // schema-required fields — see the controller's CREATE_REQUIRED_FIELDS
 // design note for why petName/petWeight/petHeight are required here despite
-// the ticket framing them as PUT-only). Two fields are set here rather than
-// accepted from the client at all: adoptionStatus always starts "available"
-// so the pet is immediately visible in the public catalog (the column has
-// no DB default despite being effectively required for the pet to be
-// useful), and petPhoto gets a placeholder until POST /pets/:id/photos (a
+// the ticket framing them as PUT-only). adoptionStatus defaults to
+// "incoming" when the client doesn't send one (the column has no DB
+// default) — a new arrival stays out of the public catalog, and shows in
+// the Overview's New Arrivers and the Pets tab's Incoming Pets, until staff
+// mark it available. petPhoto is never accepted from the client: it gets a
+// placeholder until POST /pets/:id/photos (a
 // later Sprint 5.1 card) supplies a real one — the column is NOT NULL with
 // no default, so pet creation can't leave it empty even though photo
 // upload is a separate step.
@@ -424,7 +460,7 @@ const createPet = async ({ data, actor, requestedShelterID }) => {
     data: {
       ...data,
       shelterID,
-      adoptionStatus: "available",
+      adoptionStatus: data.adoptionStatus ?? "incoming",
       petPhoto: "placeholder.jpg",
     },
   });
@@ -513,6 +549,7 @@ const updatePet = async (petID, data, { role, userID }, photoFile) => {
     where: { petID },
     select: {
       shelterID: true,
+      adoptionStatus: true,
       petPhoto: true,
       photos: { select: { photoURL: true } },
     },
@@ -522,6 +559,9 @@ const updatePet = async (petID, data, { role, userID }, photoFile) => {
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  assertPetEditable(existing.adoptionStatus, {
+    statusOnly: isStatusOnlyUpdate(data, photoFile),
+  });
 
   if ("breedID" in data) {
     await assertBreedExists(data.breedID);
@@ -559,6 +599,9 @@ const updatePet = async (petID, data, { role, userID }, photoFile) => {
 };
 
 // ——————————————— DELETE PET (DELETE /pets/:id) ———————————————
+// Manager-only for Staff: only the pet's own shelter manager
+// (Shelter.managerStaffID, same check as transfer reassignment) may delete
+// it — permanent, and takes the pet's photos with it. Admin may too.
 // Blocked while the pet has a Pending or Accepted application — those are
 // the two non-terminal statuses (see the adoption-applications design
 // notes elsewhere in this codebase); Rejected/Withdrawn don't block since
@@ -571,7 +614,9 @@ const deletePet = async (petID, { role, userID }) => {
     where: { petID },
     select: {
       shelterID: true,
+      adoptionStatus: true,
       photos: { select: { photoURL: true } },
+      shelter: { select: { managerStaffID: true } },
     },
   });
   if (!existing) {
@@ -579,6 +624,10 @@ const deletePet = async (petID, { role, userID }) => {
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  if (role === "Staff" && existing.shelter.managerStaffID !== userID) {
+    throw managerOnlyDelete();
+  }
+  assertPetEditable(existing.adoptionStatus);
 
   const activeApplication = await prisma.adoptionApplication.findFirst({
     where: { petID, applicationStatus: { in: ["Pending", "Accepted"] } },
@@ -648,6 +697,7 @@ const addPhoto = async (petID, { role, userID }, { file }) => {
     where: { petID },
     select: {
       shelterID: true,
+      adoptionStatus: true,
       petPhoto: true,
       photos: { select: { photoURL: true } },
     },
@@ -657,6 +707,7 @@ const addPhoto = async (petID, { role, userID }, { file }) => {
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  assertPetEditable(existing.adoptionStatus);
 
   const newPhoto = await preparePhotoReplacement(petID, file);
 
@@ -684,13 +735,14 @@ const addPhoto = async (petID, { role, userID }, { file }) => {
 const deletePhoto = async (petID, photoID, { role, userID }) => {
   const existing = await prisma.pet.findUnique({
     where: { petID },
-    select: { shelterID: true, petPhoto: true },
+    select: { shelterID: true, adoptionStatus: true, petPhoto: true },
   });
   if (!existing) {
     throw notFound(petID);
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  assertPetEditable(existing.adoptionStatus);
 
   const photo = await prisma.petPhoto.findFirst({
     where: { photoID, petID },

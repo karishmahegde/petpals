@@ -31,7 +31,7 @@ const FavoritesWidget = ({ openId, onKnowMore }: FavoritesWidgetProps) => {
       isEmpty={!favorites || favorites.length === 0}
       emptyMessage="No favorites yet. tap the heart on a pet you love!"
       emptyAction={
-        <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
+        <ButtonElement to="/adopt" className="bg-teal-dark hover:brightness-95">
           Explore Pets
         </ButtonElement>
       }

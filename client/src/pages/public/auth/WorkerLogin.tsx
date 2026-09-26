@@ -167,7 +167,7 @@ const WorkerLogin = () => {
             type="submit"
             disabled={loading}
             size="bare"
-            className="w-full bg-gold-md text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            className="w-full bg-gold-md text-sm font-light py-3 rounded-xl hover:brightness-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing in..." : "sign in"}
           </ButtonElement>

@@ -175,7 +175,7 @@ const formatTransferDetail = (row, actor) => {
 // transferred — mirrors the adoption-application eligibility check
 // (adopter/adoptionApplications.service.js's validateApplicationEligibility).
 // While the transfer is In_Progress the pet sits at adoptionStatus
-// 'transferred', outside the normal available/pending/adopted flow, and only
+// 'transferred', outside the normal available/adopted flow, and only
 // reverts (to 'available', win or lose) once the transfer resolves — see
 // updateTransferStatus.
 // Assigned staff on both sides is fixed at creation: fromShelterStaff is the

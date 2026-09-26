@@ -26,7 +26,7 @@ const router = express.Router();
  *     parameters:
  *       - in: query
  *         name: adoptionStatus
- *         schema: { type: string, enum: [incoming, available, pending, adopted, fostered, transferred, deceased] }
+ *         schema: { type: string, enum: [incoming, available, adopted, fostered, transferred, deceased] }
  *       - in: query
  *         name: species
  *         schema: { type: array, items: { type: integer, minimum: 1 } }
@@ -210,7 +210,8 @@ router.get(
  *       never read from the request body for that role; Admin has no home
  *       shelter, so shelterID is required in the body instead. petPhoto
  *       starts as a placeholder — POST /pets/:id/photos supplies the real
- *       one. adoptionStatus always starts 'available'.
+ *       one. adoptionStatus is optional and defaults to 'incoming' (kept out of
+ *       the public catalog until staff mark it 'available').
  *     tags: [Pets, Staff]
  *     security:
  *       - bearerAuth: []
@@ -293,7 +294,7 @@ router.post(
  *                   properties:
  *                     data: { $ref: '#/components/schemas/PetDetail' }
  *       400:
- *         description: No updatable fields provided, invalid field, an unsupported photo file type, or breedID doesn't reference an existing breed
+ *         description: No updatable fields provided, invalid field (including adoptionStatus 'adopted'/'transferred', which only the adoption/transfer workflows set), an unsupported photo file type, or breedID doesn't reference an existing breed
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -304,6 +305,11 @@ router.post(
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The pet is mid-transfer (read-only), or adopted and the update touches anything other than adoptionStatus (an adopted pet's status alone may be changed)
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.put(
   "/pets/:id",
@@ -317,10 +323,10 @@ router.put(
  * @swagger
  * /pets/{id}:
  *   delete:
- *     summary: Delete a pet profile (Staff, Admin)
+ *     summary: Delete a pet profile (shelter Manager, Admin)
  *     description: >
- *       Staff may only delete pets at their own shelter; Admin may delete
- *       any. Blocked with 409 CONFLICT while the pet has a Pending or
+ *       Staff must be the manager of the pet's shelter
+ *       (Shelter.managerStaffID); Admin may delete any. Blocked with 409 CONFLICT while the pet has a Pending or
  *       Accepted adoption application. Removes photos from the pet-images
  *       Storage bucket before removing the row.
  *     tags: [Pets, Staff]
@@ -336,13 +342,13 @@ router.put(
  *         description: Pet deleted successfully
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403:
- *         description: Staff attempting to delete a pet at another shelter
+ *         description: Staff attempting to delete a pet at another shelter, or who isn't that shelter's manager
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: The pet has a Pending or Accepted adoption application
+ *         description: The pet has a Pending or Accepted adoption application, or is adopted/mid-transfer (adoptionStatus 'adopted'/'transferred')
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -452,6 +458,11 @@ router.get(
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The pet is adopted or mid-transfer (adoptionStatus 'adopted'/'transferred') — read-only, only the adoption/transfer workflow changes it
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.post(
   "/pets/:id/photos",
@@ -503,6 +514,11 @@ router.post(
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404:
  *         description: The pet doesn't exist, or the photo doesn't exist/belong to this pet
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       409:
+ *         description: The pet is adopted or mid-transfer (adoptionStatus 'adopted'/'transferred') — read-only, only the adoption/transfer workflow changes it
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

@@ -328,7 +328,7 @@ export interface AppointmentDetail {
   vetName: string | null;
   shelterName: string;
   shelterAddress: string;
-  // Vaccination records for the pet dated the same day as the appointment.
+  // Vaccination records linked to this appointment.
   vaccinesAdministered: {
     recordID: number;
     vaccineName: string;

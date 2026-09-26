@@ -1,4 +1,7 @@
 const prisma = require("../../config/prisma");
+// Adopter oversight — the list and detail reads are shared by Admin and
+// Staff (the Staff dashboard's People → Adopters tab, read-only); the status
+// change stays Admin-only.
 const { nullifyRefreshToken } = require("../auth/auth.service");
 
 const notFound = (userID) => {
@@ -28,12 +31,14 @@ const ADOPTER_LIST_SELECT = {
 const listAdopters = async ({
   accountStatus,
   adopterRiskFlag,
+  name,
   page = 1,
   limit = 20,
 } = {}) => {
   const where = {};
   if (accountStatus !== undefined) where.accountStatus = accountStatus;
   if (adopterRiskFlag !== undefined) where.adopterRiskFlag = adopterRiskFlag;
+  if (name) where.adopterName = { contains: name, mode: "insensitive" };
 
   const [data, total] = await Promise.all([
     prisma.adopter.findMany({
@@ -49,6 +54,63 @@ const listAdopters = async ({
   return {
     data,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+// ——————————————— ADOPTER DETAIL (GET /adopters/:id) ———————————————
+// Every profile column an adopter fills in (contact, address, household,
+// preferences, flags), plus the preferred breed's name and the government
+// ID's verification status only — never the ID itself, and never
+// stripeCustomerID (CLAUDE.md's "Never expose" list).
+const ADOPTER_DETAIL_SELECT = {
+  ...ADOPTER_LIST_SELECT,
+  adopterDOB: true,
+  adopterSex: true,
+  addressLine1: true,
+  addressLine2: true,
+  zip: true,
+  housingType: true,
+  ownsOrRents: true,
+  landlordContact: true,
+  householdSize: true,
+  numChildren: true,
+  employmentStatus: true,
+  activityLevel: true,
+  yardAvailable: true,
+  petExperience: true,
+  currentPets: true,
+  preferredAgeRange: true,
+  preferredSize: true,
+  openToSpecialNeeds: true,
+  onboardingComplete: true,
+  preferredBreed: { select: { breedName: true } },
+  // emailVerified/lastLoginAt live on Users (account-level).
+  user: { select: { userEmail: true, emailVerified: true, lastLoginAt: true } },
+};
+
+const getAdopterDetail = async (userID) => {
+  const [adopter, governmentId] = await Promise.all([
+    prisma.adopter.findUnique({
+      where: { userID },
+      select: ADOPTER_DETAIL_SELECT,
+    }),
+    prisma.governmentID.findFirst({
+      where: { userID, userType: "Adopter" },
+      select: { verificationStatus: true },
+    }),
+  ]);
+  if (!adopter) {
+    throw notFound(userID);
+  }
+
+  const { user, preferredBreed, ...rest } = adopter;
+  return {
+    ...rest,
+    adopterEmail: user.userEmail,
+    emailVerified: user.emailVerified,
+    lastLoginAt: user.lastLoginAt,
+    preferredBreedName: preferredBreed?.breedName ?? null,
+    governmentIdStatus: governmentId?.verificationStatus ?? null,
   };
 };
 
@@ -82,4 +144,4 @@ const updateAdopterStatus = async (userID, accountStatus) => {
   });
 };
 
-module.exports = { listAdopters, updateAdopterStatus };
+module.exports = { listAdopters, getAdopterDetail, updateAdopterStatus };

@@ -3,7 +3,8 @@
 // (applications, visits, appointments, …):
 //
 //   DashboardListRow    — how one row looks: leading visual | title + sub-lines
-//                         | badge + action buttons. Pure layout, no data.
+//                         | optional inline details | badge + action buttons.
+//                         Pure layout, no data.
 //   DashboardActionList — how a list of rows behaves when they share one
 //                         "confirm, then mutate" action (withdraw, cancel, …):
 //                         owns the <ul>, the pending-item state, the mutation +
@@ -41,6 +42,11 @@ interface DashboardListRowProps {
   leading?: ReactNode;
   title: ReactNode;
   lines?: RowLine[];
+  /**
+   * Inline middle column(s) — e.g. phone and email side by side. When set,
+   * the title block gets a fixed width so these line up across rows.
+   */
+  details?: ReactNode;
   badge?: RowBadge;
   /** Right-aligned buttons, shown under the badge. */
   actions?: ReactNode;
@@ -52,6 +58,7 @@ export const DashboardListRow = ({
   leading,
   title,
   lines = [],
+  details,
   badge,
   actions,
   className = "bg-gold-lightest",
@@ -59,7 +66,9 @@ export const DashboardListRow = ({
   <div
     className={`flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between ${className}`}
   >
-    <div className="flex items-center gap-4">
+    <div
+      className={`flex items-center gap-4 ${details ? "sm:w-64 sm:shrink-0" : ""}`}
+    >
       {leading}
       <div className="min-w-0">
         <p className="font-body text-sm font-medium text-neutral-charcoal">
@@ -79,6 +88,12 @@ export const DashboardListRow = ({
         ))}
       </div>
     </div>
+
+    {details && (
+      <div className="flex min-w-0 flex-1 flex-col gap-1 font-body text-sm text-neutral-charcoal lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-8">
+        {details}
+      </div>
+    )}
 
     {(badge || actions) && (
       <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
@@ -149,7 +164,7 @@ export const RowActionButton = ({
     onClick={onClick}
     disabled={disabled}
     size="sm"
-    className={`hover:brightness-90 ${ACTION_VARIANT[variant]}`}
+    className={`hover:brightness-95 ${ACTION_VARIANT[variant]}`}
   >
     {children}
   </ButtonElement>

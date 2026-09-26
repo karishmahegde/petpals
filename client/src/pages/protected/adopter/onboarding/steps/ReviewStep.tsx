@@ -181,7 +181,7 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
           <ButtonElement
             onClick={onBack}
             size="bare"
-            className="flex-1 rounded-xl bg-gold py-3 text-sm font-medium hover:brightness-90 disabled:cursor-not-allowed"
+            className="flex-1 rounded-xl bg-gold py-3 text-sm font-medium hover:brightness-95 disabled:cursor-not-allowed"
           >
             Back
           </ButtonElement>
@@ -190,7 +190,7 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending}
           size="bare"
-          className="flex-1 rounded-xl bg-teal-dark py-3 text-sm font-medium hover:brightness-90 disabled:cursor-not-allowed"
+          className="flex-1 rounded-xl bg-teal-dark py-3 text-sm font-medium hover:brightness-95 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? "Submitting…" : "Submit"}
         </ButtonElement>

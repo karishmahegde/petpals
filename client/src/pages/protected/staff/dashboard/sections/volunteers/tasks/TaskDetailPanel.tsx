@@ -105,7 +105,7 @@ const TaskDetailPanel = ({ taskID, onClose, onEdit }: TaskDetailPanelProps) => {
               <ButtonElement
                 onClick={() => setPendingAction("Cancelled")}
                 size="panel"
-                className="w-full bg-red hover:brightness-90"
+                className="w-full bg-red hover:brightness-95"
               >
                 Cancel Task
               </ButtonElement>

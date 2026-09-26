@@ -5,8 +5,11 @@
 // to the staff member's own shelter), not the public catalog — that
 // endpoint is hardcoded to adoptionStatus=available, which would never
 // include a genuinely new arrival. sort=newest is a Sprint 5.2 addition to
-// this endpoint, see server/.../staff/pets.service.js. "View All" leads to
-// /staff/pets, the already-built Pets tab.
+// this endpoint, see server/.../staff/pets.service.js. New pets start
+// "incoming" (POST /pets's default), so every newly added pet lands here.
+// "View All" leads to the Pets tab (its Incoming Pets section); "View
+// Details" deep-links there via ?petID= to open that pet's panel, where
+// staff can move it on to Available.
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { FaPaw } from "react-icons/fa";
@@ -62,7 +65,9 @@ const NewArriversWidget = () => {
               title={pet.petName}
               lines={[{ text: pet.breed.breedName }]}
               actions={
-                <RowActionButton onClick={() => navigate("/staff/pets")}>
+                <RowActionButton
+                  onClick={() => navigate(`/staff/pets?petID=${pet.petID}`)}
+                >
                   View Details
                 </RowActionButton>
               }

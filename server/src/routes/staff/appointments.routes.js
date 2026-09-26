@@ -260,9 +260,9 @@ router.get(
  *     summary: Get one appointment's full detail (Staff, Admin)
  *     description: >
  *       Staff may only view an appointment at their own shelter; Admin may
- *       view any. Includes vaccines administered (approximated as the pet's
- *       vaccination records dated the same calendar day — there's no direct
- *       FK) and the pet's current adopter, if it has an Accepted application.
+ *       view any. Includes the vaccines administered at this appointment
+ *       (vaccination records linked to it) and the pet's current adopter, if
+ *       it has an Accepted application.
  *     tags: [Appointments, Staff]
  *     security:
  *       - bearerAuth: []

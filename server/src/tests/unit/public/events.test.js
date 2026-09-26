@@ -189,6 +189,16 @@ describe("GET /api/v1/events/:id", () => {
     });
   });
 
+  test("no auth header required", async () => {
+    prisma.event.findUnique.mockResolvedValueOnce(buildDetailRow());
+
+    // Deliberately no Authorization header — the detail view is public.
+    const res = await request(app).get("/api/v1/events/1");
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
   test("non-integer id → 400 BAD_REQUEST", async () => {
     const res = await request(app).get("/api/v1/events/abc");
 

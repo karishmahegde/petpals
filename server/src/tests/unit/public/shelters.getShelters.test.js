@@ -35,6 +35,18 @@ describe("GET /api/v1/shelters", () => {
     });
   });
 
+  test("hasManager=true → only shelters with a manager assigned (the vet sign-up list)", async () => {
+    prisma.shelter.findMany.mockResolvedValueOnce([]);
+
+    await request(app).get("/api/v1/shelters").query({ hasManager: "true" });
+
+    expect(prisma.shelter.findMany).toHaveBeenCalledWith({
+      where: { shelterStatus: "Open", managerStaffID: { not: null } },
+      orderBy: { shelterName: "asc" },
+      select: { shelterID: true, shelterName: true },
+    });
+  });
+
   test("returned order is passed through unchanged, not re-sorted or reversed", async () => {
     const alreadySorted = [
       { shelterID: 2, shelterName: "PetPals Brooklyn" },

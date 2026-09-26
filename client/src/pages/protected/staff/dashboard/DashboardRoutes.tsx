@@ -9,7 +9,9 @@ import Volunteers from "./Volunteers";
 import Visits from "./Visits";
 import Events from "./Events";
 import Donations from "./Donations";
-import Team from "./Team";
+import Staff from "./Staff";
+import Vets from "./Vets";
+import Adopters from "./Adopters";
 import IdVerification from "./IdVerification";
 import HealthPassport from "./sections/pets/HealthPassport";
 
@@ -25,12 +27,14 @@ const DashboardRoutes = () => (
     <Route path="transfers" element={<Transfers />} />
     <Route path="appointments" element={<Appointments />} />
     <Route path="applications" element={<Applications />} />
+    <Route path="adopters" element={<Adopters />} />
     <Route path="volunteers" element={<Volunteers />} />
     <Route path="visits" element={<Visits />} />
     <Route path="id-verification" element={<IdVerification />} />
     <Route path="events" element={<Events />} />
     <Route path="donations" element={<Donations />} />
-    <Route path="team" element={<Team />} />
+    <Route path="team" element={<Staff />} />
+    <Route path="vets" element={<Vets />} />
     <Route path="profile" element={<Profile />} />
     <Route path="*" element={<Navigate to="/staff" replace />} />
   </Routes>

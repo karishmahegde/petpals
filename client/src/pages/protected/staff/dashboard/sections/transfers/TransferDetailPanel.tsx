@@ -141,8 +141,7 @@ const TransferDetailPanel = ({
                 <ButtonElement
                   onClick={() => setPendingAction("Rejected")}
                   size="panel"
-                  variant="outline"
-                  className="flex-1 border border-rose-dark text-rose-dark hover:bg-rose-dark hover:text-white"
+                  className="flex-1 bg-red hover:brightness-95"
                 >
                   Decline
                 </ButtonElement>
@@ -158,8 +157,7 @@ const TransferDetailPanel = ({
               <ButtonElement
                 onClick={() => setPendingAction("Cancelled")}
                 size="panel"
-                variant="outline"
-                className="w-full border bg-red text-white hover:brightness-95"
+                className="w-full bg-red hover:brightness-95"
               >
                 Cancel Transfer
               </ButtonElement>

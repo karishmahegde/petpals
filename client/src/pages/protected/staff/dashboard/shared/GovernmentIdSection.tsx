@@ -256,7 +256,7 @@ const GovernmentIdSection = ({ isEditing }: GovernmentIdSectionProps) => {
             type="submit"
             disabled={mutation.isPending}
             size="bare"
-            className="self-start rounded-xl bg-rose-dark px-5 py-2 text-sm font-medium hover:brightness-90"
+            className="self-start rounded-xl bg-teal-dark px-5 py-2 text-sm font-medium hover:brightness-95"
           >
             {mutation.isPending ? "Submitting…" : "Submit"}
           </ButtonElement>

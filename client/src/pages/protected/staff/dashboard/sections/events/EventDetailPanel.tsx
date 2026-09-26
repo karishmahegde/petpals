@@ -93,7 +93,7 @@ const EventDetailPanel = ({ eventID, onClose, onEdit }: EventDetailPanelProps) =
               <ButtonElement
                 onClick={() => setConfirmingCancel(true)}
                 size="panel"
-                className="w-full bg-red hover:brightness-90"
+                className="w-full bg-red hover:brightness-95"
               >
                 Cancel Event
               </ButtonElement>

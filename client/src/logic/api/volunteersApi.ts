@@ -3,8 +3,10 @@
 // the caller's shelter), GET /volunteers/:id, PATCH /volunteers/:id/status.
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
+import type { Address } from "../utils/address";
 
-export type VolunteerAccountStatus = "Pending" | "Active" | "Banned" | "Deactivated";
+export type VolunteerAccountStatus =
+  "Pending" | "Active" | "Banned" | "Deactivated";
 
 // Row shape for GET /volunteers.
 export interface VolunteerListItem {
@@ -16,12 +18,11 @@ export interface VolunteerListItem {
 }
 
 // Every Volunteer column, plus login email and government ID type/number.
-export interface VolunteerDetail {
+export interface VolunteerDetail extends Address {
   userID: number;
   volunteerCode: string | null;
   avatarSeed: string;
   volunteerName: string;
-  volunteerAddress: string | null;
   volunteerPhone: string | null;
   volunteerDOB: string | null;
   volunteerSex: string | null;
@@ -48,7 +49,9 @@ export const getVolunteers = async (
   return { data: response.data.data, pagination: response.data.pagination };
 };
 
-export const getVolunteerDetail = async (userID: number): Promise<VolunteerDetail> => {
+export const getVolunteerDetail = async (
+  userID: number,
+): Promise<VolunteerDetail> => {
   const response = await axiosInstance.get(`/volunteers/${userID}`);
   return response.data.data;
 };

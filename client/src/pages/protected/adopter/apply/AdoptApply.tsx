@@ -295,7 +295,7 @@ const AdoptApply = () => {
             onClick={handleSubmit}
             disabled={applicationType === null || mutation.isPending}
             size="panel"
-            className="w-full bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
+            className="w-full bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
           >
             {mutation.isPending
               ? "Redirecting to payment…"
@@ -303,9 +303,8 @@ const AdoptApply = () => {
           </ButtonElement>
           <ButtonElement
             onClick={handleCancelClick}
-            size="bare"
-            variant="outline"
-            className="mt-3 w-full text-center font-body text-sm text-neutral-gray hover:text-neutral-dark"
+            size="panel"
+            className="mt-3 w-full bg-red hover:brightness-95"
           >
             Cancel
           </ButtonElement>

@@ -10,8 +10,8 @@ import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { FaTimes } from "react-icons/fa";
 import ButtonElement from "../../../../../components/ui/ButtonElement";
+import Modal, { ModalActions } from "../../../../../components/ui/Modal";
 import useAuthStore from "../../../../../logic/store/useAuthStore";
 import {
   closeMyStaffAccount,
@@ -62,135 +62,99 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
     },
   });
 
-  if (!isOpen) return null;
-
   const canConfirm =
     mode !== null &&
     confirmText.trim().toUpperCase() === CONFIRM_WORD[mode] &&
     !mutation.isPending;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={handleClose}
+    <Modal
+      isOpen={isOpen}
+      title="Close account"
+      onClose={handleClose}
+      dismissDisabled={mutation.isPending}
     >
-      <div
-        className="w-full max-w-md rounded-2xl bg-white p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between">
-          <h2 className="font-display text-xl text-rose-dark">
-            Close account
-          </h2>
+      {/* Step 1: choice */}
+      {mode === null && (
+        <div className="flex flex-col gap-3">
           <ButtonElement
-            onClick={handleClose}
-            aria-label="Close"
+            onClick={() => setMode("deactivate")}
             size="bare"
             variant="outline"
-            className="text-neutral-gray hover:text-neutral-dark"
+            className="rounded-xl border border-neutral-gray p-4 text-left hover:border-rose-dark hover:bg-rose-light"
           >
-            <FaTimes />
+            <p className="font-body text-sm font-bold text-neutral-dark">
+              Deactivate
+            </p>
+            <p className="mt-1 font-body text-xs text-neutral-charcoal">
+              Your data is kept and your account is hidden. There is{" "}
+              <strong>no self-service reactivation</strong> - you'll need
+              an admin to reactivate it.
+            </p>
+          </ButtonElement>
+          <ButtonElement
+            onClick={() => setMode("delete")}
+            size="bare"
+            variant="outline"
+            className="rounded-xl border border-rose-md p-4 text-left hover:border-rose-dark hover:bg-rose-light"
+          >
+            <p className="font-body text-sm font-bold text-rose-dark">
+              Permanently delete
+            </p>
+            <p className="mt-1 font-body text-xs text-neutral-charcoal">
+              Your staff account is removed for good. This can't be undone.
+            </p>
           </ButtonElement>
         </div>
+      )}
 
-        {/* Step 1: choice */}
-        {mode === null && (
-          <div className="flex flex-col gap-3">
-            <ButtonElement
-              onClick={() => setMode("deactivate")}
-              size="bare"
-              variant="outline"
-              className="rounded-xl border border-neutral-gray p-4 text-left hover:border-rose-dark hover:bg-rose-light"
-            >
-              <p className="font-body text-sm font-bold text-neutral-dark">
-                Deactivate
-              </p>
-              <p className="mt-1 font-body text-xs text-neutral-charcoal">
-                Your data is kept and your account is hidden. There is{" "}
-                <strong>no self-service reactivation</strong> - you'll need
-                an admin to reactivate it.
-              </p>
-            </ButtonElement>
-            <ButtonElement
-              onClick={() => setMode("delete")}
-              size="bare"
-              variant="outline"
-              className="rounded-xl border border-rose-md p-4 text-left hover:border-rose-dark hover:bg-rose-light"
-            >
-              <p className="font-body text-sm font-bold text-rose-dark">
-                Permanently delete
-              </p>
-              <p className="mt-1 font-body text-xs text-neutral-charcoal">
-                Your staff account is removed for good. This can't be undone.
-              </p>
-            </ButtonElement>
-          </div>
-        )}
-
-        {/* Step 2: explicit confirmation */}
-        {mode !== null && (
-          <div className="flex flex-col gap-3">
-            <p className="font-body text-sm text-neutral-charcoal">
-              {mode === "deactivate" ? (
-                <>
-                  This deactivates your account. Data is kept, but there's no
-                  self-service reactivation - you'll need an admin to
-                  reactivate it.
-                </>
-              ) : (
-                <>
-                  This permanently deletes your staff account. This can't be
-                  undone.
-                </>
-              )}
-            </p>
-            <label className="font-body text-xs text-neutral-gray">
-              Type <strong>{CONFIRM_WORD[mode]}</strong> to confirm
-            </label>
-            <input
-              type="text"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              className="w-full rounded-lg border border-rose-light bg-white px-3 py-1.5 font-body text-sm text-neutral-dark focus:border-teal-dark focus:outline-none"
-              autoFocus
-            />
-
-            {mutation.isError && (
-              <p className="rounded-lg bg-rose-lightest px-4 py-2 font-body text-sm text-rose-dark">
-                {extractError(mutation.error)}
-              </p>
+      {/* Step 2: explicit confirmation */}
+      {mode !== null && (
+        <div className="flex flex-col gap-3">
+          <p className="font-body text-sm text-neutral-charcoal">
+            {mode === "deactivate" ? (
+              <>
+                This deactivates your account. Data is kept, but there's no
+                self-service reactivation - you'll need an admin to
+                reactivate it.
+              </>
+            ) : (
+              <>
+                This permanently deletes your staff account. This can't be
+                undone.
+              </>
             )}
+          </p>
+          <label className="font-body text-xs text-neutral-gray">
+            Type <strong>{CONFIRM_WORD[mode]}</strong> to confirm
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className="w-full rounded-lg border border-rose-light bg-white px-3 py-1.5 font-body text-sm text-neutral-dark focus:border-teal-dark focus:outline-none"
+            autoFocus
+          />
 
-            <div className="mt-2 flex justify-end gap-3">
-              <ButtonElement
-                onClick={() => {
-                  setMode(null);
-                  setConfirmText("");
-                }}
-                disabled={mutation.isPending}
-                size="bare"
-                variant="outline"
-                className="rounded-xl border border-neutral-gray px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-neutral-lightgray"
-              >
-                Back
-              </ButtonElement>
-              <ButtonElement
-                onClick={() => mutation.mutate(mode)}
-                disabled={!canConfirm}
-                size="bare"
-                className="rounded-xl bg-red px-4 py-2 text-sm font-medium hover:brightness-90"
-              >
-                {mutation.isPending
-                  ? "Working…"
-                  : mode === "delete"
-                    ? "Delete my account"
-                    : "Deactivate my account"}
-              </ButtonElement>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+          {mutation.isError && (
+            <p className="rounded-lg bg-rose-lightest px-4 py-2 font-body text-sm text-rose-dark">
+              {extractError(mutation.error)}
+            </p>
+          )}
+
+          <ModalActions
+            cancelLabel="Back"
+            confirmLabel={
+              mode === "delete" ? "Delete my account" : "Deactivate my account"
+            }
+            onCancel={reset}
+            onConfirm={() => mutation.mutate(mode)}
+            isPending={mutation.isPending}
+            confirmDisabled={!canConfirm}
+          />
+        </div>
+      )}
+    </Modal>
   );
 };
 

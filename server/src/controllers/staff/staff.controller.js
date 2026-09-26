@@ -5,6 +5,7 @@ const {
 } = require("../../services/auth/auth.service");
 const { successResponse } = require("../../utils/response");
 const { normalizePhone } = require("../../utils/phone");
+const { pickAddressUpdate } = require("../../utils/address");
 
 const badRequest = (message) => {
   const err = new Error(message);
@@ -50,7 +51,14 @@ const updateMyProfile = async (req, res, next) => {
     );
   }
 
-  const data = {};
+  // Address fields (addressLine1/2, city, state, zip, country) — validated
+  // by the shared helper, same rules on every role's profile.
+  let data;
+  try {
+    data = pickAddressUpdate(body);
+  } catch (err) {
+    return next(err);
+  }
   for (const field of SELF_UPDATABLE_FIELDS) {
     if (!(field in body)) continue; // partial update — only touch provided fields
     const value = body[field];

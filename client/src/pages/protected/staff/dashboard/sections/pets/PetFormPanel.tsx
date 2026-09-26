@@ -13,6 +13,14 @@
 // petAge) — exactly the fields the view needs to display and the edit form
 // needs to pre-fill with real values instead of leaving them blank for
 // staff to re-enter. `petID` absent/null -> create mode.
+//
+// A pet in a system-set status (LOCKED_NOTE — mid-transfer or adopted)
+// gets no Edit button, just a note — the backend 409s any edit/photo/
+// delete on it. An adopted pet's status alone can still be changed via
+// "Change Status" (e.g. back to Incoming when it's surrendered back).
+// Neither status is offered in either dropdown; only the transfer/adoption
+// workflows set them. Deleting a pet (the edit form's Danger zone) is
+// shelter-manager-only — hidden for everyone else, and 403 server-side.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +29,7 @@ import toast from "react-hot-toast";
 import { FaPaw, FaTimes } from "react-icons/fa";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
-import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
+import Badge from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import { getSpecies, getBreeds } from "../../../../../../logic/api/petsApi";
 import { formatShortDate } from "../../../../../../logic/utils/datetime";
@@ -41,6 +49,9 @@ import {
   type PetSize,
   type StaffPetFullDetail,
 } from "../../../../../../logic/api/staffPetsApi";
+import { PET_STATUS_META } from "../../../../../../logic/staff/petStatus";
+import { getMyStaffProfile } from "../../../../../../logic/api/staffApi";
+import AddSpeciesBreedModal from "./AddSpeciesBreedModal";
 
 interface PetFormPanelProps {
   open: boolean;
@@ -66,10 +77,10 @@ interface PetFormState {
   petBGroup: string;
   petDesc: string;
   // Shown in both modes (same fields/order as the edit form), but POST
-  // /pets doesn't accept any of these — the backend always creates a pet at
-  // adoptionStatus "available" with no profile fields set. So on create,
-  // saveMutation sends these via a follow-up PUT once the pet exists,
-  // rather than in the create request itself.
+  // /pets doesn't accept any of these except adoptionStatus — the backend
+  // creates a pet with no profile fields set. So on create, saveMutation
+  // sends adoptionStatus in the create request itself and the rest via a
+  // follow-up PUT once the pet exists.
   microchipID: string;
   compatibleWithChildren: boolean;
   compatibleWithPets: boolean;
@@ -97,9 +108,9 @@ const EMPTY_FORM: PetFormState = {
   compatibleWithPets: false,
   specialNeeds: false,
   featuredFlag: false,
-  // Matches what POST /pets always sets server-side, so a create that
-  // leaves this untouched needs no follow-up PUT just for this field.
-  adoptionStatus: "available",
+  // Matches POST /pets's server-side default — a new arrival starts out of
+  // the public catalog until staff mark it available.
+  adoptionStatus: "incoming",
 };
 
 const PET_SEX_OPTIONS: { value: PetSex; label: string }[] = [
@@ -112,26 +123,6 @@ const INTAKE_TYPE_LABEL: Record<IntakeType, string> = {
   stray: "Stray",
   surrendered: "Surrendered",
   transferred: "Transferred",
-};
-
-const ADOPTION_STATUS_LABEL: Record<PetAdoptionStatus, string> = {
-  incoming: "Incoming",
-  available: "Available",
-  pending: "Pending",
-  adopted: "Adopted",
-  fostered: "Fostered",
-  transferred: "Transferred",
-  deceased: "Deceased",
-};
-
-const STATUS_TONE: Record<PetAdoptionStatus, BadgeTone> = {
-  incoming: "gold",
-  available: "teal",
-  pending: "gold",
-  adopted: "green",
-  fostered: "teal",
-  transferred: "neutral",
-  deceased: "red",
 };
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -152,6 +143,8 @@ const Required = () => (
 
 // View-mode styling — matches the adopter dashboard's PetDetailPanel.tsx.
 const sectionTitle = "font-display text-lg text-neutral-dark";
+const addLinkClass =
+  "font-body text-xs font-semibold text-teal-dark underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline";
 const infoLabel = "font-body text-sm font-semibold text-teal-dark";
 const infoValue = "font-body text-sm text-neutral-charcoal";
 const divider = "my-5 border-t border-neutral-lightgray";
@@ -171,6 +164,20 @@ const extractError = (err: unknown): string =>
     ? String(err.response.data.message)
     : "Something went wrong. Please try again.";
 
+// Statuses only the transfer/adoption workflows set — the pet is read-only
+// while in one. Keyed so the note completes "{petName} ...".
+const LOCKED_NOTE: Partial<Record<PetAdoptionStatus, string>> = {
+  transferred:
+    "is being transferred, so this profile is read-only until the transfer is approved, declined, or cancelled.",
+  adopted:
+    "has been adopted, so only its status can be changed — e.g. back to Incoming if it's surrendered back to the shelter.",
+};
+
+// Statuses a staff member may pick by hand (never a system-set one).
+const SELECTABLE_STATUSES = PET_ADOPTION_STATUS_VALUES.filter(
+  (status) => !(status in LOCKED_NOTE),
+);
+
 const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -179,6 +186,19 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
   const [mode, setMode] = useState<PanelMode>("edit");
   const [form, setForm] = useState<PetFormState>(EMPTY_FORM);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  // Same ["staff", "me"] query the sidebar and Staff tab use to gate
+  // manager-only UI.
+  const { data: myProfile } = useQuery({
+    queryKey: ["staff", "me"],
+    queryFn: getMyStaffProfile,
+  });
+  const isManager = myProfile?.staffDesignation === "Manager";
+  // Which "Add species/breed" dialog is open, if any.
+  const [addingKind, setAddingKind] = useState<"species" | "breed" | null>(
+    null,
+  );
+  // null = Change Status modal closed.
+  const [nextStatus, setNextStatus] = useState<PetAdoptionStatus | null>(null);
   // The photo is staged client-side and only actually uploaded when the
   // main form is saved — see saveMutation and staffPetsApi.ts's updatePet
   // (multipart, field changes + the file in one request).
@@ -321,20 +341,22 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
       };
 
       if (!isEdit) {
-        const created = await createPet(payload);
-        // POST /pets ignores all of the above (it always creates at
-        // "available" with no profile fields, and is plain JSON — no file
-        // support) — only follow up with a PUT if the staff member actually
-        // set one of these or staged a photo, to skip a no-op request on
-        // the common case of leaving them all at their defaults.
+        const created = await createPet({
+          ...payload,
+          adoptionStatus: profileFields.adoptionStatus,
+        });
+        // POST /pets takes adoptionStatus but none of the other profile
+        // fields (and is plain JSON — no file support) — only follow up
+        // with a PUT if the staff member actually set one of these or
+        // staged a photo, to skip a no-op request on the common case of
+        // leaving them all at their defaults.
         const hasProfileFields =
           profileFields.petDesc !== null ||
           profileFields.microchipID !== null ||
           profileFields.compatibleWithChildren ||
           profileFields.compatibleWithPets ||
           profileFields.specialNeeds ||
-          profileFields.featuredFlag ||
-          profileFields.adoptionStatus !== "available";
+          profileFields.featuredFlag;
         return hasProfileFields || photoFile
           ? updatePet(
               created.petID,
@@ -351,6 +373,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "shelter-pets"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "new-arrivers"] });
       if (isEdit) {
         queryClient.invalidateQueries({
           queryKey: ["staff", "pet-detail", petID],
@@ -381,10 +404,28 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
     onError: (err) => toast.error(extractError(err)),
   });
 
+  // Adopted pets only — a PUT whose sole field is adoptionStatus, the one
+  // update the backend still allows on them.
+  const statusMutation = useMutation({
+    mutationFn: (status: PetAdoptionStatus) =>
+      updatePet(petID!, { adoptionStatus: status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff", "shelter-pets"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "new-arrivers"] });
+      queryClient.invalidateQueries({
+        queryKey: ["staff", "pet-detail", petID],
+      });
+      toast.success("Status updated");
+      setNextStatus(null);
+    },
+    onError: (err) => toast.error(extractError(err)),
+  });
+
   const deletePetMutation = useMutation({
     mutationFn: () => deletePet(petID!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "shelter-pets"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "new-arrivers"] });
       toast.success("Pet deleted");
       closeAndReset();
     },
@@ -430,6 +471,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
   const pet = petQuery.data;
   const showView = isEdit && mode === "view" && pet;
   const showForm = mode === "edit" && (!isEdit || pet);
+  const lockedNote = pet && LOCKED_NOTE[pet.adoptionStatus];
 
   const title = !isEdit
     ? "Add Pet"
@@ -457,13 +499,30 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
               >
                 View Health Passport
               </ButtonElement>
-              <ButtonElement
-                onClick={() => setMode("edit")}
-                size="panel"
-                className="w-full bg-teal-dark hover:brightness-95"
-              >
-                Edit
-              </ButtonElement>
+              {lockedNote ? (
+                <>
+                  <p className="rounded-lg bg-neutral-offwhite px-4 py-3 text-center font-body text-sm text-neutral-charcoal">
+                    {pet.petName} {lockedNote}
+                  </p>
+                  {pet.adoptionStatus === "adopted" && (
+                    <ButtonElement
+                      onClick={() => setNextStatus("incoming")}
+                      size="panel"
+                      className="w-full bg-teal-dark hover:brightness-95"
+                    >
+                      Change Status
+                    </ButtonElement>
+                  )}
+                </>
+              ) : (
+                <ButtonElement
+                  onClick={() => setMode("edit")}
+                  size="panel"
+                  className="w-full bg-teal-dark hover:brightness-95"
+                >
+                  Edit
+                </ButtonElement>
+              )}
             </div>
           ) : undefined
         }
@@ -503,10 +562,10 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                 </p>
               </div>
               <Badge
-                tone={STATUS_TONE[pet.adoptionStatus]}
+                tone={PET_STATUS_META[pet.adoptionStatus].tone}
                 className="shrink-0"
               >
-                {ADOPTION_STATUS_LABEL[pet.adoptionStatus]}
+                {PET_STATUS_META[pet.adoptionStatus].label}
               </Badge>
             </div>
 
@@ -578,15 +637,12 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                   onClick={() => {
                     const adopterID = pet.adopter!.adopterID;
                     closeAndReset();
-                    // TODO: placeholder — the Staff Adopters section isn't
-                    // built yet (no /staff/adopters route, so this currently
-                    // falls through to the catch-all → /staff). Point it at
-                    // the real adopter detail route once that section exists.
+                    // Opens that adopter's panel on the Adopters tab.
                     navigate(`/staff/adopters?adopterID=${adopterID}`);
                   }}
                   size="panel"
                   variant="outline"
-                  className="mt-4 w-full border bg-rose-md text-white hover:brightness-95"
+                  className="mt-4 w-full bg-rose-md text-white hover:brightness-95"
                 >
                   View Details
                 </ButtonElement>
@@ -606,10 +662,20 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
             <h3 className={sectionTitle}>Primary Details</h3>
 
             <div>
-              <label className={labelClass} htmlFor="pet-species">
-                Species
-                <Required />
-              </label>
+              <div className="flex items-baseline justify-between gap-3">
+                <label className={labelClass} htmlFor="pet-species">
+                  Species
+                  <Required />
+                </label>
+                <ButtonElement
+                  onClick={() => setAddingKind("species")}
+                  size="bare"
+                  variant="outline"
+                  className={addLinkClass}
+                >
+                  + Add species
+                </ButtonElement>
+              </div>
               <select
                 id="pet-species"
                 required
@@ -633,10 +699,24 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
             </div>
 
             <div>
-              <label className={labelClass} htmlFor="pet-breed">
-                Breed
-                <Required />
-              </label>
+              <div className="flex items-baseline justify-between gap-3">
+                <label className={labelClass} htmlFor="pet-breed">
+                  Breed
+                  <Required />
+                </label>
+                <ButtonElement
+                  onClick={() => setAddingKind("breed")}
+                  disabled={speciesIDNum === null}
+                  title={
+                    speciesIDNum === null ? "Select a species first" : undefined
+                  }
+                  size="bare"
+                  variant="outline"
+                  className={addLinkClass}
+                >
+                  + Add breed
+                </ButtonElement>
+              </div>
               <select
                 id="pet-breed"
                 required
@@ -977,9 +1057,9 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                 }
                 className={fieldClass}
               >
-                {PET_ADOPTION_STATUS_VALUES.map((status) => (
+                {SELECTABLE_STATUSES.map((status) => (
                   <option key={status} value={status}>
-                    {ADOPTION_STATUS_LABEL[status]}
+                    {PET_STATUS_META[status].label}
                   </option>
                 ))}
               </select>
@@ -1030,7 +1110,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                         aria-label="Remove photo"
                         title="Remove photo"
                         size="bare"
-                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-dark shadow-sm hover:brightness-90"
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-dark shadow-sm hover:brightness-95"
                       >
                         <FaTimes className="h-2.5 w-2.5" />
                       </ButtonElement>
@@ -1077,8 +1157,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                 <ButtonElement
                   onClick={cancelEdit}
                   size="panel"
-                  variant="outline"
-                  className="flex-1 border border-neutral-lightgray text-neutral-charcoal hover:bg-neutral-lightgray"
+                  className="flex-1 bg-red hover:brightness-95"
                 >
                   Cancel
                 </ButtonElement>
@@ -1113,7 +1192,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
                   }}
                   size="bare"
                   variant="outline"
-                  className="font-semibold text-teal-dark underline hover:brightness-90"
+                  className="font-semibold text-teal-dark underline hover:brightness-95"
                 >
                   Initiate a transfer
                 </ButtonElement>{" "}
@@ -1123,7 +1202,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
           </div>
         )}
 
-        {isEdit && mode === "edit" && pet && (
+        {isEdit && mode === "edit" && pet && isManager && (
           <div className="border-t border-neutral-lightgray p-6">
             <div className="rounded-2xl border border-rose-md bg-rose-lightest p-4">
               <h3 className="font-display text-lg text-rose-dark">
@@ -1136,8 +1215,7 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
               <ButtonElement
                 onClick={() => setIsDeleteOpen(true)}
                 size="panel"
-                variant="outline"
-                className="mt-3 border border-rose-dark text-rose-dark hover:bg-rose-dark hover:text-white"
+                className="mt-3 bg-red hover:brightness-95"
               >
                 Delete pet
               </ButtonElement>
@@ -1157,6 +1235,69 @@ const PetFormPanel = ({ open, onClose, petID }: PetFormPanelProps) => {
         This permanently removes {pet?.petName ?? "this pet"}'s profile and
         photos. This can't be undone.
       </ConfirmActionModal>
+
+      <ConfirmActionModal
+        isOpen={nextStatus !== null}
+        title="Change status?"
+        confirmLabel="Update"
+        cancelLabel="Cancel"
+        isPending={statusMutation.isPending}
+        onCancel={() => setNextStatus(null)}
+        onConfirm={() => nextStatus && statusMutation.mutate(nextStatus)}
+      >
+        <div className="flex flex-col gap-3">
+          <p>
+            {pet?.petName ?? "This pet"} is currently Adopted. Moving it to
+            another status takes it off the adopter's record here — use Incoming
+            if it's been surrendered back to the shelter.
+          </p>
+          <div>
+            <label
+              htmlFor="adopted-pet-status"
+              className="font-body text-xs text-neutral-gray"
+            >
+              New status
+            </label>
+            <select
+              id="adopted-pet-status"
+              value={nextStatus ?? ""}
+              disabled={statusMutation.isPending}
+              onChange={(e) =>
+                setNextStatus(e.target.value as PetAdoptionStatus)
+              }
+              className={`mt-1 ${fieldClass}`}
+            >
+              {SELECTABLE_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {PET_STATUS_META[status].label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </ConfirmActionModal>
+
+      <AddSpeciesBreedModal
+        kind="species"
+        isOpen={addingKind === "species"}
+        onClose={() => setAddingKind(null)}
+        onCreated={(id) =>
+          setForm((f) => ({ ...f, speciesID: String(id), breedID: "" }))
+        }
+      />
+      {speciesIDNum !== null && (
+        <AddSpeciesBreedModal
+          kind="breed"
+          speciesID={speciesIDNum}
+          speciesName={
+            species?.find((s) => s.speciesID === speciesIDNum)?.speciesName ??
+            ""
+          }
+          isOpen={addingKind === "breed"}
+          onClose={() => setAddingKind(null)}
+          onCreated={(id) => setForm((f) => ({ ...f, breedID: String(id) }))}
+        />
+      )}
     </>
   );
 };

@@ -4,7 +4,9 @@
 // summary banner, InfoRow dl, ConfirmActionModal-driven footer actions).
 // Unlike every other place GovernmentID is exposed, this shows the FULL
 // idNumber and the actual document image via a signed URL — the dedicated,
-// authorized verification workflow those fields exist for.
+// authorized verification workflow those fields exist for. Shared by the
+// Staff and Admin dashboards' ID Verification tabs (IdVerificationQueue);
+// `scope` namespaces the query keys per dashboard.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -12,16 +14,19 @@ import toast from "react-hot-toast";
 import {
   getGovernmentIdDetail,
   updateGovernmentIdStatus,
-} from "../../../../../../logic/api/staffGovernmentIdsApi";
-import SlideOver from "../../../../../../components/ui/SlideOver";
-import ButtonElement from "../../../../../../components/ui/ButtonElement";
-import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
-import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
-import Avatar from "../../../../../../components/ui/Avatar";
+} from "../../../../logic/api/staffGovernmentIdsApi";
+import SlideOver from "../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../components/ui/ButtonElement";
+import Badge, { type BadgeTone } from "../../../../components/ui/Badge";
+import ConfirmActionModal from "../../../../components/ui/ConfirmActionModal";
+import Avatar from "../../../../components/ui/Avatar";
+import { governmentIdTypeBadge } from "../../../../logic/staff/governmentIdUserType";
+import { formatVetName } from "../../../../logic/utils/vetName";
 
 interface GovernmentIdDetailPanelProps {
   governmentIDID: number | null;
   onClose: () => void;
+  scope: "staff" | "admin";
 }
 
 type ReviewAction = "Verified" | "Rejected";
@@ -30,11 +35,6 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   Pending: "gold",
   Verified: "green",
   Rejected: "red",
-};
-
-const USER_TYPE_TONE: Record<string, BadgeTone> = {
-  Adopter: "teal",
-  Volunteer: "rose",
 };
 
 const label = "font-body text-sm font-semibold text-teal-dark";
@@ -57,12 +57,13 @@ const extractError = (err: unknown): string =>
 const GovernmentIdDetailPanel = ({
   governmentIDID,
   onClose,
+  scope,
 }: GovernmentIdDetailPanelProps) => {
   const queryClient = useQueryClient();
   const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["staff", "government-id", governmentIDID],
+    queryKey: [scope, "government-id-review", governmentIDID],
     queryFn: () => getGovernmentIdDetail(governmentIDID!),
     enabled: governmentIDID !== null,
   });
@@ -71,11 +72,17 @@ const GovernmentIdDetailPanel = ({
     mutationFn: (status: ReviewAction) =>
       updateGovernmentIdStatus(governmentIDID!, status),
     onSuccess: (_, status) => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "government-ids-queue"] });
       queryClient.invalidateQueries({
-        queryKey: ["staff", "government-id", governmentIDID],
+        queryKey: [scope, "government-ids-queue"],
       });
-      toast.success(status === "Verified" ? "Government ID verified" : "Government ID rejected");
+      queryClient.invalidateQueries({
+        queryKey: [scope, "government-id-review", governmentIDID],
+      });
+      toast.success(
+        status === "Verified"
+          ? "Government ID verified"
+          : "Government ID rejected",
+      );
       setPendingAction(null);
       onClose();
     },
@@ -83,6 +90,11 @@ const GovernmentIdDetailPanel = ({
   });
 
   const showActions = data?.verificationStatus === "Pending";
+
+  const displayName =
+    data?.userType === "Veterinarian"
+      ? formatVetName(data.personName)
+      : data?.personName;
 
   return (
     <>
@@ -96,8 +108,7 @@ const GovernmentIdDetailPanel = ({
               <ButtonElement
                 onClick={() => setPendingAction("Rejected")}
                 size="panel"
-                variant="outline"
-                className="flex-1 border border-rose-dark text-rose-dark hover:bg-rose-dark hover:text-white"
+                className="flex-1 bg-red hover:brightness-95"
               >
                 Reject
               </ButtonElement>
@@ -134,14 +145,17 @@ const GovernmentIdDetailPanel = ({
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-body font-bold text-neutral-charcoal">
-                  {data.personName}
+                  {displayName}
                 </p>
                 <p className="truncate text-xs text-neutral-gray">
                   {data.personEmail ?? "No email on file"}
                 </p>
               </div>
-              <Badge tone={USER_TYPE_TONE[data.userType]} className="shrink-0">
-                {data.userType}
+              <Badge
+                tone={governmentIdTypeBadge(data.userType, scope).tone}
+                className="shrink-0"
+              >
+                {governmentIdTypeBadge(data.userType, scope).label}
               </Badge>
             </div>
 
@@ -177,7 +191,9 @@ const GovernmentIdDetailPanel = ({
 
       <ConfirmActionModal
         isOpen={pendingAction !== null}
-        title={pendingAction === "Rejected" ? "Reject this ID?" : "Verify this ID?"}
+        title={
+          pendingAction === "Rejected" ? "Reject this ID?" : "Verify this ID?"
+        }
         confirmLabel={pendingAction === "Rejected" ? "Reject" : "Verify"}
         isPending={review.isPending}
         onCancel={() => setPendingAction(null)}
@@ -188,13 +204,13 @@ const GovernmentIdDetailPanel = ({
             {pendingAction === "Rejected" ? (
               <>
                 This rejects the government ID submitted by{" "}
-                <strong>{data.personName}</strong>. They'll be able to
-                resubmit a new one.
+                <strong>{displayName}</strong>. They'll be able to resubmit a
+                new one.
               </>
             ) : (
               <>
                 This verifies the government ID submitted by{" "}
-                <strong>{data.personName}</strong>.
+                <strong>{displayName}</strong>.
               </>
             )}
           </p>

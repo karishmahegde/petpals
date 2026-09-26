@@ -1,6 +1,8 @@
 // StaffApprovalPanel.tsx
-// Detail slide-over for one Pending (self-registered, awaiting approval)
-// staff member — opened from the Staff Approvals section's "View Details".
+// Detail slide-over for one Pending Manager sign-up (the first staff
+// sign-up at a shelter without a manager) — opened from the Manager
+// Approvals section's "View Details". Approving also makes them that
+// shelter's manager, server-side.
 // Read-only profile plus Approve/Decline in the footer, both going through
 // the existing PATCH /staff/:id/status endpoint (Active = approve,
 // Deactivated = decline — there's no dedicated approve/decline endpoint).
@@ -45,10 +47,10 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
       updateStaffStatus(userID!, accountStatus),
     onSuccess: (_, accountStatus) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
+      // Approving sets the shelter's manager — refresh the shelter views too.
+      queryClient.invalidateQueries({ queryKey: ["admin", "shelters-analytics"] });
       toast.success(
-        accountStatus === "Active"
-          ? "Staff member approved"
-          : "Staff member declined",
+        accountStatus === "Active" ? "Manager approved" : "Manager declined",
       );
       onClose();
     },

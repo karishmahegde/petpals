@@ -537,4 +537,32 @@ describe("Event management (Staff/Admin)", () => {
       expect(prisma.event.delete).not.toHaveBeenCalled();
     });
   });
+
+  // ————————————————————— role enforcement —————————————————————
+  // Every write is Staff/Admin-only — Adopter is covered per endpoint above;
+  // these are the remaining non-staff roles, rejected before any DB work.
+  describe("POST/PUT/DELETE /api/v1/events: non-Staff/Admin roles", () => {
+    const WRITES = [
+      ["post", "/api/v1/events", VALID_CREATE_BODY],
+      ["put", "/api/v1/events/10", { eventName: "Renamed" }],
+      ["delete", "/api/v1/events/10", undefined],
+    ];
+    const ROLES = ["Volunteer", "Veterinarian", "Donor"];
+
+    test.each(
+      ROLES.flatMap((role) => WRITES.map(([method, path, body]) => [role, method, path, body])),
+    )("%s: %s %s -> 403 FORBIDDEN, nothing written", async (role, method, path, body) => {
+      let req = request(app)[method](path).set("Authorization", `Bearer ${signToken(role)}`);
+      if (body) req = req.send(body);
+
+      const res = await req;
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+      expect(prisma.event.findUnique).not.toHaveBeenCalled();
+      expect(prisma.event.create).not.toHaveBeenCalled();
+      expect(prisma.event.update).not.toHaveBeenCalled();
+      expect(prisma.event.delete).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -19,11 +19,8 @@ Multi-shelter pet adoption platform (solo full-stack learning project). Unifies 
 
 ## ⚠️ Permanent Known Issues
 
-- **PostGIS migration drift (CRITICAL) — never run `npx prisma migrate dev`.** It detects drift from the hand-added `shelterLocation` geography column and offers to reset the DB. For any schema change: edit `schema.prisma` → apply the SQL directly in the Supabase editor → `npx prisma generate`. After any DB reset, re-add all hand-applied constraints, including:
-  ```sql
-  ALTER TABLE "Shelter" ADD COLUMN "shelterLocation" geography(Point, 4326);
-  ```
-  Seed uses `prisma.$executeRaw` for PostGIS values — intentional.
+- **PostGIS migration drift (CRITICAL) — never run `npx prisma migrate dev`.** Prisma can't model the PostGIS `shelterLocation` column or the generated reference-code columns, so `migrate dev` sees them as drift and offers to reset the DB. `migrate deploy` is safe. The single baseline migration (`server/src/prisma/migrations/20260926000000_baseline/`) builds the whole schema, those columns and the partial unique indexes included, so a reset DB only needs `npx prisma migrate deploy` (+ the storage buckets in `setup/manual-constraints.sql`). For any schema change: edit `schema.prisma` → write the SQL as a **new** migration folder `migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql` (draft it with `npx prisma migrate diff --from-config-datasource --to-schema src/prisma/schema.prisma --script`, deleting the generated-code `DROP DEFAULT` noise) → `npx prisma migrate deploy` → `npx prisma generate`. Never edit an applied migration, and never apply schema SQL by hand only — a fresh setup would miss it.
+  Seed uses `prisma.$executeRaw` for PostGIS values — intentional. **The seed wipes every table first** (deterministic IDs/data) and covers every enum value — keep it that way when adding statuses.
 - **`CHAR(n)` padding:** right-pads with spaces, breaking strict string compares. Use `VARCHAR` unless the declared length exactly matches content width (`*Sex CHAR(1)` are safe; `petSex` was fixed `CHAR(2)`→`CHAR(1)`). Check on every new fixed-length column.
 - **TanStack `queryKey` must include everything `queryFn` reads** — not just the state that looks like "the input". A computed override driven by other state silently breaks refetching if it's not in the key.
 - **Age filter:** `petDOB` → `buildAgeFilter(minAge, maxAge)`. `minAge` = direct `lte`; `maxAge` = shift the cutoff back one month **and** use strict `gt` (not `gte`). Both parts required together.
@@ -62,7 +59,7 @@ client/src/
     geocoding/   (empty — server-side only)
   static/        assets/images/branding/ · content/ (CMS-ready page copy, one file/folder per page)
   components/
-    ui/          generic primitives (Card, ButtonElement, Avatar, ConfirmActionModal, Phone*, SegmentedControl)
+    ui/          generic primitives (Card, ButtonElement, Avatar, Modal + ModalActions, ConfirmActionModal, Phone*, SegmentedControl)
       marketing/ SectionContainer, SectionHeading[Center]
       pets/      PetCatalogCard, PetDetailsModal, FilterControls
       dashboard/ DashboardHeading, DashboardWidgetHeader, DashboardList, StatTile
@@ -185,7 +182,7 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 ## Database Notes
 
 - `Pet.petDOB` replaced static `petAge` (age computed at request time). `Pet.featuredFlag BOOLEAN DEFAULT FALSE` powers `/pets/featured` (set via SQL for now, staff toggle planned).
-- Hand-applied constraints (PostGIS column, partial unique indexes) live only in Supabase and must be re-added after any reset — see Known Issues. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`. Double-submit guard on Appointment: `UNIQUE (petID, vetID, appointmentDate) WHERE appointmentStatus = 'Scheduled'` — same pet+vet+timestamp can't have two Scheduled rows (a resubmitted create after a perceived failure).
+- Partial unique indexes (not expressible in `schema.prisma`) live in the baseline migration's SQL — see Known Issues. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`. Double-submit guard on Appointment: `UNIQUE (petID, vetID, appointmentDate) WHERE appointmentStatus = 'Scheduled'` — same pet+vet+timestamp can't have two Scheduled rows (a resubmitted create after a perceived failure).
 
 ---
 

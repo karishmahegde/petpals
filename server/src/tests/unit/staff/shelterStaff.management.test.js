@@ -67,7 +67,7 @@ describe("Shelter manager staff management", () => {
       });
     });
 
-    test("section=pending lists only Pending registrations", async () => {
+    test("section=pending lists Pending registrations, minus Manager sign-ups (Admin's)", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.staff.findMany.mockResolvedValueOnce([]);
       prisma.staff.count.mockResolvedValueOnce(0);
@@ -80,6 +80,10 @@ describe("Shelter manager staff management", () => {
       expect(prisma.staff.findMany.mock.calls[0][0].where).toEqual({
         shelterID: 9,
         accountStatus: "Pending",
+        OR: [
+          { staffDesignation: null },
+          { staffDesignation: { not: "Manager" } },
+        ],
       });
     });
 
@@ -178,24 +182,81 @@ describe("Shelter manager staff management", () => {
   });
 
   describe("PATCH /api/v1/staff/me/team/:id/status", () => {
-    test("approve: Pending -> Active", async () => {
+    const pendingMember = (overrides = {}) => ({
+      shelterID: 9,
+      staffDesignation: null,
+      accountStatus: "Pending",
+      staffDOJ: null,
+      ...overrides,
+    });
+
+    test("approve: Pending -> Active sets the designation and joining date", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
-      prisma.staff.findUnique.mockResolvedValueOnce({
-        shelterID: 9,
-        staffDesignation: null,
-        accountStatus: "Pending",
-      });
+      prisma.staff.findUnique.mockResolvedValueOnce(pendingMember());
       prisma.staff.update.mockResolvedValueOnce(memberRow());
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Active", staffDesignation: "Senior" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            accountStatus: "Active",
+            staffDOJ: expect.any(Date),
+            staffDOS: null,
+            staffDesignation: "Senior",
+          },
+        }),
+      );
+    });
+
+    test("approve without a designation → 400, nothing written", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce(pendingMember());
 
       const res = await request(app)
         .patch("/api/v1/staff/me/team/50/status")
         .set("Authorization", `Bearer ${managerToken()}`)
         .send({ accountStatus: "Active" });
 
+      expect(res.status).toBe(400);
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
+
+    test("decline needs no designation", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce(pendingMember());
+      prisma.staff.update.mockResolvedValueOnce(
+        memberRow({ accountStatus: "Deactivated" }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Deactivated" });
+
       expect(res.status).toBe(200);
       expect(prisma.staff.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Active" } }),
+        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
       );
+    });
+
+    test("a Pending Manager sign-up is Admin's → 403", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce(
+        pendingMember({ staffDesignation: "Manager" }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Active", staffDesignation: "Senior" });
+
+      expect(res.status).toBe(403);
+      expect(prisma.staff.update).not.toHaveBeenCalled();
     });
 
     test("Deactivated -> Active isn't allowed -> 409", async () => {

@@ -7,44 +7,55 @@ datasource db {
 }
 
 model Users {
-  userID       Int           @id @default(autoincrement())
-  userEmail    String        @unique @db.VarChar(45)
-  userPassword String        @db.VarChar(255)
-  refreshToken String?       @db.Text
-  role         role
-  admin        Admin?
-  adopter      Adopter?
-  donor        Donor?
-  staff        Staff?
-  veterinarian Veterinarian?
-  volunteer    Volunteer?
+  userID        Int           @id @default(autoincrement())
+  userEmail     String        @unique @db.VarChar(45)
+  userPassword  String        @db.VarChar(255)
+  refreshToken  String?       @db.Text
+  role          role
+  // Account-level, so shared by every role (moved off Adopter/Admin).
+  emailVerified Boolean       @default(false)
+  lastLoginAt   DateTime?
+  admin         Admin?
+  adopter       Adopter?
+  donor         Donor?
+  staff         Staff?
+  veterinarian  Veterinarian?
+  volunteer     Volunteer?
 }
 
 model Admin {
-  userID            Int                 @id
-  avatarSeed        String              @db.VarChar(64)
-  adminName         String              @db.VarChar(45)
-  adminPhone        String?             @db.VarChar(20)
-  adminAddress      String?             @db.VarChar(45)
-  adminDOB          DateTime?           @db.Date
-  adminSex          String?             @db.Char(1)
-  createdAt         DateTime            @default(now())
-  lastLoginAt       DateTime?
+  userID             Int                 @id
+  avatarSeed         String              @db.VarChar(64)
+  adminName          String              @db.VarChar(45)
+  adminPhone         String?             @db.VarChar(20)
+  adminDOB           DateTime?           @db.Date
+  adminSex           String?             @db.Char(1)
+  createdAt          DateTime            @default(now())
+  // Basic info shared by every role (same columns + defaults as Adopter's),
+  // filled in by each role's onboarding wizard.
+  addressLine1       String              @default("") @db.VarChar(100)
+  addressLine2       String?             @db.VarChar(100)
+  city               String              @default("") @db.VarChar(45)
+  state              String              @default("") @db.VarChar(45)
+  zip                String              @default("") @db.VarChar(10)
+  country            String              @default("") @db.VarChar(45)
+  onboardingComplete Boolean             @default(false)
+  onboardingStep     Int                 @default(2)
   // Self-registered admins start Pending, approved by an existing Admin —
   // same shape as Staff. The very first Admin ever created is auto-activated
   // (see auth.service.js's register()) so there's always someone to approve
   // the rest.
-  accountStatus     AdminAccountStatus? @default(Pending)
+  accountStatus      AdminAccountStatus? @default(Pending)
   // Audit trail for the *last* accountStatus change (approve/decline/
   // activate/deactivate) — who did it and when. Not a full history log,
   // just the most recent transition; set on self-service close-account too
   // (statusChangedByID = self). Nulled, not blocked, if that admin is later
   // deleted — see onDelete: SetNull below.
-  statusChangedByID Int?
-  statusChangedAt   DateTime?
-  user              Users               @relation(fields: [userID], references: [userID])
-  statusChangedBy   Admin?              @relation("AdminStatusChangedBy", fields: [statusChangedByID], references: [userID], onDelete: SetNull)
-  statusChangesMade Admin[]             @relation("AdminStatusChangedBy")
+  statusChangedByID  Int?
+  statusChangedAt    DateTime?
+  user               Users               @relation(fields: [userID], references: [userID])
+  statusChangedBy    Admin?              @relation("AdminStatusChangedBy", fields: [statusChangedByID], references: [userID], onDelete: SetNull)
+  statusChangesMade  Admin[]             @relation("AdminStatusChangedBy")
 }
 
 model Shelter {
@@ -76,29 +87,39 @@ model Shelter {
 }
 
 model Staff {
-  userID           Int                    @id
-  avatarSeed       String                 @db.VarChar(64)
-  staffName        String                 @db.VarChar(45)
-  staffPhone       String?                @db.VarChar(20)
-  shelterID        Int?
-  staffDOB         DateTime?              @db.Date
-  staffSex         String?                @db.Char(1)
-  staffDOJ         DateTime?
-  staffDOS         DateTime?
-  staffDesignation StaffDesignation?
-  accountStatus    StaffAccountStatus?    @default(Pending)
-  adoptionApps     AdoptionApplication[]
-  appointments     Appointment[]
-  events           Event[]
-  pets             Pet[]
-  managedShelters  Shelter[]              @relation("ShelterManager")
-  shelter          Shelter?               @relation("ShelterStaff", fields: [shelterID], references: [shelterID])
-  user             Users                  @relation(fields: [userID], references: [userID])
-  tasks            Task[]
-  fromTransfers    TransferHistory[]      @relation("FromShelterStaff")
-  toTransfers      TransferHistory[]      @relation("ToShelterStaff")
-  visits           Visit[]
-  volunteerApps    VolunteerApplication[]
+  userID             Int                    @id
+  avatarSeed         String                 @db.VarChar(64)
+  staffName          String                 @db.VarChar(45)
+  staffPhone         String?                @db.VarChar(20)
+  shelterID          Int?
+  staffDOB           DateTime?              @db.Date
+  staffSex           String?                @db.Char(1)
+  staffDOJ           DateTime?
+  staffDOS           DateTime?
+  staffDesignation   StaffDesignation?
+  accountStatus      StaffAccountStatus?    @default(Pending)
+  // Basic info shared by every role (same columns + defaults as Adopter's),
+  // filled in by each role's onboarding wizard.
+  addressLine1       String                 @default("") @db.VarChar(100)
+  addressLine2       String?                @db.VarChar(100)
+  city               String                 @default("") @db.VarChar(45)
+  state              String                 @default("") @db.VarChar(45)
+  zip                String                 @default("") @db.VarChar(10)
+  country            String                 @default("") @db.VarChar(45)
+  onboardingComplete Boolean                @default(false)
+  onboardingStep     Int                    @default(2)
+  adoptionApps       AdoptionApplication[]
+  appointments       Appointment[]
+  events             Event[]
+  pets               Pet[]
+  managedShelters    Shelter[]              @relation("ShelterManager")
+  shelter            Shelter?               @relation("ShelterStaff", fields: [shelterID], references: [shelterID])
+  user               Users                  @relation(fields: [userID], references: [userID])
+  tasks              Task[]
+  fromTransfers      TransferHistory[]      @relation("FromShelterStaff")
+  toTransfers        TransferHistory[]      @relation("ToShelterStaff")
+  visits             Visit[]
+  volunteerApps      VolunteerApplication[]
 
   @@index([shelterID])
 }
@@ -107,16 +128,25 @@ model Veterinarian {
   userID             Int                 @id
   avatarSeed         String              @db.VarChar(64)
   vetName            String              @db.VarChar(45)
-  vetAddress         String?             @db.VarChar(45)
   vetPhone           String?             @db.VarChar(20)
   vetDOB             DateTime?           @db.Date
   vetSex             String?             @db.Char(1)
   createdAt          DateTime            @default(now())
   shelterID          Int?
-  // Self-registered vets start Pending. No approval workflow is built yet
-  // (planned as Staff-owned, per the Staff dashboard once it exists) —
-  // approving one today means setting accountStatus by hand.
+  // Self-registered vets pick their shelter at sign-up and start Pending;
+  // that shelter's manager approves (or declines) them from the Staff
+  // dashboard's Vets tab (staff/vets.service.js).
   accountStatus      VetAccountStatus?   @default(Pending)
+  // Basic info shared by every role (same columns + defaults as Adopter's),
+  // filled in by each role's onboarding wizard.
+  addressLine1       String              @default("") @db.VarChar(100)
+  addressLine2       String?             @db.VarChar(100)
+  city               String              @default("") @db.VarChar(45)
+  state              String              @default("") @db.VarChar(45)
+  zip                String              @default("") @db.VarChar(10)
+  country            String              @default("") @db.VarChar(45)
+  onboardingComplete Boolean             @default(false)
+  onboardingStep     Int                 @default(2)
   appointments       Appointment[]
   healthRecords      HealthRecord[]
   vaccinationRecords VaccinationRecord[]
@@ -153,7 +183,7 @@ model Pet {
   petCode                String?               @unique @db.Text
   petName                String                @db.VarChar(45)
   breedID                Int
-  petDOB                 DateTime
+  petDOB                 DateTime              @db.Date
   petWeight              Float
   petHeight              Float
   petBGroup              String                @db.VarChar(5)
@@ -225,8 +255,6 @@ model Adopter {
   preferredAgeRange  PreferredAgeRange?
   preferredSize      PetSize?
   openToSpecialNeeds Boolean               @default(false)
-  emailVerified      Boolean               @default(false)
-  lastLoginAt        DateTime?
   stripeCustomerID   String?               @db.VarChar(255)
   accountStatus      AdopterAccountStatus? @default(Active)
   addressLine1       String                @default("") @db.VarChar(100)
@@ -355,10 +383,18 @@ model VaccinationRecord {
   dueDate          DateTime
   administeredBy   Int?
   administeredAt   Int?
+  // The appointment this dose was given at — what an appointment detail's
+  // "Vaccines administered" list reads. Optional: a dose recorded outside
+  // any appointment (e.g. history carried in at intake) has none. Hand-applied
+  // (see CLAUDE.md — migrate dev is banned); SQL in setup/manual-constraints.sql.
+  appointmentID    Int?
   shelter          Shelter?      @relation(fields: [administeredAt], references: [shelterID])
   vet              Veterinarian? @relation(fields: [administeredBy], references: [userID])
   pet              Pet           @relation(fields: [petID], references: [petID])
   vaccine          Vaccine       @relation(fields: [vaccineID], references: [vaccineID])
+  appointment      Appointment?  @relation(fields: [appointmentID], references: [appointmentID], onDelete: SetNull)
+
+  @@index([appointmentID])
 }
 
 model TransferHistory {
@@ -379,7 +415,7 @@ model TransferHistory {
 }
 
 model Appointment {
-  appointmentID     Int          @id @default(autoincrement())
+  appointmentID     Int                 @id @default(autoincrement())
   // Human-facing reference, e.g. "APT-00123". Postgres GENERATED ALWAYS STORED
   // column computed from appointmentID — READ-ONLY, never set in a
   // create()/update(). Same manual-migration pattern as Pet.petCode (see
@@ -387,7 +423,7 @@ model Appointment {
   //   ALTER TABLE "Appointment" ADD COLUMN "appointmentCode" TEXT
   //     GENERATED ALWAYS AS ('APT-' || lpad("appointmentID"::text, 5, '0')) STORED;
   //   CREATE UNIQUE INDEX "Appointment_appointmentCode_key" ON "Appointment" ("appointmentCode");
-  appointmentCode   String?           @unique @db.Text
+  appointmentCode   String?             @unique @db.Text
   petID             Int
   vetID             Int
   shelterID         Int
@@ -399,14 +435,14 @@ model Appointment {
   staffID           Int?
   volunteerID       Int?
   appointmentDate   DateTime
-  appointmentReason String            @db.VarChar(300)
+  appointmentReason String              @db.VarChar(300)
   // Only real write-transition today is Scheduled -> Cancelled (see
   // cancelAppointment). "Completed" is never written back — it's a derived
   // display label for a Scheduled row whose appointmentDate has passed
   // (see staff/appointments.service.js's deriveAppointmentStatus), since
   // there's no "mark complete" action and no cron/scheduler in this
   // codebase to flip it automatically.
-  appointmentStatus AppointmentStatus @default(Scheduled)
+  appointmentStatus AppointmentStatus   @default(Scheduled)
   // Hand-applied partial unique index (see CLAUDE.md — migrate dev is
   // banned) guarding against the double-submit case (a slow/dropped
   // response reads client-side as a failure, the caller resubmits, and
@@ -414,11 +450,12 @@ model Appointment {
   // have one Scheduled appointment. A re-booked slot after a Cancelled one
   // is unaffected — the index only matches Scheduled rows.
   //   CREATE UNIQUE INDEX "Appointment_pet_vet_date_scheduled_key" ON "Appointment" ("petID", "vetID", "appointmentDate") WHERE "appointmentStatus" = 'Scheduled';
-  pet               Pet               @relation(fields: [petID], references: [petID])
-  shelter           Shelter           @relation(fields: [shelterID], references: [shelterID])
-  vet               Veterinarian      @relation(fields: [vetID], references: [userID])
-  staff             Staff?            @relation(fields: [staffID], references: [userID])
-  volunteer         Volunteer?        @relation(fields: [volunteerID], references: [userID])
+  pet               Pet                 @relation(fields: [petID], references: [petID])
+  shelter           Shelter             @relation(fields: [shelterID], references: [shelterID])
+  vet               Veterinarian        @relation(fields: [vetID], references: [userID])
+  staff             Staff?              @relation(fields: [staffID], references: [userID])
+  volunteer         Volunteer?          @relation(fields: [volunteerID], references: [userID])
+  vaccinations      VaccinationRecord[]
 }
 
 model VolunteerApplication {
@@ -435,7 +472,7 @@ model VolunteerApplication {
 }
 
 model Volunteer {
-  userID            Int                     @id
+  userID             Int                     @id
   // Human-facing reference, e.g. "VOL-00012". Postgres GENERATED ALWAYS STORED
   // column computed from userID — READ-ONLY, never set in a create()/update().
   // Same manual-migration pattern as Pet.petCode (see CLAUDE.md — migrate dev
@@ -443,23 +480,32 @@ model Volunteer {
   //   ALTER TABLE "Volunteer" ADD COLUMN "volunteerCode" TEXT
   //     GENERATED ALWAYS AS ('VOL-' || lpad("userID"::text, 5, '0')) STORED;
   //   CREATE UNIQUE INDEX "Volunteer_volunteerCode_key" ON "Volunteer" ("volunteerCode");
-  volunteerCode     String?                 @unique @db.Text
-  avatarSeed        String                  @db.VarChar(64)
-  volunteerName     String                  @db.VarChar(45)
-  volunteerAddress  String?                 @db.VarChar(45)
-  volunteerPhone    String?                 @db.VarChar(20)
-  volunteerDOB      DateTime?               @db.Date
-  volunteerSex      String?                 @db.Char(1)
-  volunteerSchedule String?                 @db.VarChar(100)
-  shelterID         Int?
-  createdAt         DateTime                @default(now())
-  accountStatus     VolunteerAccountStatus? @default(Pending)
-  shelter           Shelter?                @relation(fields: [shelterID], references: [shelterID])
-  user              Users                   @relation(fields: [userID], references: [userID])
-  appointments      Appointment[]
-  applications      VolunteerApplication[]
-  events            VolunteerEvent[]
-  tasks             VolunteerTask[]
+  volunteerCode      String?                 @unique @db.Text
+  avatarSeed         String                  @db.VarChar(64)
+  volunteerName      String                  @db.VarChar(45)
+  volunteerPhone     String?                 @db.VarChar(20)
+  volunteerDOB       DateTime?               @db.Date
+  volunteerSex       String?                 @db.Char(1)
+  volunteerSchedule  String?                 @db.VarChar(100)
+  shelterID          Int?
+  createdAt          DateTime                @default(now())
+  accountStatus      VolunteerAccountStatus? @default(Pending)
+  // Basic info shared by every role (same columns + defaults as Adopter's),
+  // filled in by each role's onboarding wizard.
+  addressLine1       String                  @default("") @db.VarChar(100)
+  addressLine2       String?                 @db.VarChar(100)
+  city               String                  @default("") @db.VarChar(45)
+  state              String                  @default("") @db.VarChar(45)
+  zip                String                  @default("") @db.VarChar(10)
+  country            String                  @default("") @db.VarChar(45)
+  onboardingComplete Boolean                 @default(false)
+  onboardingStep     Int                     @default(2)
+  shelter            Shelter?                @relation(fields: [shelterID], references: [shelterID])
+  user               Users                   @relation(fields: [userID], references: [userID])
+  appointments       Appointment[]
+  applications       VolunteerApplication[]
+  events             VolunteerEvent[]
+  tasks              VolunteerTask[]
 }
 
 model GovernmentID {
@@ -526,18 +572,27 @@ model VolunteerEvent {
 }
 
 model Donor {
-  userID           Int                 @id
-  avatarSeed       String              @db.VarChar(64)
-  donorName        String              @db.VarChar(45)
-  donorAddress     String?             @db.VarChar(45)
-  donorPhone       String?             @db.VarChar(20)
-  donorDOB         DateTime?           @db.Date
-  donorSex         String?             @db.Char(1)
-  createdAt        DateTime            @default(now())
-  stripeCustomerID String?             @db.VarChar(255)
-  accountStatus    DonorAccountStatus? @default(Active)
-  donations        Donation[]
-  user             Users               @relation(fields: [userID], references: [userID])
+  userID             Int                 @id
+  avatarSeed         String              @db.VarChar(64)
+  donorName          String              @db.VarChar(45)
+  donorPhone         String?             @db.VarChar(20)
+  donorDOB           DateTime?           @db.Date
+  donorSex           String?             @db.Char(1)
+  createdAt          DateTime            @default(now())
+  stripeCustomerID   String?             @db.VarChar(255)
+  accountStatus      DonorAccountStatus? @default(Active)
+  // Basic info shared by every role (same columns + defaults as Adopter's),
+  // filled in by each role's onboarding wizard.
+  addressLine1       String              @default("") @db.VarChar(100)
+  addressLine2       String?             @db.VarChar(100)
+  city               String              @default("") @db.VarChar(45)
+  state              String              @default("") @db.VarChar(45)
+  zip                String              @default("") @db.VarChar(10)
+  country            String              @default("") @db.VarChar(45)
+  onboardingComplete Boolean             @default(false)
+  onboardingStep     Int                 @default(2)
+  donations          Donation[]
+  user               Users               @relation(fields: [userID], references: [userID])
 }
 
 model Donation {
@@ -595,7 +650,6 @@ enum IntakeType {
 enum AdoptionStatus {
   incoming
   available
-  pending
   adopted
   fostered
   transferred

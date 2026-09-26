@@ -17,11 +17,12 @@ import {
   PiArrowsClockwise,
   PiHandHeart,
   PiCalendarCheck,
-  PiHouseLine,
   PiConfettiFill,
   PiHandCoins,
   PiGearSix,
   PiIdentificationBadge,
+  PiFirstAidKit,
+  PiUserList,
   PiIdentificationCard,
 } from "react-icons/pi";
 import { FaUserCircle } from "react-icons/fa";
@@ -42,6 +43,8 @@ interface NavLinkItem {
   to: string;
   icon: IconType;
   end?: boolean;
+  /** Staff only: shown just to the shelter's manager. */
+  managerOnly?: boolean;
 }
 
 interface NavGroupItem {
@@ -49,8 +52,6 @@ interface NavGroupItem {
   label: string;
   icon: IconType;
   items: NavLinkItem[];
-  /** Staff only: shown just to the shelter's manager. */
-  managerOnly?: boolean;
 }
 
 type NavEntry = NavLinkItem | NavGroupItem;
@@ -79,6 +80,12 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
     },
     { type: "link", label: "Staff", to: "/admin/staff", icon: PiUsersThree },
     { type: "link", label: "Admins", to: "/admin/admins", icon: PiShieldCheck },
+    {
+      type: "link",
+      label: "ID Verification",
+      to: "/admin/id-verification",
+      icon: PiIdentificationCard,
+    },
   ],
   Adopter: [
     {
@@ -136,10 +143,11 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
         },
       ],
     },
+    // The adoption pipeline, in the order staff work it.
     {
       type: "group",
-      label: "People",
-      icon: PiUsersThree,
+      label: "Adoptions",
+      icon: PiHeart,
       items: [
         {
           type: "link",
@@ -149,29 +157,29 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
         },
         {
           type: "link",
-          label: "Volunteers",
-          to: "/staff/volunteers",
-          icon: PiHandHeart,
-        },
-        {
-          type: "link",
           label: "Visits",
           to: "/staff/visits",
           icon: PiCalendarCheck,
         },
         {
           type: "link",
-          label: "ID Verification",
-          to: "/staff/id-verification",
-          icon: PiIdentificationCard,
+          label: "Adopters",
+          to: "/staff/adopters",
+          icon: PiUserList,
         },
       ],
     },
     {
       type: "group",
-      label: "Shelter",
-      icon: PiHouseLine,
+      label: "Community",
+      icon: PiUsersThree,
       items: [
+        {
+          type: "link",
+          label: "Volunteers",
+          to: "/staff/volunteers",
+          icon: PiHandHeart,
+        },
         {
           type: "link",
           label: "Events",
@@ -186,17 +194,33 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
         },
       ],
     },
+    // Who may act at this shelter. ID Verification is open to all staff
+    // (adopter/volunteer IDs); Staff and Vets are manager-only, and so are
+    // staff/vet IDs within ID Verification (enforced server-side).
     {
       type: "group",
       label: "Management",
       icon: PiGearSix,
-      managerOnly: true,
       items: [
         {
           type: "link",
           label: "Staff",
           to: "/staff/team",
           icon: PiIdentificationBadge,
+          managerOnly: true,
+        },
+        {
+          type: "link",
+          label: "Vets",
+          to: "/staff/vets",
+          icon: PiFirstAidKit,
+          managerOnly: true,
+        },
+        {
+          type: "link",
+          label: "ID Verification",
+          to: "/staff/id-verification",
+          icon: PiIdentificationCard,
         },
       ],
     },
@@ -233,7 +257,8 @@ const DashboardSidebar = ({
   const [acctOpen, setAcctOpen] = useState(false);
 
   // Staff: whether this user manages their shelter (same cached query as the
-  // staff pages) — hides managerOnly groups otherwise.
+  // staff pages) — hides managerOnly links otherwise (and a group left with
+  // no links).
   const { data: staffProfile } = useQuery({
     queryKey: ["staff", "me"],
     queryFn: getMyStaffProfile,
@@ -241,11 +266,14 @@ const DashboardSidebar = ({
   });
   const isManager = staffProfile?.staffDesignation === "Manager";
 
+  const isVisible = (link: NavLinkItem) => !link.managerOnly || isManager;
   const items: NavEntry[] =
     role && ROLE_NAV[role]
-      ? ROLE_NAV[role].filter(
-          (entry) => !(entry.type === "group" && entry.managerOnly && !isManager),
-        )
+      ? ROLE_NAV[role].flatMap((entry): NavEntry[] => {
+          if (entry.type === "link") return isVisible(entry) ? [entry] : [];
+          const links = entry.items.filter(isVisible);
+          return links.length > 0 ? [{ ...entry, items: links }] : [];
+        })
       : [
           {
             type: "link",

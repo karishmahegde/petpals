@@ -1,7 +1,9 @@
 const prisma = require("../../config/prisma");
+const { staffStatusDates } = require("../../utils/staffDates");
 const storage = require("../storage");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
 const { nullifyRefreshToken } = require("../auth/auth.service");
+const { ADDRESS_SELECT } = require("../../utils/address");
 
 // Self-service shape — everything a staff member may see about their own
 // row. Same field set as admin/staff.service.js's STAFF_LIST_SELECT (email
@@ -21,8 +23,10 @@ const STAFF_SELF_SELECT = {
   staffDOS: true,
   staffDesignation: true,
   accountStatus: true,
+  ...ADDRESS_SELECT,
   shelter: { select: { shelterName: true } },
-  user: { select: { userEmail: true } },
+  // emailVerified/lastLoginAt live on Users — flattened by toSelfProfile.
+  user: { select: { userEmail: true, emailVerified: true, lastLoginAt: true } },
 };
 
 const notFound = () => {
@@ -32,6 +36,15 @@ const notFound = () => {
 };
 
 // ——————————————— GET /staff/me ———————————————
+// user.userEmail stays nested (same as the admin staff list shape);
+// emailVerified/lastLoginAt are lifted to the top level.
+const toSelfProfile = ({ user, ...rest }) => ({
+  ...rest,
+  emailVerified: user.emailVerified,
+  lastLoginAt: user.lastLoginAt,
+  user: { userEmail: user.userEmail },
+});
+
 const getMyProfile = async (userID) => {
   const staff = await prisma.staff.findUnique({
     where: { userID },
@@ -40,21 +53,24 @@ const getMyProfile = async (userID) => {
   if (!staff) {
     throw notFound();
   }
-  return staff;
+  return toSelfProfile(staff);
 };
 
 // ——————————————— PUT /staff/me ———————————————
 // `data` is already validated and whitelisted by the controller — only
-// avatarSeed/staffName/staffPhone/staffDOB/staffSex, never
+// avatarSeed/staffName/staffPhone/staffDOB/staffSex and the address
+// fields, never
 // shelterID/staffDesignation/accountStatus (those are Admin-controlled, via
 // PATCH /staff/:id and PATCH /staff/:id/status).
 const updateMyProfile = async (userID, data) => {
   try {
-    return await prisma.staff.update({
-      where: { userID },
-      data,
-      select: STAFF_SELF_SELECT,
-    });
+    return toSelfProfile(
+      await prisma.staff.update({
+        where: { userID },
+        data,
+        select: STAFF_SELF_SELECT,
+      }),
+    );
   } catch (err) {
     if (err.code === "P2025") {
       throw notFound();
@@ -228,10 +244,18 @@ const closeMyAccount = async (userID, mode) => {
   });
 
   if (mode === "deactivate") {
+    const current = await prisma.staff.findUnique({
+      where: { userID },
+      select: { staffDOJ: true },
+    });
     await prisma.$transaction([
       prisma.staff.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        // Stamps staffDOS — see utils/staffDates.js.
+        data: {
+          accountStatus: "Deactivated",
+          ...staffStatusDates("Deactivated", current ?? {}),
+        },
       }),
       clearManagedShelters,
       nullifyRefreshToken(prisma, userID),

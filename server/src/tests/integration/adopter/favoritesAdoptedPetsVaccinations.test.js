@@ -30,7 +30,7 @@ describe("favorites, adopted pets, and vaccinations", () => {
   let shelterID;
   let petFavID; // used for the favorites POST/DELETE/list tests
   let petAcceptedAdoptedID; // Accepted application + adoptionStatus 'adopted' — the one real "adopted pet"
-  let petAcceptedNotAdoptedID; // Accepted application, but pet still 'pending' — must NOT show as adopted
+  let petAcceptedNotAdoptedID; // Accepted application, but pet not 'adopted' (still 'available') — must NOT show as adopted
   let petPendingAdoptedID; // pet already 'adopted', but this adopter's application is only 'Pending'
   let vaccineID;
   let adopterA;
@@ -76,7 +76,7 @@ describe("favorites, adopted pets, and vaccinations", () => {
 
     petFavID = (await makePet("Favorite Testy", "available")).petID;
     petAcceptedAdoptedID = (await makePet("Accepted+Adopted Testy", "adopted")).petID;
-    petAcceptedNotAdoptedID = (await makePet("Accepted+Pending Testy", "pending")).petID;
+    petAcceptedNotAdoptedID = (await makePet("Accepted+NotAdopted Testy", "available")).petID;
     petPendingAdoptedID = (await makePet("Pending+Adopted Testy", "adopted")).petID;
 
     const vaccine = await prisma.vaccine.create({

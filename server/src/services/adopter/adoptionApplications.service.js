@@ -219,6 +219,16 @@ const getApplicationByCheckoutSession = async (adopterID, sessionId) => {
   return toClientShape(application);
 };
 
+// Only the application's own shelter manager (Shelter.managerStaffID — kept
+// in sync with staffDesignation 'Manager' by admin/staff.service.js) may
+// assign its staff, and only while it's still Pending (Accept overwrites
+// staffID with the deciding staff member anyway). Admin may too, same as the
+// transfer reassign in staff/transfers.service.js.
+const canAssignStaff = (application, actor) =>
+  application.applicationStatus === "Pending" &&
+  (actor.role === "Admin" ||
+    (actor.role === "Staff" && application.shelter.managerStaffID === actor.userID));
+
 // ——————————————— GET APPLICATION BY ID (GET /adoption-applications/:id) ———————————————
 // Powers the Applications section's detail slide-over: the scalar fields plus
 // the pet summary, assigned staff name, and the shelter's closing remark.
@@ -241,7 +251,7 @@ const getApplicationById = async (applicationID, user) => {
           },
         },
       },
-      shelter: { select: { shelterName: true } },
+      shelter: { select: { shelterName: true, managerStaffID: true } },
       staff: { select: { staffName: true } },
       adopter: {
         select: {
@@ -328,6 +338,7 @@ const getApplicationById = async (applicationID, user) => {
       preQualifyFlag: application.adopter.preQualifyFlag,
     },
     governmentIdStatus,
+    canAssignStaff: canAssignStaff(application, user),
   };
 };
 
@@ -645,6 +656,11 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
   ];
   // Accept marks the pet adopted; Reject deliberately leaves the pet's
   // adoptionStatus untouched — still 'available' for other applicants.
+  // Withdrawing an Accepted application undoes the Accept: the pet goes
+  // back to 'available'. Staff can't do that by hand (an adopted pet is
+  // read-only — see staff/pets.service.js), so this is the only way back.
+  // updateMany + the 'adopted' guard so a pet that has since moved on
+  // isn't clobbered.
   if (status === "Accepted") {
     operations.push(
       prisma.pet.update({
@@ -652,10 +668,72 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
         data: { adoptionStatus: "adopted" },
       }),
     );
+  } else if (status === "Withdrawn" && application.applicationStatus === "Accepted") {
+    operations.push(
+      prisma.pet.updateMany({
+        where: { petID: application.petID, adoptionStatus: "adopted" },
+        data: { adoptionStatus: "available" },
+      }),
+    );
   }
 
   const [updated] = await prisma.$transaction(operations);
   return toClientShape(updated);
+};
+
+// ——————————————— ASSIGN STAFF (PATCH /adoption-applications/:id) ———————————————
+// The only editable field on an application. The new assignee must be an
+// Active staff member at the application's shelter.
+const assignApplicationStaff = async (applicationID, { staffID }, actor) => {
+  const application = await prisma.adoptionApplication.findUnique({
+    where: { applicationID },
+    select: {
+      shelterID: true,
+      applicationStatus: true,
+      shelter: { select: { managerStaffID: true } },
+    },
+  });
+
+  if (!application) {
+    const err = new Error(
+      `No adoption application exists with ID ${applicationID}`,
+    );
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+
+  if (actor.role === "Staff" && application.shelter.managerStaffID !== actor.userID) {
+    const err = new Error(
+      "Only the shelter's manager may assign staff to this application",
+    );
+    err.code = "FORBIDDEN";
+    throw err;
+  }
+
+  if (application.applicationStatus !== "Pending") {
+    throw conflict(
+      `A ${application.applicationStatus.toLowerCase()} application can't be reassigned`,
+    );
+  }
+
+  const assignee = await prisma.staff.findUnique({
+    where: { userID: staffID },
+    select: { shelterID: true, accountStatus: true },
+  });
+  if (assignee?.shelterID !== application.shelterID || assignee.accountStatus !== "Active") {
+    const err = new Error(
+      "staffID must be an active staff member at the application's shelter",
+    );
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+
+  await prisma.adoptionApplication.update({
+    where: { applicationID },
+    data: { staffID },
+  });
+
+  return getApplicationById(applicationID, actor);
 };
 
 module.exports = {
@@ -669,4 +747,5 @@ module.exports = {
   listApplicationsForStaff,
   listAdoptedPetsByAdopter,
   updateApplicationStatus,
+  assignApplicationStaff,
 };

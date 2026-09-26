@@ -1,8 +1,9 @@
 // What it does: Defines the Staff/Admin ID-verification routes (GET
 // /government-ids, GET /government-ids/:id, PATCH
-// /government-ids/:id/status) — mounted at /api/v1 in app.js. Scoped to
-// Adopters + Volunteers only; Staff/Veterinarian/Admin account approval is
-// a separate, pre-existing flow under Admin.
+// /government-ids/:id/status) — mounted at /api/v1 in app.js. Who reviews
+// whose ID: Admin → Managers and other Admins; a shelter's manager → its
+// Staff, Vets, Volunteers, Adopters; other staff → Adopters and Volunteers (see
+// services/staff/governmentIds.service.js).
 const express = require("express");
 const governmentIdsController = require("../../controllers/staff/governmentIds.controller");
 const authenticate = require("../../middleware/authenticate");
@@ -15,11 +16,15 @@ const router = express.Router();
  *   get:
  *     summary: List government ID records awaiting or already reviewed (Staff, Admin)
  *     description: >
- *       Scoped to Adopters + Volunteers connected to the caller's shelter —
- *       an Adopter with at least one AdoptionApplication at that shelter, or
- *       a Volunteer whose shelterID matches it directly. Staff is always
- *       scoped to their own shelter, resolved server-side; Admin may pass an
- *       explicit shelterID or omit it for a network-wide list.
+ *       Who sees whose IDs: a shelter's manager → its Staff, Veterinarians,
+ *       Volunteers, and Adopters; any other staff member → Adopters and
+ *       Volunteers;
+ *       Admin → shelter Managers and other Admins (network-wide, or one
+ *       shelter's Manager with shelterID). Staff-side lists are scoped to
+ *       people connected to the caller's shelter — an Adopter with at least
+ *       one AdoptionApplication there, anyone else by their own shelterID.
+ *       A userType filter the caller doesn't review returns an empty page;
+ *       the caller's own ID is never listed.
  *       section=pending -> verificationStatus Pending; section=reviewed ->
  *       Verified or Rejected.
  *     tags: [GovernmentIds, Staff]
@@ -32,7 +37,7 @@ const router = express.Router();
  *         schema: { type: string, enum: [pending, reviewed] }
  *       - in: query
  *         name: userType
- *         schema: { type: string, enum: [Adopter, Volunteer] }
+ *         schema: { type: string, enum: [Adopter, Volunteer, Staff, Veterinarian, Admin] }
  *       - in: query
  *         name: name
  *         schema: { type: string }
@@ -84,8 +89,8 @@ router.get(
  *       FULL (unmasked) idNumber and a short-lived signed URL for the actual
  *       document image — this is the dedicated, authorized verification
  *       workflow the field and the private government-ids bucket exist for.
- *       Staff may only view a record for a person connected to their own
- *       shelter; Admin may view any Adopter/Volunteer record.
+ *       Same who-reviews-whom rules as the list (403 otherwise), and never
+ *       the caller's own record.
  *     tags: [GovernmentIds, Staff]
  *     security:
  *       - bearerAuth: []
@@ -137,9 +142,8 @@ router.get(
  *   patch:
  *     summary: Verify or reject a Pending government ID record (Staff, Admin)
  *     description: >
- *       Only a Pending record can be reviewed. Staff may only review a
- *       record for a person connected to their own shelter; Admin may
- *       review any Adopter/Volunteer record.
+ *       Only a Pending record can be reviewed. Same who-reviews-whom rules
+ *       as the list (403 otherwise), and never the caller's own record.
  *     tags: [GovernmentIds, Staff]
  *     security:
  *       - bearerAuth: []

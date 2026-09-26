@@ -178,7 +178,11 @@ describe("Admin staff management endpoints", () => {
 
   // ————————————————————————————— PATCH /staff/:id/status —————————————————————————————
   describe("PATCH /api/v1/staff/:id/status", () => {
-    test("deactivating a shelter's current manager clears managerStaffID", async () => {
+    test("deactivating a shelter's current manager clears managerStaffID and stamps staffDOS", async () => {
+      // Current row's staffDOJ (read before the update), then the refreshed detail.
+      prisma.staff.findUnique.mockResolvedValueOnce({
+        staffDOJ: new Date("2020-01-10"),
+      });
       prisma.staff.update.mockResolvedValueOnce({});
       prisma.shelter.updateMany.mockResolvedValueOnce({ count: 1 });
       prisma.staff.findUnique.mockResolvedValueOnce(
@@ -195,6 +199,110 @@ describe("Admin staff management endpoints", () => {
       expect(prisma.shelter.updateMany).toHaveBeenCalledWith({
         where: { managerStaffID: 42 },
         data: { managerStaffID: null },
+      });
+      expect(prisma.staff.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { accountStatus: "Deactivated", staffDOS: expect.any(Date) },
+      });
+    });
+
+    test("approving a Pending non-Manager sign-up → 403 (their shelter manager approves them), nothing written", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({
+        staffDOJ: null,
+        accountStatus: "Pending",
+        staffDesignation: null,
+        shelterID: 9,
+        shelter: { managerStaffID: 7 },
+      });
+
+      const res = await request(app)
+        .patch("/api/v1/staff/42/status")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(403);
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
+
+    test("approving a Pending Manager sign-up → 200, becomes the shelter's manager, joining date stamped", async () => {
+      prisma.staff.findUnique
+        .mockResolvedValueOnce({
+          staffDOJ: null,
+          accountStatus: "Pending",
+          staffDesignation: "Manager",
+          shelterID: 9,
+          shelter: { managerStaffID: null },
+        })
+        .mockResolvedValueOnce(buildStaffDetail({ accountStatus: "Active" }));
+      prisma.staff.update.mockResolvedValueOnce({});
+      prisma.shelter.update.mockResolvedValueOnce({});
+
+      const res = await request(app)
+        .patch("/api/v1/staff/42/status")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: {
+          accountStatus: "Active",
+          staffDOJ: expect.any(Date),
+          staffDOS: null,
+        },
+      });
+      expect(prisma.shelter.update).toHaveBeenCalledWith({
+        where: { shelterID: 9 },
+        data: { managerStaffID: 42 },
+      });
+    });
+
+    test("approving a Manager sign-up at a shelter that already has one → 409", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({
+        staffDOJ: null,
+        accountStatus: "Pending",
+        staffDesignation: "Manager",
+        shelterID: 9,
+        shelter: { managerStaffID: 7 },
+      });
+
+      const res = await request(app)
+        .patch("/api/v1/staff/42/status")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(409);
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
+
+    test("GET /staff?name= → case-insensitive contains match on staffName", async () => {
+      prisma.staff.findMany.mockResolvedValueOnce([]);
+      prisma.staff.count.mockResolvedValueOnce(0);
+
+      const res = await request(app)
+        .get("/api/v1/staff")
+        .query({ name: " sash " })
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.findMany.mock.calls[0][0].where).toEqual({
+        staffName: { contains: "sash", mode: "insensitive" },
+      });
+    });
+
+    test("GET /staff?awaitingAdmin=true → only Pending Manager sign-ups", async () => {
+      prisma.staff.findMany.mockResolvedValueOnce([]);
+      prisma.staff.count.mockResolvedValueOnce(0);
+
+      const res = await request(app)
+        .get("/api/v1/staff")
+        .query({ awaitingAdmin: "true", limit: 100 })
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.findMany.mock.calls[0][0].where).toEqual({
+        accountStatus: "Pending",
+        staffDesignation: "Manager",
       });
     });
 

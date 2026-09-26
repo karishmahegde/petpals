@@ -5,7 +5,7 @@
 // call to the caller's own shelter, and only if they are its manager
 // (Shelter.managerStaffID).
 const express = require("express");
-const teamController = require("../../controllers/staff/team.controller");
+const shelterStaffController = require("../../controllers/staff/shelterStaff.controller");
 const authenticate = require("../../middleware/authenticate");
 const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
 const router = express.Router();
@@ -52,7 +52,7 @@ const router = express.Router();
  *                   properties:
  *                     data:
  *                       type: array
- *                       items: { $ref: '#/components/schemas/TeamMember' }
+ *                       items: { $ref: '#/components/schemas/ShelterStaffMember' }
  *                     pagination: { $ref: '#/components/schemas/Pagination' }
  *       400:
  *         description: Missing/invalid section, designation, or pagination param
@@ -70,7 +70,7 @@ router.get(
   "/staff/me/team",
   authenticate,
   authorizeRoles(ROLES.STAFF),
-  teamController.listTeam,
+  shelterStaffController.listShelterStaff,
 );
 
 /**
@@ -109,7 +109,7 @@ router.get(
  *                 - $ref: '#/components/schemas/ApiEnvelope'
  *                 - type: object
  *                   properties:
- *                     data: { $ref: '#/components/schemas/TeamMember' }
+ *                     data: { $ref: '#/components/schemas/ShelterStaffMember' }
  *       400:
  *         description: Invalid id or designation
  *         content:
@@ -132,7 +132,7 @@ router.patch(
   "/staff/me/team/:id",
   authenticate,
   authorizeRoles(ROLES.STAFF),
-  teamController.updateTeamMember,
+  shelterStaffController.updateShelterStaffMember,
 );
 
 /**
@@ -143,7 +143,10 @@ router.patch(
  *     description: >
  *       Pending → Active (approve), Pending → Deactivated (decline),
  *       Active → Deactivated (deactivate); anything else is 409. The target
- *       must be at the caller's shelter and not the caller.
+ *       must be at the caller's shelter and not the caller. Approving also
+ *       sets the new member's designation — staffDesignation (Senior or
+ *       Associate) is required then (400 otherwise). A Pending Manager
+ *       sign-up is approved by an Admin, not here (403).
  *     tags: [Staff]
  *     security:
  *       - bearerAuth: []
@@ -161,6 +164,10 @@ router.patch(
  *             required: [accountStatus]
  *             properties:
  *               accountStatus: { type: string, enum: [Active, Deactivated] }
+ *               staffDesignation:
+ *                 type: string
+ *                 enum: [Senior, Associate]
+ *                 description: Required when approving a Pending member
  *     responses:
  *       200:
  *         description: The updated staff member
@@ -171,7 +178,7 @@ router.patch(
  *                 - $ref: '#/components/schemas/ApiEnvelope'
  *                 - type: object
  *                   properties:
- *                     data: { $ref: '#/components/schemas/TeamMember' }
+ *                     data: { $ref: '#/components/schemas/ShelterStaffMember' }
  *       400:
  *         description: Invalid id or accountStatus
  *         content:
@@ -194,7 +201,7 @@ router.patch(
   "/staff/me/team/:id/status",
   authenticate,
   authorizeRoles(ROLES.STAFF),
-  teamController.updateTeamMemberStatus,
+  shelterStaffController.updateShelterStaffStatus,
 );
 
 module.exports = router;

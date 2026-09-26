@@ -22,6 +22,9 @@ import {
   formatShortDate,
   formatFullDate,
 } from "../../../../logic/utils/datetime";
+import type { Address } from "../../../../logic/utils/address";
+import ProfileAddressSection from "../../../../components/ui/profile/ProfileAddressSection";
+import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
 
 const STATUS_TONE: Record<AdminAccountStatus, BadgeTone> = {
   Pending: "gold",
@@ -37,11 +40,10 @@ const SEX_LABELS: Record<string, string> = {
   O: "Other",
 };
 
-interface EditableProfile {
+interface EditableProfile extends Address {
   avatarSeed: string;
   adminName: string;
   adminPhone: string | null;
-  adminAddress: string | null;
   adminDOB: string | null; // "YYYY-MM-DD"
   adminSex: string | null;
 }
@@ -50,7 +52,12 @@ const toEditable = (p: AdminListItem): EditableProfile => ({
   avatarSeed: p.avatarSeed,
   adminName: p.adminName,
   adminPhone: p.adminPhone,
-  adminAddress: p.adminAddress,
+  addressLine1: p.addressLine1,
+  addressLine2: p.addressLine2,
+  city: p.city,
+  state: p.state,
+  zip: p.zip,
+  country: p.country,
   adminDOB: p.adminDOB ? p.adminDOB.slice(0, 10) : null,
   adminSex: p.adminSex,
 });
@@ -172,7 +179,7 @@ const Profile = () => {
                     title="Randomize avatar"
                     size="bare"
                     variant="outline"
-                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm transition-colors hover:brightness-90"
+                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm transition-colors hover:brightness-95"
                   >
                     <PiArrowsClockwiseBold
                       className="h-3.5 w-3.5"
@@ -197,11 +204,14 @@ const Profile = () => {
                 </p>
               </div>
             </div>
-            {profile.accountStatus && (
-              <Badge tone={STATUS_TONE[profile.accountStatus]}>
-                {profile.accountStatus}
-              </Badge>
-            )}
+            <div className="flex items-center gap-3">
+              <EmailVerificationStatus verified={profile.emailVerified} />
+              {profile.accountStatus && (
+                <Badge tone={STATUS_TONE[profile.accountStatus]}>
+                  {profile.accountStatus}
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Sections */}
@@ -292,28 +302,6 @@ const Profile = () => {
                     )}
                   </dd>
                 </div>
-                <div>
-                  <dt className="font-body text-xs text-neutral-gray">
-                    Address
-                  </dt>
-                  <dd className="mt-1 font-body text-sm text-neutral-dark">
-                    {isEditing && formState ? (
-                      <input
-                        type="text"
-                        value={formState.adminAddress ?? ""}
-                        maxLength={45}
-                        onChange={(e) =>
-                          patch({ adminAddress: e.target.value || null })
-                        }
-                        className={inputClass}
-                      />
-                    ) : (
-                      (profile.adminAddress ?? (
-                        <span className="text-neutral-gray">—</span>
-                      ))
-                    )}
-                  </dd>
-                </div>
                 {profile.statusChangedAt && (
                   <div>
                     <dt className="font-body text-xs text-neutral-gray">
@@ -330,6 +318,13 @@ const Profile = () => {
               </dl>
               <GovernmentIdSection isEditing={isEditing} />
             </section>
+
+            <ProfileAddressSection
+              value={profile}
+              isEditing={isEditing}
+              draft={formState}
+              onChange={patch}
+            />
           </div>
 
           {/* Save error */}
@@ -347,8 +342,7 @@ const Profile = () => {
                   onClick={cancelEdit}
                   disabled={mutation.isPending}
                   size="bare"
-                  variant="outline"
-                  className="rounded-xl border border-neutral-gray px-5 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-50"
+                  className="rounded-xl bg-red px-5 py-2 font-body text-sm font-medium hover:brightness-95 disabled:opacity-50"
                 >
                   Cancel
                 </ButtonElement>
@@ -356,7 +350,7 @@ const Profile = () => {
                   onClick={handleSave}
                   disabled={mutation.isPending}
                   size="bare"
-                  className="rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium hover:brightness-90 disabled:opacity-50"
+                  className="rounded-xl bg-teal-dark px-5 py-2 font-body text-sm font-medium hover:brightness-95 disabled:opacity-50"
                 >
                   {mutation.isPending ? "Saving…" : "Save"}
                 </ButtonElement>
@@ -365,7 +359,7 @@ const Profile = () => {
               <ButtonElement
                 onClick={beginEdit}
                 size="bare"
-                className="rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium hover:brightness-90"
+                className="rounded-xl bg-teal-dark px-5 py-2 font-body text-sm font-medium hover:brightness-95"
               >
                 Edit profile
               </ButtonElement>
@@ -382,8 +376,7 @@ const Profile = () => {
             <ButtonElement
               onClick={() => setIsCloseAccountOpen(true)}
               size="bare"
-              variant="outline"
-              className="mt-4 rounded-xl border border-rose-dark px-4 py-2 font-body text-sm font-medium text-rose-dark transition-colors hover:bg-rose-dark hover:text-white"
+              className="mt-4 rounded-xl bg-red px-4 py-2 font-body text-sm font-medium hover:brightness-95"
             >
               Close account
             </ButtonElement>

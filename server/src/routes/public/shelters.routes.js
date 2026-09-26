@@ -52,6 +52,13 @@ router.get("/shelters/nearby", sheltersController.getNearbyShelters);
  *   get:
  *     summary: List all open shelters, for hydrating the shelter filter dropdown
  *     tags: [Shelters]
+ *     parameters:
+ *       - in: query
+ *         name: hasManager
+ *         schema: { type: boolean }
+ *         description: >
+ *           When exactly "true", only shelters with a manager assigned — the
+ *           ones a veterinarian can sign up at.
  *     responses:
  *       200:
  *         description: Open shelters ordered alphabetically by name

@@ -72,7 +72,6 @@ export interface PetDetail {
   adoptionStatus:
     | "incoming"
     | "available"
-    | "pending"
     | "adopted"
     | "fostered"
     | "transferred"
@@ -109,6 +108,16 @@ export const getBreeds = async (speciesIDs: number[]): Promise<Breed[]> => {
 // ———————————————— SHELTERS API ————————————————
 export const getShelters = async (): Promise<Shelter[]> => {
   const response = await axiosInstance.get("/shelters");
+  return response.data.data;
+};
+
+// Open shelters that already have a manager — the only ones a vet can sign
+// up at (the server rejects any other). A separate function rather than a
+// getShelters option, since getShelters is passed straight to queryFn.
+export const getSheltersWithManager = async (): Promise<Shelter[]> => {
+  const response = await axiosInstance.get("/shelters", {
+    params: { hasManager: true },
+  });
   return response.data.data;
 };
 

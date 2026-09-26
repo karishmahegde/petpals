@@ -327,6 +327,51 @@ describe("Staff pet management endpoints", () => {
       );
     });
 
+    test("adoptionStatus omitted → new pet starts 'incoming'", async () => {
+      prisma.breed.findUnique.mockResolvedValueOnce({ breedID: 3 });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.pet.create.mockResolvedValueOnce({ petID: 10 });
+
+      const res = await request(app)
+        .post("/api/v1/pets")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send(VALID_CREATE_BODY);
+
+      expect(res.status).toBe(201);
+      expect(prisma.pet.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ adoptionStatus: "incoming" }),
+        }),
+      );
+    });
+
+    test("adoptionStatus sent → used as-is; invalid value → 400, nothing written", async () => {
+      prisma.breed.findUnique.mockResolvedValueOnce({ breedID: 3 });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.pet.create.mockResolvedValueOnce({ petID: 10 });
+
+      const res = await request(app)
+        .post("/api/v1/pets")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ ...VALID_CREATE_BODY, adoptionStatus: "available" });
+
+      expect(res.status).toBe(201);
+      expect(prisma.pet.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ adoptionStatus: "available" }),
+        }),
+      );
+
+      prisma.pet.create.mockClear();
+      const badRes = await request(app)
+        .post("/api/v1/pets")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ ...VALID_CREATE_BODY, adoptionStatus: "bogus" });
+
+      expect(badRes.status).toBe(400);
+      expect(prisma.pet.create).not.toHaveBeenCalled();
+    });
+
     test("missing required field → 400 BAD_REQUEST, nothing written", async () => {
       const { petName: _omit, ...incomplete } = VALID_CREATE_BODY;
 
@@ -505,6 +550,79 @@ describe("Staff pet management endpoints", () => {
 
       expect(res.status).toBe(400);
       expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
+
+    test("adoptionStatus 'transferred' set by hand → 400 BAD_REQUEST, nothing written", async () => {
+      const res = await request(app)
+        .put("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ adoptionStatus: "transferred" });
+
+      expect(res.status).toBe(400);
+      expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
+
+    test("adoptionStatus 'adopted' set by hand → 400 BAD_REQUEST, nothing written", async () => {
+      const res = await request(app)
+        .put("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ adoptionStatus: "adopted" });
+
+      expect(res.status).toBe(400);
+      expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
+
+    test("adopted pet, status-only update (e.g. surrendered back) → 200", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        adoptionStatus: "adopted",
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.pet.update.mockResolvedValueOnce({});
+
+      const res = await request(app)
+        .put("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ adoptionStatus: "incoming" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.pet.update).toHaveBeenCalledWith({
+        where: { petID: 10 },
+        data: { adoptionStatus: "incoming" },
+      });
+    });
+
+    test("adopted pet, any other field → 409 CONFLICT, nothing written", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        adoptionStatus: "adopted",
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .put("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ petColor: "Golden" });
+
+      expect(res.status).toBe(409);
+      expect(prisma.pet.update).not.toHaveBeenCalled();
+    });
+
+    test("pet mid-transfer (adoptionStatus 'transferred') → 409 CONFLICT, nothing written", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        adoptionStatus: "transferred",
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .put("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ petColor: "Golden" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
+      expect(prisma.pet.update).not.toHaveBeenCalled();
     });
 
     // Multipart requests (the edit form's Save, now that it carries an
@@ -763,6 +881,7 @@ describe("Staff pet management endpoints", () => {
       prisma.pet.findUnique.mockResolvedValueOnce({
         shelterID: 9,
         photos: [{ photoURL: "pets/10/photo-1.jpg" }],
+        shelter: { managerStaffID: 42 }, // the caller (staffToken's default userID)
       });
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.adoptionApplication.findFirst.mockResolvedValueOnce(null);
@@ -779,8 +898,29 @@ describe("Staff pet management endpoints", () => {
       expect(prisma.$transaction).toHaveBeenCalled();
     });
 
+    test("pet mid-transfer (adoptionStatus 'transferred') → 409 CONFLICT, nothing deleted", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        adoptionStatus: "transferred",
+        photos: [],
+        shelter: { managerStaffID: 42 },
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .delete("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     test("pet has a Pending application → 409 CONFLICT, nothing written", async () => {
-      prisma.pet.findUnique.mockResolvedValueOnce({ shelterID: 9, photos: [] });
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        photos: [],
+        shelter: { managerStaffID: 42 },
+      });
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.adoptionApplication.findFirst.mockResolvedValueOnce({
         applicationID: 5,
@@ -794,6 +934,40 @@ describe("Staff pet management endpoints", () => {
       expect(res.body.error.code).toBe("CONFLICT");
       expect(storage.deletePrivateFile).not.toHaveBeenCalled();
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    test("Staff who isn't the shelter's manager → 403 FORBIDDEN, nothing written", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        photos: [{ photoURL: "pets/10/photo-1.jpg" }],
+        shelter: { managerStaffID: 7 }, // someone else manages shelter 9
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .delete("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+      expect(storage.deletePrivateFile).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    test("Admin: no manager check → 200", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        photos: [],
+        shelter: { managerStaffID: 7 },
+      });
+      prisma.adoptionApplication.findFirst.mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .delete("/api/v1/pets/10")
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.$transaction).toHaveBeenCalled();
     });
 
     test("Staff deleting another shelter's pet → 403 FORBIDDEN, nothing written", async () => {

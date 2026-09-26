@@ -6,17 +6,22 @@
 // layout) with three differences: an Adopter info section (the applicant's
 // name/email — meaningless on the adopter's own copy, essential here),
 // Accept/Reject actions instead of Withdraw, and a staffRemark textarea on
-// both confirmations (the backend accepts it on either transition).
+// both confirmations (the backend accepts it on either transition). The
+// shelter manager also gets an Update Staff action beside the Assigned staff
+// value on a Pending application (server-computed canAssignStaff), picked
+// from a dropdown in its own modal.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FaPaw } from "react-icons/fa";
 import {
+  assignApplicationStaff,
   getApplicationById,
   reviewApplication,
   type StaffReviewStatus,
 } from "../../../../../../logic/api/adoptionApplicationsApi";
+import { getShelterStaff } from "../../../../../../logic/api/staffAppointmentsApi";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
@@ -53,6 +58,8 @@ const value = "font-body text-sm text-neutral-charcoal";
 const sectionHeading = "mt-4 font-body text-sm font-semibold text-neutral-dark";
 const quoteBlock = "mt-1 font-body text-sm italic text-neutral-charcoal";
 const divider = "my-5 border-t border-neutral-lightgray";
+const selectClass =
+  "mt-1 w-full rounded-md border border-neutral-lightgray bg-white px-3 py-1.5 font-body text-sm text-neutral-charcoal focus:outline-none focus:ring-1 focus:ring-teal-dark disabled:opacity-50";
 
 const InfoRow = ({ k, v }: { k: string; v: React.ReactNode }) => (
   <>
@@ -75,11 +82,40 @@ const ApplicationDetailPanel = ({
     null,
   );
   const [remark, setRemark] = useState("");
+  // null = Update Staff modal closed; "" = open, nothing picked yet.
+  const [assigneeID, setAssigneeID] = useState<number | "" | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["staff", "application", applicationID],
     queryFn: () => getApplicationById(applicationID!),
     enabled: applicationID !== null,
+  });
+
+  const canAssign = data?.canAssignStaff === true;
+
+  // The manager's own shelter is the application's shelter (canAssignStaff
+  // guarantees it), which is exactly what /appointments/staff is scoped to.
+  const { data: shelterStaff = [] } = useQuery({
+    queryKey: ["staff", "shelter-staff"],
+    queryFn: getShelterStaff,
+    enabled: canAssign,
+  });
+
+  const assign = useMutation({
+    mutationFn: (staffID: number) =>
+      assignApplicationStaff(applicationID!, staffID),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(
+        ["staff", "application", applicationID],
+        updated,
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["staff", "applications-queue"],
+      });
+      toast.success("Staff updated");
+      setAssigneeID(null);
+    },
+    onError: (err) => toast.error(extractError(err)),
   });
 
   const closeConfirm = () => {
@@ -133,8 +169,7 @@ const ApplicationDetailPanel = ({
               <ButtonElement
                 onClick={() => setPendingAction("Rejected")}
                 size="panel"
-                variant="outline"
-                className="border bg-red text-white hover:brightness-95"
+                className="bg-red text-white hover:brightness-95"
               >
                 Reject
               </ButtonElement>
@@ -224,10 +259,21 @@ const ApplicationDetailPanel = ({
                 v={formatFullDate(new Date(data.createdAt))}
               />
               <InfoRow k="Adoption Type" v={data.applicationType} />
-              <InfoRow
-                k="Assigned staff"
-                v={data.assignedStaffName ?? "Not assigned yet"}
-              />
+              <dt className={label}>Assigned staff</dt>
+              <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className={value}>
+                  {data.assignedStaffName ?? "Not assigned yet"}
+                </span>
+                {canAssign && (
+                  <ButtonElement
+                    onClick={() => setAssigneeID(data.staffID ?? "")}
+                    size="bare"
+                    className="rounded-md bg-teal-dark px-2 py-0.5 text-xs hover:brightness-95"
+                  >
+                    Update Staff
+                  </ButtonElement>
+                )}
+              </dd>
               <dt className={label}>Status</dt>
               <dd>
                 <Badge tone={STATUS_TONE[data.applicationStatus]}>
@@ -303,6 +349,60 @@ const ApplicationDetailPanel = ({
                 onChange={(e) => setRemark(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-rose-light bg-white px-3 py-1.5 font-body text-sm text-neutral-dark focus:border-teal-dark focus:outline-none"
               />
+            </div>
+          </div>
+        )}
+      </ConfirmActionModal>
+
+      <ConfirmActionModal
+        isOpen={assigneeID !== null}
+        title="Update staff?"
+        confirmLabel="Update"
+        cancelLabel="Cancel"
+        isPending={assign.isPending}
+        onCancel={() => setAssigneeID(null)}
+        onConfirm={() => {
+          if (!assigneeID) {
+            toast.error("Pick a staff member to assign");
+            return;
+          }
+          if (assigneeID === data?.staffID) {
+            setAssigneeID(null);
+            return;
+          }
+          assign.mutate(assigneeID);
+        }}
+      >
+        {data && (
+          <div className="flex flex-col gap-3">
+            <p>
+              Choose who handles the application for{" "}
+              <strong>{data.pet.petName}</strong> from{" "}
+              {data.adopter.adopterName}.
+            </p>
+            <div>
+              <label
+                htmlFor="application-assignee"
+                className="font-body text-xs text-neutral-gray"
+              >
+                Staff member
+              </label>
+              <select
+                id="application-assignee"
+                value={assigneeID ?? ""}
+                disabled={assign.isPending}
+                onChange={(e) => setAssigneeID(Number(e.target.value))}
+                className={selectClass}
+              >
+                <option value="" disabled>
+                  - Select -
+                </option>
+                {shelterStaff.map((member) => (
+                  <option key={member.staffID} value={member.staffID}>
+                    {member.staffName}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         )}

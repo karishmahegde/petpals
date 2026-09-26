@@ -151,7 +151,7 @@ const StaffDetailPanel = ({ userID, onClose }: StaffDetailPanelProps) => {
                 <ButtonElement
                   onClick={() => setConfirmingStatusChange(true)}
                   size="panel"
-                  className={`w-full hover:brightness-90 ${
+                  className={`w-full hover:brightness-95 ${
                     data.accountStatus === "Active" ? "bg-red" : "bg-green"
                   }`}
                 >

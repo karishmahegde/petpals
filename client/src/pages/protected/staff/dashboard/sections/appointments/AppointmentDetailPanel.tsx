@@ -25,6 +25,7 @@ import {
   formatShortDate,
   formatTime,
 } from "../../../../../../logic/utils/datetime";
+import { formatVetName } from "../../../../../../logic/utils/vetName";
 
 interface AppointmentDetailPanelProps {
   appointmentID: number | null;
@@ -104,7 +105,7 @@ const AppointmentDetailPanel = ({
               <ButtonElement
                 onClick={() => setIsCancelOpen(true)}
                 size="panel"
-                className="w-full bg-red hover:brightness-90"
+                className="w-full bg-red hover:brightness-95"
               >
                 Cancel Appointment
               </ButtonElement>
@@ -162,7 +163,7 @@ const AppointmentDetailPanel = ({
               />
               <InfoRow k="Reason for appointment" v={data.appointmentReason} />
               <InfoRow k="Shelter" v={data.shelterName} />
-              <InfoRow k="Vet" v={data.vetName} />
+              <InfoRow k="Vet" v={formatVetName(data.vetName)} />
               <InfoRow k="Staff" v={data.staffName ?? "—"} />
               <InfoRow k="Volunteer" v={data.volunteerName ?? "—"} />
             </dl>
@@ -220,7 +221,7 @@ const AppointmentDetailPanel = ({
         onConfirm={() => cancel.mutate()}
       >
         This cancels {data?.pet.petName ?? "this"}'s appointment with Dr.{" "}
-        {data?.vetName}. This can't be undone.
+        {data?.vetName ? formatVetName(data.vetName) : ""}. This can't be undone.
       </ConfirmActionModal>
     </>
   );

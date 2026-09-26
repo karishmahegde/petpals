@@ -27,7 +27,7 @@ const VisitsWidget = () => {
       isEmpty={upcoming.length === 0}
       emptyMessage="No upcoming visits"
       emptyAction={
-        <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
+        <ButtonElement to="/adopt" className="bg-teal-dark hover:brightness-95">
           Explore Pets
         </ButtonElement>
       }

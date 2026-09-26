@@ -188,7 +188,7 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
             aria-label="Randomize avatar"
             title="Randomize avatar"
             size="bare"
-            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark shadow-sm hover:brightness-90"
+            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark shadow-sm hover:brightness-95"
           >
             <PiArrowsClockwiseBold className="h-3.5 w-3.5" aria-hidden />
           </ButtonElement>
@@ -363,7 +363,7 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
           <ButtonElement
             onClick={onBack}
             size="panel"
-            className="flex-1 bg-gold hover:brightness-90 disabled:cursor-not-allowed"
+            className="flex-1 bg-gold hover:brightness-95 disabled:cursor-not-allowed"
           >
             Back
           </ButtonElement>
@@ -372,7 +372,7 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
           onClick={handleContinue}
           disabled={mutation.isPending}
           size="panel"
-          className="flex-1 bg-teal-dark hover:brightness-90 disabled:cursor-not-allowed"
+          className="flex-1 bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? "Saving…" : "Continue"}
         </ButtonElement>

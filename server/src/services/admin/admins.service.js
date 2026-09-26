@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const storage = require("../storage");
+const { ADDRESS_SELECT } = require("../../utils/address");
 
 // Admin has no designation/shelter to manage — just identity + account
 // status. Email comes from the `user` relation only, so userPassword/
@@ -12,16 +13,25 @@ const ADMIN_LIST_SELECT = {
   avatarSeed: true,
   adminName: true,
   adminPhone: true,
-  adminAddress: true,
+  ...ADDRESS_SELECT,
   adminDOB: true,
   adminSex: true,
   createdAt: true,
-  lastLoginAt: true,
   accountStatus: true,
   statusChangedAt: true,
-  user: { select: { userEmail: true } },
+  // emailVerified/lastLoginAt live on Users — flattened by toAdminShape.
+  user: { select: { userEmail: true, emailVerified: true, lastLoginAt: true } },
   statusChangedBy: { select: { userID: true, adminName: true } },
 };
+
+// Keeps the response shape: user.userEmail nested as before, lastLoginAt at
+// the top level (it used to be an Admin column).
+const toAdminShape = ({ user, ...rest }) => ({
+  ...rest,
+  emailVerified: user.emailVerified,
+  lastLoginAt: user.lastLoginAt,
+  user: { userEmail: user.userEmail },
+});
 
 // ——————————————— LIST ADMINS (GET /admins) ———————————————
 const listAdmins = async ({ accountStatus, page = 1, limit = 20 } = {}) => {
@@ -40,7 +50,7 @@ const listAdmins = async ({ accountStatus, page = 1, limit = 20 } = {}) => {
   ]);
 
   return {
-    data,
+    data: data.map(toAdminShape),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -60,7 +70,7 @@ const getAdminDetail = async (userID) => {
   if (!admin) {
     throw notFound(userID);
   }
-  return admin;
+  return toAdminShape(admin);
 };
 
 // ——————————————— UPDATE STATUS (PATCH /admins/:id/status) ———————————————
@@ -95,11 +105,13 @@ const updateAdminStatus = async (userID, accountStatus, actorID) => {
 // avatarSeed and/or adminName, nothing account-status-related.
 const updateMyProfile = async (userID, data) => {
   try {
-    return await prisma.admin.update({
-      where: { userID },
-      data,
-      select: ADMIN_LIST_SELECT,
-    });
+    return toAdminShape(
+      await prisma.admin.update({
+        where: { userID },
+        data,
+        select: ADMIN_LIST_SELECT,
+      }),
+    );
   } catch (err) {
     if (err.code === "P2025") {
       throw notFound(userID);

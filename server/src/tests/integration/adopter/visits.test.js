@@ -27,9 +27,19 @@ const registerAndLoginAdopter = async (name) => {
 // Staff start Pending (PENDING_GATED_ROLES in auth.service.js) — force
 // Active (plus any caller-supplied overrides, e.g. shelterID) directly via
 // Prisma, same shortcut integration/staff/sprint5_1Journeys.test.js takes.
+// Staff sign-up requires picking a shelter (auth.service.js register()), so
+// overrides.shelterID doubles as the one they register at — every caller
+// passes one.
 const registerAndLoginActiveStaff = async (name, overrides = {}) => {
-  const payload = { name, email: uniqueEmail(), password: "Secret123!", role: "staff" };
+  const payload = {
+    name,
+    email: uniqueEmail(),
+    password: "Secret123!",
+    role: "staff",
+    shelterID: overrides.shelterID,
+  };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
+  expect(registerRes.status).toBe(201);
   const userID = registerRes.body.data.userID;
   await prisma.staff.update({
     where: { userID },

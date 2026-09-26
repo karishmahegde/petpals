@@ -22,6 +22,7 @@ import AppointmentFormPanel from "./sections/appointments/AppointmentFormPanel";
 import AppointmentDetailPanel from "./sections/appointments/AppointmentDetailPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
+import { formatVetName } from "../../../../logic/utils/vetName";
 
 const PAGE_SIZE = 20;
 
@@ -59,7 +60,7 @@ const AppointmentRow = ({
           </p>
         </div>
       }
-      title={`${item.pet.petName} - ${item.appointmentReason} | Dr. ${item.vetName}`}
+      title={`${item.pet.petName} - ${item.appointmentReason} | ${formatVetName(item.vetName)}`}
       lines={[{ text: `${formatTime(when)} | ${item.appointmentReason}` }]}
       badge={showStatus ? { label: item.status, tone: STATUS_TONE[item.status] } : undefined}
       actions={<RowActionButton onClick={onViewDetails}>View Details</RowActionButton>}
@@ -91,7 +92,7 @@ const Appointments = () => {
   });
   const vetOptions = [
     { value: "all", label: "All Vets" },
-    ...vets.map((v) => ({ value: String(v.vetID), label: v.vetName })),
+    ...vets.map((v) => ({ value: String(v.vetID), label: formatVetName(v.vetName) })),
   ];
 
   const [upcomingPage, setUpcomingPage] = useState(1);

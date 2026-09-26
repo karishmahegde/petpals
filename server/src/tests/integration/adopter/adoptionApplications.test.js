@@ -99,7 +99,7 @@ describe("adoption applications", () => {
     petAvailableID = petAvailable.petID;
 
     const petUnavailable = await prisma.pet.create({
-      data: { ...petData, petName: "Unavailable Testy", adoptionStatus: "pending" },
+      data: { ...petData, petName: "Unavailable Testy", adoptionStatus: "incoming" },
     });
     petUnavailableID = petUnavailable.petID;
 

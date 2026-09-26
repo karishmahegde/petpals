@@ -254,6 +254,27 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
       );
     });
 
+    // Transitions only move forward — a Completed visit can't be re-opened.
+    test("Confirm an already-Completed visit (Completed → Confirmed) → 409 CONFLICT, nothing written", async () => {
+      prisma.visit.findUnique.mockResolvedValueOnce({
+        visitID: 1,
+        adopterID: 7,
+        shelterID: 9,
+        visitStatus: "Completed",
+        visitTime: new Date(Date.now() - 3600000),
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .patch("/api/v1/visits/1")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ visitStatus: "Confirmed" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
+      expect(prisma.visit.update).not.toHaveBeenCalled();
+    });
+
     test("Complete an already-Cancelled visit → 409 CONFLICT, nothing written", async () => {
       prisma.visit.findUnique.mockResolvedValueOnce({
         visitID: 1,

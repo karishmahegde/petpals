@@ -1,15 +1,14 @@
 // components/ui/ConfirmActionModal.tsx
 // Generic confirmation dialog for a one-off, destructive-ish action (withdraw
 // an application, cancel a visit, discard an unsaved form). The caller supplies
-// the title, button labels, body copy, and handlers. Same shell as
-// CloseAccountModal.
-import { FaTimes } from "react-icons/fa";
-import ButtonElement from "./ButtonElement";
+// the title, button labels, body copy, and handlers. Shell and buttons come
+// from Modal/ModalActions, same as CloseAccountModal.
+import Modal, { ModalActions } from "./Modal";
 
 interface ConfirmActionModalProps {
   isOpen: boolean;
   title: string;
-  /** Primary (destructive) button label. */
+  /** Primary (confirm) button label. */
   confirmLabel: string;
   /** Dismiss button label. Defaults to "Never mind". */
   cancelLabel?: string;
@@ -29,56 +28,23 @@ const ConfirmActionModal = ({
   onCancel,
   onConfirm,
   children,
-}: ConfirmActionModalProps) => {
-  if (!isOpen) return null;
+}: ConfirmActionModalProps) => (
+  <Modal
+    isOpen={isOpen}
+    title={title}
+    onClose={onCancel}
+    dismissDisabled={isPending}
+  >
+    <div className="font-body text-sm text-neutral-charcoal">{children}</div>
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={isPending ? undefined : onCancel}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl bg-white p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between">
-          <h2 className="font-display text-xl text-rose-dark">{title}</h2>
-          <ButtonElement
-            onClick={onCancel}
-            disabled={isPending}
-            aria-label="Close"
-            size="bare"
-            variant="outline"
-            className="text-neutral-gray hover:text-neutral-dark"
-          >
-            <FaTimes />
-          </ButtonElement>
-        </div>
-
-        <p className="font-body text-sm text-neutral-charcoal">{children}</p>
-
-        <div className="mt-5 flex justify-end gap-3">
-          <ButtonElement
-            onClick={onCancel}
-            disabled={isPending}
-            size="bare"
-            variant="outline"
-            className="rounded-xl border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-50"
-          >
-            {cancelLabel}
-          </ButtonElement>
-          <ButtonElement
-            onClick={onConfirm}
-            disabled={isPending}
-            size="bare"
-            className="rounded-xl bg-red px-4 py-2 font-body text-sm font-medium transition-colors hover:brightness-90 disabled:opacity-50"
-          >
-            {isPending ? "Working…" : confirmLabel}
-          </ButtonElement>
-        </div>
-      </div>
-    </div>
-  );
-};
+    <ModalActions
+      cancelLabel={cancelLabel}
+      confirmLabel={confirmLabel}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      isPending={isPending}
+    />
+  </Modal>
+);
 
 export default ConfirmActionModal;

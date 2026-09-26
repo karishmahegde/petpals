@@ -22,6 +22,7 @@ import {
 } from "../../../../../../logic/api/adminsApi";
 import useAuthStore from "../../../../../../logic/store/useAuthStore";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
+import { formatAddress } from "../../../../../../logic/utils/address";
 
 const SEX_LABELS: Record<string, string> = { M: "Male", F: "Female", O: "Other" };
 
@@ -103,7 +104,7 @@ const AdminDetailPanel = ({ userID, onClose }: AdminDetailPanelProps) => {
             <ButtonElement
               onClick={() => setConfirmingStatusChange(true)}
               size="panel"
-              className={`w-full hover:brightness-90 ${
+              className={`w-full hover:brightness-95 ${
                 data.accountStatus === "Active" ? "bg-red" : "bg-green"
               }`}
             >
@@ -174,7 +175,7 @@ const AdminDetailPanel = ({ userID, onClose }: AdminDetailPanelProps) => {
                 }
               />
               <InfoRow k="Sex" v={data.adminSex ? (SEX_LABELS[data.adminSex] ?? data.adminSex) : "—"} />
-              <InfoRow k="Address" v={data.adminAddress ?? "—"} />
+              <InfoRow k="Address" v={formatAddress(data) || "—"} />
               <InfoRow k="Joined" v={formatFullDate(new Date(data.createdAt))} />
               <InfoRow
                 k="Last login"

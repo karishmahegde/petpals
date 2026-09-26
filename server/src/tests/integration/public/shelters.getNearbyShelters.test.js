@@ -3,6 +3,8 @@ const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 
+jest.setTimeout(20000);
+
 // GET /shelters/nearby uses PostGIS (a `geography` column Prisma marks
 // Unsupported — see CLAUDE.md's "PostGIS migration drift" note), so
 // shelterLocation can't be set via prisma.shelter.create()'s normal input

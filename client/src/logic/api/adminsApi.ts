@@ -4,6 +4,7 @@
 // fields Admin doesn't have.
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
+import type { Address } from "../utils/address";
 
 // Pending = self-registered, awaiting approval by an existing admin.
 // Filter-only — never a target an admin sets directly (see
@@ -13,16 +14,16 @@ export type AdminAccountStatus = "Pending" | "Active" | "Deactivated";
 // account (or reactivates), Deactivated declines/deactivates.
 export type AdminAccountStatusTarget = "Active" | "Deactivated";
 
-export interface AdminListItem {
+export interface AdminListItem extends Address {
   userID: number;
   avatarSeed: string;
   adminName: string;
   adminPhone: string | null;
-  adminAddress: string | null;
   adminDOB: string | null;
   adminSex: string | null;
   createdAt: string;
-  lastLoginAt: string | null;
+  emailVerified: boolean; // from Users (account-level)
+  lastLoginAt: string | null; // from Users (account-level)
   accountStatus: AdminAccountStatus | null;
   // Last accountStatus change (approve/decline/activate/deactivate) — not a
   // full history, just the most recent one. Null if never changed since
@@ -60,7 +61,9 @@ export const getAdminsPage = async (
   return { data: response.data.data, pagination: response.data.pagination };
 };
 
-export const getAdminDetail = async (userID: number): Promise<AdminListItem> => {
+export const getAdminDetail = async (
+  userID: number,
+): Promise<AdminListItem> => {
   const response = await axiosInstance.get(`/admins/${userID}`);
   return response.data.data;
 };
@@ -83,10 +86,11 @@ export const getMyAdminProfile = async (): Promise<AdminListItem> => {
   return response.data.data;
 };
 
-// Partial update — avatarSeed, adminName, adminPhone, adminAddress,
-// adminDOB, and/or adminSex. adminPhone must be a valid phone number
-// (normalized server-side to E.164); adminSex must be M/F/O. All except
-// avatarSeed/adminName accept null to clear them.
+// Partial update — avatarSeed, adminName, adminPhone, the address fields
+// (addressLine1/2, city, state, zip, country), adminDOB, and/or adminSex.
+// adminPhone must be a valid phone number (normalized server-side to
+// E.164); adminSex must be M/F/O. adminPhone/addressLine2/adminDOB/adminSex
+// accept null to clear them; the other address fields clear to "".
 export const updateMyAdminProfile = async (
   payload: Record<string, unknown>,
 ): Promise<AdminListItem> => {
@@ -120,10 +124,11 @@ export interface AdminGovernmentIdRecord {
 
 // 404 means no ID has been submitted yet — callers should treat that as a
 // normal "not submitted" state, not an error to surface.
-export const getMyAdminGovernmentId = async (): Promise<AdminGovernmentIdRecord> => {
-  const response = await axiosInstance.get("/admins/me/government-id");
-  return response.data.data;
-};
+export const getMyAdminGovernmentId =
+  async (): Promise<AdminGovernmentIdRecord> => {
+    const response = await axiosInstance.get("/admins/me/government-id");
+    return response.data.data;
+  };
 
 export interface UploadAdminGovernmentIdPayload {
   idType: string;

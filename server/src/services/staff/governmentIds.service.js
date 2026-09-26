@@ -1,11 +1,31 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 
-// Scope of this feature: Adopters + Volunteers only (see plan) — Staff/
-// Veterinarian/Admin GovernmentID rows go through the separate,
-// pre-existing account-approval flow under Admin (AdminApprovalPanel/
-// StaffApprovalPanel) and are never discoverable here.
-const REVIEWABLE_USER_TYPES = ["Adopter", "Volunteer"];
+// The ID-verification queue (Staff dashboard → ID Verification, and the
+// same endpoints for Admin). Who reviews whose ID:
+// - Admin: shelter Managers', and other Admins'.
+// - A shelter's manager: its Staff, Veterinarians, Volunteers, and Adopters.
+// - Any other staff member: Adopters and Volunteers.
+// Nobody reviews their own ID. (Mirrors account approval: Admin approves
+// Managers and Admins, Managers approve their staff and vets.)
+// "Connected to the shelter" for a staff-side reviewer: an Adopter through
+// at least one AdoptionApplication there; Volunteer/Staff/Veterinarian by
+// their own shelterID. Admin reviews are network-wide.
+const PERSON_TYPES = {
+  Adopter: { model: "adopter", nameField: "adopterName" },
+  Volunteer: { model: "volunteer", nameField: "volunteerName" },
+  Staff: { model: "staff", nameField: "staffName" },
+  Veterinarian: { model: "veterinarian", nameField: "vetName" },
+  Admin: { model: "admin", nameField: "adminName" },
+};
+const REVIEWABLE_USER_TYPES = Object.keys(PERSON_TYPES);
+
+// Which person types each kind of reviewer may review (see above).
+const REVIEWER_USER_TYPES = {
+  admin: ["Staff", "Admin"], // Staff narrowed to Managers
+  manager: ["Adopter", "Volunteer", "Staff", "Veterinarian"],
+  staff: ["Adopter", "Volunteer"],
+};
 
 const notFound = (governmentIDID) => {
   const err = new Error(`No government ID record exists with ID ${governmentIDID}`);
@@ -17,6 +37,18 @@ const forbiddenShelter = () => {
   const err = new Error(
     "You may only review government IDs for people connected to your own shelter",
   );
+  err.code = "FORBIDDEN";
+  return err;
+};
+
+const forbiddenType = () => {
+  const err = new Error("You aren't responsible for reviewing this person's ID");
+  err.code = "FORBIDDEN";
+  return err;
+};
+
+const forbiddenSelf = () => {
+  const err = new Error("You can't review your own government ID");
   err.code = "FORBIDDEN";
   return err;
 };
@@ -33,79 +65,93 @@ const conflict = (message) => {
   return err;
 };
 
-// Same convention as staff/appointments.service.js's own copy — duplicated
-// locally rather than shared. Staff -> own shelter (or the -1 sentinel if
-// unassigned); Admin -> an explicit shelterID param, or undefined
-// (unscoped, network-wide).
-const resolveShelterID = async ({ role, userID }, shelterIDParam) => {
+// Who the caller is, for scoping: the shelter they review for and which
+// person types they may review (REVIEWER_USER_TYPES). Staff -> own shelter
+// (or the -1 sentinel if unassigned); Admin -> an explicit shelterID param
+// (narrows Managers to that shelter's) or undefined (network-wide).
+const resolveReviewScope = async ({ role, userID }, shelterIDParam) => {
   if (role === "Admin") {
-    if (shelterIDParam === undefined) return undefined;
-    const shelter = await prisma.shelter.findUnique({
-      where: { shelterID: shelterIDParam },
-      select: { shelterID: true },
-    });
-    if (!shelter) throw shelterNotFound(shelterIDParam);
-    return shelterIDParam;
+    if (shelterIDParam !== undefined) {
+      const shelter = await prisma.shelter.findUnique({
+        where: { shelterID: shelterIDParam },
+        select: { shelterID: true },
+      });
+      if (!shelter) throw shelterNotFound(shelterIDParam);
+    }
+    return {
+      shelterID: shelterIDParam,
+      userTypes: REVIEWER_USER_TYPES.admin,
+      isAdmin: true,
+    };
   }
+
   const staff = await prisma.staff.findUnique({
     where: { userID },
-    select: { shelterID: true },
+    select: { shelterID: true, shelter: { select: { managerStaffID: true } } },
   });
-  return staff?.shelterID ?? -1;
+  const isManager = staff?.shelter?.managerStaffID === userID;
+  return {
+    shelterID: staff?.shelterID ?? -1,
+    userTypes: isManager ? REVIEWER_USER_TYPES.manager : REVIEWER_USER_TYPES.staff,
+  };
 };
 
-// GovernmentID has no relation field to Adopter/Volunteer (just a bare
+// GovernmentID has no relation field to any person table (just a bare
 // userID + userType) — so shelter-scoping and name-filtering can't ride
-// along in a single nested-select query like every other tab this session.
-// This resolves "which userIDs, of each reviewable type, are connected to
-// this shelter" as its own step, then the caller filters GovernmentID rows
-// by userID afterwards.
-const resolveScopedUserIDs = async (shelterID, userTypeFilter) => {
-  const branches = [];
+// along in a single nested-select query like every other tab. This
+// resolves "which userIDs, of each type, are connected to this shelter" as
+// its own step (minus the caller themself), then the caller filters
+// GovernmentID rows by userID afterwards.
+// Admin's extra narrowing for Staff rows — Managers only (see the header
+// note).
+const ADMIN_REVIEWABLE_WHERE = {
+  Staff: { staffDesignation: "Manager" },
+};
 
-  if (userTypeFilter === undefined || userTypeFilter === "Adopter") {
-    const rows = await prisma.adoptionApplication.findMany({
-      where: shelterID === undefined ? {} : { shelterID },
-      select: { adopterID: true },
-      distinct: ["adopterID"],
-    });
-    branches.push({ userType: "Adopter", userIDs: rows.map((r) => r.adopterID) });
-  }
-
-  if (userTypeFilter === undefined || userTypeFilter === "Volunteer") {
-    const rows = await prisma.volunteer.findMany({
-      where: shelterID === undefined ? {} : { shelterID },
-      select: { userID: true },
-    });
-    branches.push({ userType: "Volunteer", userIDs: rows.map((r) => r.userID) });
-  }
-
-  return branches;
+const resolveScopedUserIDs = async (scope, userTypes, callerID) => {
+  const { shelterID } = scope;
+  return Promise.all(
+    userTypes.map(async (userType) => {
+      let userIDs;
+      if (userType === "Adopter") {
+        const rows = await prisma.adoptionApplication.findMany({
+          where: shelterID === undefined ? {} : { shelterID },
+          select: { adopterID: true },
+          distinct: ["adopterID"],
+        });
+        userIDs = rows.map((r) => r.adopterID);
+      } else if (userType === "Admin") {
+        // Admins belong to no shelter.
+        const rows = await prisma.admin.findMany({ select: { userID: true } });
+        userIDs = rows.map((r) => r.userID);
+      } else {
+        const where = shelterID === undefined ? {} : { shelterID };
+        const adminWhere = scope.isAdmin && ADMIN_REVIEWABLE_WHERE[userType];
+        const rows = await prisma[PERSON_TYPES[userType].model].findMany({
+          where: adminWhere ? { AND: [where, adminWhere] } : where,
+          select: { userID: true },
+        });
+        userIDs = rows.map((r) => r.userID);
+      }
+      return { userType, userIDs: userIDs.filter((id) => id !== callerID) };
+    }),
+  );
 };
 
 // Second-query name filter — narrows each branch's userIDs by joining
-// directly to Adopter/Volunteer, for the same reason resolveScopedUserIDs
-// can't use a nested select.
+// directly to that person type's table, for the same reason
+// resolveScopedUserIDs can't use a nested select.
 const applyNameFilter = async (branches, name) => {
   if (!name) return branches;
 
   return Promise.all(
     branches.map(async (branch) => {
       if (branch.userIDs.length === 0) return branch;
-      if (branch.userType === "Adopter") {
-        const matches = await prisma.adopter.findMany({
-          where: {
-            userID: { in: branch.userIDs },
-            adopterName: { contains: name, mode: "insensitive" },
-          },
-          select: { userID: true },
-        });
-        return { ...branch, userIDs: matches.map((m) => m.userID) };
-      }
-      const matches = await prisma.volunteer.findMany({
+      const { model, nameField } = PERSON_TYPES[branch.userType];
+      const matches = await prisma[model].findMany({
         where: {
           userID: { in: branch.userIDs },
-          volunteerName: { contains: name, mode: "insensitive" },
+          [nameField]: { contains: name, mode: "insensitive" },
         },
         select: { userID: true },
       });
@@ -115,6 +161,9 @@ const applyNameFilter = async (branches, name) => {
 };
 
 const buildPersonFilter = (branches) => {
+  if (branches.length === 0) {
+    return { userID: { in: [] } }; // nothing this caller may review
+  }
   if (branches.length === 1) {
     return { userType: branches[0].userType, userID: { in: branches[0].userIDs } };
   }
@@ -123,50 +172,53 @@ const buildPersonFilter = (branches) => {
   };
 };
 
+const personSelect = (userType) => ({
+  userID: true,
+  [PERSON_TYPES[userType].nameField]: true,
+  avatarSeed: true,
+  user: { select: { userEmail: true } },
+});
+
+const toPersonSummary = (userType, person) => ({
+  name: person?.[PERSON_TYPES[userType].nameField] ?? "Unknown",
+  email: person?.user?.userEmail ?? null,
+  avatarSeed: person?.avatarSeed ?? null,
+});
+
 // Batched name/email lookup for a page of list rows — one query per person
-// type for the whole page, not one per row.
+// type present on the page, not one per row.
 const attachPersonSummaries = async (rows) => {
-  const adopterIDs = rows.filter((r) => r.userType === "Adopter").map((r) => r.userID);
-  const volunteerIDs = rows.filter((r) => r.userType === "Volunteer").map((r) => r.userID);
-
-  const [adopters, volunteers] = await Promise.all([
-    adopterIDs.length
-      ? prisma.adopter.findMany({
-          where: { userID: { in: adopterIDs } },
-          select: {
-            userID: true,
-            adopterName: true,
-            avatarSeed: true,
-            user: { select: { userEmail: true } },
+  const typesOnPage = [...new Set(rows.map((r) => r.userType))];
+  const people = await Promise.all(
+    typesOnPage.map((userType) =>
+      prisma[PERSON_TYPES[userType].model].findMany({
+        where: {
+          userID: {
+            in: rows.filter((r) => r.userType === userType).map((r) => r.userID),
           },
-        })
-      : [],
-    volunteerIDs.length
-      ? prisma.volunteer.findMany({
-          where: { userID: { in: volunteerIDs } },
-          select: {
-            userID: true,
-            volunteerName: true,
-            avatarSeed: true,
-            user: { select: { userEmail: true } },
-          },
-        })
-      : [],
-  ]);
-
-  const adopterByID = new Map(adopters.map((a) => [a.userID, a]));
-  const volunteerByID = new Map(volunteers.map((v) => [v.userID, v]));
+        },
+        select: personSelect(userType),
+      }),
+    ),
+  );
+  const byTypeAndID = new Map(
+    typesOnPage.flatMap((userType, i) =>
+      people[i].map((person) => [`${userType}:${person.userID}`, person]),
+    ),
+  );
 
   return rows.map((row) => {
-    const person =
-      row.userType === "Adopter" ? adopterByID.get(row.userID) : volunteerByID.get(row.userID);
+    const person = toPersonSummary(
+      row.userType,
+      byTypeAndID.get(`${row.userType}:${row.userID}`),
+    );
     return {
       governmentIDID: row.governmentIDID,
       userID: row.userID,
       userType: row.userType,
-      personName: (row.userType === "Adopter" ? person?.adopterName : person?.volunteerName) ?? "Unknown",
-      personEmail: person?.user?.userEmail ?? null,
-      personAvatarSeed: person?.avatarSeed ?? null,
+      personName: person.name,
+      personEmail: person.email,
+      personAvatarSeed: person.avatarSeed,
       idType: row.idType,
       verificationStatus: row.verificationStatus,
     };
@@ -174,26 +226,11 @@ const attachPersonSummaries = async (rows) => {
 };
 
 const fetchPersonSummary = async (userID, userType) => {
-  if (userType === "Adopter") {
-    const adopter = await prisma.adopter.findUnique({
-      where: { userID },
-      select: { adopterName: true, avatarSeed: true, user: { select: { userEmail: true } } },
-    });
-    return {
-      name: adopter?.adopterName ?? "Unknown",
-      email: adopter?.user?.userEmail ?? null,
-      avatarSeed: adopter?.avatarSeed ?? null,
-    };
-  }
-  const volunteer = await prisma.volunteer.findUnique({
+  const person = await prisma[PERSON_TYPES[userType].model].findUnique({
     where: { userID },
-    select: { volunteerName: true, avatarSeed: true, user: { select: { userEmail: true } } },
+    select: personSelect(userType),
   });
-  return {
-    name: volunteer?.volunteerName ?? "Unknown",
-    email: volunteer?.user?.userEmail ?? null,
-    avatarSeed: volunteer?.avatarSeed ?? null,
-  };
+  return toPersonSummary(userType, person);
 };
 
 // ——————————————— LIST QUEUE (GET /government-ids) ———————————————
@@ -201,9 +238,14 @@ const listGovernmentIds = async (
   actor,
   { section, userType, name, shelterID: shelterIDParam, page = 1, limit = 20 } = {},
 ) => {
-  const shelterID = await resolveShelterID(actor, shelterIDParam);
+  const scope = await resolveReviewScope(actor, shelterIDParam);
+  // A userType filter the caller may not review (e.g. Staff for a
+  // non-manager) just yields an empty page, not an error.
+  const userTypes = userType
+    ? scope.userTypes.filter((type) => type === userType)
+    : scope.userTypes;
 
-  let branches = await resolveScopedUserIDs(shelterID, userType);
+  let branches = await resolveScopedUserIDs(scope, userTypes, actor.userID);
   branches = await applyNameFilter(branches, name);
 
   const where = {
@@ -236,32 +278,46 @@ const listGovernmentIds = async (
   };
 };
 
-// Staff-only ownership check — Admin is unscoped. Shares the "connected to
-// this shelter" rule with resolveScopedUserIDs: an Adopter needs at least
-// one AdoptionApplication at this shelter, a Volunteer needs a direct
-// shelterID match.
+// Access check for one record — same rules as resolveReviewScope/
+// resolveScopedUserIDs: never your own ID, only the person types you
+// review, and (staff-side) only people connected to your shelter.
 const assertOwnership = async (record, actor) => {
+  if (record.userID === actor.userID) throw forbiddenSelf();
+  if (actor.role === "Admin") {
+    await assertAdminMayReview(record);
+    return;
+  }
   if (actor.role !== "Staff") return;
 
-  const staff = await prisma.staff.findUnique({
-    where: { userID: actor.userID },
-    select: { shelterID: true },
-  });
-  const shelterID = staff?.shelterID ?? -1;
+  const scope = await resolveReviewScope(actor);
+  if (!scope.userTypes.includes(record.userType)) throw forbiddenType();
 
   if (record.userType === "Adopter") {
     const hasApplication = await prisma.adoptionApplication.findFirst({
-      where: { adopterID: record.userID, shelterID },
+      where: { adopterID: record.userID, shelterID: scope.shelterID },
       select: { applicationID: true },
     });
     if (!hasApplication) throw forbiddenShelter();
   } else {
-    const volunteer = await prisma.volunteer.findUnique({
+    const person = await prisma[PERSON_TYPES[record.userType].model].findUnique({
       where: { userID: record.userID },
       select: { shelterID: true },
     });
-    if (volunteer?.shelterID !== shelterID) throw forbiddenShelter();
+    if (person?.shelterID !== scope.shelterID) throw forbiddenShelter();
   }
+};
+
+// Admin: other Admins' IDs, and Managers' (not other staff's).
+const assertAdminMayReview = async (record) => {
+  if (record.userType === "Admin") return;
+  if (record.userType === "Staff") {
+    const person = await prisma.staff.findUnique({
+      where: { userID: record.userID },
+      select: { staffDesignation: true },
+    });
+    if (person?.staffDesignation === "Manager") return;
+  }
+  throw forbiddenType();
 };
 
 const DETAIL_SELECT = {
@@ -280,9 +336,6 @@ const findReviewableRecord = async (governmentIDID) => {
     select: DETAIL_SELECT,
   });
   if (!record || !REVIEWABLE_USER_TYPES.includes(record.userType)) {
-    // A Staff/Veterinarian/Admin GovernmentID row (out of this feature's
-    // scope) is treated as not found rather than forbidden — it's never
-    // meant to be discoverable through this endpoint at all.
     throw notFound(governmentIDID);
   }
   return record;
