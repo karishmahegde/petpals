@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const { staffStatusDates } = require("../../utils/staffDates");
+const { withGovernmentIdStatus, assertReadyForApproval } = require("./staffApproval.service");
 
 // Shelter-level staff management for the shelter's manager (Management →
 // Staff tab) — distinct from Admin's org-wide admin/staff.service.js. Every
@@ -51,9 +52,12 @@ const SHELTER_STAFF_SELECT = {
   staffDOJ: true,
   staffDOS: true,
   accountStatus: true,
+  onboardingComplete: true,
   user: { select: { userEmail: true } },
 };
 
+// `row` already carries governmentIdStatus (see withGovernmentIdStatus) —
+// with onboardingComplete, what the manager needs to see before approving.
 const formatMember = (row) => ({
   userID: row.userID,
   avatarSeed: row.avatarSeed,
@@ -66,7 +70,11 @@ const formatMember = (row) => ({
   staffDOJ: row.staffDOJ,
   staffDOS: row.staffDOS,
   accountStatus: row.accountStatus,
+  onboardingComplete: row.onboardingComplete,
+  governmentIdStatus: row.governmentIdStatus,
 });
+
+const formatOne = async (row) => formatMember((await withGovernmentIdStatus([row]))[0]);
 
 // The shelter the caller manages — the gate for every endpoint here.
 const resolveManagedShelterID = async (userID) => {
@@ -93,6 +101,7 @@ const loadShelterStaffMember = async (managerID, targetID) => {
       staffDesignation: true,
       accountStatus: true,
       staffDOJ: true,
+      onboardingComplete: true,
     },
   });
   if (!member) {
@@ -140,7 +149,7 @@ const listShelterStaff = async (
   ]);
 
   return {
-    data: rows.map(formatMember),
+    data: (await withGovernmentIdStatus(rows)).map(formatMember),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -165,7 +174,7 @@ const updateDesignation = async (managerID, targetID, staffDesignation) => {
     data: { staffDesignation },
     select: SHELTER_STAFF_SELECT,
   });
-  return formatMember(updated);
+  return formatOne(updated);
 };
 
 // ——————————————— STATUS (PATCH /staff/me/team/:id/status) ———————————————
@@ -190,6 +199,9 @@ const updateStatus = async (managerID, targetID, accountStatus, staffDesignation
       `staffDesignation is required when approving and must be one of: ${ASSIGNABLE_DESIGNATIONS.join(", ")}`,
     );
   }
+  if (approving) {
+    await assertReadyForApproval(targetID, member.onboardingComplete);
+  }
 
   // Approving stamps staffDOJ; deactivating stamps staffDOS — see
   // utils/staffDates.js.
@@ -202,7 +214,7 @@ const updateStatus = async (managerID, targetID, accountStatus, staffDesignation
     },
     select: SHELTER_STAFF_SELECT,
   });
-  return formatMember(updated);
+  return formatOne(updated);
 };
 
 module.exports = {

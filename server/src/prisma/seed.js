@@ -118,6 +118,8 @@ const address = (addressLine1, city, state, zip, addressLine2 = null) => ({
   country: "United States",
 });
 const ONBOARDED = { onboardingComplete: true, onboardingStep: 7 };
+// The staff wizard is shorter: 2 Personal, 3 Address, 4 Identity, 5 Review.
+const STAFF_ONBOARDED = { onboardingComplete: true, onboardingStep: 5 };
 const avatar = () => crypto.randomUUID();
 
 const logins = [];
@@ -238,7 +240,7 @@ async function main() {
       staffDesignation: "Manager",
       accountStatus: "Active",
       ...address("88 Greenwich Street", "New York", "NY", "10006", "Apt 12C"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
   });
   login("Staff", "staff@petpals.com", "Staff@123", "Active — Manager, PetPals Downtown");
@@ -380,7 +382,7 @@ async function main() {
       staffDesignation: "Senior",
       accountStatus: "Active",
       ...address("40 Water Street", "New York", "NY", "10004"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-2) },
   );
@@ -398,7 +400,7 @@ async function main() {
       staffDesignation: "Associate",
       accountStatus: "Active",
       ...address("15 Broad Street", "New York", "NY", "10005"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-3) },
   );
@@ -411,12 +413,35 @@ async function main() {
       staffName: "Omar Haddad",
       staffPhone: "+12125550113",
       shelterID: shelter1.shelterID,
+      staffDOB: new Date("1995-11-04"),
+      staffSex: "M",
       staffDesignation: "Associate",
       accountStatus: "Pending",
+      ...address("22 Cortlandt Street", "New York", "NY", "10007"),
+      ...STAFF_ONBOARDED,
     },
     { emailVerified: false },
   );
-  login("Staff", "staff.pending@petpals.com", "Staff@123", "Pending Associate — Downtown manager approves");
+  login("Staff", "staff.pending@petpals.com", "Staff@123", "Pending Associate, onboarded, ID awaiting verification — Downtown manager approves");
+
+  // Pending sign-up still mid-onboarding (finished Personal, stopped at
+  // Address — step 3): can log in, but only to the onboarding wizard, and
+  // can't be approved until onboarding is complete and their ID Verified.
+  await createStaff(
+    "staff.onboarding@petpals.com",
+    {
+      staffName: "Hannah Park",
+      staffPhone: "+12125550118",
+      shelterID: shelter1.shelterID,
+      staffDOB: new Date("1999-02-17"),
+      staffSex: "F",
+      accountStatus: "Pending",
+      onboardingComplete: false,
+      onboardingStep: 3,
+    },
+    { emailVerified: false },
+  );
+  login("Staff", "staff.onboarding@petpals.com", "Staff@123", "Pending — onboarding incomplete (step 3), Downtown");
 
   // Pending Manager sign-up at a manager-less shelter: Admin approves.
   await createStaff(
@@ -425,12 +450,16 @@ async function main() {
       staffName: "Grace Liu",
       staffPhone: "+17185550114",
       shelterID: shelter3.shelterID,
+      staffDOB: new Date("1986-07-29"),
+      staffSex: "F",
       staffDesignation: "Manager",
       accountStatus: "Pending",
+      ...address("41-12 Queens Boulevard", "Queens", "NY", "11104"),
+      ...STAFF_ONBOARDED,
     },
     { emailVerified: false },
   );
-  login("Staff", "staff.manager.pending@petpals.com", "Staff@123", "Pending Manager — Queens, Admin approves");
+  login("Staff", "staff.manager.pending@petpals.com", "Staff@123", "Pending Manager, onboarded, ID awaiting verification — Queens, Admin approves");
 
   // Deactivated after having joined: both DOJ and DOS stamped.
   await createStaff(
@@ -446,7 +475,7 @@ async function main() {
       staffDesignation: "Senior",
       accountStatus: "Deactivated",
       ...address("70 Pine Street", "New York", "NY", "10005"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-65) },
   );
@@ -465,7 +494,7 @@ async function main() {
       staffDesignation: "Manager",
       accountStatus: "Active",
       ...address("300 Atlantic Avenue", "Brooklyn", "NY", "11201"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: recent },
   );
@@ -482,7 +511,7 @@ async function main() {
       staffDOJ: new Date("2023-05-22"),
       accountStatus: "Active",
       ...address("5 Beekman Street", "New York", "NY", "10038"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-7) },
   );
@@ -1647,6 +1676,7 @@ async function main() {
     other: "seed/other.png",
   };
   const pendingStaff = await prisma.users.findUnique({ where: { userEmail: "staff.pending@petpals.com" } });
+  const pendingManager = await prisma.users.findUnique({ where: { userEmail: "staff.manager.pending@petpals.com" } });
   const pendingVet = await prisma.users.findUnique({ where: { userEmail: "vet.pending@petpals.com" } });
   await prisma.governmentID.createMany({
     data: [
@@ -1655,6 +1685,7 @@ async function main() {
       { userID: riley.userID, userType: "Adopter", idType: "State ID", idNumber: "S99887766", verificationStatus: "Rejected", documentURL: ID_FILES.stateId },
       { userID: sasha.userID, userType: "Staff", idType: "Driver's License", idNumber: "D55501234", verificationStatus: "Verified", documentURL: ID_FILES.other },
       { userID: pendingStaff.userID, userType: "Staff", idType: "Passport", idNumber: "P44412345", verificationStatus: "Pending", documentURL: ID_FILES.passport },
+      { userID: pendingManager.userID, userType: "Staff", idType: "State ID", idNumber: "S52019876", verificationStatus: "Pending", documentURL: ID_FILES.stateId },
       { userID: pendingVet.userID, userType: "Veterinarian", idType: "Driver's License", idNumber: "D77712345", verificationStatus: "Pending", documentURL: ID_FILES.license },
       { userID: bryan.userID, userType: "Volunteer", idType: "State ID", idNumber: "S11122233", verificationStatus: "Verified", documentURL: ID_FILES.stateId },
       { userID: leo.userID, userType: "Volunteer", idType: "Passport", idNumber: "P88812345", verificationStatus: "Pending", documentURL: ID_FILES.passport },

@@ -34,6 +34,13 @@ const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet", "volunteer"]);
 // Roles that pick the shelter they're joining at registration.
 const SHELTER_ROLES = new Set(["volunteer", "staff", "vet"]);
 
+// Roles with an onboarding wizard — their session carries
+// onboardingComplete/onboardingStep so the frontend's OnboardingGate can
+// route them. Staff also carry accountStatus: a Pending staff member can log
+// in (to onboard before approval), so the frontend needs to know they're
+// still Pending once onboarding is done.
+const ONBOARDING_ROLES = new Set(["Adopter", "Staff"]);
+
 // ——————————————— REGISTER ———————————————
 const register = async ({ name, email, password, role, shelterID }) => {
   const { roleEnum, model, nameField } = ROLE_CONFIG[role];
@@ -155,11 +162,13 @@ const login = async ({ email, password }) => {
   }
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
-  const isAdopter = user.role === "Adopter";
+  const tracksOnboarding = ONBOARDING_ROLES.has(user.role);
+  const isStaff = user.role === "Staff";
   let name = null;
   let avatarSeed = null;
   let onboardingComplete;
   let onboardingStep;
+  let accountStatus;
   if (config) {
     // Every role table now carries its own accountStatus field (Active/
     // Deactivated for Admin/Staff/Vet; Active/Banned/Deactivated for Adopter/
@@ -173,12 +182,13 @@ const login = async ({ email, password }) => {
         [config.nameField]: true,
         accountStatus: true,
         avatarSeed: true,
-        ...(isAdopter ? { onboardingComplete: true, onboardingStep: true } : {}),
+        ...(tracksOnboarding ? { onboardingComplete: true, onboardingStep: true } : {}),
       },
     });
     name = roleRecord?.[config.nameField] ?? null;
     avatarSeed = roleRecord?.avatarSeed ?? null;
-    if (isAdopter) {
+    accountStatus = roleRecord?.accountStatus;
+    if (tracksOnboarding) {
       onboardingComplete = roleRecord?.onboardingComplete ?? false;
       onboardingStep = roleRecord?.onboardingStep ?? 2;
     }
@@ -205,10 +215,13 @@ const login = async ({ email, password }) => {
       err.code = "UNAUTHORIZED";
       throw err;
     }
-    if (roleRecord?.accountStatus === "Pending") {
-      // Staff/Vet are approved by an Admin/Staff member; a self-registered
-      // Volunteer is approved by staff. Generic wording since "pending staff
-      // approval" was only ever true for two of the four Pending-capable roles.
+    // Pending Staff are the exception: they log in to complete onboarding
+    // before approval, and authenticate.js only lets them reach the
+    // onboarding endpoints (authenticate.allowPendingStaff) until approved.
+    if (roleRecord?.accountStatus === "Pending" && !isStaff) {
+      // Vets are approved by a shelter manager; a self-registered
+      // Volunteer is approved by staff; an Admin by another Admin. Generic
+      // wording since the approver differs by role.
       const err = new Error(
         "This account is pending approval and can't log in yet.",
       );
@@ -230,7 +243,8 @@ const login = async ({ email, password }) => {
     ...safeUser,
     name,
     avatarSeed,
-    ...(isAdopter ? { onboardingComplete, onboardingStep } : {}),
+    ...(tracksOnboarding ? { onboardingComplete, onboardingStep } : {}),
+    ...(isStaff ? { accountStatus } : {}),
   };
 };
 
@@ -332,23 +346,27 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
   });
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
-  const isAdopter = user.role === "Adopter";
+  const tracksOnboarding = ONBOARDING_ROLES.has(user.role);
+  const isStaff = user.role === "Staff";
   let name = null;
   let avatarSeed = null;
   let onboardingComplete;
   let onboardingStep;
+  let accountStatus;
   if (config) {
     const roleRecord = await prisma[config.model].findUnique({
       where: { userID: user.userID },
       select: {
         [config.nameField]: true,
         avatarSeed: true,
-        ...(isAdopter ? { onboardingComplete: true, onboardingStep: true } : {}),
+        ...(tracksOnboarding ? { onboardingComplete: true, onboardingStep: true } : {}),
+        ...(isStaff ? { accountStatus: true } : {}),
       },
     });
     name = roleRecord?.[config.nameField] ?? null;
     avatarSeed = roleRecord?.avatarSeed ?? null;
-    if (isAdopter) {
+    accountStatus = roleRecord?.accountStatus;
+    if (tracksOnboarding) {
       onboardingComplete = roleRecord?.onboardingComplete ?? false;
       onboardingStep = roleRecord?.onboardingStep ?? 2;
     }
@@ -359,7 +377,8 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
     ...safeUser,
     name,
     avatarSeed,
-    ...(isAdopter ? { onboardingComplete, onboardingStep } : {}),
+    ...(tracksOnboarding ? { onboardingComplete, onboardingStep } : {}),
+    ...(isStaff ? { accountStatus } : {}),
   };
 };
 

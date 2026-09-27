@@ -23,6 +23,8 @@ const STAFF_SELF_SELECT = {
   staffDOS: true,
   staffDesignation: true,
   accountStatus: true,
+  onboardingComplete: true,
+  onboardingStep: true,
   ...ADDRESS_SELECT,
   shelter: { select: { shelterName: true } },
   // emailVerified/lastLoginAt live on Users — flattened by toSelfProfile.
@@ -77,6 +79,94 @@ const updateMyProfile = async (userID, data) => {
     }
     throw err;
   }
+};
+
+// ——————————————— ONBOARDING (PATCH /staff/me/onboarding-step, /onboarding-complete) ———————————————
+// A new staff member onboards while still Pending, before approval (see
+// authenticate.allowPendingStaff): Step 2 Personal, 3 Address, 4 Identity,
+// 5 Review. Mirrors adopters.service.js's pair of endpoints.
+const LAST_ONBOARDING_STEP = 5;
+
+// `step` is the wizard step just completed (validated 2-5 by the
+// controller). onboardingStep only ever advances, whatever the client sends.
+const advanceOnboardingStep = async (userID, step) => {
+  const staff = await prisma.staff.findUnique({
+    where: { userID },
+    select: { onboardingStep: true },
+  });
+  if (!staff) {
+    throw notFound();
+  }
+
+  const nextStep = Math.min(
+    Math.max(staff.onboardingStep, step + 1),
+    LAST_ONBOARDING_STEP,
+  );
+  return toSelfProfile(
+    await prisma.staff.update({
+      where: { userID },
+      data: { onboardingStep: nextStep },
+      select: STAFF_SELF_SELECT,
+    }),
+  );
+};
+
+// Checked server-side rather than trusting the wizard's own required-field
+// checks, since this endpoint could be called directly. A submitted
+// government ID is required too; it's Verified later by the approver, before
+// they can approve (staffApproval.service.js).
+const REQUIRED_FOR_COMPLETION = {
+  staffPhone: "Phone",
+  staffDOB: "Date of birth",
+  staffSex: "Sex",
+  addressLine1: "Address line 1",
+  city: "City",
+  state: "State",
+  zip: "ZIP",
+  country: "Country",
+};
+
+const completeOnboarding = async (userID) => {
+  const staff = await prisma.staff.findUnique({
+    where: { userID },
+    select: Object.fromEntries(
+      Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
+    ),
+  });
+  if (!staff) {
+    throw notFound();
+  }
+
+  const missingLabels = Object.entries(REQUIRED_FOR_COMPLETION)
+    .filter(([field]) => {
+      const value = staff[field];
+      return value === null || value === undefined || value === "";
+    })
+    .map(([, label]) => label);
+
+  const governmentId = await prisma.governmentID.findFirst({
+    where: { userID, userType: "Staff" },
+    select: { governmentIDID: true },
+  });
+  if (!governmentId) {
+    missingLabels.push("Government ID");
+  }
+
+  if (missingLabels.length > 0) {
+    const err = new Error(
+      `Onboarding is incomplete — missing: ${missingLabels.join(", ")}`,
+    );
+    err.code = "CONFLICT";
+    throw err;
+  }
+
+  return toSelfProfile(
+    await prisma.staff.update({
+      where: { userID },
+      data: { onboardingComplete: true, onboardingStep: LAST_ONBOARDING_STEP },
+      select: STAFF_SELF_SELECT,
+    }),
+  );
 };
 
 // ——————————————— GOVERNMENT ID (GET/POST /staff/me/government-id) ———————
@@ -289,6 +379,8 @@ const closeMyAccount = async (userID, mode) => {
 module.exports = {
   getMyProfile,
   updateMyProfile,
+  advanceOnboardingStep,
+  completeOnboarding,
   createGovernmentId,
   getGovernmentId,
   closeMyAccount,

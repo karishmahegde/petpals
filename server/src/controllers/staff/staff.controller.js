@@ -118,6 +118,31 @@ const updateMyProfile = async (req, res, next) => {
   }
 };
 
+// ——————————————— PATCH /staff/me/onboarding-step ———————————————
+const advanceOnboardingStep = async (req, res, next) => {
+  const step = Number(req.body?.step);
+  if (!Number.isInteger(step) || step < 2 || step > 5) {
+    return next(badRequest("step must be an integer between 2 and 5"));
+  }
+
+  try {
+    const staff = await staffService.advanceOnboardingStep(req.user.userID, step);
+    return successResponse(res, "Onboarding step updated successfully", staff);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PATCH /staff/me/onboarding-complete ———————————————
+const completeOnboarding = async (req, res, next) => {
+  try {
+    const staff = await staffService.completeOnboarding(req.user.userID);
+    return successResponse(res, "Onboarding completed successfully", staff);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ——————————————— GOVERNMENT ID (GET/POST /staff/me/government-id) ———————
 // Mirrors adopters.controller.js's uploadGovernmentId/getGovernmentId
 // exactly — see staffService.createGovernmentId/getGovernmentId.
@@ -197,6 +222,8 @@ const closeMyAccount = async (req, res, next) => {
 module.exports = {
   getMyProfile,
   updateMyProfile,
+  advanceOnboardingStep,
+  completeOnboarding,
   uploadGovernmentId,
   getGovernmentId,
   closeMyAccount,

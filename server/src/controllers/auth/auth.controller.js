@@ -149,6 +149,7 @@ const refreshToken = async (req, res, next) => {
         avatarSeed: user.avatarSeed,
         onboardingComplete: user.onboardingComplete,
         onboardingStep: user.onboardingStep,
+        accountStatus: user.accountStatus,
       },
     });
   } catch (err) {

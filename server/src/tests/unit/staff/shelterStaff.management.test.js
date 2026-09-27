@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 jest.mock("../../../config/prisma", () => ({
   shelter: { findFirst: jest.fn() },
   staff: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn(), update: jest.fn() },
+  governmentID: { findMany: jest.fn() },
 }));
 
 // Only getAccountStatus is faked (authenticate.js's live per-request check).
@@ -37,6 +38,8 @@ describe("Shelter manager staff management", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     authService.getAccountStatus.mockResolvedValue("Active");
+    // No government IDs on file unless a test says otherwise.
+    prisma.governmentID.findMany.mockResolvedValue([]);
   });
 
   describe("GET /api/v1/staff/me/team", () => {
@@ -187,12 +190,17 @@ describe("Shelter manager staff management", () => {
       staffDesignation: null,
       accountStatus: "Pending",
       staffDOJ: null,
+      onboardingComplete: true,
       ...overrides,
     });
 
     test("approve: Pending -> Active sets the designation and joining date", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.staff.findUnique.mockResolvedValueOnce(pendingMember());
+      // Approval requires a Verified government ID (staffApproval.service.js).
+      prisma.governmentID.findMany.mockResolvedValueOnce([
+        { userID: 50, verificationStatus: "Verified" },
+      ]);
       prisma.staff.update.mockResolvedValueOnce(memberRow());
 
       const res = await request(app)

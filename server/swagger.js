@@ -703,6 +703,16 @@ const schemas = {
       staffDOJ: { type: "string", format: "date-time", nullable: true, description: "Date of Joining — stamped on first approval." },
       staffDOS: { type: "string", format: "date-time", nullable: true, description: "Date of Separation — stamped on deactivation, cleared on reactivation." },
       accountStatus: { type: "string", enum: ["Pending", "Active", "Deactivated"] },
+      onboardingComplete: {
+        type: "boolean",
+        description: "Whether they've finished the staff onboarding wizard. Required (with a Verified government ID) before a Pending account can be approved.",
+      },
+      governmentIdStatus: {
+        type: "string",
+        enum: ["Pending", "Verified", "Rejected"],
+        nullable: true,
+        description: "Verification status of their government ID — null if none submitted. Only the status is exposed, never the document or number.",
+      },
     },
   },
   ShelterVet: {
@@ -1175,6 +1185,16 @@ const schemas = {
           "'Pending' is a self-registered account awaiting admin approval (PATCH /staff/:id/status to 'Active' approves it, 'Deactivated' declines it) — never a state an admin sets directly.",
         enum: ["Pending", "Active", "Deactivated"],
         nullable: true,
+      },
+      onboardingComplete: {
+        type: "boolean",
+        description: "Whether they've finished the staff onboarding wizard. Required (with a Verified government ID) before a Pending account can be approved.",
+      },
+      governmentIdStatus: {
+        type: "string",
+        enum: ["Pending", "Verified", "Rejected"],
+        nullable: true,
+        description: "Verification status of their government ID — null if none submitted. Only the status is exposed, never the document or number.",
       },
       shelter: {
         type: "object",

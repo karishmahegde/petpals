@@ -15,6 +15,7 @@ jest.mock("../../../config/prisma", () => ({
     update: jest.fn(),
     updateMany: jest.fn(),
   },
+  governmentID: { findMany: jest.fn() },
   // The service always passes an array of already-invoked prisma calls
   // (each already a Promise) — Promise.all is a faithful enough stand-in for
   // the real transaction batching.
@@ -64,6 +65,8 @@ describe("Admin staff management endpoints", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     authService.getAccountStatus.mockResolvedValue("Active");
+    // No government IDs on file unless a test says otherwise.
+    prisma.governmentID.findMany.mockResolvedValue([]);
   });
 
   // ————————————————————————————— GET /staff —————————————————————————————
@@ -231,9 +234,14 @@ describe("Admin staff management endpoints", () => {
           accountStatus: "Pending",
           staffDesignation: "Manager",
           shelterID: 9,
+          onboardingComplete: true,
           shelter: { managerStaffID: null },
         })
         .mockResolvedValueOnce(buildStaffDetail({ accountStatus: "Active" }));
+      // Approval requires a Verified government ID (staffApproval.service.js).
+      prisma.governmentID.findMany.mockResolvedValueOnce([
+        { userID: 42, verificationStatus: "Verified" },
+      ]);
       prisma.staff.update.mockResolvedValueOnce({});
       prisma.shelter.update.mockResolvedValueOnce({});
 

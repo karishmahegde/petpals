@@ -1,5 +1,9 @@
 const prisma = require("../../config/prisma");
 const { staffStatusDates } = require("../../utils/staffDates");
+const {
+  withGovernmentIdStatus,
+  assertReadyForApproval,
+} = require("../staff/staffApproval.service");
 
 // Every field lives on STAFF itself except shelterName and userEmail — the
 // `user` relation is scoped to userEmail alone, so nothing else from USERS
@@ -19,6 +23,10 @@ const STAFF_LIST_SELECT = {
   staffDOS: true,
   staffDesignation: true,
   accountStatus: true,
+  // With governmentIdStatus (added after the query, see
+  // withGovernmentIdStatus), what an Admin needs to see before approving a
+  // Manager sign-up.
+  onboardingComplete: true,
   shelter: { select: { shelterName: true } },
   user: { select: { userEmail: true } },
 };
@@ -56,7 +64,7 @@ const listStaff = async ({
   ]);
 
   return {
-    data,
+    data: await withGovernmentIdStatus(data),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -83,7 +91,7 @@ const getStaffDetail = async (userID) => {
   if (!staff) {
     throw notFound(userID);
   }
-  return staff;
+  return (await withGovernmentIdStatus([staff]))[0];
 };
 
 // ——————————————— UPDATE STAFF (PATCH /staff/:id) ———————————————
@@ -189,6 +197,7 @@ const updateStaffStatus = async (userID, accountStatus) => {
       accountStatus: true,
       staffDesignation: true,
       shelterID: true,
+      onboardingComplete: true,
       shelter: { select: { managerStaffID: true } },
     },
   });
@@ -211,6 +220,9 @@ const updateStaffStatus = async (userID, accountStatus) => {
       const err = new Error("This shelter already has a manager");
       err.code = "CONFLICT";
       throw err;
+    }
+    if (approvingManager) {
+      await assertReadyForApproval(userID, current.onboardingComplete);
     }
   }
 

@@ -67,9 +67,15 @@ router.post("/register", authController.register);
  *                 example: secret123
  *     responses:
  *       200:
- *         description: Login successful — returns access token in body, refresh token as httpOnly cookie
+ *         description: >
+ *           Login successful — returns access token in body, refresh token
+ *           as httpOnly cookie. user carries onboardingComplete and
+ *           onboardingStep for Adopter and Staff, plus accountStatus for
+ *           Staff. A Pending Staff member CAN log in (to onboard before
+ *           approval) but can only reach their own onboarding endpoints
+ *           until approved; Pending accounts of other roles get 401.
  *       401:
- *         description: Incorrect password
+ *         description: Incorrect password, or a Deactivated/Banned account (or Pending, for non-Staff roles)
  *       404:
  *         description: No account found with this email
  */
@@ -89,7 +95,9 @@ router.post("/login", authController.login);
  *       401:
  *         description: Missing, invalid, or already-invalidated token
  */
-router.post("/logout", authenticate, authController.logout);
+// allowPendingStaff: a Pending staff member is logged in while they onboard
+// (before approval), so they must be able to log out too.
+router.post("/logout", authenticate.allowPendingStaff, authController.logout);
 
 /**
  * @swagger
@@ -101,7 +109,7 @@ router.post("/logout", authenticate, authController.logout);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Token refreshed successfully — new access token in body, new refresh token cookie set
+ *         description: Token refreshed successfully — new access token in body, new refresh token cookie set. user has the same onboarding/accountStatus fields as login.
  *       401:
  *         description: Refresh token missing, invalid, or session expired
  */
