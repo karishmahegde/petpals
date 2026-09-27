@@ -292,12 +292,26 @@ const getApplicationById = async (applicationID, user) => {
   // Verification tab (staff/governmentIds.service.js) for the actual
   // review workflow.
   let governmentIdStatus = null;
+  // Staff/Admin only: how many OTHER Pending applications this pet has —
+  // accepting this one declines all of them (see updateApplicationStatus),
+  // so the Accept confirmation can say so up front.
+  let otherPendingCount = null;
   if (user.role !== "Adopter") {
-    const record = await prisma.governmentID.findFirst({
-      where: { userID: application.adopterID, userType: "Adopter" },
-      select: { verificationStatus: true },
-    });
+    const [record, pendingCount] = await Promise.all([
+      prisma.governmentID.findFirst({
+        where: { userID: application.adopterID, userType: "Adopter" },
+        select: { verificationStatus: true },
+      }),
+      prisma.adoptionApplication.count({
+        where: {
+          petID: application.petID,
+          applicationStatus: "Pending",
+          applicationID: { not: application.applicationID },
+        },
+      }),
+    ]);
     governmentIdStatus = record?.verificationStatus ?? null;
+    otherPendingCount = pendingCount;
   }
 
   return {
@@ -338,6 +352,7 @@ const getApplicationById = async (applicationID, user) => {
       preQualifyFlag: application.adopter.preQualifyFlag,
     },
     governmentIdStatus,
+    otherPendingCount,
     canAssignStaff: canAssignStaff(application, user),
   };
 };
@@ -567,6 +582,16 @@ const listApplicationsForStaff = async (
 // index on (adopterID, petID) (scoped to Pending/Accepted only), so the
 // adopter can re-apply for the same pet afterwards.
 const WITHDRAWABLE_STATUSES = ["Pending", "Accepted"];
+
+// Staff remark on the applications declined automatically when another
+// application for the same pet is accepted — shown to those adopters.
+const AUTO_DECLINE_REMARK =
+  "Another applicant was approved for this pet. Thank you for your interest — we hope you'll find another match.";
+
+const petNoLongerAvailable = (petName) =>
+  conflict(
+    `${petName} is no longer available — another application has already been accepted`,
+  );
 const STAFF_TARGET_STATUSES = ["Accepted", "Rejected"];
 
 const updateApplicationStatus = async (applicationID, { status, staffRemark }, actor) => {
@@ -578,6 +603,7 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
       shelterID: true,
       petID: true,
       applicationStatus: true,
+      pet: { select: { petName: true, adoptionStatus: true } },
     },
   });
 
@@ -633,6 +659,11 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
         `A ${application.applicationStatus.toLowerCase()} application can't be ${status.toLowerCase()}`,
       );
     }
+    // A pet goes to one applicant: once it's adopted (or otherwise no
+    // longer available), none of its other applications can be accepted.
+    if (status === "Accepted" && application.pet.adoptionStatus !== "available") {
+      throw petNoLongerAvailable(application.pet.petName);
+    }
   }
 
   const data = { applicationStatus: status };
@@ -661,11 +692,22 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
   // read-only — see staff/pets.service.js), so this is the only way back.
   // updateMany + the 'adopted' guard so a pet that has since moved on
   // isn't clobbered.
+  // Accepting also declines the pet's other Pending applications, with a
+  // remark the applicant sees — rather than leaving them "Under
+  // Consideration" for a pet that's gone.
   if (status === "Accepted") {
     operations.push(
       prisma.pet.update({
         where: { petID: application.petID },
         data: { adoptionStatus: "adopted" },
+      }),
+      prisma.adoptionApplication.updateMany({
+        where: {
+          petID: application.petID,
+          applicationStatus: "Pending",
+          applicationID: { not: applicationID },
+        },
+        data: { applicationStatus: "Rejected", staffRemark: AUTO_DECLINE_REMARK },
       }),
     );
   } else if (status === "Withdrawn" && application.applicationStatus === "Accepted") {
@@ -677,8 +719,18 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
     );
   }
 
-  const [updated] = await prisma.$transaction(operations);
-  return toClientShape(updated);
+  try {
+    const [updated] = await prisma.$transaction(operations);
+    return toClientShape(updated);
+  } catch (err) {
+    // Another application for this pet was accepted at the same moment —
+    // the one-Accepted-per-pet partial unique index fired (migration
+    // …_one_accepted_application_per_pet). Nothing was written.
+    if (status === "Accepted" && isUniqueViolation(err)) {
+      throw petNoLongerAvailable(application.pet.petName);
+    }
+    throw err;
+  }
 };
 
 // ——————————————— ASSIGN STAFF (PATCH /adoption-applications/:id) ———————————————

@@ -219,8 +219,13 @@ router.get(
  *       otherwise); Admin any shelter. Accepting sets staffID to the acting
  *       Staff member (never set for an Admin actor — the column FKs
  *       Staff.userID, which an Admin doesn't have) and sets the pet's
- *       adoptionStatus to 'adopted'; Rejecting leaves the pet's
- *       adoptionStatus untouched, still available for other applicants.
+ *       adoptionStatus to 'adopted'. A pet goes to one applicant: accepting
+ *       also moves the pet's OTHER Pending applications to 'Rejected' with an
+ *       automatic staffRemark, and accepting an application for a pet that
+ *       is no longer 'available' is refused with 409 (also enforced by a
+ *       one-Accepted-per-pet unique index, so two simultaneous acceptances
+ *       can't both land). Rejecting leaves the pet's adoptionStatus and its
+ *       other applications untouched, still available for other applicants.
  *       Moving to 'Withdrawn' or 'Rejected' clears the active
  *       (adopterID, petID) uniqueness constraint, so the adopter can
  *       re-apply for the same pet afterwards.
@@ -270,7 +275,7 @@ router.get(
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: The application isn't in a status the requested transition allows
+ *         description: The application isn't in a status the requested transition allows, or (Accept) the pet is no longer available — another application was already accepted
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

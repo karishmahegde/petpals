@@ -331,6 +331,16 @@ const ApplicationDetailPanel = ({
                 </>
               )}
             </p>
+            {/* A pet goes to one applicant — accepting declines the rest,
+                with a remark they'll see, server-side. */}
+            {pendingAction === "Accepted" && (data.otherPendingCount ?? 0) > 0 && (
+              <p className="rounded-lg bg-gold-lightest px-3 py-2">
+                This will also decline {data.otherPendingCount} other pending{" "}
+                {data.otherPendingCount === 1 ? "application" : "applications"}{" "}
+                for {data.pet.petName}. Those applicants will see that another
+                applicant was approved.
+              </p>
+            )}
 
             <div>
               <label

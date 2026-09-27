@@ -73,6 +73,9 @@ export interface AdoptionApplicationFullDetail {
   // (see CLAUDE.md's "Never expose ... governmentID" rule) — the full
   // record lives in the dedicated ID Verification tab.
   governmentIdStatus: "Pending" | "Verified" | "Rejected" | null;
+  // Staff/Admin only (null for an Adopter): how many OTHER Pending
+  // applications this pet has — accepting this one declines them all.
+  otherPendingCount: number | null;
   // Server-computed: true only for the application's shelter manager (or
   // Admin) while it's still Pending — gates assignApplicationStaff.
   canAssignStaff: boolean;

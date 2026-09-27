@@ -12,6 +12,7 @@ jest.mock("../../../config/prisma", () => ({
     count: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
   pet: { update: jest.fn(), updateMany: jest.fn() },
   governmentID: { findFirst: jest.fn() },
@@ -209,13 +210,14 @@ describe("Application review workflow (Staff/Admin)", () => {
 
   // ————————————————— PATCH /api/v1/adoption-applications/:id/status —————————————————
   describe("PATCH /api/v1/adoption-applications/:id/status", () => {
-    test("Accept on a Pending application: pet marked adopted, staffID set to the acting staff member", async () => {
+    test("Accept on a Pending application: pet marked adopted, staffID set, the pet's other Pending applications declined", async () => {
       prisma.adoptionApplication.findUnique.mockResolvedValueOnce({
         applicationID: 1,
         adopterID: 7,
         shelterID: 9,
         petID: 5,
         applicationStatus: "Pending",
+        pet: { petName: "Rex", adoptionStatus: "available" },
       });
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.adoptionApplication.update.mockResolvedValueOnce(
@@ -242,6 +244,72 @@ describe("Application review workflow (Staff/Admin)", () => {
         where: { petID: 5 },
         data: { adoptionStatus: "adopted" },
       });
+      // Every OTHER Pending application for the same pet, with a remark the
+      // applicant sees.
+      expect(prisma.adoptionApplication.updateMany).toHaveBeenCalledWith({
+        where: {
+          petID: 5,
+          applicationStatus: "Pending",
+          applicationID: { not: 1 },
+        },
+        data: {
+          applicationStatus: "Rejected",
+          staffRemark: expect.stringContaining("Another applicant was approved for this pet"),
+        },
+      });
+    });
+
+    test("Accept when the pet is no longer available (already adopted) → 409, nothing written", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce({
+        applicationID: 2,
+        adopterID: 8,
+        shelterID: 9,
+        petID: 5,
+        applicationStatus: "Pending",
+        pet: { petName: "Rex", adoptionStatus: "adopted" },
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .patch("/api/v1/adoption-applications/2/status")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ status: "Accepted" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe(
+        "Rex is no longer available — another application has already been accepted",
+      );
+      expect(prisma.adoptionApplication.update).not.toHaveBeenCalled();
+      expect(prisma.pet.update).not.toHaveBeenCalled();
+      expect(prisma.adoptionApplication.updateMany).not.toHaveBeenCalled();
+    });
+
+    // Two staff accepting different applications for the same pet at the
+    // same moment both pass the availability check — the one-Accepted-per-
+    // pet unique index stops the second, surfaced as the same 409.
+    test("Accept losing a race to another acceptance (unique index) → 409", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce({
+        applicationID: 2,
+        adopterID: 8,
+        shelterID: 9,
+        petID: 5,
+        applicationStatus: "Pending",
+        pet: { petName: "Rex", adoptionStatus: "available" },
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.$transaction.mockRejectedValueOnce(
+        Object.assign(new Error("duplicate"), { code: "P2002" }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/adoption-applications/2/status")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ status: "Accepted" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe(
+        "Rex is no longer available — another application has already been accepted",
+      );
     });
 
     test("Accept on a non-Pending application → 409 CONFLICT, nothing written", async () => {
@@ -293,6 +361,8 @@ describe("Application review workflow (Staff/Admin)", () => {
         }),
       );
       expect(prisma.pet.update).not.toHaveBeenCalled();
+      // Rejecting one application leaves the pet's others as they are.
+      expect(prisma.adoptionApplication.updateMany).not.toHaveBeenCalled();
     });
 
     test("Staff acting on another shelter's application → 403 FORBIDDEN, nothing written", async () => {
@@ -323,6 +393,7 @@ describe("Application review workflow (Staff/Admin)", () => {
         shelterID: 9,
         petID: 5,
         applicationStatus: "Pending",
+        pet: { petName: "Rex", adoptionStatus: "available" },
       });
       prisma.adoptionApplication.update.mockResolvedValueOnce(
         buildUpdatedApplication({ applicationStatus: "Accepted" }),
@@ -517,6 +588,41 @@ describe("Application review workflow (Staff/Admin)", () => {
         governmentIdStatus: "Verified",
         canAssignStaff: true,
       });
+    });
+
+    // The detail view (GET /adoption-applications/:id, also what an assign
+    // returns) tells staff how many OTHER Pending applications the pet has
+    // — accepting this one declines them all.
+    test("GET detail as Staff → otherPendingCount counts the pet's other Pending applications", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(detailRow());
+      prisma.governmentID.findFirst.mockResolvedValueOnce(null);
+      prisma.adoptionApplication.count.mockResolvedValueOnce(2);
+
+      const res = await request(app)
+        .get("/api/v1/adoption-applications/1")
+        .set("Authorization", `Bearer ${staffToken(42)}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.otherPendingCount).toBe(2);
+      expect(prisma.adoptionApplication.count).toHaveBeenCalledWith({
+        where: {
+          petID: 5,
+          applicationStatus: "Pending",
+          applicationID: { not: 1 },
+        },
+      });
+    });
+
+    test("GET detail as the Adopter → otherPendingCount is null, never counted", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(detailRow());
+
+      const res = await request(app)
+        .get("/api/v1/adoption-applications/1")
+        .set("Authorization", `Bearer ${adopterToken(7)}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.otherPendingCount).toBeNull();
+      expect(prisma.adoptionApplication.count).not.toHaveBeenCalled();
     });
 
     test("Admin can assign at any shelter without being its manager", async () => {

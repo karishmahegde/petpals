@@ -247,6 +247,11 @@ const schemas = {
             nullable: true,
             description: "Staff/Admin only — null for an Adopter viewing their own application, or if no government ID has been submitted yet. No idType/idNumber here; the full record lives in the dedicated ID Verification tab.",
           },
+          otherPendingCount: {
+            type: "integer",
+            nullable: true,
+            description: "Staff/Admin only (null for an Adopter) — how many OTHER Pending applications this pet has. Accepting this application declines them all.",
+          },
           canAssignStaff: {
             type: "boolean",
             description: "True only for the application's shelter manager (or Admin) while it's still Pending — gates PATCH /adoption-applications/{id}.",
