@@ -25,12 +25,12 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 | **Multi-shelter network**      | Unified animal listings and workflows across all branches of an organisation      |
 | **Inter-shelter transfers**    | Capacity-aware transfer requests with full transfer history                       |
 | **Universal health passport**  | Medical records that travel with an animal across shelter relocations             |
-| **AI compatibility matcher**   | OpenAI-powered pet–adopter matching to improve adoption success rates _(planned)_ |
+| **AI compatibility matcher**   | OpenAI-powered pet–adopter matching to improve adoption success rates             |
 | **Role-based access control**  | Six distinct roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor |
 | **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                     |
 | **Two-token JWT auth**         | Short-lived access token + httpOnly refresh cookie, with post-login redirect-back |
 | **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                         |
-| **Donation management**        | Stripe-integrated donor flow with impact tracking _(planned)_                     |
+| **Donation management**        | Stripe-integrated donor flow with impact tracking                                 |
 
 ## 🟤 Tech Stack
 
@@ -113,18 +113,23 @@ Log in with any of the seeded test accounts, e.g. `adopter@petpals.com` / `Adopt
 
 ### Option B: Docker
 
-> ⚠️ **Not working end-to-end yet.** `docker-compose.yml` points the API at its bundled Postgres container, which has no PostGIS (so the migrations fail) and no storage backend. Use Option A for now.
+Runs the API and client in containers against your Supabase project — the database and file storage stay on Supabase, configured through `server/.env`.
 
 ```bash
-cp server/.env.example server/.env   # fill in values
+# 1. Configure the server — same values as Option A
+cp server/.env.example server/.env
+
+# 2. One-time: build the database, storage buckets and sample data
+cd server && npm install && npm run setup && cd ..
+
+# 3. Build and start the API and client
 docker-compose up --build
 ```
 
-| Service              | URL                   |
-| -------------------- | --------------------- |
-| Client               | http://localhost:3000 |
-| API                  | http://localhost:5000 |
-| DB (local container) | localhost:5432        |
+| Service | URL                   |
+| ------- | --------------------- |
+| Client  | http://localhost:3000 |
+| API     | http://localhost:5000 |
 
 ---
 

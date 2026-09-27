@@ -130,8 +130,6 @@ Every other seeded account uses its role's password above. The ones worth knowin
 | `staff.manager.pending@petpals.com` | Pending Manager sign-up at Queens — an Admin approves |
 | `*.deactivated@` / `*.banned@petpals.com` | Closed or banned accounts — login is refused |
 
-The public site and the Adopter, Staff and Admin dashboards are built; the Vet, Volunteer and Donor dashboards are placeholders until Sprint 5.
-
 ## Troubleshooting
 
 - **Prisma asks to reset the database / mentions drift** — you (or a script) ran `migrate dev` instead of `migrate deploy`. Don't confirm the reset; re-read the callout in step 3.
@@ -142,4 +140,12 @@ The public site and the Adopter, Staff and Admin dashboards are built; the Vet, 
 
 ## Docker Compose alternative
 
-`docker-compose.yml` at the repo root can run a plain local Postgres instead of Supabase for the database. It does **not** include PostGIS or a storage backend, so the baseline migration (which enables PostGIS) fails against it, and `/shelters/nearby` and photo/ID uploads can't work. For a fully working setup, point `DATABASE_URL` at Supabase and run `npm run setup` as above, even if you use Docker for the app containers themselves.
+`docker-compose.yml` at the repo root runs the API and client in containers instead of steps 4–5. They use the same Supabase project as everything above — the API container reads `server/.env`, so the database and file storage stay on Supabase.
+
+After steps 1–3 (clone, Supabase project, `server/.env` + `npm run setup`), from the repo root:
+
+```bash
+docker-compose up --build
+```
+
+The client runs at `http://localhost:3000` and the API at `http://localhost:5000`, the same as the non-Docker setup. `npm run setup` still runs from your machine, once — it isn't part of the containers.
