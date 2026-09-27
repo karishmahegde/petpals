@@ -55,7 +55,7 @@ Open `.env` and fill in:
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | leave the placeholders if skipping payments |
 | `CLIENT_URL` | `http://localhost:3000` (default is fine) |
 
-`PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. Ignore `VITE_API_BASE_URL` in this file — that one belongs to the client, configured separately in step 5.
+`PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. The client has its own env file, configured in step 5.
 
 ### Build the database, storage and sample data
 
@@ -95,7 +95,7 @@ In a **new terminal**:
 ```bash
 cd client
 npm install
-echo "VITE_API_BASE_URL=http://localhost:5000/api/v1" > .env.local
+echo "VITE_API_URL=http://localhost:5000/api/v1" > .env.local
 npm run dev
 ```
 

@@ -92,7 +92,7 @@ npm run setup
 # 4. Configure the client
 cd ../client
 npm install
-echo "VITE_API_BASE_URL=http://localhost:5000/api/v1" > .env.local
+echo "VITE_API_URL=http://localhost:5000/api/v1" > .env.local
 ```
 
 Then start both dev servers:
