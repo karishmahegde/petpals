@@ -11,12 +11,14 @@ jest.mock("../../../config/prisma", () => ({
   },
   pet: {
     groupBy: jest.fn(),
+    findMany: jest.fn(),
   },
   adopter: {
     groupBy: jest.fn(),
   },
   adoptionApplication: {
     groupBy: jest.fn(),
+    findMany: jest.fn(),
   },
   staff: {
     groupBy: jest.fn(),
@@ -155,11 +157,120 @@ describe("Admin analytics endpoints", () => {
     });
   });
 
+  // ————————————————————————————— GET /analytics/monthly-stats —————————————————————————————
+  describe("GET /api/v1/analytics/monthly-stats", () => {
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentYear = new Date().getFullYear();
+
+    test("buckets intake and Accepted applications into Jan–Dec of the requested year", async () => {
+      prisma.pet.findMany.mockResolvedValueOnce([
+        { intakeDate: new Date("2025-03-01T00:00:00Z") },
+        { intakeDate: new Date("2025-03-15T12:00:00Z") },
+        { intakeDate: new Date("2025-11-20T08:00:00Z") },
+      ]);
+      prisma.adoptionApplication.findMany.mockResolvedValueOnce([
+        { createdAt: new Date("2025-03-10T09:00:00Z") },
+        { createdAt: new Date("2025-07-04T18:00:00Z") },
+      ]);
+
+      const res = await request(app)
+        .get("/api/v1/analytics/monthly-stats")
+        .query({ year: 2025 })
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual(
+        MONTHS.map((month) => ({
+          month,
+          year: 2025,
+          intake: { Mar: 2, Nov: 1 }[month] ?? 0,
+          adoptions: { Mar: 1, Jul: 1 }[month] ?? 0,
+        })),
+      );
+    });
+
+    test("reads only that year's range (UTC), and only Accepted applications", async () => {
+      prisma.pet.findMany.mockResolvedValueOnce([]);
+      prisma.adoptionApplication.findMany.mockResolvedValueOnce([]);
+
+      await request(app)
+        .get("/api/v1/analytics/monthly-stats")
+        .query({ year: 2025 })
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      const range = {
+        gte: new Date(Date.UTC(2025, 0, 1)),
+        lt: new Date(Date.UTC(2026, 0, 1)),
+      };
+      expect(prisma.pet.findMany.mock.calls[0][0].where).toEqual({ intakeDate: range });
+      expect(prisma.adoptionApplication.findMany.mock.calls[0][0].where).toEqual({
+        applicationStatus: "Accepted",
+        createdAt: range,
+      });
+    });
+
+    // A timestamp just before midnight UTC on the last day of a month belongs
+    // to that month — bucketing with local-time getters would move it into
+    // the next month on a server running ahead of UTC.
+    test("buckets by UTC month, whatever the server's timezone", async () => {
+      prisma.pet.findMany.mockResolvedValueOnce([
+        { intakeDate: new Date("2025-01-31T23:30:00Z") },
+      ]);
+      prisma.adoptionApplication.findMany.mockResolvedValueOnce([
+        { createdAt: new Date("2025-12-31T23:59:00Z") },
+      ]);
+
+      const res = await request(app)
+        .get("/api/v1/analytics/monthly-stats")
+        .query({ year: 2025 })
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.body.data[0]).toMatchObject({ month: "Jan", intake: 1 });
+      expect(res.body.data[1]).toMatchObject({ month: "Feb", intake: 0 });
+      expect(res.body.data[11]).toMatchObject({ month: "Dec", adoptions: 1 });
+    });
+
+    test("no year → the current year, all twelve months zeroed when there's no data", async () => {
+      prisma.pet.findMany.mockResolvedValueOnce([]);
+      prisma.adoptionApplication.findMany.mockResolvedValueOnce([]);
+
+      const res = await request(app)
+        .get("/api/v1/analytics/monthly-stats")
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.pet.findMany.mock.calls[0][0].where.intakeDate.gte).toEqual(
+        new Date(Date.UTC(currentYear, 0, 1)),
+      );
+      expect(res.body.data).toEqual(
+        MONTHS.map((month) => ({ month, year: currentYear, intake: 0, adoptions: 0 })),
+      );
+    });
+
+    test.each([
+      ["not a number", "abc"],
+      ["not an integer", "2025.5"],
+      ["before 2000", "1999"],
+      ["in the future", String(currentYear + 1)],
+    ])("year %s → 400 BAD_REQUEST, nothing queried", async (_label, year) => {
+      const res = await request(app)
+        .get("/api/v1/analytics/monthly-stats")
+        .query({ year })
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.pet.findMany).not.toHaveBeenCalled();
+      expect(prisma.adoptionApplication.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   // ————————————————————————————— ROLE ENFORCEMENT —————————————————————————————
   describe("role enforcement", () => {
     test.each([
       ["get", "/api/v1/analytics/overview"],
       ["get", "/api/v1/analytics/shelters"],
+      ["get", "/api/v1/analytics/monthly-stats"],
     ])("%s %s: non-Admin role → 403 FORBIDDEN, nothing queried", async (method, path) => {
       const res = await request(app)
         [method](path)
@@ -172,6 +283,7 @@ describe("Admin analytics endpoints", () => {
       });
       expect(prisma.shelter.groupBy).not.toHaveBeenCalled();
       expect(prisma.shelter.findMany).not.toHaveBeenCalled();
+      expect(prisma.pet.findMany).not.toHaveBeenCalled();
     });
   });
 });

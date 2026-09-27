@@ -14,6 +14,7 @@ jest.mock("../../../config/prisma", () => ({
     update: jest.fn(),
   },
   pet: { update: jest.fn(), updateMany: jest.fn() },
+  governmentID: { findFirst: jest.fn() },
   // The service always passes an array of already-invoked prisma calls
   // (each already a Promise) — Promise.all is a faithful enough stand-in for
   // the real transaction batching.
@@ -440,6 +441,161 @@ describe("Application review workflow (Staff/Admin)", () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.adoptionApplication.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  // ————————————————— PATCH /api/v1/adoption-applications/:id (assign staff) —————————————————
+  describe("PATCH /api/v1/adoption-applications/:id (assign staff)", () => {
+    // Application 1 is at shelter 9, managed by staff 42. Staff 43 is an
+    // Active member of shelter 9 — a valid assignee.
+    const lookupRow = (overrides = {}) => ({
+      shelterID: 9,
+      applicationStatus: "Pending",
+      shelter: { managerStaffID: 42 },
+      ...overrides,
+    });
+
+    // Matches getApplicationById's select shape — the response re-reads the
+    // application after the update.
+    const detailRow = (overrides = {}) => ({
+      ...buildUpdatedApplication({ staffID: 43 }),
+      applicationCode: "APP-00001",
+      staffRemark: null,
+      pet: {
+        petName: "Rex",
+        petPhoto: null,
+        breed: { breedName: "Beagle", species: { speciesName: "Dog" } },
+      },
+      shelter: { shelterName: "Athens Shelter", managerStaffID: 42 },
+      staff: { staffName: "Jo Park" },
+      adopter: {
+        adopterName: "Emilie",
+        adopterPhone: null,
+        housingType: null,
+        ownsOrRents: null,
+        landlordContact: null,
+        householdSize: null,
+        numChildren: null,
+        preQualifyFlag: false,
+        user: { userEmail: "emilie@example.com" },
+      },
+      ...overrides,
+    });
+
+    // The full happy-path sequence: lookup → assignee check → update → re-read.
+    const mockSuccessfulAssign = () => {
+      prisma.adoptionApplication.findUnique
+        .mockResolvedValueOnce(lookupRow())
+        .mockResolvedValueOnce(detailRow());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9, accountStatus: "Active" });
+      prisma.adoptionApplication.update.mockResolvedValueOnce({});
+      prisma.governmentID.findFirst.mockResolvedValueOnce({ verificationStatus: "Verified" });
+    };
+
+    const assign = (body, token = staffToken(42), id = 1) =>
+      request(app)
+        .patch(`/api/v1/adoption-applications/${id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send(body);
+
+    test("shelter manager assigns an Active staff member at the same shelter → 200 with the updated detail", async () => {
+      mockSuccessfulAssign();
+
+      const res = await assign({ staffID: 43 });
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.findUnique.mock.calls[0][0].where).toEqual({ userID: 43 });
+      expect(prisma.adoptionApplication.update).toHaveBeenCalledWith({
+        where: { applicationID: 1 },
+        data: { staffID: 43 },
+      });
+      expect(res.body.data).toMatchObject({
+        applicationID: 1,
+        staffID: 43,
+        assignedStaffName: "Jo Park",
+        governmentIdStatus: "Verified",
+        canAssignStaff: true,
+      });
+    });
+
+    test("Admin can assign at any shelter without being its manager", async () => {
+      mockSuccessfulAssign(); // shelter 9 is managed by staff 42, not this Admin
+
+      const res = await assign({ staffID: 43 }, adminToken(1));
+
+      expect(res.status).toBe(200);
+      expect(prisma.adoptionApplication.update).toHaveBeenCalledTimes(1);
+    });
+
+    test("Staff who isn't the shelter's manager → 403 FORBIDDEN, nothing changed", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(lookupRow());
+
+      const res = await assign({ staffID: 43 }, staffToken(50));
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+      expect(prisma.staff.findUnique).not.toHaveBeenCalled();
+      expect(prisma.adoptionApplication.update).not.toHaveBeenCalled();
+    });
+
+    test.each(["Accepted", "Rejected", "Withdrawn"])(
+      "%s application → 409 CONFLICT, nothing changed",
+      async (applicationStatus) => {
+        prisma.adoptionApplication.findUnique.mockResolvedValueOnce(
+          lookupRow({ applicationStatus }),
+        );
+
+        const res = await assign({ staffID: 43 });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("CONFLICT");
+        expect(prisma.adoptionApplication.update).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each([
+      ["at another shelter", { shelterID: 3, accountStatus: "Active" }],
+      ["not Active", { shelterID: 9, accountStatus: "Pending" }],
+      ["not a staff member at all", null],
+    ])("assignee %s → 400 BAD_REQUEST, nothing changed", async (_label, assignee) => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(lookupRow());
+      prisma.staff.findUnique.mockResolvedValueOnce(assignee);
+
+      const res = await assign({ staffID: 43 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.adoptionApplication.update).not.toHaveBeenCalled();
+    });
+
+    test("application not found → 404 NOT_FOUND", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(null);
+
+      const res = await assign({ staffID: 43 }, staffToken(42), 999);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe("NOT_FOUND");
+      expect(prisma.adoptionApplication.update).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ["missing staffID", {}, 1],
+      ["non-integer staffID", { staffID: "abc" }, 1],
+      ["zero staffID", { staffID: 0 }, 1],
+      ["non-integer id", { staffID: 43 }, "abc"],
+    ])("%s → 400 BAD_REQUEST, nothing queried", async (_label, body, id) => {
+      const res = await assign(body, staffToken(42), id);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.adoptionApplication.findUnique).not.toHaveBeenCalled();
+    });
+
+    test("Adopter role → 403 FORBIDDEN, nothing queried", async () => {
+      const res = await assign({ staffID: 43 }, adopterToken(7));
+
+      expect(res.status).toBe(403);
       expect(prisma.adoptionApplication.findUnique).not.toHaveBeenCalled();
     });
   });

@@ -24,6 +24,9 @@ jest.mock("../../../config/prisma", () => ({
     deleteMany: jest.fn(),
   },
   adoptionApplication: { findFirst: jest.fn() },
+  healthRecord: { findMany: jest.fn() },
+  vaccinationRecord: { findMany: jest.fn() },
+  transferHistory: { findMany: jest.fn() },
   // The service always passes an array of already-invoked prisma calls
   // (each already a Promise) — Promise.all is a faithful enough stand-in for
   // the real transaction batching.
@@ -95,6 +98,37 @@ const buildPetDetail = (overrides = {}) => ({
   petPhoto: "https://cdn.test/pet-images/placeholder.jpg",
   adoptionStatus: "available",
   breed: { breedID: 3, breedName: "Beagle", speciesName: "Dog" },
+  shelter: { shelterID: 9, shelterName: "Athens Shelter", shelterAddress: "1 Main St" },
+  compatibleWithChildren: false,
+  compatibleWithPets: false,
+  specialNeeds: false,
+  ...overrides,
+});
+
+// Matches services/staff/pets.service.js's STAFF_PET_DETAIL_SELECT shape
+// (PET_DETAIL_SELECT + shelterID/petCode/petSize/petBGroup/microchipID/
+// intakeDate/intakeType/featuredFlag) — the extra fields public GET
+// /pets/:id doesn't return.
+const buildStaffPetRow = (overrides = {}) => ({
+  petID: 10,
+  petCode: "PE000010",
+  petName: "Rex",
+  petDOB: new Date(2021, 0, 1),
+  petSex: "M",
+  petColor: "Brown",
+  petPhoto: "rex.jpg",
+  petHeight: 40,
+  petWeight: 12.5,
+  petDesc: null,
+  petSize: "Medium",
+  petBGroup: "DEA1",
+  microchipID: "985141000000010",
+  intakeDate: new Date(2024, 5, 1),
+  intakeType: "stray",
+  featuredFlag: true,
+  adoptionStatus: "available",
+  shelterID: 9,
+  breed: { breedID: 3, breedName: "Beagle", species: { speciesName: "Dog" } },
   shelter: { shelterID: 9, shelterName: "Athens Shelter", shelterAddress: "1 Main St" },
   compatibleWithChildren: false,
   compatibleWithPets: false,
@@ -209,37 +243,6 @@ describe("Staff pet management endpoints", () => {
 
   // ————————————————————————————— GET /api/v1/staff/me/pets/:id —————————————————————————————
   describe("GET /api/v1/staff/me/pets/:id", () => {
-    // Matches services/staff/pets.service.js's STAFF_PET_DETAIL_SELECT shape
-    // (PET_DETAIL_SELECT + shelterID/petCode/petSize/petBGroup/microchipID/
-    // intakeDate/intakeType/featuredFlag) — the extra fields public GET
-    // /pets/:id doesn't return.
-    const buildStaffPetRow = (overrides = {}) => ({
-      petID: 10,
-      petCode: "PE000010",
-      petName: "Rex",
-      petDOB: new Date(2021, 0, 1),
-      petSex: "M",
-      petColor: "Brown",
-      petPhoto: "rex.jpg",
-      petHeight: 40,
-      petWeight: 12.5,
-      petDesc: null,
-      petSize: "Medium",
-      petBGroup: "DEA1",
-      microchipID: "985141000000010",
-      intakeDate: new Date(2024, 5, 1),
-      intakeType: "stray",
-      featuredFlag: true,
-      adoptionStatus: "available",
-      shelterID: 9,
-      breed: { breedID: 3, breedName: "Beagle", species: { speciesName: "Dog" } },
-      shelter: { shelterID: 9, shelterName: "Athens Shelter", shelterAddress: "1 Main St" },
-      compatibleWithChildren: false,
-      compatibleWithPets: false,
-      specialNeeds: false,
-      ...overrides,
-    });
-
     test("Staff: returns the richer detail shape (petCode, microchipID, petSize, petBGroup, raw petDOB, intakeType, featuredFlag)", async () => {
       prisma.pet.findUnique.mockResolvedValueOnce(buildStaffPetRow());
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
@@ -300,6 +303,168 @@ describe("Staff pet management endpoints", () => {
       const res = await request(app)
         .get("/api/v1/staff/me/pets/10")
         .set("Authorization", `Bearer ${adminToken()}`);
+
+      expect(res.status).toBe(403);
+      expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  // ————————————————————————————— GET /api/v1/staff/me/pets/:id/health-passport —————————————————————————————
+  describe("GET /api/v1/staff/me/pets/:id/health-passport", () => {
+    const DAY = 86400000;
+
+    const getPassport = (id = 10, token = staffToken(42)) =>
+      request(app)
+        .get(`/api/v1/staff/me/pets/${id}/health-passport`)
+        .set("Authorization", `Bearer ${token}`);
+
+    // Pet 10 at shelter 9, viewed by staff 42 who works there.
+    const mockOwnPet = () => {
+      prisma.pet.findUnique.mockResolvedValueOnce(buildStaffPetRow());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+    };
+
+    test("own shelter's pet → identity plus health records, vaccinations and transfers", async () => {
+      mockOwnPet();
+      prisma.healthRecord.findMany.mockResolvedValueOnce([
+        {
+          recordID: 2,
+          createdAt: new Date("2026-05-01T10:00:00Z"),
+          recordDesc: "Annual check",
+          vet: { vetName: "Dr. Vee", shelter: { shelterName: "Athens Shelter" } },
+        },
+        {
+          recordID: 1,
+          createdAt: new Date("2025-01-10T10:00:00Z"),
+          recordDesc: "Intake exam",
+          vet: null,
+        },
+      ]);
+      prisma.vaccinationRecord.findMany.mockResolvedValueOnce([]);
+      prisma.transferHistory.findMany.mockResolvedValueOnce([
+        {
+          recordID: 4,
+          transferDate: new Date("2025-06-01T00:00:00Z"),
+          transferReason: "Capacity",
+          transferStatus: "Completed",
+          fromShelter: { shelterName: "Brooklyn Shelter" },
+          toShelter: { shelterName: "Athens Shelter" },
+          fromStaff: { staffName: "Sam Lee" },
+          toStaff: null,
+        },
+      ]);
+
+      const res = await getPassport();
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.pet).toMatchObject({ petID: 10, petCode: "PE000010", petName: "Rex" });
+      expect(res.body.data.healthRecords).toEqual([
+        {
+          recordID: 2,
+          createdAt: "2026-05-01T10:00:00.000Z",
+          recordDesc: "Annual check",
+          vetName: "Dr. Vee",
+          shelterName: "Athens Shelter",
+        },
+        {
+          recordID: 1,
+          createdAt: "2025-01-10T10:00:00.000Z",
+          recordDesc: "Intake exam",
+          vetName: null,
+          shelterName: null,
+        },
+      ]);
+      expect(res.body.data.transferHistory).toEqual([
+        {
+          recordID: 4,
+          transferDate: "2025-06-01T00:00:00.000Z",
+          transferReason: "Capacity",
+          transferStatus: "Completed",
+          fromShelterName: "Brooklyn Shelter",
+          toShelterName: "Athens Shelter",
+          fromStaffName: "Sam Lee",
+          toStaffName: null,
+        },
+      ]);
+    });
+
+    // A passport travels with the pet, so its history isn't limited to the
+    // viewer's shelter the way the Transfers tab is.
+    test("every history read is scoped by pet only, not by the caller's shelter", async () => {
+      mockOwnPet();
+      prisma.healthRecord.findMany.mockResolvedValueOnce([]);
+      prisma.vaccinationRecord.findMany.mockResolvedValueOnce([]);
+      prisma.transferHistory.findMany.mockResolvedValueOnce([]);
+
+      await getPassport();
+
+      for (const model of ["healthRecord", "vaccinationRecord", "transferHistory"]) {
+        expect(prisma[model].findMany.mock.calls[0][0].where).toEqual({ petID: 10 });
+      }
+    });
+
+    test("vaccination status comes from how soon the next dose is due", async () => {
+      mockOwnPet();
+      prisma.healthRecord.findMany.mockResolvedValueOnce([]);
+      prisma.vaccinationRecord.findMany.mockResolvedValueOnce(
+        [
+          [1, "Rabies", -1],
+          [2, "DHPP", 10],
+          [3, "Bordetella", 60],
+        ].map(([recordID, vaccineName, daysUntilDue]) => ({
+          recordID,
+          administeredDate: new Date(Date.now() - 300 * DAY),
+          dueDate: new Date(Date.now() + daysUntilDue * DAY),
+          vaccine: { vaccineName },
+        })),
+      );
+      prisma.transferHistory.findMany.mockResolvedValueOnce([]);
+
+      const res = await getPassport();
+
+      expect(res.body.data.vaccinations.map((v) => [v.vaccineName, v.status])).toEqual([
+        ["Rabies", "Overdue"],
+        ["DHPP", "Due Soon"],
+        ["Bordetella", "Up to Date"],
+      ]);
+    });
+
+    test("another shelter's pet → 403 FORBIDDEN, no history read", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce(buildStaffPetRow({ shelterID: 9 }));
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 3 });
+
+      const res = await getPassport();
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+      expect(prisma.healthRecord.findMany).not.toHaveBeenCalled();
+      expect(prisma.vaccinationRecord.findMany).not.toHaveBeenCalled();
+      expect(prisma.transferHistory.findMany).not.toHaveBeenCalled();
+    });
+
+    test("pet not found → 404 NOT_FOUND, no history read", async () => {
+      prisma.pet.findUnique.mockResolvedValueOnce(null);
+
+      const res = await getPassport(999);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe("NOT_FOUND");
+      expect(prisma.healthRecord.findMany).not.toHaveBeenCalled();
+    });
+
+    test("non-integer id → 400 BAD_REQUEST, nothing queried", async () => {
+      const res = await getPassport("abc");
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ["Admin", () => adminToken()],
+      ["Adopter", () => adopterToken()],
+    ])("%s role → 403 FORBIDDEN (this endpoint is Staff-only)", async (_role, token) => {
+      const res = await getPassport(10, token());
 
       expect(res.status).toBe(403);
       expect(prisma.pet.findUnique).not.toHaveBeenCalled();
