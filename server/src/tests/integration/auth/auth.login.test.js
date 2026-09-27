@@ -4,10 +4,6 @@ const jwt = require("jsonwebtoken"); //to verify the JWT token
 const app = require("../../../app"); // loads dotenv, so process.env.JWT_SECRET is populated below
 const prisma = require("../../../config/prisma"); //to interact with the database
 
-// Chained register + login + Prisma round trips against the remote Supabase
-// instance can exceed Jest's 5s default.
-jest.setTimeout(20000);
-
 // Runs against the DATABASE_URL configured in server/.env — the seed user
 // created for this suite is removed in afterAll so no test data accumulates.
 // Users.userEmail is VARCHAR(45), so the generated address must stay short.

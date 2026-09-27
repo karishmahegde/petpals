@@ -11,16 +11,22 @@ interface AvatarProps {
   seed: string;
   size?: number;
   className?: string;
+  alt?: string;
 }
 
-const Avatar = ({ seed, size = 64, className = "" }: AvatarProps) => {
+const Avatar = ({
+  seed,
+  size = 64,
+  className = "",
+  alt = "Avatar",
+}: AvatarProps) => {
   const dataUri = useMemo(
     () =>
       new DiceBearAvatar(style, { seed, size, ...AVATAR_OPTIONS }).toDataUri(),
     [seed, size],
   );
 
-  return <img src={dataUri} alt="Adopter avatar" className={className} />;
+  return <img src={dataUri} alt={alt} className={className} />;
 };
 
 export default Avatar;

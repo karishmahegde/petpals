@@ -2,12 +2,12 @@ import { useState } from "react";
 import useAuthStore from "../../../../logic/store/useAuthStore";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import PetDetailsModal from "../../../../components/ui/pets/PetDetailsModal";
-import StatsWidget from "./overview/StatsWidget";
-import PetsWidget from "./overview/PetsWidget";
-import AppointmentsWidget from "./overview/AppointmentsWidget";
-import FavoritesWidget from "./overview/FavoritesWidget";
-import ApplicationsWidget from "./overview/ApplicationsWidget";
-import VisitsWidget from "./overview/VisitsWidget";
+import StatsWidget from "./sections/overview/StatsWidget";
+import PetsWidget from "./sections/overview/PetsWidget";
+import AppointmentsWidget from "./sections/overview/AppointmentsWidget";
+import FavoritesWidget from "./sections/overview/FavoritesWidget";
+import ApplicationsWidget from "./sections/overview/ApplicationsWidget";
+import VisitsWidget from "./sections/overview/VisitsWidget";
 import { getGreeting, getGreetingEmoji } from "../../../../logic/utils/datetime";
 
 // Landing / overview section of the adopter dashboard.

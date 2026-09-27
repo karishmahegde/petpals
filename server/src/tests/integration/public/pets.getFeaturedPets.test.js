@@ -92,9 +92,9 @@ describe("GET /api/v1/pets/featured (integration)", () => {
     // Featured, but not available — two different non-available statuses,
     // to confirm the exclusion isn't hardcoded to just one enum value.
     await makePet({
-      petName: "FeaturedPending",
+      petName: "FeaturedIncoming",
       featuredFlag: true,
-      adoptionStatus: "pending",
+      adoptionStatus: "incoming",
     });
     await makePet({
       petName: "FeaturedAdopted",
@@ -111,9 +111,9 @@ describe("GET /api/v1/pets/featured (integration)", () => {
 
     // Neither featured nor available — pure noise, should never surface.
     await makePet({
-      petName: "NotFeaturedPending",
+      petName: "NotFeaturedIncoming",
       featuredFlag: false,
-      adoptionStatus: "pending",
+      adoptionStatus: "incoming",
     });
   });
 
@@ -132,10 +132,10 @@ describe("GET /api/v1/pets/featured (integration)", () => {
     const names = res.body.data.map((p) => p.petName);
 
     expect(names).toContain("FeaturedAvailable");
-    expect(names).not.toContain("FeaturedPending");
+    expect(names).not.toContain("FeaturedIncoming");
     expect(names).not.toContain("FeaturedAdopted");
     expect(names).not.toContain("NotFeaturedAvailable");
-    expect(names).not.toContain("NotFeaturedPending");
+    expect(names).not.toContain("NotFeaturedIncoming");
   });
 
   test("full round trip returns correctly shaped data for the featured pet", async () => {

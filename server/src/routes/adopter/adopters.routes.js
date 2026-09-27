@@ -422,7 +422,7 @@ router.get(
  *     summary: Full detail for one vet appointment (Appointments detail panel)
  *     description: >
  *       The record behind one Appointments row: pet summary, date/time, reason,
- *       vet, shelter, and the vaccines administered that day. Requires an
+ *       vet, shelter, and the vaccines administered at it. Requires an
  *       Accepted adoption application by this adopter for the appointment's
  *       pet — otherwise 404.
  *     tags: [Adopters]

@@ -227,6 +227,35 @@ const schemas = {
             type: "object",
             properties: { shelterName: { type: "string" } },
           },
+          adopter: {
+            type: "object",
+            properties: {
+              adopterName: { type: "string" },
+              adopterEmail: { type: "string" },
+              adopterPhone: { type: "string", nullable: true },
+              housingType: { type: "string", nullable: true },
+              ownsOrRents: { type: "string", nullable: true },
+              landlordContact: { type: "string", nullable: true },
+              householdSize: { type: "integer", nullable: true },
+              numChildren: { type: "integer", nullable: true },
+              preQualifyFlag: { type: "boolean" },
+            },
+          },
+          governmentIdStatus: {
+            type: "string",
+            enum: ["Pending", "Verified", "Rejected"],
+            nullable: true,
+            description: "Staff/Admin only — null for an Adopter viewing their own application, or if no government ID has been submitted yet. No idType/idNumber here; the full record lives in the dedicated ID Verification tab.",
+          },
+          otherPendingCount: {
+            type: "integer",
+            nullable: true,
+            description: "Staff/Admin only (null for an Adopter) — how many OTHER Pending applications this pet has. Accepting this application declines them all.",
+          },
+          canAssignStaff: {
+            type: "boolean",
+            description: "True only for the application's shelter manager (or Admin) while it's still Pending — gates PATCH /adoption-applications/{id}.",
+          },
         },
       },
     ],
@@ -325,6 +354,489 @@ const schemas = {
       assignedStaffName: { type: "string", nullable: true },
     },
   },
+  // One row of the Staff/Admin shelter-wide visit queue (GET /visits) —
+  // distinct from VisitListItem (an adopter's own visits), since staff are
+  // managing visits booked by many different adopters.
+  VisitQueueItem: {
+    allOf: [
+      { $ref: "#/components/schemas/Visit" },
+      {
+        type: "object",
+        properties: {
+          pet: {
+            type: "object",
+            nullable: true,
+            properties: { petName: { type: "string" } },
+          },
+          adopter: {
+            type: "object",
+            properties: {
+              adopterName: { type: "string" },
+              user: {
+                type: "object",
+                properties: { userEmail: { type: "string" } },
+              },
+            },
+          },
+          staff: {
+            type: "object",
+            nullable: true,
+            description: "null until a staff member Confirms or Completes the visit.",
+            properties: { staffName: { type: "string" } },
+          },
+        },
+      },
+    ],
+  },
+
+  Event: {
+    type: "object",
+    properties: {
+      eventID: { type: "integer" },
+      eventName: { type: "string", maxLength: 45 },
+      eventDate: { type: "string", format: "date-time" },
+      eventDesc: { type: "string", maxLength: 300 },
+      eventCategory: {
+        type: "string",
+        enum: [
+          "Adoption_Event",
+          "Fundraiser",
+          "Volunteer_Orientation",
+          "Vaccination_Clinic",
+          "Community_Outreach",
+          "Workshop",
+          "Donation_Drive",
+          "Other",
+        ],
+      },
+    },
+  },
+  EventListItem: {
+    allOf: [
+      { $ref: "#/components/schemas/Event" },
+      {
+        type: "object",
+        properties: {
+          shelter: {
+            type: "object",
+            properties: {
+              shelterID: { type: "integer" },
+              shelterName: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
+  EventDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/Event" },
+      {
+        type: "object",
+        properties: {
+          shelter: {
+            type: "object",
+            properties: {
+              shelterID: { type: "integer" },
+              shelterName: { type: "string" },
+              shelterAddress: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
+
+  AppointmentQueueItem: {
+    type: "object",
+    properties: {
+      appointmentID: { type: "integer" },
+      appointmentDate: { type: "string", format: "date-time" },
+      appointmentReason: { type: "string", maxLength: 300 },
+      status: {
+        type: "string",
+        enum: ["Scheduled", "Completed", "Cancelled"],
+      },
+      pet: {
+        type: "object",
+        properties: {
+          petID: { type: "integer" },
+          petName: { type: "string" },
+          petPhoto: { type: "string", nullable: true },
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
+      vetName: { type: "string" },
+    },
+  },
+  AppointmentDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/AppointmentQueueItem" },
+      {
+        type: "object",
+        properties: {
+          appointmentCode: { type: "string", example: "APT-00123" },
+          shelterName: { type: "string" },
+          vetID: { type: "integer" },
+          staffID: { type: "integer", nullable: true },
+          volunteerID: { type: "integer", nullable: true },
+          staffName: { type: "string", nullable: true },
+          volunteerName: { type: "string", nullable: true },
+          vaccinesAdministered: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                recordID: { type: "integer" },
+                vaccineName: { type: "string" },
+                dueDate: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          adopter: {
+            type: "object",
+            nullable: true,
+            properties: {
+              adopterName: { type: "string" },
+              adopterPhone: { type: "string", nullable: true },
+              adopterEmail: { type: "string" },
+              address: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
+
+  GovernmentIdQueueItem: {
+    type: "object",
+    description:
+      "One row in the ID Verification queue. Scoped to Adopters + Volunteers only.",
+    properties: {
+      governmentIDID: { type: "integer" },
+      userID: { type: "integer" },
+      userType: { type: "string", enum: ["Adopter", "Volunteer"] },
+      personName: { type: "string" },
+      personEmail: { type: "string", nullable: true },
+      personAvatarSeed: {
+        type: "string",
+        nullable: true,
+        description: "Passed to the DiceBear Avatar component client-side, same as every other role's avatarSeed.",
+      },
+      idType: { type: "string" },
+      verificationStatus: {
+        type: "string",
+        enum: ["Pending", "Verified", "Rejected"],
+      },
+    },
+  },
+  GovernmentIdDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/GovernmentIdQueueItem" },
+      {
+        type: "object",
+        properties: {
+          idNumber: {
+            type: "string",
+            description:
+              "Unmasked, unlike every other place GovernmentID is exposed (e.g. the Applications detail panel) — this is the dedicated, authorized verification workflow.",
+          },
+          documentURL: {
+            type: "string",
+            nullable: true,
+            description:
+              "Short-lived (5 min) signed URL for the document image, generated fresh on every read — never cached or persisted.",
+          },
+          documentKind: {
+            type: "string",
+            enum: ["image", "pdf", "file"],
+            nullable: true,
+            description:
+              "How to display documentURL, from the stored file's extension: 'image' (JPEG/PNG/WebP) in an <img>, 'pdf' in the browser's PDF viewer, 'file' (HEIC or unrecognized) as an open/download link only. Null when there's no document.",
+          },
+        },
+      },
+    ],
+  },
+
+  HealthPassport: {
+    type: "object",
+    description:
+      "Read-only aggregate for the Health Passport page — pet is the same shape as GET /staff/me/pets/:id's data.",
+    properties: {
+      pet: { type: "object" },
+      healthRecords: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            recordID: { type: "integer" },
+            createdAt: { type: "string", format: "date-time" },
+            recordDesc: { type: "string", maxLength: 500 },
+            vetName: { type: "string", nullable: true },
+            shelterName: { type: "string", nullable: true },
+          },
+        },
+      },
+      vaccinations: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            recordID: { type: "integer" },
+            vaccineName: { type: "string" },
+            administeredDate: { type: "string", format: "date-time" },
+            dueDate: { type: "string", format: "date-time" },
+            status: {
+              type: "string",
+              enum: ["Overdue", "Due Soon", "Up to Date"],
+            },
+          },
+        },
+      },
+      transferHistory: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            recordID: { type: "integer" },
+            transferDate: { type: "string", format: "date-time" },
+            transferReason: { type: "string", maxLength: 300 },
+            transferStatus: {
+              type: "string",
+              enum: ["In_Progress", "Completed", "Rejected", "Cancelled"],
+            },
+            fromShelterName: { type: "string" },
+            toShelterName: { type: "string" },
+            fromStaffName: { type: "string", nullable: true },
+            toStaffName: { type: "string", nullable: true },
+          },
+        },
+      },
+    },
+  },
+
+  TransferQueueItem: {
+    type: "object",
+    properties: {
+      recordID: { type: "integer" },
+      petID: { type: "integer" },
+      transferDate: { type: "string", format: "date-time" },
+      fromShelterID: { type: "integer" },
+      toShelterID: { type: "integer" },
+      transferStatus: {
+        type: "string",
+        enum: ["In_Progress", "Completed", "Rejected", "Cancelled"],
+      },
+      transferReason: { type: "string", maxLength: 300 },
+      pet: {
+        type: "object",
+        properties: {
+          petName: { type: "string" },
+          petPhoto: { type: "string", nullable: true },
+          breedName: { type: "string" },
+          speciesName: { type: "string" },
+        },
+      },
+      fromShelter: {
+        type: "object",
+        properties: { shelterName: { type: "string" } },
+      },
+      toShelter: {
+        type: "object",
+        properties: { shelterName: { type: "string" } },
+      },
+    },
+  },
+  Task: {
+    type: "object",
+    properties: {
+      taskID: { type: "integer" },
+      taskName: {
+        type: "string",
+        enum: [
+          "Animal_Care",
+          "Vet_Assistance",
+          "Cleaning",
+          "Feeding",
+          "Events",
+          "Admin",
+          "Other",
+        ],
+      },
+      taskDesc: { type: "string", maxLength: 300 },
+      taskDate: { type: "string", format: "date-time", nullable: true },
+      taskDue: { type: "string", format: "date-time", nullable: true },
+      taskStatus: {
+        type: "string",
+        enum: ["In_progress", "Completed", "Cancelled"],
+      },
+      status: {
+        type: "string",
+        enum: ["In_progress", "Overdue", "Completed", "Cancelled"],
+        description: "taskStatus, or Overdue for an In_progress task past due",
+      },
+      staffName: { type: "string", nullable: true },
+      volunteers: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            volunteerID: { type: "integer" },
+            volunteerName: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  ShelterStaffMember: {
+    type: "object",
+    properties: {
+      userID: { type: "integer" },
+      avatarSeed: { type: "string", description: "DiceBear seed — the avatar is generated client-side." },
+      staffName: { type: "string" },
+      staffEmail: { type: "string" },
+      staffPhone: { type: "string", nullable: true },
+      staffDOB: { type: "string", format: "date", nullable: true },
+      staffSex: { type: "string", enum: ["M", "F"], nullable: true },
+      staffDesignation: {
+        type: "string",
+        enum: ["Manager", "Senior", "Associate"],
+        nullable: true,
+      },
+      staffDOJ: { type: "string", format: "date-time", nullable: true, description: "Date of Joining — stamped on first approval." },
+      staffDOS: { type: "string", format: "date-time", nullable: true, description: "Date of Separation — stamped on deactivation, cleared on reactivation." },
+      accountStatus: { type: "string", enum: ["Pending", "Active", "Deactivated"] },
+      addressLine1: { type: "string" },
+      addressLine2: { type: "string", nullable: true },
+      city: { type: "string" },
+      state: { type: "string" },
+      zip: { type: "string" },
+      country: { type: "string" },
+      onboardingComplete: {
+        type: "boolean",
+        description: "Whether they've finished the staff onboarding wizard. Required (with a Verified government ID) before a Pending account can be approved.",
+      },
+      governmentIdStatus: {
+        type: "string",
+        enum: ["Pending", "Verified", "Rejected"],
+        nullable: true,
+        description: "Verification status of their government ID — null if none submitted. Only the status is exposed, never the document or number.",
+      },
+    },
+  },
+  ShelterVet: {
+    type: "object",
+    properties: {
+      userID: { type: "integer" },
+      avatarSeed: { type: "string", description: "DiceBear seed — the avatar is generated client-side." },
+      vetName: { type: "string" },
+      vetEmail: { type: "string" },
+      vetPhone: { type: "string", nullable: true },
+      addressLine1: { type: "string" },
+      addressLine2: { type: "string", nullable: true },
+      city: { type: "string" },
+      state: { type: "string" },
+      zip: { type: "string" },
+      country: { type: "string" },
+      vetDOB: { type: "string", format: "date", nullable: true },
+      vetSex: { type: "string", enum: ["M", "F"], nullable: true },
+      createdAt: { type: "string", format: "date-time", description: "When the vet registered." },
+      accountStatus: { type: "string", enum: ["Pending", "Active", "Deactivated"] },
+    },
+  },
+  VolunteerListItem: {
+    type: "object",
+    properties: {
+      userID: { type: "integer" },
+      volunteerName: { type: "string" },
+      volunteerPhone: { type: "string", nullable: true },
+      volunteerEmail: { type: "string" },
+      accountStatus: {
+        type: "string",
+        enum: ["Pending", "Active", "Banned", "Deactivated"],
+      },
+    },
+  },
+  VolunteerDetail: {
+    type: "object",
+    properties: {
+      userID: { type: "integer" },
+      volunteerCode: { type: "string", example: "VOL-00012" },
+      avatarSeed: { type: "string" },
+      volunteerName: { type: "string" },
+      addressLine1: { type: "string" },
+      addressLine2: { type: "string", nullable: true },
+      city: { type: "string" },
+      state: { type: "string" },
+      zip: { type: "string" },
+      country: { type: "string" },
+      volunteerPhone: { type: "string", nullable: true },
+      volunteerDOB: { type: "string", format: "date-time", nullable: true },
+      volunteerSex: { type: "string", nullable: true },
+      volunteerSchedule: { type: "string", nullable: true },
+      shelterID: { type: "integer", nullable: true },
+      shelterName: { type: "string", nullable: true },
+      createdAt: { type: "string", format: "date-time" },
+      accountStatus: {
+        type: "string",
+        enum: ["Pending", "Active", "Banned", "Deactivated"],
+      },
+      volunteerEmail: { type: "string" },
+      governmentID: {
+        type: "object",
+        nullable: true,
+        properties: {
+          idType: { type: "string" },
+          idNumber: { type: "string" },
+        },
+      },
+    },
+  },
+  TransferStaffOption: {
+    type: "object",
+    nullable: true,
+    properties: {
+      staffID: { type: "integer" },
+      staffName: { type: "string" },
+    },
+  },
+  TransferDetail: {
+    allOf: [
+      { $ref: "#/components/schemas/TransferQueueItem" },
+      {
+        type: "object",
+        properties: {
+          fromShelterStaff: { type: "integer", nullable: true },
+          toShelterStaff: { type: "integer", nullable: true },
+          fromStaff: {
+            type: "object",
+            nullable: true,
+            properties: { staffName: { type: "string" } },
+          },
+          toStaff: {
+            type: "object",
+            nullable: true,
+            properties: { staffName: { type: "string" } },
+          },
+          canReassignToShelterStaff: {
+            type: "boolean",
+            description:
+              "True when the caller may PATCH toShelterStaff (destination manager or Admin, In_Progress only)",
+          },
+          pet: {
+            type: "object",
+            properties: {
+              petAge: { type: "string", example: "~4 yrs" },
+              petSex: { type: "string" },
+              petColor: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
 
   AppointmentListItem: {
     type: "object",
@@ -417,6 +929,104 @@ const schemas = {
       compatibleWithChildren: { type: "boolean" },
       compatibleWithPets: { type: "boolean" },
       specialNeeds: { type: "boolean" },
+    },
+  },
+  PetCreate: {
+    type: "object",
+    description:
+      "shelterID is never a body field — taken from the acting Staff member's own shelter, or required separately for Admin (see the endpoint description). petPhoto starts as a placeholder (POST /pets/:id/photos supplies the real one) and adoptionStatus always starts 'available' — neither is client-settable here.",
+    required: [
+      "breedID",
+      "petName",
+      "petDOB",
+      "petSex",
+      "petColor",
+      "petSize",
+      "intakeDate",
+      "petWeight",
+      "petHeight",
+    ],
+    properties: {
+      breedID: { type: "integer" },
+      petName: { type: "string", maxLength: 45 },
+      petDOB: { type: "string", format: "date" },
+      petSex: { type: "string", enum: ["M", "F"] },
+      petColor: { type: "string", maxLength: 45 },
+      petSize: { type: "string", enum: ["Small", "Medium", "Large"] },
+      intakeDate: { type: "string", format: "date" },
+      petWeight: { type: "number", exclusiveMinimum: 0 },
+      petHeight: { type: "number", exclusiveMinimum: 0 },
+      petBGroup: {
+        type: "string",
+        maxLength: 5,
+        description: "Optional — defaults to 'N/A' if omitted (often unknown at intake).",
+      },
+      intakeType: {
+        type: "string",
+        enum: ["stray", "surrendered", "transferred"],
+        nullable: true,
+        description: "Optional — how the pet arrived at the shelter.",
+      },
+      adoptionStatus: {
+        type: "string",
+        enum: ["incoming", "available", "adopted", "fostered", "transferred", "deceased"],
+        description: "Optional — defaults to 'incoming' (not shown in the public catalog until 'available').",
+      },
+      shelterID: {
+        type: "integer",
+        description: "Admin only — required for that role, ignored for Staff.",
+      },
+    },
+  },
+  PetUpdate: {
+    type: "object",
+    description:
+      "Partial update — send only the fields to change. shelterID reassignment is out of scope (that's a transfer, not a profile edit); petPhoto/adoptionStatus are managed by their own endpoints, not here.",
+    properties: {
+      breedID: { type: "integer" },
+      petName: { type: "string", maxLength: 45 },
+      petDOB: { type: "string", format: "date" },
+      petSex: { type: "string", enum: ["M", "F"] },
+      petColor: { type: "string", maxLength: 45 },
+      petSize: { type: "string", enum: ["Small", "Medium", "Large"] },
+      intakeDate: { type: "string", format: "date" },
+      intakeType: {
+        type: "string",
+        enum: ["stray", "surrendered", "transferred"],
+        nullable: true,
+      },
+      petWeight: { type: "number", exclusiveMinimum: 0 },
+      petHeight: { type: "number", exclusiveMinimum: 0 },
+      petBGroup: { type: "string", maxLength: 5 },
+      petDesc: { type: "string", maxLength: 500, nullable: true },
+      microchipID: { type: "string", maxLength: 45, nullable: true },
+      featuredFlag: { type: "boolean" },
+      compatibleWithChildren: { type: "boolean" },
+      compatibleWithPets: { type: "boolean" },
+      specialNeeds: { type: "boolean" },
+      adoptionStatus: {
+        type: "string",
+        enum: [
+          "incoming",
+          "available",
+          "pending",
+          "adopted",
+          "fostered",
+          "transferred",
+          "deceased",
+        ],
+      },
+    },
+  },
+  PetPhoto: {
+    type: "object",
+    description:
+      "isPrimary is computed, not a stored column — true when this row's photoURL matches the pet's current petPhoto.",
+    properties: {
+      photoID: { type: "integer" },
+      photoURL: { type: "string" },
+      uploadedAt: { type: "string", format: "date-time" },
+      isPrimary: { type: "boolean" },
     },
   },
   AdoptedPet: {
@@ -587,6 +1197,16 @@ const schemas = {
         enum: ["Pending", "Active", "Deactivated"],
         nullable: true,
       },
+      onboardingComplete: {
+        type: "boolean",
+        description: "Whether they've finished the staff onboarding wizard. Required (with a Verified government ID) before a Pending account can be approved.",
+      },
+      governmentIdStatus: {
+        type: "string",
+        enum: ["Pending", "Verified", "Rejected"],
+        nullable: true,
+        description: "Verification status of their government ID — null if none submitted. Only the status is exposed, never the document or number.",
+      },
       shelter: {
         type: "object",
         nullable: true,
@@ -620,7 +1240,7 @@ const schemas = {
           byStatus: {
             type: "object",
             additionalProperties: { type: "integer" },
-            example: { available: 90, pending: 10, adopted: 30 },
+            example: { available: 90, incoming: 10, adopted: 30 },
           },
         },
       },
@@ -688,7 +1308,7 @@ const schemas = {
       petsByStatus: {
         type: "object",
         additionalProperties: { type: "integer" },
-        example: { available: 12, pending: 3, adopted: 5 },
+        example: { available: 12, incoming: 3, adopted: 5 },
       },
       openApplicationCount: {
         type: "integer",

@@ -7,7 +7,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { PiClipboardTextBold } from "react-icons/pi";
-import OnboardingStepHeader from "../OnboardingStepHeader";
+import OnboardingStepHeader from "../../../../../components/ui/onboarding/OnboardingStepHeader";
+import OnboardingStepNav from "../../../../../components/ui/onboarding/OnboardingStepNav";
+import ButtonElement from "../../../../../components/ui/ButtonElement";
 import {
   completeOnboarding,
   getGovernmentId,
@@ -142,15 +144,16 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
               <h3 className="font-body text-sm font-bold text-neutral-dark">
                 {section.title}
               </h3>
-              <button
-                type="button"
+              <ButtonElement
                 onClick={() =>
                   navigate(`/onboarding/step/${section.step}?from=review`)
                 }
-                className="font-body text-xs font-medium text-teal-dark underline"
+                size="bare"
+                variant="outline"
+                className="text-xs font-medium text-teal-dark underline"
               >
                 Edit
-              </button>
+              </ButtonElement>
             </div>
             <dl className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
               {section.rows.map(([label, value]) => (
@@ -174,25 +177,13 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
         </p>
       )}
 
-      <div className="mt-6 flex gap-3">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Back
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {mutation.isPending ? "Submitting…" : "Submit"}
-        </button>
-      </div>
+      <OnboardingStepNav
+        onBack={onBack}
+        onContinue={() => mutation.mutate()}
+        continueLabel="Submit"
+        pendingLabel="Submitting…"
+        isPending={mutation.isPending}
+      />
     </div>
   );
 };

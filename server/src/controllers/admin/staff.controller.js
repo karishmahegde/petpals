@@ -23,6 +23,8 @@ const listStaff = async (req, res, next) => {
     shelterID: shelterIDRaw,
     staffDesignation,
     accountStatus,
+    awaitingAdmin,
+    name,
     page: pageRaw,
     limit: limitRaw,
   } = req.query;
@@ -78,6 +80,10 @@ const listStaff = async (req, res, next) => {
       shelterID,
       staffDesignation,
       accountStatus,
+      // Only the exact string "true" enables it (same convention as
+      // adopterRiskFlag / upcoming elsewhere).
+      awaitingAdmin: awaitingAdmin === "true",
+      name: typeof name === "string" ? name.trim() || undefined : undefined,
       page,
       limit,
     });

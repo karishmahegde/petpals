@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+import useEndSession from "../../logic/hooks/useEndSession";
+import { useQuery } from "@tanstack/react-query";
 import type { IconType } from "react-icons";
 import {
   PiHouse,
@@ -12,18 +14,49 @@ import {
   PiShieldCheck,
   PiArrowUpRight,
   PiDotsThreeVertical,
+  PiPawPrint,
+  PiArrowsClockwise,
+  PiHandHeart,
+  PiCalendarCheck,
+  PiConfettiFill,
+  PiHandCoins,
+  PiGearSix,
+  PiIdentificationBadge,
+  PiFirstAidKit,
+  PiUserList,
+  PiIdentificationCard,
 } from "react-icons/pi";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
+import ButtonElement from "../ui/ButtonElement";
 import useAuthStore from "../../logic/store/useAuthStore";
+import { logoutDestinationFor } from "../../logic/route/resolveDestination";
 import { logout as logoutApi } from "../../logic/api/authApi";
+import { getMyStaffProfile } from "../../logic/api/staffApi";
 
-interface NavItem {
+// A flat entry is a single clickable link. A group is a non-clickable
+// section header (label + icon) followed by its own links, indented one
+// level — a real two-level nav, not just a visual divider. Groups are
+// always expanded (no collapse state) since no role's menu is deep enough
+// yet to need that.
+interface NavLinkItem {
+  type: "link";
   label: string;
   to: string;
   icon: IconType;
   end?: boolean;
+  /** Staff only: shown just to the shelter's manager. */
+  managerOnly?: boolean;
 }
+
+interface NavGroupItem {
+  type: "group";
+  label: string;
+  icon: IconType;
+  items: NavLinkItem[];
+}
+
+type NavEntry = NavLinkItem | NavGroupItem;
 
 // DB role enum → client dashboard route (fallback nav when a role has no
 // dedicated item set yet).
@@ -38,27 +71,168 @@ const ROLE_HOME: Record<string, string> = {
 
 // Role-specific navigation. The constant "Main website" link is appended for
 // every role in renderNav — it is always the last item.
-const ROLE_NAV: Record<string, NavItem[]> = {
+const ROLE_NAV: Record<string, NavEntry[]> = {
   Admin: [
-    { label: "Overview", to: "/admin", icon: PiHouse, end: true },
-    { label: "Shelters", to: "/admin/shelters", icon: PiBuildings },
-    { label: "Staff", to: "/admin/staff", icon: PiUsersThree },
-    { label: "Admins", to: "/admin/admins", icon: PiShieldCheck },
+    { type: "link", label: "Overview", to: "/admin", icon: PiHouse, end: true },
+    {
+      type: "link",
+      label: "Shelters",
+      to: "/admin/shelters",
+      icon: PiBuildings,
+    },
+    { type: "link", label: "Staff", to: "/admin/staff", icon: PiUsersThree },
+    { type: "link", label: "Admins", to: "/admin/admins", icon: PiShieldCheck },
+    {
+      type: "link",
+      label: "ID Verification",
+      to: "/admin/id-verification",
+      icon: PiIdentificationCard,
+    },
   ],
   Adopter: [
-    { label: "Overview", to: "/adopter", icon: PiHouse, end: true },
-    { label: "My Pets", to: "/adopter/pets", icon: PiDog },
-    { label: "Appointments", to: "/adopter/appointments", icon: PiStethoscope },
-    { label: "Favorites", to: "/adopter/favorites", icon: PiHeart },
-    { label: "Applications", to: "/adopter/applications", icon: PiFileText },
-    { label: "Visits", to: "/adopter/visits", icon: PiBuildings },
+    {
+      type: "link",
+      label: "Overview",
+      to: "/adopter",
+      icon: PiHouse,
+      end: true,
+    },
+    { type: "link", label: "My Pets", to: "/adopter/pets", icon: PiDog },
+    {
+      type: "link",
+      label: "Appointments",
+      to: "/adopter/appointments",
+      icon: PiStethoscope,
+    },
+    {
+      type: "link",
+      label: "Favorites",
+      to: "/adopter/favorites",
+      icon: PiHeart,
+    },
+    {
+      type: "link",
+      label: "Applications",
+      to: "/adopter/applications",
+      icon: PiFileText,
+    },
+    { type: "link", label: "Visits", to: "/adopter/visits", icon: PiBuildings },
+  ],
+  // Full information architecture scaffolded now per product direction — most
+  // sub-pages are placeholders until their own sprint builds real content
+  // (see each page's own file). Only "Overview" here doubles as the index
+  // route's label; it is distinct from the constant "Home" link renderNav
+  // always appends last (that one exits the dashboard to the public site).
+  Staff: [
+    { type: "link", label: "Overview", to: "/staff", icon: PiHouse, end: true },
+    {
+      type: "group",
+      label: "Animals",
+      icon: PiPawPrint,
+      items: [
+        { type: "link", label: "Pets", to: "/staff/pets", icon: PiDog },
+        {
+          type: "link",
+          label: "Transfers",
+          to: "/staff/transfers",
+          icon: PiArrowsClockwise,
+        },
+        {
+          type: "link",
+          label: "Appointments",
+          to: "/staff/appointments",
+          icon: PiStethoscope,
+        },
+      ],
+    },
+    // The adoption pipeline, in the order staff work it.
+    {
+      type: "group",
+      label: "Adoptions",
+      icon: PiHeart,
+      items: [
+        {
+          type: "link",
+          label: "Applications",
+          to: "/staff/applications",
+          icon: PiFileText,
+        },
+        {
+          type: "link",
+          label: "Visits",
+          to: "/staff/visits",
+          icon: PiCalendarCheck,
+        },
+        {
+          type: "link",
+          label: "Adopters",
+          to: "/staff/adopters",
+          icon: PiUserList,
+        },
+      ],
+    },
+    {
+      type: "group",
+      label: "Community",
+      icon: PiUsersThree,
+      items: [
+        {
+          type: "link",
+          label: "Volunteers",
+          to: "/staff/volunteers",
+          icon: PiHandHeart,
+        },
+        {
+          type: "link",
+          label: "Events",
+          to: "/staff/events",
+          icon: PiConfettiFill,
+        },
+        {
+          type: "link",
+          label: "Donations",
+          to: "/staff/donations",
+          icon: PiHandCoins,
+        },
+      ],
+    },
+    // Who may act at this shelter. ID Verification is open to all staff
+    // (adopter/volunteer IDs); Staff and Vets are manager-only, and so are
+    // staff/vet IDs within ID Verification (enforced server-side).
+    {
+      type: "group",
+      label: "Management",
+      icon: PiGearSix,
+      items: [
+        {
+          type: "link",
+          label: "Staff",
+          to: "/staff/team",
+          icon: PiIdentificationBadge,
+          managerOnly: true,
+        },
+        {
+          type: "link",
+          label: "Vets",
+          to: "/staff/vets",
+          icon: PiFirstAidKit,
+          managerOnly: true,
+        },
+        {
+          type: "link",
+          label: "ID Verification",
+          to: "/staff/id-verification",
+          icon: PiIdentificationCard,
+        },
+      ],
+    },
   ],
 };
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-4 px-6 py-3.5 font-body text-[15px] transition-colors ${
+  `flex items-center gap-4 px-6 py-3.5 font-light font-body text-[15px] transition-colors ${
     isActive
-      ? "bg-rose-light font-semibold text-neutral-dark"
+      ? "bg-rose-light text-neutral-dark"
       : "text-white hover:bg-white/10"
   }`;
 
@@ -76,19 +250,34 @@ const DashboardSidebar = ({
   onClose,
   role: roleProp,
 }: DashboardSidebarProps) => {
-  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const storeRole = useAuthStore((state) => state.role);
-  const storeLogout = useAuthStore((state) => state.logout);
+  const endSession = useEndSession();
   const role = roleProp ?? storeRole ?? undefined;
 
   const [acctOpen, setAcctOpen] = useState(false);
 
-  const items: NavItem[] =
+  // Staff: whether this user manages their shelter (same cached query as the
+  // staff pages) — hides managerOnly links otherwise (and a group left with
+  // no links).
+  const { data: staffProfile } = useQuery({
+    queryKey: ["staff", "me"],
+    queryFn: getMyStaffProfile,
+    enabled: role === "Staff",
+  });
+  const isManager = staffProfile?.staffDesignation === "Manager";
+
+  const isVisible = (link: NavLinkItem) => !link.managerOnly || isManager;
+  const items: NavEntry[] =
     role && ROLE_NAV[role]
-      ? ROLE_NAV[role]
+      ? ROLE_NAV[role].flatMap((entry): NavEntry[] => {
+          if (entry.type === "link") return isVisible(entry) ? [entry] : [];
+          const links = entry.items.filter(isVisible);
+          return links.length > 0 ? [{ ...entry, items: links }] : [];
+        })
       : [
           {
+            type: "link",
             label: "Home",
             to: role ? (ROLE_HOME[role] ?? "/") : "/",
             icon: PiHouse,
@@ -126,33 +315,57 @@ const DashboardSidebar = ({
     try {
       await logoutApi();
     } finally {
-      storeLogout();
       setAcctOpen(false);
       onClose?.();
-      navigate("/");
+      // Leave the protected page and clear the session in one render —
+      // otherwise ProtectedRoute sees the token vanish first and redirects
+      // to /login?redirect=<this page> (see useEndSession). Workers
+      // (Admin/Staff/Vet) go back to the worker login page, everyone else
+      // home.
+      endSession(logoutDestinationFor(storeRole));
     }
   };
 
+  const renderLink = (
+    { label, to, icon: Icon, end }: NavLinkItem,
+    indented = false,
+  ) => (
+    <NavLink
+      key={to}
+      to={to}
+      end={end}
+      onClick={onClose}
+      className={({ isActive }) =>
+        `${linkClass({ isActive })} ${indented ? "pl-11" : ""}`
+      }
+    >
+      <Icon className="h-5 w-5 shrink-0" aria-hidden />
+      <span>{label}</span>
+    </NavLink>
+  );
+
   const renderNav = () => (
     <>
-      {items.map(({ label, to, icon: Icon, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          onClick={onClose}
-          className={linkClass}
-        >
-          <Icon className="h-5 w-5 shrink-0" aria-hidden />
-          <span>{label}</span>
-        </NavLink>
-      ))}
+      {items.map((entry) =>
+        entry.type === "group" ? (
+          <div key={entry.label}>
+            {/* Section header — not a link, just groups the items below it. */}
+            <div className="flex items-center gap-4 px-6 pb-1 pt-4 font-body text-xs font-semibold uppercase tracking-wide text-gold-md">
+              <entry.icon className="h-4 w-4 shrink-0" aria-hidden />
+              <span>{entry.label}</span>
+            </div>
+            {entry.items.map((item) => renderLink(item, true))}
+          </div>
+        ) : (
+          renderLink(entry)
+        ),
+      )}
 
       {/* Constant last item — leaves the dashboard for the public site. */}
       <Link
         to="/"
         onClick={onClose}
-        className="flex items-center gap-4 px-6 py-3.5 font-body text-[15px] text-white transition-colors hover:bg-white/10"
+        className="flex items-center font-light gap-4 px-6 py-3.5 font-body text-[15px] text-white transition-colors hover:bg-white/10"
       >
         <PiArrowUpRight className="h-5 w-5 shrink-0" aria-hidden />
         <span>Home</span>
@@ -183,15 +396,16 @@ const DashboardSidebar = ({
             <p className="font-body text-xs text-neutral-lightgray">{role}</p>
           )}
         </div>
-        <button
-          type="button"
+        <ButtonElement
           onClick={() => setAcctOpen((prev) => !prev)}
           aria-label="Account menu"
           aria-expanded={acctOpen}
+          size="bare"
+          variant="outline"
           className="shrink-0 text-neutral-lightgray transition-colors hover:text-white"
         >
           <PiDotsThreeVertical className="h-5 w-5" />
-        </button>
+        </ButtonElement>
       </div>
 
       {acctOpen && (
@@ -206,12 +420,14 @@ const DashboardSidebar = ({
           >
             Profile
           </Link>
-          <button
+          <ButtonElement
             onClick={handleLogout}
+            size="bare"
+            variant="outline"
             className="block w-full border-t border-neutral-offwhite px-4 py-3 text-left font-body text-sm text-rose-dark transition-colors hover:bg-gold-light"
           >
             Log out
-          </button>
+          </ButtonElement>
         </div>
       )}
     </div>

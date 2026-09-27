@@ -7,6 +7,7 @@ import { HiOutlineLocationMarker } from "react-icons/hi";
 import { useQuery } from "@tanstack/react-query";
 import { getSpecies } from "../../../../logic/api/petsApi";
 import toast from "react-hot-toast";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 
 const Searchbar = () => {
   // "Species" or "Location" — which search mode is currently active.
@@ -136,40 +137,43 @@ const Searchbar = () => {
           className="px-6 py-3 w-full my-3 bg-white rounded-lg border-2 border-neutral-lightgray lg:my-0 lg:w-40 lg:rounded-l-full lg:border-none relative"
           ref={filterMenuRef}
         >
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => setIsOpen(!isOpen)}
+            size="bare"
+            variant="outline"
             className="flex items-center justify-between w-full text-teal-dark"
           >
             {filter}
             <FaChevronDown
               className={`h-3 w-3 text-black transition-transform ${isOpen ? "rotate-180" : ""}`}
             />
-          </button>
+          </ButtonElement>
 
           {isOpen && (
             <ul className="absolute left-0 top-full mt-1 w-full p-2 rounded-lg font-light bg-white shadow z-10">
               <li className="p-2">
-                <button
-                  type="button"
+                <ButtonElement
                   onClick={() => {
                     setFilter("Species");
                     setIsOpen(false);
                   }}
+                  size="bare"
+                  variant="outline"
                 >
                   Species
-                </button>
+                </ButtonElement>
               </li>
               <li className="p-2">
-                <button
-                  type="button"
+                <ButtonElement
                   onClick={() => {
                     setFilter("Location");
                     setIsOpen(false);
                   }}
+                  size="bare"
+                  variant="outline"
                 >
                   Location
-                </button>
+                </ButtonElement>
               </li>
             </ul>
           )}
@@ -182,9 +186,10 @@ const Searchbar = () => {
             className="flex-1 mx-0 rounded-lg border-2 border-neutral-lightgray px-6 py-3 bg-white relative lg:border-none lg:rounded-none lg:mx-1"
             ref={speciesMenuRef}
           >
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => setIsSpeciesOpen(!isSpeciesOpen)}
+              size="bare"
+              variant="outline"
               className="flex items-center justify-between w-full"
             >
               <span className={selectedSpecies ? "" : "text-teal-dark"}>
@@ -193,21 +198,22 @@ const Searchbar = () => {
               <FaChevronDown
                 className={`h-3 w-3 transition-transform ${isSpeciesOpen ? "rotate-180" : ""}`}
               />
-            </button>
+            </ButtonElement>
 
             {isSpeciesOpen && (
               <ul className="absolute left-0 top-full mt-1 w-full p-2 rounded-lg font-light bg-white shadow z-10">
                 {species.map((s) => (
                   <li key={s.speciesID} className="p-2">
-                    <button
-                      type="button"
+                    <ButtonElement
                       onClick={() => {
                         setSelectedSpecies(s.speciesName);
                         setIsSpeciesOpen(false);
                       }}
+                      size="bare"
+                      variant="outline"
                     >
                       {s.speciesName}
-                    </button>
+                    </ButtonElement>
                   </li>
                 ))}
               </ul>
@@ -226,35 +232,37 @@ const Searchbar = () => {
               className="flex-1 min-w-0 py-3 placeholder:italic placeholder:font-light placeholder:text-sm placeholder:text-teal-dark focus:outline-none lg:py-0"
             />
 
-            <button
-              type="button"
+            <ButtonElement
               onClick={handleGeolocateClick}
-              className="flex items-center justify-center gap-1 whitespace-nowrap rounded-md bg-gold-md px-4 py-1 text-xs text-white"
+              size="bare"
+              className="flex items-center justify-center gap-1 whitespace-nowrap rounded-md bg-gold-md px-4 py-1 text-xs"
             >
               <HiOutlineLocationMarker />
               <span>{isLocating ? "Locating…" : "use current location"}</span>
-            </button>
+            </ButtonElement>
           </div>
         )}
 
         {/* Desktop submit — icon-only, joins the right edge of the pill */}
-        <button
+        <ButtonElement
           type="submit"
           aria-label="Search"
           title="Search"
+          size="bare"
           className="hidden lg:flex items-center justify-center rounded-r-full bg-teal-dark px-6 hover:bg-gold-md"
         >
-          <FaSearch className="h-4 w-4 text-white" />
-        </button>
+          <FaSearch className="h-4 w-4" />
+        </ButtonElement>
 
         {/* Mobile submit — full-width, labeled, stacks below the fields */}
-        <button
+        <ButtonElement
           type="submit"
-          className="lg:hidden mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-dark py-3 text-white"
+          size="bare"
+          className="lg:hidden mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-dark py-3"
         >
           <FaSearch className="h-4 w-4" />
           <span>Search</span>
-        </button>
+        </ButtonElement>
       </form>
     </SectionContainer>
   );

@@ -5,6 +5,7 @@ const {
 } = require("../../services/auth/auth.service");
 const { successResponse, successListResponse } = require("../../utils/response");
 const { normalizePhone } = require("../../utils/phone");
+const { pickAddressUpdate } = require("../../utils/address");
 
 const badRequest = (message) => {
   const err = new Error(message);
@@ -37,14 +38,13 @@ const SELF_UPDATABLE_FIELDS = [
   "avatarSeed",
   "adminName",
   "adminPhone",
-  "adminAddress",
   "adminDOB",
   "adminSex",
 ];
 const SELF_REJECTED_FIELDS = ["accountStatus"];
 // Nullable (unlike avatarSeed/adminName) — clearing one of these is a valid
 // update, sent as `null` rather than omitted.
-const SELF_NULLABLE_FIELDS = ["adminPhone", "adminAddress", "adminDOB", "adminSex"];
+const SELF_NULLABLE_FIELDS = ["adminPhone", "adminDOB", "adminSex"];
 const ADMIN_SEX_VALUES = ["M", "F", "O"];
 
 // ——————————————— PUT /admins/me ———————————————
@@ -58,7 +58,14 @@ const updateMyProfile = async (req, res, next) => {
     );
   }
 
-  const data = {};
+  // Address fields (addressLine1/2, city, state, zip, country) — validated
+  // by the shared helper, same rules on every role's profile.
+  let data;
+  try {
+    data = pickAddressUpdate(body);
+  } catch (err) {
+    return next(err);
+  }
   for (const field of SELF_UPDATABLE_FIELDS) {
     if (!(field in body)) continue; // partial update — only touch provided fields
     const value = body[field];
@@ -79,9 +86,6 @@ const updateMyProfile = async (req, res, next) => {
     }
     if (field === "avatarSeed" && value.length > 64) {
       return next(badRequest("avatarSeed must be 64 characters or fewer"));
-    }
-    if (field === "adminAddress" && value.length > 45) {
-      return next(badRequest("adminAddress must be 45 characters or fewer"));
     }
     if (field === "adminSex" && !ADMIN_SEX_VALUES.includes(value)) {
       return next(

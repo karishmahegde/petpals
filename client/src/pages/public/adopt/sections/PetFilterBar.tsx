@@ -6,6 +6,7 @@ import { TbCake } from "react-icons/tb";
 import type { Species, Breed, Shelter } from "../../../../logic/api/petsApi";
 import type { Filters, NearbySearchParams } from "./PetCatalog";
 import Card from "../../../../components/ui/Card";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import {
   CheckboxDropdown,
   Pill,
@@ -101,10 +102,11 @@ const PetFilterBar = ({
 
   return (
     <Card className="mb-8 p-6">
-      <button
-        type="button"
+      <ButtonElement
         onClick={() => setIsOpen((o) => !o)}
         aria-expanded={isOpen}
+        size="bare"
+        variant="outline"
         className="flex w-full items-center justify-between"
       >
         <span className="flex items-center gap-2">
@@ -114,7 +116,7 @@ const PetFilterBar = ({
         <FaChevronDown
           className={`text-neutral-gray transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
-      </button>
+      </ButtonElement>
 
       <div className={isOpen ? "" : "hidden"}>
         <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">

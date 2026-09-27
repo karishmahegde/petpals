@@ -3,11 +3,6 @@ const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 const storage = require("../../../services/storage");
 
-// Real Supabase Storage round trips (upload on POST, delete on cleanup) on top
-// of the usual register + login + POST/GET chain — the 5s Jest default is
-// too tight for that.
-jest.setTimeout(20000);
-
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 

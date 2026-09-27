@@ -6,6 +6,7 @@ import { getFeaturedPets } from "../../../../logic/api/petsApi";
 import CardComponent from "../../../../components/ui/pets/PetCatalogCard";
 import SectionContainer from "../../../../components/ui/marketing/SectionContainer";
 import SectionHeading from "../../../../components/ui/marketing/SectionHeading";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 
 const FeaturedPets = () => {
   const navigate = useNavigate();
@@ -46,10 +47,11 @@ const FeaturedPets = () => {
                   ))}
             </div>
             {/* Left Arrow */}
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => emblaApi?.scrollPrev()}
               aria-label="Previous pets"
+              size="bare"
+              variant="outline"
               className="
               absolute left-[-2%] top-1/2 -translate-y-1/2
               z-10 flex h-10 w-10 items-center justify-center
@@ -58,13 +60,14 @@ const FeaturedPets = () => {
             "
             >
               <FaChevronLeft />
-            </button>
+            </ButtonElement>
 
             {/* Right Arrow */}
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => emblaApi?.scrollNext()}
               aria-label="Next pets"
+              size="bare"
+              variant="outline"
               className="
               absolute right-[-2.8%] top-1/2 -translate-y-1/2
               z-10 flex h-10 w-10 items-center justify-center
@@ -73,7 +76,7 @@ const FeaturedPets = () => {
             "
             >
               <FaChevronRight />
-            </button>
+            </ButtonElement>
           </div>
         </div>
       </div>

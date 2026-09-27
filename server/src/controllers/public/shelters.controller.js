@@ -5,7 +5,11 @@ const { resolveCoordsFromPostalCode } = require("../../services/geocoding");
 // ——————————————— GET /shelters ———————————————
 const getShelters = async (req, res, next) => {
   try {
-    const shelters = await sheltersService.getShelters();
+    // Only the exact string "true" enables it (same convention as other
+    // boolean query flags).
+    const shelters = await sheltersService.getShelters({
+      hasManager: req.query.hasManager === "true",
+    });
     return successResponse(res, "Shelters retrieved successfully", shelters);
   } catch (err) {
     return next(err);

@@ -16,7 +16,13 @@ const { getAccountStatus } = require("../services/auth/auth.service");
 // sentinel getAccountStatus returns when the role row is gone entirely.
 const BLOCKED_STATUSES = ["Deactivated", "Banned", "Pending", "DELETED"];
 
-const authenticate = async (req, res, next) => {
+// A Pending Staff member can log in before approval, but only to finish
+// onboarding (profile, address, government ID) — see auth.service.js's
+// login(). Routes that onboarding needs opt in with
+// authenticate.allowPendingStaff; every other route keeps rejecting Pending
+// accounts, so the boundary is enforced here, not by the frontend. Pending
+// accounts of any other role stay blocked everywhere.
+const buildAuthenticate = ({ allowPendingStaff }) => async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1]; // Check if acessToken is available
   if (!token) {
     return res.status(401).json({
@@ -30,7 +36,9 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verfify accessToken
 
     const accountStatus = await getAccountStatus(decoded.userID, decoded.role);
-    if (BLOCKED_STATUSES.includes(accountStatus)) {
+    const pendingStaffAllowed =
+      allowPendingStaff && decoded.role === "Staff" && accountStatus === "Pending";
+    if (BLOCKED_STATUSES.includes(accountStatus) && !pendingStaffAllowed) {
       return res.status(401).json({
         success: false,
         message: "This account is no longer active",
@@ -53,6 +61,9 @@ const authenticate = async (req, res, next) => {
     });
   }
 };
+
+const authenticate = buildAuthenticate({ allowPendingStaff: false });
+authenticate.allowPendingStaff = buildAuthenticate({ allowPendingStaff: true });
 
 //Exporting the authenticate middleware
 module.exports = authenticate;

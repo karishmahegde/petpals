@@ -12,8 +12,8 @@ import {
   type VisitListItem,
 } from "../../../../logic/api/adoptersApi";
 import VisitsList from "./shared/VisitsList";
-import VisitDetailPanel from "./visits/VisitDetailPanel";
-import ScheduleVisitPanel from "./visits/ScheduleVisitPanel";
+import VisitDetailPanel from "./sections/visits/VisitDetailPanel";
+import ScheduleVisitPanel from "./sections/visits/ScheduleVisitPanel";
 
 const isUpcoming = (visit: VisitListItem): boolean =>
   visit.visitStatus !== "Cancelled" &&
@@ -85,7 +85,7 @@ const Visits = () => {
           <DashboardEmptyMessage>
             You have no visits scheduled.
           </DashboardEmptyMessage>
-          <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
+          <ButtonElement to="/adopt" className="bg-teal-dark hover:brightness-95">
             Explore Pets
           </ButtonElement>
         </div>

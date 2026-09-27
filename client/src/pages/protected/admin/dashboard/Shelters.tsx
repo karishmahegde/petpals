@@ -10,8 +10,8 @@ import {
   type ShelterAnalyticsItem,
 } from "../../../../logic/api/analyticsApi";
 import type { ShelterStatus } from "../../../../logic/api/sheltersApi";
-import ShelterRow from "./shelters/ShelterRow";
-import ShelterFormPanel from "./shelters/ShelterFormPanel";
+import ShelterRow from "./sections/shelters/ShelterRow";
+import ShelterFormPanel from "./sections/shelters/ShelterFormPanel";
 
 type StatusFilter = ShelterStatus | "All";
 const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [

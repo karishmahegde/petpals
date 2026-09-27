@@ -25,14 +25,18 @@ const StatTile = ({ icon, value, label, color }: StatTileProps) => {
   const { bg, icon: iconColor } = COLOR_STYLES[color];
 
   return (
-    <div className={`h-36 w-36 shrink-0 rounded-2xl p-5 shadow-md ${bg}`}>
+    <div
+      className={`min-h-36 w-36 shrink-0 rounded-2xl p-5 shadow-md ${bg}`}
+    >
       <div className={`mb-6 text-3xl ${iconColor}`} aria-hidden>
         {icon}
       </div>
       <p className="font-display text-2xl font-bold text-neutral-dark">
         {value}
       </p>
-      <p className="font-body text-sm text-neutral-charcoal">{label}</p>
+      <p className="font-body text-sm leading-tight text-neutral-charcoal">
+        {label}
+      </p>
     </div>
   );
 };

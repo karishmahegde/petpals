@@ -6,14 +6,28 @@
 // (self-registered, awaiting approval) except the very first Admin ever
 // created, which auto-activates (see auth.service.js's register()) —
 // Staff/Admin approvals have a review UI (Staff tab / Admins tab); Vet
-// approval doesn't yet (no Staff dashboard to host it).
+// approval doesn't yet (no Staff dashboard to host it). Staff also pick the
+// shelter they're joining — its manager approves them (Management → Staff).
+// Staff are signed straight in after registering: they complete onboarding
+// (profile, address, government ID) BEFORE approval, so their approver sees
+// a complete profile. Vet/Admin still wait for approval to sign in.
 // Route: /staff-portal/register
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
-import { register as registerApi } from "../../../logic/api/authApi";
+import ButtonElement from "../../../components/ui/ButtonElement";
+import {
+  register as registerApi,
+  login as loginApi,
+} from "../../../logic/api/authApi";
+import {
+  getShelters,
+  getSheltersWithManager,
+} from "../../../logic/api/petsApi";
+import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background-admin.png";
 
@@ -77,6 +91,7 @@ const ROLE_OPTIONS: RoleOption[] = [
 
 const WorkerRegister = () => {
   const { token, role: sessionRole } = useAuthStore();
+  const storeLogin = useAuthStore((state) => state.login);
   const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState("");
@@ -84,13 +99,24 @@ const WorkerRegister = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const [shelterID, setShelterID] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [confirmAge, setConfirmAge] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Staff and vets both join one shelter, whose manager approves them —
+  // so vets only see shelters that already have one.
+  const isVet = role === "vet";
+  const needsShelter = role === "staff" || isVet;
+  const { data: shelters = [] } = useQuery({
+    queryKey: ["shelters", { hasManager: isVet }],
+    queryFn: isVet ? getSheltersWithManager : getShelters,
+    enabled: needsShelter,
+  });
+
   if (token && sessionRole) {
-    return <Navigate to={`/${sessionRole.toLowerCase()}`} replace />;
+    return <Navigate to={dashboardPathFor(sessionRole)} replace />;
   }
 
   const validate = (): string => {
@@ -114,6 +140,8 @@ const WorkerRegister = () => {
       return "Password does not meet all requirements";
 
     if (!role) return "Please select your role";
+    if (needsShelter && !shelterID)
+      return "Please select the shelter you work at";
     if (!agreeTerms)
       return "Please agree to the Terms of Service and Privacy Policy";
     if (!confirmAge) return "Please confirm you are 18 or older";
@@ -136,7 +164,18 @@ const WorkerRegister = () => {
         email,
         password,
         role,
+        shelterID: needsShelter ? Number(shelterID) : undefined,
       });
+      if (role === "staff") {
+        // Staff onboard before they're approved: sign them straight in and
+        // start the wizard (OnboardingGate keeps a Pending staff member on
+        // it, then on /staff/pending until they're approved).
+        const { token: newToken, user } = await loginApi({ email, password });
+        storeLogin(user, newToken, user.role);
+        toast.success("Account created! Let's set up your profile.");
+        navigate("/staff/onboarding/step/2", { replace: true });
+        return;
+      }
       toast.success(
         "Registered! Your account needs approval before you can sign in.",
       );
@@ -168,19 +207,17 @@ const WorkerRegister = () => {
 
         {/* Sign in / Sign up tabs */}
         <div className="flex rounded-xl overflow-hidden mb-8">
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => navigate("/staff-portal/login")}
-            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-teal-md hover:brightness-95 transition-colors"
+            size="bare"
+            variant="outline"
+            className="flex-1 py-2.5 text-sm text-neutral-dark bg-teal-md hover:brightness-95"
           >
             Sign in
-          </button>
-          <button
-            type="button"
-            className="flex-1 py-2.5 font-body text-sm text-white bg-teal-dark transition-colors"
-          >
+          </ButtonElement>
+          <ButtonElement size="bare" className="flex-1 py-2.5 text-sm bg-teal-dark">
             Sign up
-          </button>
+          </ButtonElement>
         </div>
 
         {/* Form */}
@@ -289,11 +326,16 @@ const WorkerRegister = () => {
               {ROLE_OPTIONS.map((option) => {
                 const selected = role === option.value;
                 return (
-                  <button
+                  <ButtonElement
                     key={option.value}
-                    type="button"
-                    onClick={() => setRole(option.value)}
-                    className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+                    onClick={() => {
+                      setRole(option.value);
+                      // The two roles offer different shelter lists.
+                      setShelterID("");
+                    }}
+                    size="bare"
+                    variant="outline"
+                    className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left ${
                       option.bg
                     } ${selected ? option.border : "border-transparent"}`}
                   >
@@ -307,7 +349,7 @@ const WorkerRegister = () => {
                       <span className="font-bold">{option.label}</span> -{" "}
                       {option.description}
                     </span>
-                  </button>
+                  </ButtonElement>
                 );
               })}
             </div>
@@ -315,6 +357,36 @@ const WorkerRegister = () => {
               New accounts need approval before they can sign in.
             </p>
           </div>
+
+          {/* Shelter — staff and vets */}
+          {needsShelter && (
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="shelterID"
+                className="font-body text-sm font-bold text-neutral-black"
+              >
+                Shelter
+              </label>
+              <select
+                id="shelterID"
+                value={shelterID}
+                onChange={(e) => setShelterID(e.target.value)}
+                className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark bg-white focus:outline-none focus:border-teal-dark"
+              >
+                <option value="">Select a shelter</option>
+                {shelters.map((shelter) => (
+                  <option key={shelter.shelterID} value={shelter.shelterID}>
+                    {shelter.shelterName}
+                  </option>
+                ))}
+              </select>
+              {isVet && (
+                <p className="font-body text-xs text-neutral-gray">
+                  Only shelters with a manager in place are onboarding vets.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Consent checkboxes */}
           <div className="flex flex-col gap-2">
@@ -352,24 +424,26 @@ const WorkerRegister = () => {
           </div>
 
           {/* Submit button */}
-          <button
+          <ButtonElement
             type="submit"
             disabled={loading}
-            className="w-full bg-gold-md text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            size="bare"
+            className="w-full bg-gold-md text-sm font-light py-3 rounded-xl hover:brightness-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing up..." : "sign up"}
-          </button>
+          </ButtonElement>
         </form>
 
         <p className="mt-6 text-center font-body text-xs text-neutral-gray">
           Looking to adopt, volunteer, or donate?{" "}
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => navigate("/register")}
+            size="bare"
+            variant="outline"
             className="font-semibold text-teal-dark underline"
           >
             Register here
-          </button>
+          </ButtonElement>
         </p>
       </Card>
     </div>

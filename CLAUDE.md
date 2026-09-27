@@ -19,11 +19,8 @@ Multi-shelter pet adoption platform (solo full-stack learning project). Unifies 
 
 ## ⚠️ Permanent Known Issues
 
-- **PostGIS migration drift (CRITICAL) — never run `npx prisma migrate dev`.** It detects drift from the hand-added `shelterLocation` geography column and offers to reset the DB. For any schema change: edit `schema.prisma` → apply the SQL directly in the Supabase editor → `npx prisma generate`. After any DB reset, re-add all hand-applied constraints, including:
-  ```sql
-  ALTER TABLE "Shelter" ADD COLUMN "shelterLocation" geography(Point, 4326);
-  ```
-  Seed uses `prisma.$executeRaw` for PostGIS values — intentional.
+- **PostGIS migration drift (CRITICAL) — never run `npx prisma migrate dev`.** Prisma can't model the PostGIS `shelterLocation` column or the generated reference-code columns, so `migrate dev` sees them as drift and offers to reset the DB. `migrate deploy` is safe. The single baseline migration (`server/src/prisma/migrations/20260926000000_baseline/`) builds the whole schema, those columns and the partial unique indexes included, so a fresh DB only needs `npm run setup` from `server/` (migrate deploy → generate → `setup/setup-storage.js` for the storage buckets + seed photos → seed; first-time only, since the seed wipes). For any schema change: edit `schema.prisma` → write the SQL as a **new** migration folder `migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql` (draft it with `npx prisma migrate diff --from-config-datasource --to-schema src/prisma/schema.prisma --script`, deleting the generated-code `DROP DEFAULT` noise and the `DROP INDEX "Shelter_shelterLocation_idx"` line — that's the PostGIS spatial index Prisma can't see, and `/shelters/nearby` depends on it) → `npx prisma migrate deploy` → `npx prisma generate`. Never edit an applied migration, and never apply schema SQL by hand only — a fresh setup would miss it.
+  Seed uses `prisma.$executeRaw` for PostGIS values — intentional. **The seed wipes every table first** (deterministic IDs/data) and covers every enum value — keep it that way when adding statuses. Seed pet photos live in `setup/pet-images/<petname>.webp` (uploaded to `pet-images/seed/`); a new seeded pet needs its photo added there. `setup/placeholder.jpg` → `pet-images/placeholder.jpg` is what every app-created pet shows until a real photo is uploaded (`PLACEHOLDER_PHOTO` in `staff/pets.service.js`). Seeded ID verifications point at `setup/government-ids/*.png` (fake, SAMPLE-watermarked; uploaded to the private `government-ids/seed/`).
 - **`CHAR(n)` padding:** right-pads with spaces, breaking strict string compares. Use `VARCHAR` unless the declared length exactly matches content width (`*Sex CHAR(1)` are safe; `petSex` was fixed `CHAR(2)`→`CHAR(1)`). Check on every new fixed-length column.
 - **TanStack `queryKey` must include everything `queryFn` reads** — not just the state that looks like "the input". A computed override driven by other state silently breaks refetching if it's not in the key.
 - **Age filter:** `petDOB` → `buildAgeFilter(minAge, maxAge)`. `minAge` = direct `lte`; `maxAge` = shift the cutoff back one month **and** use strict `gt` (not `gte`). Both parts required together.
@@ -43,9 +40,11 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 | `POST /auth/logout` | Bearer | nulls `USERS.refreshToken`, clears cookie |
 | `POST /auth/refresh-token` | cookie only | — |
 
-**Guards:** FE `ProtectedRoute` (→ `/login?redirect=<path+search>` if no token — see below), `RoleRoute` (→ `/forbidden` if wrong role). BE `authenticate.js` (verifies Bearer, sets `req.user`), `authorizeRoles('Staff','Admin')` factory.
+**Guards:** FE `ProtectedRoute` (→ `/login?redirect=<path+search>` if no token, or the worker login for worker dashboards — see below), `RoleRoute` (→ `/forbidden` if wrong role). BE `authenticate.js` (verifies Bearer, sets `req.user`), `authorizeRoles('Staff','Admin')` factory.
 
-**Post-login redirect (Sprint 3):** `/login?redirect=/adopt/apply/5` — a query param (survives a mid-login refresh), URL-encoded. Any guarded route can send one — `ProtectedRoute` builds it from `location.pathname + location.search` for every protected page, and the adopt-apply flow's own navigates (`PetDetailsModal`, `AdoptApply`) set it explicitly. Login is role-agnostic about it: redirect present → go there, else → role-dashboard default (`resolveDestination` in `Login.tsx`). The same branch handles post-login and an already-authed user hitting `/login` directly. Role correctness is the *destination's* job, not Login's — `RoleRoute` bounces a mismatched role to `/forbidden`, and `AdoptApply` (which bypasses `RoleRoute`) re-checks role itself → `/adopt` + toast.
+**Staff onboarding before approval (Sprint 5.2):** new staff sign up Pending and onboard *before* they're approved (wizard: 2 Personal, 3 Address, 4 Identity/government ID, 5 Review; mandatory, no skip). Pending **Staff** can log in (Pending Vet/Volunteer/Admin still can't); login/refresh return `onboardingComplete`, `onboardingStep` (Adopter + Staff) and `accountStatus` (Staff). Plain `authenticate` still rejects Pending on every route — only routes wired with **`authenticate.allowPendingStaff`** admit a Pending staff member: `GET/PUT /staff/me`, `GET/POST /staff/me/government-id`, `PATCH /staff/me/onboarding-step` + `/onboarding-complete`, `POST /auth/logout`. Keep that list minimal. **Approval** (Manager `PATCH /staff/me/team/:id/status`; Admin `PATCH /staff/:id/status` for Manager sign-ups) requires onboarding complete **and** a Verified government ID — enforced in `services/staff/staffApproval.service.js` (409 otherwise), which also adds `governmentIdStatus` to the approvers' staff shapes. Existing staff were backfilled as onboarded (migration `…_staff_onboarding_backfill`).
+
+**Post-login redirect (Sprint 3):** `/login?redirect=/adopt/apply/5` — a query param (survives a mid-login refresh), URL-encoded. Any guarded route can send one — `ProtectedRoute` builds it from `location.pathname + location.search` for every protected page, and the adopt-apply flow's own navigates (`PetDetailsModal`, `AdoptApply`) set it explicitly. Login is mostly role-agnostic about it: redirect present → go there, else → role-dashboard default (`resolveDestination` in `logic/route/`, which also owns the role → dashboard map — Veterinarian is `/vet`). One exception: a redirect into *another* role's dashboard (e.g. `/staff/...` after logging in as Admin) falls back to the user's own dashboard, since it could only end at `/forbidden`. Ending a session from the UI (Log out, closing your own account) must go through **`useEndSession`** (`logic/hooks/`), which navigates away and clears the session inside one `flushSync` — calling `navigate()` then `logout()` separately isn't enough, since the Zustand update can re-render before the router applies the navigation, and `ProtectedRoute` then captures the current page as a stale `redirect`. Where a session ends up is by role (`logoutDestinationFor` / `loginPathFor` in `resolveDestination.ts`): workers (Admin, Staff, Veterinarian) go to the worker login `/staff-portal/login` after Log out or a 401; everyone else goes home (`/`) on Log out and to `/login` on a 401. `ProtectedRoute` likewise sends a signed-out visitor on a worker dashboard (`/staff`, `/admin`, `/vet`) to the worker login, keeping `?redirect=` (`loginPathForPage`). The same branch handles post-login and an already-authed user hitting `/login` directly. Otherwise role correctness is the *destination's* job, not Login's — `RoleRoute` bounces a mismatched role to `/forbidden`, and `AdoptApply` (which bypasses `RoleRoute`) re-checks role itself → `/adopt` + toast.
 
 ---
 
@@ -62,10 +61,11 @@ client/src/
     geocoding/   (empty — server-side only)
   static/        assets/images/branding/ · content/ (CMS-ready page copy, one file/folder per page)
   components/
-    ui/          generic primitives (Card, ButtonElement, Avatar, ConfirmActionModal, Phone*, SegmentedControl)
+    ui/          generic primitives (Card, ButtonElement, Avatar, Modal + ModalActions, ConfirmActionModal, Phone*, SegmentedControl)
       marketing/ SectionContainer, SectionHeading[Center]
       pets/      PetCatalogCard, PetDetailsModal, FilterControls
       dashboard/ DashboardHeading, DashboardWidgetHeader, DashboardList, StatTile
+      onboarding/ OnboardingProgress, OnboardingStepHeader, OnboardingStepNav, PersonalFields, AddressFields (shared by every role's wizard)
     layout/      Navbar, Footer, PublicLayout, DashboardNavbar, DashboardSidebar
   pages/
     public/      home/ · adopt/ (PetCatalog.tsx owns filter state; PetFilterBar, ShelterLocationFilter) · auth/ · about/ · volunteer-info/
@@ -78,7 +78,12 @@ client/src/
                    (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
         overview/  *Widget.tsx
         shared/    ApplicationsList, VisitsList
-    (staff/ vet/ volunteer/ donor/ admin/ — planned)
+    protected/staff/
+      onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
+      pending/     AwaitingApproval   (/staff/pending — Pending staff wait here once onboarded)
+      shared/      GovernmentIdSection   (used by onboarding + Profile)
+      dashboard/   DashboardLayout routes + one file per tab
+    (vet/ volunteer/ donor/ — planned)
   App.tsx        routes + session restore on mount
 
 server/src/
@@ -185,7 +190,7 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 ## Database Notes
 
 - `Pet.petDOB` replaced static `petAge` (age computed at request time). `Pet.featuredFlag BOOLEAN DEFAULT FALSE` powers `/pets/featured` (set via SQL for now, staff toggle planned).
-- Hand-applied constraints (PostGIS column, partial unique indexes) live only in Supabase and must be re-added after any reset — see Known Issues. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`.
+- Partial and expression unique indexes (not expressible in `schema.prisma`) live only in migration SQL — see Known Issues. Case-insensitive name uniqueness (migration `20260927060418_species_breed_name_ci_unique`): `LOWER(speciesName)` table-wide, `(speciesID, LOWER(breedName))` per species; `staff/species.service.js` pre-checks for a clean 409 and maps the index's violation (a race) to the same 409. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`. One Accepted application per pet: `UNIQUE (petID) WHERE applicationStatus = 'Accepted'` (migration `…_one_accepted_application_per_pet`) — accepting an application also declines the pet's other Pending ones with an automatic `staffRemark`, and accepting for a pet that's no longer `available` is a 409; the index stops two simultaneous acceptances. Double-submit guard on Appointment: `UNIQUE (petID, vetID, appointmentDate) WHERE appointmentStatus = 'Scheduled'` — same pet+vet+timestamp can't have two Scheduled rows (a resubmitted create after a perceived failure).
 
 ---
 
@@ -219,7 +224,7 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 | 5 | Vet, volunteer, donor flows (incl. vet-managed appointments/vaccinations) | — |
 | 6 | AI compatibility matcher (OpenAI API) | — |
 | 7 | Testing to 70% + cleanup (remove TokenDenylist → RefreshTokens table) | — |
-| 8 | Deployment, polish, final report | — |
+| 8 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
 
 ---
 

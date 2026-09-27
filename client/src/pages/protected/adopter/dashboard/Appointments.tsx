@@ -9,7 +9,7 @@ import DashboardEmptyMessage from "../../../../components/ui/dashboard/Dashboard
 import SelectField from "../../../../components/ui/SelectField";
 import { getMyAppointments } from "../../../../logic/api/adoptersApi";
 import AppointmentsList from "./shared/AppointmentsList";
-import AppointmentDetailPanel from "./appointments/AppointmentDetailPanel";
+import AppointmentDetailPanel from "./sections/appointments/AppointmentDetailPanel";
 
 type PetFilter = number | "all";
 

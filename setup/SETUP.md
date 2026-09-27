@@ -1,8 +1,18 @@
 # Setup Guide
 
-Gets you from `git clone` to a running PetPals instance with 6 test logins (one per role), 2 shelters, and 17 pets. ~15 minutes, most of it waiting on installs.
+Gets you from `git clone` to a running PetPals instance with sample data covering every case the app handles — 32 test logins (every account status for every role), 4 shelters, and 21 pets. ~15 minutes, most of it waiting on installs.
 
-For architecture, folder structure, and API reference, see [`CLAUDE.md`](../CLAUDE.md). This file only covers first-time setup. Everything setup-related — this guide and the one-time SQL script it walks you through — lives in this `setup/` folder.
+For architecture, folder structure, and API reference, see [`CLAUDE.md`](../CLAUDE.md). This file only covers first-time setup. Everything setup-related lives in this `setup/` folder:
+
+| File | What it is |
+| --- | --- |
+| `SETUP.md` | this guide |
+| `setup-storage.js` | creates the Supabase Storage buckets and uploads the seed pet photos. Run by `npm run setup`, so you never call it directly |
+| `pet-images/` | the 21 seed pet photos, one per seeded pet (`apollo.webp`, …) |
+| `placeholder.jpg` | the photo a pet created through the app shows until staff upload a real one |
+| `government-ids/` | 4 sample ID documents (clearly marked SAMPLE) that the seeded ID-verification records point at |
+
+The sample-data seed itself lives with the schema, in `server/src/prisma/seed.js`, because it changes whenever the schema does.
 
 ## Prerequisites
 
@@ -45,33 +55,30 @@ Open `.env` and fill in:
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | leave the placeholders if skipping payments |
 | `CLIENT_URL` | `http://localhost:3000` (default is fine) |
 
-`PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. Ignore `VITE_API_BASE_URL` in this file — that one belongs to the client, configured separately in step 5.
+`PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. The client has its own env file, configured in step 5.
 
-### Build the schema
-
-```bash
-npx prisma generate
-npx prisma migrate deploy
-```
-
-> ⚠️ **Use `migrate deploy`, not `migrate dev`, and not the `npm run prisma:migrate` script** (that script literally runs `migrate dev`). This schema has hand-applied PostGIS/generated columns that aren't in Prisma's migration history — `migrate dev` will detect that as drift and offer to reset your database. `migrate deploy` just applies the tracked migrations and never prompts. Full explanation in `CLAUDE.md` → Permanent Known Issues.
-
-### Apply the hand-applied pieces (one-time)
-
-A handful of things aren't expressible in a Prisma migration at all — a PostGIS geography column, three human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`) backed by Postgres generated columns, a partial unique index, and the two storage buckets. They're bundled into one script:
-
-1. Open **Supabase → SQL Editor → New query**.
-2. Paste in the contents of [`manual-constraints.sql`](./manual-constraints.sql) (in this same `setup/` folder) and run it.
-
-It's idempotent, so re-running it later (e.g. after a DB reset) is safe.
-
-### Seed sample data
+### Build the database, storage and sample data
 
 ```bash
-npx prisma db seed
+npm run setup
 ```
 
-Creates 2 shelters, species/breeds, 17 pets, and one login per role. The command prints all 6 logins when it finishes — you'll also find them in the [Test accounts](#test-accounts) table below.
+One command, four steps:
+
+1. **`prisma migrate deploy`** builds the entire schema, including the parts `schema.prisma` can't describe: PostGIS and the shelter-location column, the human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`, …) as Postgres generated columns, and the partial unique indexes. They're written directly into the baseline migration's SQL.
+2. **`prisma generate`** builds the Prisma client from the schema.
+3. **`setup-storage.js`** creates the two Supabase Storage buckets if they're missing (`pet-images`, public; `government-ids`, private), uploads `setup/pet-images/` to `pet-images/seed/`, uploads `placeholder.jpg` to the bucket root, and uploads `setup/government-ids/` to `government-ids/seed/`. Buckets live in Supabase's own `storage` schema, not the app's, which is why this is a script and not a migration.
+4. **`prisma db seed`** loads the sample data.
+
+> ⚠️ **`npm run setup` is for first-time setup — its last step wipes the database.** The seed empties every table and restarts IDs at 1, so every run produces exactly the same data (it refuses to run with `NODE_ENV=production`). Once you're set up, use the individual commands instead:
+>
+> - re-seed: `npx prisma db seed`
+> - new migrations after a pull: `npx prisma migrate deploy && npx prisma generate`
+> - re-upload the seed photos, placeholder and sample IDs: `npm run setup:storage` (only ever writes `pet-images/seed/`, `pet-images/placeholder.jpg` and `government-ids/seed/` — app uploads are left alone)
+
+> ⚠️ **Use `migrate deploy`, never `migrate dev`.** (`npm run prisma:migrate` runs `migrate deploy`, so it's safe.) Prisma can't model the PostGIS/generated columns, so `migrate dev` sees them as drift and offers to reset your database. `migrate deploy` just applies the tracked migrations and never prompts. Full explanation in `CLAUDE.md` → Permanent Known Issues.
+
+The seed creates 4 shelters (one per status), 21 pets (one per adoption status), and 32 logins covering every account status for every role, plus applications, visits, appointments, transfers, tasks, events, donations and ID verifications in every status. The command prints every login and what case it represents when it finishes — the main ones are in the [Test accounts](#test-accounts) table below.
 
 ## 4. Start the server
 
@@ -88,7 +95,7 @@ In a **new terminal**:
 ```bash
 cd client
 npm install
-echo "VITE_API_BASE_URL=http://localhost:5000/api/v1" > .env.local
+echo "VITE_API_URL=http://localhost:5000/api/v1" > .env.local
 npm run dev
 ```
 
@@ -97,6 +104,8 @@ Runs at `http://localhost:3000`.
 ## 6. Log in
 
 <a id="test-accounts"></a>
+
+One fully-featured login per role:
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -107,15 +116,38 @@ Runs at `http://localhost:3000`.
 | Volunteer | `volunteer@petpals.com` | `Volunteer@123` |
 | Donor | `donor@petpals.com` | `Donor@123` |
 
-Only the **Adopter** dashboard is built so far (see `CLAUDE.md` → Sprint Plan — Sprint 3 is in progress; Staff/Vet/Volunteer/Donor/Admin dashboards are planned). The public site (home, catalog, pet details) and Adopter flows are the fully working path right now.
+Every other seeded account uses its role's password above. The ones worth knowing:
+
+| Email | Case |
+| --- | --- |
+| `brooklyn.staff@petpals.com` | Manager of the *other* shelter — check cross-shelter isolation |
+| `staff.senior@` / `staff.associate@petpals.com` | Non-manager staff at Downtown |
+| `staff.unassigned@petpals.com` | Active staff with no shelter |
+| `adopter.two@petpals.com` | Adopted Shadow, fostering Hazel, ID pending, competing application on Apollo |
+| `adopter.onboarding@petpals.com` | Onboarding stopped at step 4 |
+| `vet.brooklyn@` / `volunteer.two@` / `volunteer.brooklyn@petpals.com` | Active at Downtown or Brooklyn |
+| `*.pending@petpals.com` (admin, vet, volunteer) | Awaiting approval — can't log in |
+| `staff.pending@petpals.com` | Pending, onboarding done, ID awaiting verification — logs in to the "awaiting approval" screen; Downtown's manager verifies the ID, then approves |
+| `staff.onboarding@petpals.com` | Pending, stopped mid-onboarding (step 3) — logs in straight to the onboarding wizard |
+| `staff.manager.pending@petpals.com` | Pending Manager sign-up at Queens, onboarding done, ID awaiting verification — an Admin verifies and approves |
+| `*.deactivated@` / `*.banned@petpals.com` | Closed or banned accounts — login is refused |
 
 ## Troubleshooting
 
 - **Prisma asks to reset the database / mentions drift** — you (or a script) ran `migrate dev` instead of `migrate deploy`. Don't confirm the reset; re-read the callout in step 3.
-- **Pet photos look broken** — seeding only points `petPhoto` at URLs in your `pet-images` bucket; it doesn't upload the actual image files. Fine for exercising every flow — upload real files to that bucket yourself if you want photos to render.
-- **`/shelters/nearby` returns nothing / errors** — usually means `manual-constraints.sql` wasn't run yet, or the `postgis` extension didn't enable (check **Database → Extensions** in Supabase).
+- **`npm run setup` stops at the storage step** — check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `server/.env` (the service-role key, not the anon key). If it says a bucket "exists but is public/private", someone changed it by hand: fix it in **Supabase → Storage → bucket settings** (`government-ids` must be private) and re-run `npm run setup:storage`.
+- **Pet photos or ID documents look broken** — the seed files weren't uploaded, or were deleted through the app. Run `npm run setup:storage` from `server/`; it doesn't touch the database.
+- **`/shelters/nearby` returns nothing / errors** — usually means the `postgis` extension didn't enable during `migrate deploy` (check **Database → Extensions** in Supabase, then re-run `npx prisma migrate deploy`).
 - **Adoption application never appears after "paying"** — the `AdoptionApplication` row is only created by the Stripe webhook after a successful checkout, not by the initial POST (see `CLAUDE.md`). Without Stripe configured, you can exercise everything up to checkout but the row won't be created — this is expected, not a bug.
 
 ## Docker Compose alternative
 
-`docker-compose.yml` at the repo root can run a plain local Postgres instead of Supabase for the database. It does **not** include PostGIS or a storage backend, so `/shelters/nearby` and photo/ID uploads won't work against it — for a fully working setup, point `DATABASE_URL` at Supabase as above even if you use Docker for the app containers themselves.
+`docker-compose.yml` at the repo root runs the API and client in containers instead of steps 4–5. They use the same Supabase project as everything above — the API container reads `server/.env`, so the database and file storage stay on Supabase.
+
+After steps 1–3 (clone, Supabase project, `server/.env` + `npm run setup`), from the repo root:
+
+```bash
+docker-compose up --build
+```
+
+The client runs at `http://localhost:3000` and the API at `http://localhost:5000`, the same as the non-Docker setup. `npm run setup` still runs from your machine, once — it isn't part of the containers.

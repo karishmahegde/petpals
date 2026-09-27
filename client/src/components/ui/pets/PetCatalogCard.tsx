@@ -11,6 +11,7 @@ import { getMyFavorites } from "../../../logic/api/adoptersApi";
 import { showAdopterAccountToast } from "../../../logic/toast/adopterAccountToast";
 import { showLoginRequiredToast } from "../../../logic/toast/loginRequiredToast";
 import useAuthStore from "../../../logic/store/useAuthStore";
+import ButtonElement from "../ButtonElement";
 
 interface CardComponentProps {
   pet: PetCard;
@@ -24,6 +25,14 @@ interface CardComponentProps {
   // with an "Unavailable" chip instead of the CTA. The heart stays live so the
   // adopter can still unfavorite them.
   unavailable?: boolean;
+  // Staff's pet management view reuses this card for its grid but has no
+  // favoriting concept — hides the heart entirely rather than rendering a
+  // control that only ever shows the "requires an Adopter account" toast.
+  showFavorite?: boolean;
+  // Overlaid on the photo's top-right corner (e.g. the staff All Pets
+  // grid's adoptionStatus Badge). Takes the heart's spot, so only pass it
+  // alongside showFavorite={false}.
+  cornerBadge?: React.ReactNode;
 }
 
 const CardComponent = ({
@@ -32,6 +41,8 @@ const CardComponent = ({
   onKnowMore,
   ctaLabel = "Know More",
   unavailable = false,
+  showFavorite = true,
+  cornerBadge,
 }: CardComponentProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -110,20 +121,28 @@ const CardComponent = ({
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleHeartClick}
-          aria-label={
-            isFavorited ? "Remove from favorites" : "Add to favorites"
-          }
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/60 shadow"
-        >
-          {isFavorited ? (
-            <FaHeart className="text-rose-md" />
-          ) : (
-            <FaRegHeart className="text-neutral-gray" />
-          )}
-        </button>
+        {showFavorite && (
+          <ButtonElement
+            onClick={handleHeartClick}
+            aria-label={
+              isFavorited ? "Remove from favorites" : "Add to favorites"
+            }
+            size="bare"
+            variant="outline"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/60 shadow"
+          >
+            {isFavorited ? (
+              <FaHeart className="text-rose-md" />
+            ) : (
+              <FaRegHeart className="text-neutral-gray" />
+            )}
+          </ButtonElement>
+        )}
+        {cornerBadge && (
+          <div className="absolute right-2 top-2 flex rounded-full shadow">
+            {cornerBadge}
+          </div>
+        )}
       </div>
       <div className={`flex flex-col p-4 ${unavailable ? "opacity-60" : ""}`}>
         <p className="truncate text-md font-bold text-neutral-charcoal">
@@ -141,12 +160,13 @@ const CardComponent = ({
             Unavailable
           </span>
         ) : (
-          <button
-            className="my-2 rounded-xl bg-black px-2 py-3 text-xs text-white"
+          <ButtonElement
+            size="bare"
+            className="my-2 rounded-xl bg-black px-2 py-3 text-xs"
             onClick={() => onKnowMore(pet.petID)}
           >
             {ctaLabel}
-          </button>
+          </ButtonElement>
         )}
       </div>
     </div>

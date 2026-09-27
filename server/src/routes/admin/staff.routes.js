@@ -34,7 +34,18 @@ const router = express.Router();
  *         schema: { type: string, enum: [Pending, Active, Deactivated] }
  *         description: >
  *           Optional filter by account status. Pending is a self-registered
- *           account awaiting admin approval.
+ *           account awaiting approval (a Manager sign-up by an Admin, anyone
+ *           else by their shelter's manager).
+ *       - in: query
+ *         name: name
+ *         schema: { type: string }
+ *         description: Case-insensitive contains match on staffName
+ *       - in: query
+ *         name: awaitingAdmin
+ *         schema: { type: boolean }
+ *         description: >
+ *           When exactly "true", returns only the Pending Manager sign-ups
+ *           an Admin approves (overrides accountStatus).
  *     responses:
  *       200:
  *         description: Paginated staff list, ordered by staffName ascending
@@ -159,7 +170,10 @@ router.patch(
  *       This is also how a self-registered (Pending) staff account is
  *       approved or declined — setting accountStatus to 'Active' approves it,
  *       'Deactivated' declines it. There is no distinct approve/decline
- *       endpoint. Deactivating clears managerStaffID on every shelter this
+ *       endpoint. Admin may only approve/decline a Pending *Manager*
+ *       sign-up (403 otherwise — the shelter's manager approves everyone
+ *       else from the Staff tab); approving one also makes them their
+ *       shelter's manager (409 if it already has one). Deactivating clears managerStaffID on every shelter this
  *       staff member currently manages. A Deactivated (or still-Pending)
  *       staff account is rejected on its next login attempt
  *       (POST /auth/login) — existing already-issued access tokens are
@@ -202,7 +216,11 @@ router.patch(
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
- *       403: { $ref: '#/components/responses/Forbidden' }
+ *       403:
+ *         description: Not an Admin, or a Pending account that isn't a Manager sign-up
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.patch(

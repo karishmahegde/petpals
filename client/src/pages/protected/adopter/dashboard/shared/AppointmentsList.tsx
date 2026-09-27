@@ -13,6 +13,7 @@ import {
   formatTime,
   relativeDateBadge,
 } from "../../../../../logic/utils/datetime";
+import { formatVetName } from "../../../../../logic/utils/vetName";
 
 interface AppointmentsListProps {
   appointments: AppointmentListItem[];
@@ -55,7 +56,7 @@ const AppointmentsList = ({
             title={`${appointment.pet.petName} — ${appointment.appointmentReason}`}
             lines={[
               {
-                text: `${formatTime(when)} | ${appointment.vet.vetName} | ${appointment.shelter.shelterName}`,
+                text: `${formatTime(when)} | ${formatVetName(appointment.vet.vetName)} | ${appointment.shelter.shelterName}`,
               },
             ]}
             badge={

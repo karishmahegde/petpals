@@ -17,8 +17,10 @@ import {
   type AdminAccountStatus,
 } from "../../../../logic/api/adminsApi";
 import useAuthStore from "../../../../logic/store/useAuthStore";
-import AdminDetailPanel from "./admins/AdminDetailPanel";
-import AdminApprovalPanel from "./admins/AdminApprovalPanel";
+import AdminDetailPanel from "./sections/admins/AdminDetailPanel";
+import AdminApprovalPanel from "./sections/admins/AdminApprovalPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
+import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 
 const PAGE_SIZE = 10;
 
@@ -164,37 +166,13 @@ const Admins = () => {
             ))}
           </ul>
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span className="font-body text-sm text-neutral-gray">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          )}
+          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
         </Card>
       )}
 
       {/* Admin Approvals */}
       <Card className="mt-6 p-6">
-        <h2 className="mb-4 flex items-center gap-2 font-display text-2xl text-neutral-dark">
-          🛡️ Admin Approvals
-        </h2>
+        <DashboardWidgetHeader icon="🛡️" title="Admin Approvals" className="mb-4" />
 
         {pendingLoading ? (
           <p className="py-6 text-center font-body text-sm text-neutral-gray">

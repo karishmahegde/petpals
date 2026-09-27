@@ -5,32 +5,35 @@ const app = require("../../../app"); //to access the express app
 const prisma = require("../../../config/prisma"); //to interact with the database
 
 // Runs against the DATABASE_URL configured in server/.env — every user this
-// suite creates is removed in afterEach/afterAll so no test data accumulates.
+// suite creates is removed in afterEach so no test data accumulates.
 // Users.userEmail is VARCHAR(45), so the generated address must stay short.
 const uniqueEmail = () =>
   //to generate a unique email address
   `t${Date.now()}${Math.floor(Math.random() * 1000)}@ex.com`;
 
-const validPayload = () => ({
+// Every generated address is recorded before its request is sent, and cleanup
+// deletes by address — so a test that times out or fails after the server has
+// already created the account still gets cleaned up.
+const createdEmails = [];
+
+const validPayload = () => {
   //to store the valid payload data
-  name: "Test Adopter",
-  email: uniqueEmail(),
-  password: "Secret123!",
-  role: "adopter",
-});
+  const email = uniqueEmail();
+  createdEmails.push(email);
+  return { name: "Test Adopter", email, password: "Secret123!", role: "adopter" };
+};
 
 describe("POST /api/v1/auth/register", () => {
-  const createdUserIDs = [];
-
-  const cleanupUser = async (userID) => {
-    // Adopter row FKs to Users — must be removed first to satisfy the constraint.
-    await prisma.adopter.deleteMany({ where: { userID } });
-    await prisma.users.deleteMany({ where: { userID } });
-  };
-
   afterEach(async () => {
-    await Promise.all(createdUserIDs.map(cleanupUser));
-    createdUserIDs.length = 0;
+    const users = await prisma.users.findMany({
+      where: { userEmail: { in: createdEmails } },
+      select: { userID: true },
+    });
+    const userIDs = users.map((u) => u.userID);
+    // Adopter row FKs to Users — must be removed first to satisfy the constraint.
+    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
+    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
+    createdEmails.length = 0;
   });
 
   afterAll(async () => {
@@ -48,8 +51,6 @@ describe("POST /api/v1/auth/register", () => {
       success: true,
       data: { userEmail: payload.email, role: "Adopter" },
     });
-
-    createdUserIDs.push(res.body.data.userID);
 
     const dbUser = await prisma.users.findUnique({
       where: { userEmail: payload.email },
@@ -91,7 +92,6 @@ describe("POST /api/v1/auth/register", () => {
       .post("/api/v1/auth/register")
       .send(payload);
     expect(first.status).toBe(201);
-    createdUserIDs.push(first.body.data.userID);
 
     const duplicate = await request(app)
       .post("/api/v1/auth/register")
@@ -110,7 +110,6 @@ describe("POST /api/v1/auth/register", () => {
 
     const res = await request(app).post("/api/v1/auth/register").send(payload);
     expect(res.status).toBe(201);
-    createdUserIDs.push(res.body.data.userID);
 
     const dbUser = await prisma.users.findUnique({
       where: { userEmail: payload.email },
@@ -132,13 +131,11 @@ describe("POST /api/v1/auth/register", () => {
       .post("/api/v1/auth/register")
       .send(validPayload());
     expect(first.status).toBe(201);
-    createdUserIDs.push(first.body.data.userID);
 
     const second = await request(app)
       .post("/api/v1/auth/register")
       .send(validPayload());
     expect(second.status).toBe(201);
-    createdUserIDs.push(second.body.data.userID);
 
     const firstAdopter = await prisma.adopter.findUnique({
       where: { userID: first.body.data.userID },

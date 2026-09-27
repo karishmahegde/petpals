@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const { formatSex } = require("../public/pets.service");
+const storage = require("../storage");
 
 // ——————————————— ADOPTED-PET DETAIL (GET /adopters/me/adopted-pets/:petId) ———————————————
 // One consolidated payload for the My Pets side panel: basic details, intake,
@@ -110,7 +111,7 @@ const getAdoptedPetDetailForAdopter = async (adopterID, petID) => {
     petID: pet.petID,
     petCode: pet.petCode,
     petName: pet.petName,
-    petPhoto: pet.petPhoto,
+    petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, pet.petPhoto),
     microchipID: pet.microchipID,
     petAge: formatAgeLong(pet.petDOB),
     petDOB: pet.petDOB,

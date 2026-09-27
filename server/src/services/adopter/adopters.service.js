@@ -30,8 +30,6 @@ const ADOPTER_PROFILE_SELECT = {
   preferredAgeRange: true,
   preferredSize: true,
   openToSpecialNeeds: true,
-  emailVerified: true,
-  lastLoginAt: true,
   accountStatus: true,
   addressLine1: true,
   addressLine2: true,
@@ -41,7 +39,16 @@ const ADOPTER_PROFILE_SELECT = {
   country: true,
   onboardingComplete: true,
   onboardingStep: true,
+  // Account-level, on Users — flattened back onto the profile by
+  // toAdopterProfile so the response shape is unchanged.
+  user: { select: { emailVerified: true, lastLoginAt: true } },
 };
+
+const toAdopterProfile = ({ user, ...rest }) => ({
+  ...rest,
+  emailVerified: user.emailVerified,
+  lastLoginAt: user.lastLoginAt,
+});
 
 const notFound = (userID) => {
   const err = new Error(`No adopter exists with ID ${userID}`);
@@ -60,18 +67,20 @@ const getAdopterProfile = async (userID) => {
     throw notFound(userID);
   }
 
-  return adopter;
+  return toAdopterProfile(adopter);
 };
 
 // ——————————————— UPDATE ADOPTER PROFILE (PUT /adopters/me) ———————————————
 // `data` is already validated and whitelisted by the controller.
 const updateAdopterProfile = async (userID, data) => {
   try {
-    return await prisma.adopter.update({
-      where: { userID },
-      data,
-      select: ADOPTER_PROFILE_SELECT,
-    });
+    return toAdopterProfile(
+      await prisma.adopter.update({
+        where: { userID },
+        data,
+        select: ADOPTER_PROFILE_SELECT,
+      }),
+    );
   } catch (err) {
     if (err.code === "P2025") {
       // error codes sent by prisma
@@ -105,11 +114,13 @@ const advanceOnboardingStep = async (userID, step) => {
 
   const nextStep = Math.min(Math.max(adopter.onboardingStep, step + 1), 7);
 
-  return prisma.adopter.update({
-    where: { userID },
-    data: { onboardingStep: nextStep },
-    select: ADOPTER_PROFILE_SELECT,
-  });
+  return toAdopterProfile(
+    await prisma.adopter.update({
+      where: { userID },
+      data: { onboardingStep: nextStep },
+      select: ADOPTER_PROFILE_SELECT,
+    }),
+  );
 };
 
 // ——————————————— COMPLETE ONBOARDING (PATCH /adopters/me/onboarding-complete) ———————————————
@@ -176,11 +187,13 @@ const completeOnboarding = async (userID) => {
   }
 
   try {
-    return await prisma.adopter.update({
-      where: { userID },
-      data: { onboardingComplete: true, onboardingStep: 7 },
-      select: ADOPTER_PROFILE_SELECT,
-    });
+    return toAdopterProfile(
+      await prisma.adopter.update({
+        where: { userID },
+        data: { onboardingComplete: true, onboardingStep: 7 },
+        select: ADOPTER_PROFILE_SELECT,
+      }),
+    );
   } catch (err) {
     if (err.code === "P2025") {
       throw notFound(userID);

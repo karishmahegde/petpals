@@ -1,5 +1,6 @@
 // Register.tsx
 // Page: Public registration form for adopters, volunteers, and donors
+// (volunteers also pick the shelter they're applying to)
 // Responsibilities:
 //   - Renders name, email, password, role, and consent fields with client-side validation
 //   - Calls authApi.register() on submit and handles loading/error states
@@ -8,10 +9,14 @@
 // Route: /register
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
+import ButtonElement from "../../../components/ui/ButtonElement";
 import { register as registerApi } from "../../../logic/api/authApi";
+import { getShelters } from "../../../logic/api/petsApi";
+import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
 
@@ -83,13 +88,21 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const [shelterID, setShelterID] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [confirmAge, setConfirmAge] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const isVolunteer = role === "volunteer";
+  const { data: shelters = [] } = useQuery({
+    queryKey: ["shelters"],
+    queryFn: getShelters,
+    enabled: isVolunteer,
+  });
+
   if (token && sessionRole) {
-    return <Navigate to={`/${sessionRole.toLowerCase()}`} replace />;
+    return <Navigate to={dashboardPathFor(sessionRole)} replace />;
   }
 
   const validate = (): string => {
@@ -113,6 +126,8 @@ const Register = () => {
       return "Password does not meet all requirements";
 
     if (!role) return "Please select how you'd like to get involved";
+    if (isVolunteer && !shelterID)
+      return "Please select the shelter you'd like to volunteer at";
     if (!agreeTerms)
       return "Please agree to the Terms of Service and Privacy Policy";
     if (!confirmAge) return "Please confirm you are 18 or older";
@@ -135,6 +150,7 @@ const Register = () => {
         email,
         password,
         role,
+        shelterID: isVolunteer ? Number(shelterID) : undefined,
       });
       toast.success("Registered successfully");
       navigate("/login", { replace: true });
@@ -162,19 +178,17 @@ const Register = () => {
 
         {/* Sign in / Sign up tabs */}
         <div className="flex rounded-xl overflow-hidden mb-8">
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => navigate("/login")}
-            className="flex-1 py-2.5 font-body text-sm text-neutral-dark bg-rose-md hover:brightness-95 transition-colors"
+            size="bare"
+            variant="outline"
+            className="flex-1 py-2.5 text-sm text-neutral-dark bg-rose-md hover:brightness-95"
           >
             Sign in
-          </button>
-          <button
-            type="button"
-            className="flex-1 py-2.5 font-body text-sm text-white bg-rose-dark transition-colors"
-          >
+          </ButtonElement>
+          <ButtonElement size="bare" className="flex-1 py-2.5 text-sm bg-rose-dark">
             Sign up
-          </button>
+          </ButtonElement>
         </div>
 
         {/* Form */}
@@ -283,11 +297,12 @@ const Register = () => {
               {ROLE_OPTIONS.map((option) => {
                 const selected = role === option.value;
                 return (
-                  <button
+                  <ButtonElement
                     key={option.value}
-                    type="button"
                     onClick={() => setRole(option.value)}
-                    className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+                    size="bare"
+                    variant="outline"
+                    className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left ${
                       option.bg
                     } ${selected ? option.border : "border-transparent"}`}
                   >
@@ -301,11 +316,36 @@ const Register = () => {
                       <span className="font-bold">{option.label}</span> -{" "}
                       {option.description}
                     </span>
-                  </button>
+                  </ButtonElement>
                 );
               })}
             </div>
           </div>
+
+          {/* Shelter — volunteers only */}
+          {isVolunteer && (
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="shelterID"
+                className="font-body text-sm font-bold text-neutral-black"
+              >
+                Shelter
+              </label>
+              <select
+                id="shelterID"
+                value={shelterID}
+                onChange={(e) => setShelterID(e.target.value)}
+                className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark bg-white focus:outline-none focus:border-teal-dark"
+              >
+                <option value="">Select a shelter</option>
+                {shelters.map((shelter) => (
+                  <option key={shelter.shelterID} value={shelter.shelterID}>
+                    {shelter.shelterName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Consent checkboxes */}
           <div className="flex flex-col gap-2">
@@ -343,13 +383,14 @@ const Register = () => {
           </div>
 
           {/* Submit button */}
-          <button
+          <ButtonElement
             type="submit"
             disabled={loading}
-            className="w-full bg-teal-dark text-white font-body text-sm font-light py-3 rounded-xl hover:brightness-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+            size="bare"
+            className="w-full bg-teal-dark text-sm font-light py-3 rounded-xl hover:bg-gold-dark transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-1"
           >
             {loading ? "Signing up..." : "sign up"}
-          </button>
+          </ButtonElement>
         </form>
       </Card>
     </div>

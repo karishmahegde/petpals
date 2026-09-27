@@ -66,7 +66,7 @@ describe("GET /api/v1/pets", () => {
 
       await request(app)
         .get("/api/v1/pets")
-        .query({ adoptionStatus: "pending" });
+        .query({ adoptionStatus: "adopted" });
 
       expect(prisma.pet.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -435,7 +435,9 @@ describe("GET /api/v1/pets", () => {
         petID: 7,
         petName: "Mochi",
         petSex: "Female",
-        petPhoto: "mochi.jpg",
+        // Converted from the bare stored filename to a full public Storage
+        // URL — see storage/index.js's toPublicFileUrl.
+        petPhoto: `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-images/mochi.jpg`,
         breed: { breedName: "Poodle", speciesName: "Dog" },
       });
     });

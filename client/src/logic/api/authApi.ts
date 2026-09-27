@@ -7,10 +7,14 @@ export interface AuthUser {
   role: string;
   name?: string; // present on login, absent on refresh-token response
   avatarSeed?: string; // present on both login and refresh-token responses
-  // Adopter-only — present on both login and refresh-token responses when
-  // role === "Adopter", absent for every other role.
+  // Present on both login and refresh-token responses for roles with an
+  // onboarding wizard (Adopter, Staff); absent for every other role.
   onboardingComplete?: boolean;
   onboardingStep?: number;
+  // Staff only. A Pending staff member can log in — to onboard before
+  // they're approved — so OnboardingGate needs to know they're still
+  // Pending once onboarding is done.
+  accountStatus?: string;
 }
 
 export interface RefreshTokenResponse {
@@ -48,6 +52,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   role: string;
+  shelterID?: number; // volunteer/staff/vet — the shelter that approves them
 }
 
 // ———————————————— REGISTER API ————————————————
