@@ -385,8 +385,7 @@ model VaccinationRecord {
   administeredAt   Int?
   // The appointment this dose was given at — what an appointment detail's
   // "Vaccines administered" list reads. Optional: a dose recorded outside
-  // any appointment (e.g. history carried in at intake) has none. Hand-applied
-  // (see CLAUDE.md — migrate dev is banned); SQL in setup/manual-constraints.sql.
+  // any appointment (e.g. history carried in at intake) has none.
   appointmentID    Int?
   shelter          Shelter?      @relation(fields: [administeredAt], references: [shelterID])
   vet              Veterinarian? @relation(fields: [administeredBy], references: [userID])
@@ -522,9 +521,8 @@ model GovernmentID {
 
 model Task {
   taskID     Int             @id @default(autoincrement())
-  // Enum since 2026-09-25 (was VarChar(100)) — hand-applied SQL, see
-  // setup/manual-constraints.sql. Labels for display live client-side
-  // (client/src/logic/staff/tasks.ts).
+  // Enum since 2026-09-25 (was VarChar(100)). Labels for display live
+  // client-side (client/src/logic/staff/tasks.ts).
   taskName   TaskName
   shelterID  Int
   taskDesc   String          @db.VarChar(300)
@@ -552,8 +550,7 @@ model Event {
   eventName     String           @db.VarChar(45)
   eventDate     DateTime
   eventDesc     String           @db.VarChar(300)
-  // Hand-applied SQL (see setup/manual-constraints.sql). Required, no DB
-  // default — every create must pick one. Labels live client-side
+  // Required, no DB default — every create must pick one. Labels live client-side
   // (client/src/logic/eventCategory.ts).
   eventCategory EventCategory
   staffID       Int?

@@ -4,8 +4,9 @@
 // ⚠️ WIPES THE DATABASE FIRST. Every table in the current schema (except
 // Prisma's own _prisma_migrations) is truncated and its ID sequence reset,
 // so every run produces exactly the same rows with exactly the same IDs.
-// Storage buckets are NOT touched — pet photos and ID documents stay put and
-// the rows below point at them by path.
+// Storage buckets are NOT touched — the rows below point at files by path.
+// The pet photos come from setup/pet-images/, uploaded to pet-images/seed/ by
+// setup/setup-storage.js (part of `npm run setup`).
 //
 // The data is chosen to cover every case the app distinguishes, not just the
 // happy path: every account status for every role, every application / visit
@@ -34,9 +35,10 @@ const SUPABASE_PROJECT_URL = process.env.SUPABASE_URL;
 if (!SUPABASE_PROJECT_URL) {
   throw new Error("SUPABASE_URL must be set in .env to seed pet photo URLs");
 }
-// Public base URL for the pet-images bucket — seeded pet photos are served
-// directly from here. Photos uploaded through the app are stored as a bare
-// object path instead (e.g. "pets/8/photo-….png"); both forms are valid.
+// Public base URL for the pet-images bucket — most seeded pet photos are
+// served directly from here. Photos uploaded through the app are stored as a
+// bare object path instead (e.g. "pets/8/photo-….png"); both forms are valid,
+// and Cleo and Mischief use the bare form to cover it.
 const PET_IMAGES = `${SUPABASE_PROJECT_URL}/storage/v1/object/public/pet-images`;
 
 // ── Date helpers ─────────────────────────────────────────────────
@@ -800,7 +802,7 @@ async function main() {
       petBGroup: "DEA4",
       petColor: "Black and Tan",
       petSize: "Large",
-      petPhoto: `${PET_IMAGES}/1.png`,
+      petPhoto: `${PET_IMAGES}/seed/apollo.webp`,
       petSex: "M",
       petDesc:
         "Apollo is a confident and loyal German Shepherd who takes his role as protector seriously. He thrives with experienced owners who can match his intelligence and energy. Best suited as the only pet in the home.",
@@ -822,7 +824,7 @@ async function main() {
       petBGroup: "DEA1",
       petColor: "Golden",
       petSize: "Large",
-      petPhoto: `${PET_IMAGES}/2.png`,
+      petPhoto: `${PET_IMAGES}/seed/buddy.webp`,
       petSex: "M",
       petDesc:
         "Buddy is the definition of a family dog — endlessly cheerful, gentle with kids, and a best friend to every dog he meets. He loves fetch, swimming, and curling up on the couch after a long walk.",
@@ -846,7 +848,7 @@ async function main() {
       petBGroup: "DEA3",
       petColor: "Tricolor",
       petSize: "Medium",
-      petPhoto: `${PET_IMAGES}/3.png`,
+      petPhoto: `${PET_IMAGES}/seed/biscuit.webp`,
       petSex: "M",
       petDesc:
         "Biscuit is a nose-to-the-ground explorer who never meets a smell he doesn't investigate. Calm and affectionate at home, he loves children and is happiest on long morning walks.",
@@ -868,7 +870,7 @@ async function main() {
       petBGroup: "DEA1",
       petColor: "Yellow",
       petSize: "Medium",
-      petPhoto: `${PET_IMAGES}/4.png`,
+      petPhoto: `${PET_IMAGES}/seed/daisy.webp`,
       petSex: "F",
       petDesc:
         "Daisy is a bouncy young Lab who is still learning the ropes. She is eager to please and picks up new commands quickly. She adores children and other dogs — the more the merrier.",
@@ -890,7 +892,7 @@ async function main() {
       petBGroup: "DEA4",
       petColor: "Brindle",
       petSize: "Medium",
-      petPhoto: `${PET_IMAGES}/5.png`,
+      petPhoto: `${PET_IMAGES}/seed/rocky.webp`,
       petSex: "M",
       petDesc:
         "Rocky is a laid-back senior Bulldog who asks for little more than a comfy sofa and a patient owner. He has a mild heart condition that requires monthly vet visits but is otherwise healthy and full of personality.",
@@ -913,7 +915,7 @@ async function main() {
       petBGroup: "DEA3",
       petColor: "Black and Mahogany",
       petSize: "Large",
-      petPhoto: `${PET_IMAGES}/6.png`,
+      petPhoto: `${PET_IMAGES}/seed/zeus.webp`,
       petSex: "M",
       petDesc:
         "Zeus is a powerful and disciplined Rottweiler who is deeply loyal to those he trusts. He requires an experienced handler and a home without other animals. With the right owner, he is an incredibly devoted companion.",
@@ -935,7 +937,7 @@ async function main() {
       petBGroup: "DEA1",
       petColor: "Apricot",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/7.png`,
+      petPhoto: `${PET_IMAGES}/seed/teddy.webp`,
       petSex: "M",
       petDesc:
         "Teddy is a fluffy 4-month-old Toy Poodle puppy who is curious about everything and afraid of nothing. He is still learning basic commands and would thrive with a patient first-time owner. Gets along wonderfully with kids and other pets.",
@@ -958,7 +960,7 @@ async function main() {
       petBGroup: "AB",
       petColor: "Seal Point",
       petSize: "Small",
-      petPhoto: "pets/8/photo-1789752882891.png", // replaced through the staff UI
+      petPhoto: "seed/cleo.webp", // bare object path, like an app upload — has a PetPhoto row
       petSex: "F",
       petDesc:
         "Cleo is a vocal and opinionated Siamese who knows exactly what she wants. She forms deep bonds with her person but prefers to be the only animal in the home. Perfect for someone who wants a cat with real personality.",
@@ -981,7 +983,7 @@ async function main() {
       petBGroup: "A",
       petColor: "White and Grey",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/9.png`,
+      petPhoto: `${PET_IMAGES}/seed/mittens.webp`,
       petSex: "F",
       petDesc:
         "Mittens is a gentle and easygoing cat who gets along with everyone — children, dogs, other cats. She loves sunny windowsills and will happily sit on a lap for hours. A wonderful first cat for any household.",
@@ -1003,7 +1005,7 @@ async function main() {
       petBGroup: "B",
       petColor: "Blue Grey",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/10.png`,
+      petPhoto: `${PET_IMAGES}/seed/shadow.webp`,
       petSex: "M",
       petDesc:
         "Shadow found his forever home and is now thriving with his new family. A calm and dignified British Shorthair who won everyone over with his quiet affection.",
@@ -1026,7 +1028,7 @@ async function main() {
       petBGroup: "A",
       petColor: "Cream",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/11.png`,
+      petPhoto: `${PET_IMAGES}/seed/mochi.webp`,
       petSex: "F",
       petDesc:
         "Mochi is a 3-month-old Persian kitten with a cloud-like coat and the most expressive eyes. She is playful and sociable, already comfortable around children and other pets. She will need regular grooming.",
@@ -1050,7 +1052,7 @@ async function main() {
       petBGroup: "AB",
       petColor: "Brown Tabby",
       petSize: "Medium",
-      petPhoto: `${PET_IMAGES}/12.png`,
+      petPhoto: `${PET_IMAGES}/seed/simba.webp`,
       petSex: "M",
       petDesc:
         "Simba is a playful young Maine Coon who thinks he is much bigger than he is. He is endlessly curious, loves to climb, and chirps at birds through the window. Great with kids and other cats.",
@@ -1070,7 +1072,7 @@ async function main() {
       petWeight: 0.5,
       petHeight: 30.0,
       petBGroup: "N/A",
-      petPhoto: `${PET_IMAGES}/13.png`,
+      petPhoto: `${PET_IMAGES}/seed/polly.webp`,
       petColor: "Green and Red",
       petSize: "Small",
       petSex: "F",
@@ -1094,7 +1096,7 @@ async function main() {
       petBGroup: "N/A",
       petColor: "Blue",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/14.png`,
+      petPhoto: `${PET_IMAGES}/seed/bloo.webp`,
       petSex: "M",
       petDesc:
         "Bloo is a stunning Blue Macaw with a bold personality to match his striking plumage. He is social and vocal, and bonds deeply with his owner. Requires an experienced bird owner and a large enclosure.",
@@ -1117,7 +1119,7 @@ async function main() {
       petBGroup: "N/A",
       petColor: "Grey and White",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/15.png`,
+      petPhoto: `${PET_IMAGES}/seed/nimbus.webp`,
       petSex: "M",
       petDesc:
         "Nimbus is a rescue pigeon who was found injured and nursed back to health. He is calm, gentle and surprisingly affectionate. He gets along well with other birds and is a wonderful low-maintenance companion.",
@@ -1140,7 +1142,7 @@ async function main() {
       petBGroup: "N/A",
       petColor: "White",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/16.png`,
+      petPhoto: `${PET_IMAGES}/seed/sky.webp`,
       petSex: "F",
       petDesc:
         "Sky is a young white pigeon with a calm and trusting nature. She was rescued from a city rooftop and has since become very comfortable around people. A peaceful and easy companion for the right home.",
@@ -1162,7 +1164,7 @@ async function main() {
       petBGroup: "N/A",
       petColor: "Grey and White",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/17.png`,
+      petPhoto: `${PET_IMAGES}/seed/pebbles.webp`,
       petSex: "F",
       petDesc:
         "Pebbles is a sweet Holland Lop rabbit who loves to binky around the room and then flop dramatically by your feet. She is litter trained, gentle with children, and gets along well with other small animals.",
@@ -1185,7 +1187,7 @@ async function main() {
       petBGroup: "AB1",
       petColor: "Golden Brown",
       petSize: "Large",
-      petPhoto: "pets/771/photo-1790401452715.png", // uploaded through the staff UI
+      petPhoto: "seed/mischief.webp", // bare object path, like an app upload — has a PetPhoto row
       petSex: "M",
       petDesc:
         "Mischief, as is name suggests, is a lover of shenanigans. Though he is always eager for adventures, he is very loving and disciplined (with a few treatos of course). He has a bright aura, always keeping everyone around him smiling.",
@@ -1210,7 +1212,7 @@ async function main() {
       petBGroup: "A",
       petColor: "Tortoiseshell",
       petSize: "Small",
-      petPhoto: `${PET_IMAGES}/hazel.png`,
+      petPhoto: `${PET_IMAGES}/seed/hazel.webp`,
       petSex: "F",
       petDesc:
         "Hazel is a shy tortoiseshell recovering from dental surgery. She's in a foster home while she heals and learns to trust people again.",
@@ -1232,7 +1234,7 @@ async function main() {
       petBGroup: "DEA1",
       petColor: "Lemon and White",
       petSize: "Medium",
-      petPhoto: `${PET_IMAGES}/pepper.png`,
+      petPhoto: `${PET_IMAGES}/seed/pepper.webp`,
       petSex: "F",
       petDesc: "Pepper arrived this week and is still in intake — health check and temperament assessment pending.",
       intakeDate: daysFromNow(-3),
@@ -1253,7 +1255,7 @@ async function main() {
       petBGroup: "DEA1",
       petColor: "Chocolate",
       petSize: "Large",
-      petPhoto: `${PET_IMAGES}/oscar.png`,
+      petPhoto: `${PET_IMAGES}/seed/oscar.webp`,
       petSex: "M",
       petDesc: null,
       microchipID: "985141000000021",
@@ -1271,11 +1273,11 @@ async function main() {
   const pet = {};
   for (const data of pets) pet[data.petName] = (await prisma.pet.create({ data })).petID;
 
-  // Photo gallery rows for the two photos uploaded through the app.
+  // Photo gallery rows for the two bare-path photos (the app-upload shape).
   await prisma.petPhoto.createMany({
     data: [
-      { petID: pet.Cleo, photoURL: "pets/8/photo-1789752882891.png" },
-      { petID: pet.Mischief, photoURL: "pets/771/photo-1790401452715.png" },
+      { petID: pet.Cleo, photoURL: "seed/cleo.webp" },
+      { petID: pet.Mischief, photoURL: "seed/mischief.webp" },
     ],
   });
 
@@ -1752,8 +1754,6 @@ async function main() {
   for (const { role, email, password, note } of logins) {
     console.log(`  ${role.padEnd(12)} ${email.padEnd(36)} ${password.padEnd(14)} ${note}`);
   }
-  console.log("");
-  console.log("Pet photos not yet in the pet-images bucket: hazel.png, pepper.png, oscar.png");
 }
 
 main()

@@ -55,7 +55,7 @@ const objectUrl = (bucket, objectPath) =>
 // load. New uploads (addPhoto in staff/pets.service.js) store the bare
 // Storage object path (e.g. "pets/5/photo-123.jpg"), which needs the
 // bucket's public read URL prefix — but seed.js pets already have a full
-// absolute URL in petPhoto (e.g. "https://.../1.png"), which must pass
+// absolute URL in petPhoto (e.g. "https://.../seed/apollo.webp"), which must pass
 // through unchanged. Only ever call this for PET_IMAGES_BUCKET (public);
 // government-ids stays private and is never rendered as an <img>.
 const toPublicFileUrl = (bucket, value) => {
@@ -64,9 +64,17 @@ const toPublicFileUrl = (bucket, value) => {
   return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURI(value)}`;
 };
 
-// Uploads a buffer to `bucket` at `objectPath` (no leading slash). Fails if an
-// object already exists there (x-upsert: false). Returns the stored object path.
-const uploadPrivateFile = async (bucket, objectPath, buffer, contentType) => {
+// Uploads a buffer to `bucket` at `objectPath` (no leading slash). By default
+// fails if an object already exists there; `{ upsert: true }` overwrites it
+// instead (setup/setup-storage.js re-uploading the seed photos). Returns the
+// stored object path.
+const uploadPrivateFile = async (
+  bucket,
+  objectPath,
+  buffer,
+  contentType,
+  { upsert = false } = {},
+) => {
   assertConfigured();
 
   const res = await fetch(objectUrl(bucket, objectPath), {
@@ -74,7 +82,7 @@ const uploadPrivateFile = async (bucket, objectPath, buffer, contentType) => {
     headers: {
       ...authHeaders(),
       "Content-Type": contentType || "application/octet-stream",
-      "x-upsert": "false",
+      "x-upsert": String(upsert),
       "cache-control": "max-age=3600",
     },
     body: buffer,
@@ -133,9 +141,44 @@ const createSignedUrl = async (bucket, objectPath, expiresInSeconds = 300) => {
   return `${SUPABASE_URL}/storage/v1${signedURL}`;
 };
 
+// Creates `bucket` if it doesn't exist yet — used by setup/setup-storage.js,
+// never at request time. Returns "created" or "exists". An existing bucket is
+// left as-is, but a public/private mismatch throws: government-ids being
+// public would expose every uploaded ID document.
+const ensureBucket = async (bucket, { isPublic }) => {
+  assertConfigured();
+
+  const createRes = await fetch(`${SUPABASE_URL}/storage/v1/bucket`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ id: bucket, name: bucket, public: isPublic }),
+  });
+  if (createRes.ok) return "created";
+
+  // Creating an existing bucket fails, so look it up before treating the
+  // failure as real.
+  const createDetail = await createRes.text().catch(() => "");
+  const getRes = await fetch(`${SUPABASE_URL}/storage/v1/bucket/${bucket}`, {
+    headers: authHeaders(),
+  });
+  if (!getRes.ok) {
+    throw storageError(`Failed to create bucket "${bucket}" (${createRes.status}): ${createDetail}`);
+  }
+
+  const existing = await getRes.json();
+  if (existing.public !== isPublic) {
+    throw storageError(
+      `Bucket "${bucket}" exists but is ${existing.public ? "public" : "private"} — ` +
+        `it must be ${isPublic ? "public" : "private"}. Change it in Supabase → Storage.`,
+    );
+  }
+  return "exists";
+};
+
 module.exports = {
   GOVERNMENT_IDS_BUCKET,
   PET_IMAGES_BUCKET,
+  ensureBucket,
   uploadPrivateFile,
   deletePrivateFile,
   createSignedUrl,

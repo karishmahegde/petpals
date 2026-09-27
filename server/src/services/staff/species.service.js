@@ -5,9 +5,9 @@ const { isUniqueViolation } = require("../../utils/prismaErrors");
 // public/breeds.service.js (which stay read-only, powering the catalog's
 // filter dropdowns). Names are compared case-insensitively so "Labrador"
 // and "labrador" can't both exist — checked up front for a clean 409, and
-// again via the unique-index catch below in case the DB has the matching
-// hand-applied indexes (CLAUDE.md's manual-constraints convention) and two
-// requests race.
+// again via the unique-index catch below, which only fires if a
+// case-insensitive unique index is ever added (the baseline migration has
+// none), in case two requests race.
 
 const conflict = (message) => {
   const err = new Error(message);

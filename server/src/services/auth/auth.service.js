@@ -23,12 +23,11 @@ const ROLE_CONFIG = {
 // Roles whose table gates login behind admin/staff approval — self-registered
 // rows start Pending. Deliberately NOT relying on each table's DB-level
 // column default here (even though schema.prisma declares one to match):
-// this project hand-applies schema changes as raw SQL rather than Prisma
-// migrations (see manual-constraints.sql), and setting a column's default to
-// an enum value it just gained requires a separate transaction from the
-// ALTER TYPE that added it — so a freshly-set-up DB may still be mid-way
-// through that two-step SQL. Setting accountStatus explicitly here means
-// registration behaves correctly regardless.
+// setting a column's default to an enum value it just gained requires a
+// separate transaction from the ALTER TYPE that added it, so a DB mid-way
+// through such a two-step migration could still have the old default.
+// Setting accountStatus explicitly here means registration behaves
+// correctly regardless.
 // Volunteer is approved by staff at the shelter picked at registration.
 const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet", "volunteer"]);
 
