@@ -20,6 +20,34 @@ const ROLE_DASHBOARD: Record<string, string> = {
 export const dashboardPathFor = (role: string): string =>
   ROLE_DASHBOARD[role] ?? "/";
 
+// Admin, Staff and Veterinarian sign in through the worker portal
+// (WorkerLogin.tsx), not the public /login — so that's where they're sent
+// when their session ends.
+const WORKER_ROLES = new Set(["Admin", "Staff", "Veterinarian"]);
+
+const WORKER_LOGIN_PATH = "/staff-portal/login";
+
+// Where a session that ended on its own (401 — expired, deactivated,
+// declined) sends the user to sign in again.
+export const loginPathFor = (role: string | null): string =>
+  role && WORKER_ROLES.has(role) ? WORKER_LOGIN_PATH : "/login";
+
+// Worker dashboards (/staff, /admin, /vet) — their login page is the worker
+// portal's, so ProtectedRoute sends a signed-out visitor there instead.
+const WORKER_DASHBOARD_ROOTS = new Set(
+  [...WORKER_ROLES].map((role) => ROLE_DASHBOARD[role].slice(1)),
+);
+
+export const loginPathForPage = (path: string): string => {
+  const first = path.split(/[/?#]/)[1];
+  return WORKER_DASHBOARD_ROOTS.has(first) ? WORKER_LOGIN_PATH : "/login";
+};
+
+// Where the Log out button takes the user: workers back to their own login
+// page; everyone else to the public home page.
+export const logoutDestinationFor = (role: string | null): string =>
+  role && WORKER_ROLES.has(role) ? WORKER_LOGIN_PATH : "/";
+
 const DASHBOARD_ROOTS = Object.values(ROLE_DASHBOARD).map((path) => path.slice(1));
 
 const dashboardRootOf = (path: string): string | undefined => {

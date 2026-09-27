@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+import useEndSession from "../../logic/hooks/useEndSession";
 import { useQuery } from "@tanstack/react-query";
 import type { IconType } from "react-icons";
 import {
@@ -29,6 +30,7 @@ import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
 import ButtonElement from "../ui/ButtonElement";
 import useAuthStore from "../../logic/store/useAuthStore";
+import { logoutDestinationFor } from "../../logic/route/resolveDestination";
 import { logout as logoutApi } from "../../logic/api/authApi";
 import { getMyStaffProfile } from "../../logic/api/staffApi";
 
@@ -248,10 +250,9 @@ const DashboardSidebar = ({
   onClose,
   role: roleProp,
 }: DashboardSidebarProps) => {
-  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const storeRole = useAuthStore((state) => state.role);
-  const storeLogout = useAuthStore((state) => state.logout);
+  const endSession = useEndSession();
   const role = roleProp ?? storeRole ?? undefined;
 
   const [acctOpen, setAcctOpen] = useState(false);
@@ -314,13 +315,14 @@ const DashboardSidebar = ({
     try {
       await logoutApi();
     } finally {
-      // Leave the protected page before clearing the session — otherwise
-      // ProtectedRoute sees the token vanish first and redirects to
-      // /login?redirect=<this page>, which the next login would follow.
-      navigate("/");
-      storeLogout();
       setAcctOpen(false);
       onClose?.();
+      // Leave the protected page and clear the session in one render —
+      // otherwise ProtectedRoute sees the token vanish first and redirects
+      // to /login?redirect=<this page> (see useEndSession). Workers
+      // (Admin/Staff/Vet) go back to the worker login page, everyone else
+      // home.
+      endSession(logoutDestinationFor(storeRole));
     }
   };
 

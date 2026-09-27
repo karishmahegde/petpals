@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import useEndSession from "../../../../../logic/hooks/useEndSession";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import ButtonElement from "../../../../../components/ui/ButtonElement";
 import Modal, { ModalActions } from "../../../../../components/ui/Modal";
-import useAuthStore from "../../../../../logic/store/useAuthStore";
 import {
   closeAccount,
   type CloseAccountMode,
@@ -29,7 +28,7 @@ const extractError = (err: unknown): string =>
     : "Something went wrong. Please try again.";
 
 const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
-  const navigate = useNavigate();
+  const endSession = useEndSession();
   const [mode, setMode] = useState<CloseAccountMode | null>(null);
   const [confirmText, setConfirmText] = useState("");
 
@@ -49,9 +48,8 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
       toast.success(
         mode === "delete" ? "Account deleted" : "Account deactivated",
       );
-      // Navigate first — see DashboardSidebar's handleLogout.
-      navigate("/", { replace: true });
-      useAuthStore.getState().logout();
+      // Leave and clear the session in one render (see useEndSession).
+      endSession("/");
     },
   });
 

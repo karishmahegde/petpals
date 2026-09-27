@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import useEndSession from "../../logic/hooks/useEndSession";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
 import ButtonElement from "../ui/ButtonElement";
 import logoNav from "../../static/assets/images/branding/logoNav.png";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
-import { dashboardPathFor } from "../../logic/route/resolveDestination";
+import {
+  dashboardPathFor,
+  logoutDestinationFor,
+} from "../../logic/route/resolveDestination";
 
 const navLinks = [
   { label: "home", to: "/" },
@@ -26,7 +30,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 const Navbar = () => {
   const navigate = useNavigate();
   const { user, role } = useAuthStore();
-  const storeLogout = useAuthStore((state) => state.logout);
+  const endSession = useEndSession();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -53,11 +57,11 @@ const Navbar = () => {
     try {
       await logoutApi();
     } finally {
-      // Navigate first — see DashboardSidebar's handleLogout.
-      navigate("/");
-      storeLogout();
       setMenuOpen(false);
       setDropdownOpen(false);
+      // Leave and clear the session in one render (see useEndSession).
+      // Workers go back to the worker login page, everyone else home.
+      endSession(logoutDestinationFor(role));
     }
   };
 

@@ -1,6 +1,7 @@
 // What it does: pre-configured axios client with base URL, credentials, and auth header interceptor
 import axios from "axios";
 import useAuthStore from "../store/useAuthStore";
+import { loginPathFor } from "../route/resolveDestination";
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -22,9 +23,11 @@ axiosInstance.interceptors.response.use(
     const status = error.response?.status;
     const isAuthCall = error.config?.url?.includes("/auth/");
     if (status === 401 && !isAuthCall) {
-      // 401 error - not authenticated, redirect to login page
-      useAuthStore.getState().logout();
-      window.location.href = "/login";
+      // 401 error - not authenticated, redirect to login page — the worker
+      // portal's for Admin/Staff/Vet. Read the role before logout clears it.
+      const { role, logout } = useAuthStore.getState();
+      logout();
+      window.location.href = loginPathFor(role);
     } else if (status === 403) {
       // 403 error - not authorized, redirect to forbidden page
       window.location.href = "/forbidden";

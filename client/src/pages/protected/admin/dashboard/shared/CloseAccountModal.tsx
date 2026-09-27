@@ -5,13 +5,12 @@
 // guard on either mode: this is self-service on your own account, unlike
 // the Admins tab's Activate/Deactivate (which does block self-deactivation).
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import useEndSession from "../../../../../logic/hooks/useEndSession";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import ButtonElement from "../../../../../components/ui/ButtonElement";
 import Modal, { ModalActions } from "../../../../../components/ui/Modal";
-import useAuthStore from "../../../../../logic/store/useAuthStore";
 import {
   closeMyAdminAccount,
   type AdminCloseAccountMode,
@@ -38,7 +37,7 @@ const CloseAccountModal = ({
   isOpen,
   onClose,
 }: CloseAccountModalProps) => {
-  const navigate = useNavigate();
+  const endSession = useEndSession();
   const [mode, setMode] = useState<AdminCloseAccountMode | null>(null);
   const [confirmText, setConfirmText] = useState("");
 
@@ -58,9 +57,8 @@ const CloseAccountModal = ({
       toast.success(
         mode === "delete" ? "Account deleted" : "Account deactivated",
       );
-      // Navigate first — see DashboardSidebar's handleLogout.
-      navigate("/", { replace: true });
-      useAuthStore.getState().logout();
+      // Leave and clear the session in one render (see useEndSession).
+      endSession("/");
     },
   });
 
