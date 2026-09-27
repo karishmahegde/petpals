@@ -5,12 +5,11 @@
 // staffApi.ts (staff account domain) — this is its own feature/domain, same
 // convention as adoptionApplicationsApi.ts living apart from adoptersApi.ts.
 import axiosInstance from "./axiosInstance";
-import type { Pagination } from "./petsApi";
+import type { Breed, Pagination, Species } from "./petsApi";
 
 export type PetAdoptionStatus =
   | "incoming"
   | "available"
-  | "pending"
   | "adopted"
   | "fostered"
   | "transferred"
@@ -19,11 +18,18 @@ export type PetAdoptionStatus =
 export const PET_ADOPTION_STATUS_VALUES: PetAdoptionStatus[] = [
   "incoming",
   "available",
-  "pending",
   "adopted",
   "fostered",
   "transferred",
   "deceased",
+];
+
+export type IntakeType = "stray" | "surrendered" | "transferred";
+
+export const PET_INTAKE_TYPE_VALUES: IntakeType[] = [
+  "stray",
+  "surrendered",
+  "transferred",
 ];
 
 // Same shape as public petsApi.ts's PetCard, plus adoptionStatus (which the
@@ -36,6 +42,7 @@ export interface StaffPetListItem {
   petSex: string;
   petPhoto: string | null;
   adoptionStatus: PetAdoptionStatus;
+  intakeDate: string;
   breed: {
     breedName: string;
     speciesName: string;
@@ -58,6 +65,10 @@ interface StaffPetListParams {
   size?: string[];
   minAge?: string;
   maxAge?: string;
+  // Omit for the existing petID-descending default. 'newest' orders by
+  // intakeDate descending — used by the Staff Overview New Arrivers widget
+  // (adoptionStatus: "incoming", sort: "newest").
+  sort?: "newest";
   page?: number;
   limit?: number;
 }
@@ -102,6 +113,83 @@ export type PetSex = (typeof PET_SEX_VALUES)[number];
 const PET_SIZE_VALUES = ["Small", "Medium", "Large"] as const;
 export type PetSize = (typeof PET_SIZE_VALUES)[number];
 
+// Richer than StaffPetDetail — adds the fields public GET /pets/:id (which
+// createPet/updatePet's response reuses) doesn't return: petCode,
+// microchipID, petSize, petBGroup, and the raw petDOB (StaffPetDetail has no
+// DOB at all, only the formatted petAge). Powers the Pets tab's read-only
+// detail view and pre-fills the edit form with real values instead of
+// leaving them blank for staff to re-enter.
+export interface StaffPetFullDetail extends StaffPetDetail {
+  petCode: string;
+  petDOB: string; // ISO date-time
+  petSize: PetSize | null;
+  petBGroup: string;
+  microchipID: string | null;
+  intakeDate: string; // ISO date-time
+  intakeType: IntakeType | null;
+  featuredFlag: boolean;
+  /** Only for adopted pets — from the Accepted application; null otherwise. */
+  adopter: {
+    adopterID: number;
+    adopterName: string;
+    adopterEmail: string;
+  } | null;
+}
+
+export const getShelterPetDetail = async (
+  petID: number,
+): Promise<StaffPetFullDetail> => {
+  const response = await axiosInstance.get(`/staff/me/pets/${petID}`);
+  return response.data.data;
+};
+
+// ——————————————— HEALTH PASSPORT (GET /staff/me/pets/:id/health-passport) ———————————————
+export interface HealthRecordItem {
+  recordID: number;
+  createdAt: string;
+  recordDesc: string;
+  vetName: string | null;
+  shelterName: string | null;
+}
+
+export type VaccinationStatus = "Overdue" | "Due Soon" | "Up to Date";
+
+export interface VaccinationItem {
+  recordID: number;
+  vaccineName: string;
+  administeredDate: string;
+  dueDate: string;
+  status: VaccinationStatus;
+}
+
+export interface PetTransferHistoryItem {
+  recordID: number;
+  transferDate: string;
+  transferReason: string;
+  transferStatus: "In_Progress" | "Completed" | "Rejected" | "Cancelled";
+  fromShelterName: string;
+  toShelterName: string;
+  fromStaffName: string | null;
+  toStaffName: string | null;
+}
+
+// transferHistory here is the pet's full cross-shelter history, NOT scoped
+// to the caller's own shelter — see transfersApi.ts's getTransfersQueue for
+// the (shelter-scoped) Transfers tab's own version of transfer history.
+export interface HealthPassportData {
+  pet: StaffPetFullDetail;
+  healthRecords: HealthRecordItem[];
+  vaccinations: VaccinationItem[];
+  transferHistory: PetTransferHistoryItem[];
+}
+
+export const getHealthPassport = async (
+  petID: number,
+): Promise<HealthPassportData> => {
+  const response = await axiosInstance.get(`/staff/me/pets/${petID}/health-passport`);
+  return response.data.data;
+};
+
 // Required fields on create — see server/src/controllers/staff/pets.controller.js's
 // CREATE_REQUIRED_FIELDS for why petName/petWeight/petHeight are required
 // here despite the ticket framing them as PUT-only (all three are NOT NULL
@@ -115,9 +203,13 @@ export interface CreatePetPayload {
   petColor: string;
   petSize: PetSize;
   intakeDate: string; // "YYYY-MM-DD"
+  intakeType?: IntakeType | null;
   petWeight: number;
   petHeight: number;
   petBGroup?: string;
+  // Optional — the server defaults a new pet to "incoming" (out of the
+  // public catalog until staff mark it "available").
+  adoptionStatus?: PetAdoptionStatus;
 }
 
 export const createPet = async (
@@ -129,8 +221,8 @@ export const createPet = async (
 
 // Partial update — everything creatable, minus shelterID (reassignment is a
 // transfer, out of scope here), plus petDesc/microchipID/featuredFlag/
-// adoptionStatus. adoptionStatus is edit-only (create always starts a pet
-// at "available") — lets staff manually correct/override it (e.g. mark
+// adoptionStatus. Create defaults adoptionStatus to "incoming"; editing it
+// lets staff move a pet on to "available" or manually correct/override it (e.g. mark
 // deceased or transferred) alongside the Pending/Accepted transitions the
 // adoption application workflow already drives automatically.
 export type UpdatePetPayload = Partial<CreatePetPayload> & {
@@ -138,13 +230,32 @@ export type UpdatePetPayload = Partial<CreatePetPayload> & {
   microchipID?: string | null;
   featuredFlag?: boolean;
   adoptionStatus?: PetAdoptionStatus;
+  compatibleWithChildren?: boolean;
+  compatibleWithPets?: boolean;
+  specialNeeds?: boolean;
 };
 
+// Multipart, not JSON — an optional photo can now be saved together with
+// the field changes in ONE request (the edit form's Save button), rather
+// than a separate immediate upload. Server-side this REPLACES the pet's
+// existing photo (v1 is one photo per pet, not a gallery); omit `photoFile`
+// to leave it untouched. `null`/`undefined` payload values are dropped
+// (multipart can't represent a real null) — the one field that's actually
+// clearable this way, petDesc, has the server treat an explicit empty
+// string as "clear it", so send "" rather than omitting the key for that.
 export const updatePet = async (
   petID: number,
   payload: UpdatePetPayload,
+  photoFile?: File | null,
 ): Promise<StaffPetDetail> => {
-  const response = await axiosInstance.put(`/pets/${petID}`, payload);
+  const formData = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined) continue;
+    formData.append(key, value === null ? "" : String(value));
+  }
+  if (photoFile) formData.append("file", photoFile);
+
+  const response = await axiosInstance.put(`/pets/${petID}`, formData);
   return response.data.data;
 };
 
@@ -168,20 +279,17 @@ export const getPetPhotos = async (petID: number): Promise<PetPhoto[]> => {
 
 export interface UploadPetPhotoPayload {
   file: File;
-  /** Make this the pet's primary photo. The very first photo ever uploaded
-   * becomes primary automatically regardless of this flag. */
-  primary?: boolean;
 }
 
 // multipart/form-data — JPEG/PNG/WebP only, narrower than the government-ID
-// upload's allowed set.
+// upload's allowed set. v1 supports exactly one photo per pet, not a
+// gallery — this REPLACES whatever photo the pet had before, server-side.
 export const uploadPetPhoto = async (
   petID: number,
-  { file, primary }: UploadPetPhotoPayload,
+  { file }: UploadPetPhotoPayload,
 ): Promise<PetPhoto[]> => {
   const formData = new FormData();
   formData.append("file", file);
-  if (primary) formData.append("primary", "true");
   const response = await axiosInstance.post(
     `/pets/${petID}/photos`,
     formData,
@@ -196,5 +304,24 @@ export const deletePetPhoto = async (
   const response = await axiosInstance.delete(
     `/pets/${petID}/photos/${photoID}`,
   );
+  return response.data.data;
+};
+
+// Staff/Admin — add a species or a breed (the read side, GET /species and
+// GET /breeds, stays in petsApi.ts). Names are unique case-insensitively
+// (per species, for breeds): a duplicate is a 409 with a readable message.
+export const createSpecies = async (speciesName: string): Promise<Species> => {
+  const response = await axiosInstance.post("/species", { speciesName });
+  return response.data.data;
+};
+
+export const createBreed = async (
+  speciesID: number,
+  breedName: string,
+): Promise<Breed> => {
+  const response = await axiosInstance.post("/breeds", {
+    speciesID,
+    breedName,
+  });
   return response.data.data;
 };

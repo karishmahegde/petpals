@@ -4,7 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { PiHeartbeatBold } from "react-icons/pi";
 import SegmentedControl from "../../../../../components/ui/SegmentedControl";
-import OnboardingStepHeader from "../OnboardingStepHeader";
+import OnboardingStepHeader from "../../../../../components/ui/onboarding/OnboardingStepHeader";
+import OnboardingStepNav from "../../../../../components/ui/onboarding/OnboardingStepNav";
 import {
   updateAdopterProfile,
   type AdopterProfile as AdopterProfileData,
@@ -168,25 +169,11 @@ const LifestyleStep = ({ profile, onContinue, onBack }: LifestyleStepProps) => {
         </p>
       )}
 
-      <div className="mt-6 flex gap-3">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 rounded-xl bg-gold py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Back
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={mutation.isPending}
-          className="flex-1 rounded-xl bg-teal-dark py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {mutation.isPending ? "Saving…" : "Continue"}
-        </button>
-      </div>
+      <OnboardingStepNav
+        onBack={onBack}
+        onContinue={handleContinue}
+        isPending={mutation.isPending}
+      />
     </div>
   );
 };

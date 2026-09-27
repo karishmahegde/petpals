@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { FaRegBell } from "react-icons/fa";
 import logoNav from "../../static/assets/images/branding/logoNav.png";
+import ButtonElement from "../ui/ButtonElement";
 
 interface DashboardNavbarProps {
   /** Opens/closes the dashboard sidebar (mobile). Owned by the dashboard layout. */
@@ -30,22 +31,24 @@ const DashboardNavbar = ({
 
         <div className="flex items-center gap-3 md:gap-4">
           {/* Notification bell */}
-          <button
-            type="button"
+          <ButtonElement
             aria-label={
               hasNotifications ? "Notifications — unread" : "Notifications"
             }
+            size="bare"
+            variant="outline"
             className="relative text-rose-dark hover:text-teal-dark transition-colors"
           >
             <FaRegBell className="h-6 w-6" />
             {hasNotifications && (
               <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-dark ring-2 ring-rose-lightest" />
             )}
-          </button>
+          </ButtonElement>
 
           {/* Hamburger (mobile) — toggles the dashboard sidebar */}
-          <button
-            type="button"
+          <ButtonElement
+            size="bare"
+            variant="outline"
             className="md:hidden text-rose-dark"
             onClick={onMenuToggle}
             aria-label="Toggle menu"
@@ -82,7 +85,7 @@ const DashboardNavbar = ({
                 />
               </svg>
             )}
-          </button>
+          </ButtonElement>
         </div>
       </div>
     </nav>

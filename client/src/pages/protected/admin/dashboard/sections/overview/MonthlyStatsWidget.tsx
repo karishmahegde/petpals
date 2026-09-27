@@ -28,6 +28,7 @@ import {
 } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import Card from "../../../../../../components/ui/Card";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import DashboardWidgetHeader from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
 import {
   getMonthlyStats,
@@ -138,13 +139,14 @@ const MonthlyStatsWidget = () => {
       </div>
       {data && data.length > 0 && !isEmpty && (
         <div className="mb-4 flex justify-end">
-          <button
-            type="button"
+          <ButtonElement
             onClick={() => setView((v) => (v === "chart" ? "table" : "chart"))}
+            size="bare"
+            variant="outline"
             className="font-body text-xs font-semibold text-teal-dark hover:underline"
           >
             {view === "chart" ? "View as table" : "View as chart"}
-          </button>
+          </ButtonElement>
         </div>
       )}
 

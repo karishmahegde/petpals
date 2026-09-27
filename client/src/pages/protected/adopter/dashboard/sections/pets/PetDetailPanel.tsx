@@ -18,6 +18,7 @@ import {
   formatNumericDate,
   formatTime,
 } from "../../../../../../logic/utils/datetime";
+import { formatVetName } from "../../../../../../logic/utils/vetName";
 
 type HealthTab = "vaccinations" | "appointments";
 const HEALTH_TABS = [
@@ -187,7 +188,7 @@ const PetDetailPanel = ({ petID, onClose }: PetDetailPanelProps) => {
                         >
                           due {formatShortDate(new Date(v.dueDate))}
                         </span>
-                        {v.vetName ? ` · ${v.vetName}` : ""}
+                        {v.vetName ? ` · ${formatVetName(v.vetName)}` : ""}
                       </p>
                     </li>
                   );
@@ -212,7 +213,7 @@ const PetDetailPanel = ({ petID, onClose }: PetDetailPanelProps) => {
                     </p>
                     <p className="font-body text-xs text-neutral-gray">
                       {formatShortDate(new Date(a.appointmentDate))}
-                      {a.vetName ? ` · ${a.vetName}` : ""}
+                      {a.vetName ? ` · ${formatVetName(a.vetName)}` : ""}
                       {a.shelterName ? ` · ${a.shelterName}` : ""}
                     </p>
                   </li>

@@ -2,10 +2,6 @@ const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 
-// Each test chains several HTTP + live-DB round trips against the remote
-// Supabase instance — the 5s Jest default is too tight for that.
-jest.setTimeout(20000);
-
 // Runs against the DATABASE_URL configured in server/.env, same convention as
 // auth.login.test.js — seeds via API calls where an endpoint exists, cleans up
 // via Prisma in afterAll.

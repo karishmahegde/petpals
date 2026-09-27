@@ -1,4 +1,9 @@
 const prisma = require("../../config/prisma");
+const { staffStatusDates } = require("../../utils/staffDates");
+const {
+  withGovernmentIdStatus,
+  assertReadyForApproval,
+} = require("../staff/staffApproval.service");
 
 // Every field lives on STAFF itself except shelterName and userEmail — the
 // `user` relation is scoped to userEmail alone, so nothing else from USERS
@@ -18,22 +23,34 @@ const STAFF_LIST_SELECT = {
   staffDOS: true,
   staffDesignation: true,
   accountStatus: true,
+  // With governmentIdStatus (added after the query, see
+  // withGovernmentIdStatus), what an Admin needs to see before approving a
+  // Manager sign-up.
+  onboardingComplete: true,
   shelter: { select: { shelterName: true } },
   user: { select: { userEmail: true } },
 };
 
 // ——————————————— LIST STAFF (GET /staff) ———————————————
+// awaitingAdmin narrows to the Pending registrations Admin approves — Manager
+// sign-ups only (the first staff sign-up at a shelter without one); every
+// other staff member is approved by their shelter's manager.
 const listStaff = async ({
   shelterID,
   staffDesignation,
   accountStatus,
+  awaitingAdmin = false,
+  name,
   page = 1,
   limit = 20,
 } = {}) => {
-  const where = {};
+  const where = awaitingAdmin
+    ? { accountStatus: "Pending", staffDesignation: "Manager" }
+    : {};
   if (shelterID !== undefined) where.shelterID = shelterID;
   if (staffDesignation !== undefined) where.staffDesignation = staffDesignation;
-  if (accountStatus !== undefined) where.accountStatus = accountStatus;
+  if (accountStatus !== undefined && !awaitingAdmin) where.accountStatus = accountStatus;
+  if (name) where.staffName = { contains: name, mode: "insensitive" };
 
   const [data, total] = await Promise.all([
     prisma.staff.findMany({
@@ -47,7 +64,7 @@ const listStaff = async ({
   ]);
 
   return {
-    data,
+    data: await withGovernmentIdStatus(data),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -74,7 +91,7 @@ const getStaffDetail = async (userID) => {
   if (!staff) {
     throw notFound(userID);
   }
-  return staff;
+  return (await withGovernmentIdStatus([staff]))[0];
 };
 
 // ——————————————— UPDATE STAFF (PATCH /staff/:id) ———————————————
@@ -166,9 +183,54 @@ const updateStaff = async (userID, data) => {
 // record. Login itself already rejects a Deactivated staff account
 // (see auth.service.js's role-agnostic accountStatus check) — nothing further
 // is needed there.
+// Also stamps staffDOJ/staffDOS — see utils/staffDates.js.
+// Admin approves/declines Pending *Manager* sign-ups only — approving one
+// also makes them their shelter's manager (Shelter.managerStaffID), in the
+// same transaction. Every other Pending staff member is their shelter
+// manager's to approve (Staff tab). Deactivating/reactivating an existing
+// member stays Admin's either way.
 const updateStaffStatus = async (userID, accountStatus) => {
+  const current = await prisma.staff.findUnique({
+    where: { userID },
+    select: {
+      staffDOJ: true,
+      accountStatus: true,
+      staffDesignation: true,
+      shelterID: true,
+      onboardingComplete: true,
+      shelter: { select: { managerStaffID: true } },
+    },
+  });
+  if (!current) {
+    throw notFound(userID);
+  }
+
+  const approvingManager =
+    current.accountStatus === "Pending" && accountStatus === "Active";
+  if (current.accountStatus === "Pending") {
+    if (current.staffDesignation !== "Manager") {
+      const err = new Error(
+        "Admin approves Manager sign-ups only — this staff member's shelter manager approves them",
+      );
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+    // Two first-sign-ups could race to Manager; only one can take the seat.
+    if (approvingManager && current.shelter?.managerStaffID != null) {
+      const err = new Error("This shelter already has a manager");
+      err.code = "CONFLICT";
+      throw err;
+    }
+    if (approvingManager) {
+      await assertReadyForApproval(userID, current.onboardingComplete);
+    }
+  }
+
   const operations = [
-    prisma.staff.update({ where: { userID }, data: { accountStatus } }),
+    prisma.staff.update({
+      where: { userID },
+      data: { accountStatus, ...staffStatusDates(accountStatus, current) },
+    }),
   ];
 
   if (accountStatus === "Deactivated") {
@@ -176,6 +238,14 @@ const updateStaffStatus = async (userID, accountStatus) => {
       prisma.shelter.updateMany({
         where: { managerStaffID: userID },
         data: { managerStaffID: null },
+      }),
+    );
+  }
+  if (approvingManager && current.shelterID !== null) {
+    operations.push(
+      prisma.shelter.update({
+        where: { shelterID: current.shelterID },
+        data: { managerStaffID: userID },
       }),
     );
   }

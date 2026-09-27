@@ -1,12 +1,18 @@
 // StaffApprovalPanel.tsx
-// Detail slide-over for one Pending (self-registered, awaiting approval)
-// staff member — opened from the Staff Approvals section's "View Details".
+// Detail slide-over for one Pending Manager sign-up (the first staff
+// sign-up at a shelter without a manager) — opened from the Manager
+// Approvals section's "View Details". Approving also makes them that
+// shelter's manager, server-side.
 // Read-only profile plus Approve/Decline in the footer, both going through
 // the existing PATCH /staff/:id/status endpoint (Active = approve,
 // Deactivated = decline — there's no dedicated approve/decline endpoint).
+// Approving needs their onboarding complete AND their government ID
+// Verified (the server refuses otherwise), so Approve stays disabled, with
+// what's missing shown, until both are true.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Avatar from "../../../../../../components/ui/Avatar";
 import {
   getStaffDetail,
@@ -14,6 +20,7 @@ import {
   type StaffAccountStatusTarget,
 } from "../../../../../../logic/api/staffApi";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
+import { approvalBlockers } from "../../../../../../logic/staff/approvalReadiness";
 
 interface StaffApprovalPanelProps {
   userID: number | null;
@@ -44,10 +51,10 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
       updateStaffStatus(userID!, accountStatus),
     onSuccess: (_, accountStatus) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
+      // Approving sets the shelter's manager — refresh the shelter views too.
+      queryClient.invalidateQueries({ queryKey: ["admin", "shelters-analytics"] });
       toast.success(
-        accountStatus === "Active"
-          ? "Staff member approved"
-          : "Staff member declined",
+        accountStatus === "Active" ? "Manager approved" : "Manager declined",
       );
       onClose();
     },
@@ -57,6 +64,8 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
       ),
   });
 
+  const blockers = data ? approvalBlockers(data) : [];
+
   return (
     <SlideOver
       open={userID !== null}
@@ -65,22 +74,22 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
       footer={
         data && (
           <div className="flex gap-3">
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => mutation.mutate("Active")}
-              disabled={mutation.isPending}
-              className="flex-1 rounded-xl bg-green px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={mutation.isPending || blockers.length > 0}
+              size="panel"
+              className="flex-1 bg-green hover:brightness-95 disabled:cursor-not-allowed"
             >
               {mutation.isPending ? "Working…" : "Approve"}
-            </button>
-            <button
-              type="button"
+            </ButtonElement>
+            <ButtonElement
               onClick={() => mutation.mutate("Deactivated")}
               disabled={mutation.isPending}
-              className="flex-1 rounded-xl bg-red px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              size="panel"
+              className="flex-1 bg-red hover:brightness-95 disabled:cursor-not-allowed"
             >
               {mutation.isPending ? "Working…" : "Decline"}
-            </button>
+            </ButtonElement>
           </div>
         )
       }
@@ -125,7 +134,32 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
               k="Applied on"
               v={data.staffDOJ ? formatFullDate(new Date(data.staffDOJ)) : "—"}
             />
+            <InfoRow
+              k="Onboarding"
+              v={data.onboardingComplete ? "Complete" : "Not finished"}
+            />
+            <InfoRow
+              k="Government ID"
+              v={data.governmentIdStatus ?? "Not submitted"}
+            />
           </dl>
+
+          {blockers.length > 0 && (
+            <div className="mt-5 rounded-lg bg-gold-lightest px-4 py-3 font-body text-sm text-neutral-charcoal">
+              <p className="font-semibold">Can't approve yet</p>
+              <p className="mt-1">{blockers.join(" · ")}</p>
+              {data.governmentIdStatus === "Pending" && (
+                <ButtonElement
+                  to="/admin/id-verification"
+                  size="bare"
+                  variant="outline"
+                  className="mt-2 text-sm font-medium text-teal-dark underline"
+                >
+                  Review their ID in ID Verification
+                </ButtonElement>
+              )}
+            </div>
+          )}
 
           <p className="mt-5 font-body text-xs text-neutral-gray">
             Approving activates this account and lets them log in. Shelter and

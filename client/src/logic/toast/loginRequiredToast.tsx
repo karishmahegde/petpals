@@ -3,13 +3,15 @@
 // so the two related toasts behave identically.
 import toast from "react-hot-toast";
 import type { NavigateFunction } from "react-router-dom";
+import ButtonElement from "../../components/ui/ButtonElement";
 
 export const showLoginRequiredToast = (navigate: NavigateFunction) => {
   toast((t) => (
     <span>
       Log in to save favorites.{" "}
-      <button
-        type="button"
+      <ButtonElement
+        size="bare"
+        variant="outline"
         onClick={() => {
           toast.dismiss(t.id);
           navigate("/login");
@@ -17,7 +19,7 @@ export const showLoginRequiredToast = (navigate: NavigateFunction) => {
         className="font-semibold underline"
       >
         Log in here
-      </button>
+      </ButtonElement>
     </span>
   ));
 };

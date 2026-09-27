@@ -84,7 +84,7 @@ const Favorites = () => {
           <DashboardEmptyMessage>
             No favorites yet. Tap the heart on a pet you love!
           </DashboardEmptyMessage>
-          <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
+          <ButtonElement to="/adopt" className="bg-teal-dark hover:brightness-95">
             Explore Pets
           </ButtonElement>
         </div>

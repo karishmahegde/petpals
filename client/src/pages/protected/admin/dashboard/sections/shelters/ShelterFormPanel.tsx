@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
+import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import PhoneInputField from "../../../../../../components/ui/PhoneInputField";
 import {
   createShelter,
@@ -311,10 +312,11 @@ const ShelterFormPanel = ({
           </div>
         )}
 
-        <button
+        <ButtonElement
           type="submit"
           disabled={!canSubmit}
-          className="mt-2 rounded-xl bg-green px-4 py-3 font-body text-sm font-medium text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          size="panel"
+          className="mt-2 bg-green hover:brightness-95 disabled:cursor-not-allowed"
         >
           {mutation.isPending
             ? isEdit
@@ -323,7 +325,7 @@ const ShelterFormPanel = ({
             : isEdit
               ? "Save"
               : "Create Shelter"}
-        </button>
+        </ButtonElement>
       </form>
     </SlideOver>
   );

@@ -1,9 +1,15 @@
 const prisma = require("../../config/prisma");
 
 // ——————————————— GET SHELTERS ———————————————
-const getShelters = async () => {
+// hasManager narrows to shelters with a manager assigned — the only ones a
+// vet can sign up at (see auth.service.js's register). Only the filter is
+// public; who the manager is stays internal.
+const getShelters = async ({ hasManager = false } = {}) => {
   const shelters = await prisma.shelter.findMany({
-    where: { shelterStatus: "Open" },
+    where: {
+      shelterStatus: "Open",
+      ...(hasManager ? { managerStaffID: { not: null } } : {}),
+    },
     orderBy: { shelterName: "asc" },
     select: { shelterID: true, shelterName: true },
   });

@@ -14,7 +14,7 @@ const storage = require("../../../services/storage");
 
 // Chained register/login/HTTP round trips, plus real Storage uploads (photo,
 // government ID) on top of that — the 5s Jest default is too tight.
-jest.setTimeout(20000);
+jest.setTimeout(60000);
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -27,9 +27,19 @@ const login = (email, password) =>
 // Prisma so these journeys can log in as the staff member and drive
 // everything through their own token, the same shortcut
 // adminJourneys.test.js takes for the pieces it doesn't mean to test.
+// Staff sign-up requires picking a shelter (auth.service.js register()), so
+// overrides.shelterID doubles as the one they register at — every caller
+// passes one.
 const registerAndLoginActiveStaff = async (name, overrides = {}) => {
-  const payload = { name, email: uniqueEmail(), password: "Secret123!", role: "staff" };
+  const payload = {
+    name,
+    email: uniqueEmail(),
+    password: "Secret123!",
+    role: "staff",
+    shelterID: overrides.shelterID,
+  };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
+  expect(registerRes.status).toBe(201);
   const userID = registerRes.body.data.userID;
   await prisma.staff.update({
     where: { userID },
@@ -106,7 +116,12 @@ describe("Sprint 5.1 Staff journeys", () => {
 
   // ——————————————————————————————————————————————————————————————
   test("full staff onboarding: PUT /staff/me -> POST /staff/me/government-id -> GET /staff/me and GET .../government-id reflect both", async () => {
-    const staff = await registerAndLoginActiveStaff("Onboarding Journey Staff");
+    const shelter = await prisma.shelter.create({
+      data: makeShelterPayload("Onboarding Shelter", 10001),
+    });
+    const staff = await registerAndLoginActiveStaff("Onboarding Journey Staff", {
+      shelterID: shelter.shelterID,
+    });
 
     const putRes = await request(app)
       .put("/api/v1/staff/me")
@@ -148,6 +163,7 @@ describe("Sprint 5.1 Staff journeys", () => {
     await prisma.governmentID.deleteMany({ where: { userID: staff.userID } });
     await prisma.staff.deleteMany({ where: { userID: staff.userID } });
     await prisma.users.deleteMany({ where: { userID: staff.userID } });
+    await prisma.shelter.deleteMany({ where: { shelterID: shelter.shelterID } });
   });
 
   // ——————————————————————————————————————————————————————————————
@@ -317,7 +333,7 @@ describe("Sprint 5.1 Staff journeys", () => {
 
     // Staff B's application queue never includes Shelter A's application.
     const appsListRes = await request(app)
-      .get("/api/v1/adoption-applications")
+      .get("/api/v1/adoption-applications?section=active")
       .set("Authorization", `Bearer ${staffB.token}`);
     expect(appsListRes.status).toBe(200);
     expect(
@@ -334,7 +350,7 @@ describe("Sprint 5.1 Staff journeys", () => {
     // Confirm nothing actually changed despite the blocked attempts.
     const petCheck = await prisma.pet.findUnique({ where: { petID } });
     expect(petCheck.petColor).not.toBe("Hijacked");
-    expect(petCheck.adoptionStatus).toBe("available");
+    expect(petCheck.adoptionStatus).toBe("incoming");
     const appCheck = await prisma.adoptionApplication.findUnique({
       where: { applicationID: application.applicationID },
     });

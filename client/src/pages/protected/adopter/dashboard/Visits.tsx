@@ -85,7 +85,7 @@ const Visits = () => {
           <DashboardEmptyMessage>
             You have no visits scheduled.
           </DashboardEmptyMessage>
-          <ButtonElement to="/adopt" className="bg-teal-dark hover:bg-gold-dark">
+          <ButtonElement to="/adopt" className="bg-teal-dark hover:brightness-95">
             Explore Pets
           </ButtonElement>
         </div>

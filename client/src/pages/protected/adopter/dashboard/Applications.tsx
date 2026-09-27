@@ -15,6 +15,7 @@ import {
 import { APPLICATION_STATUS_META } from "../../../../logic/adopter/applicationStatus";
 import ApplicationsList from "./shared/ApplicationsList";
 import ApplicationDetailPanel from "./sections/applications/ApplicationDetailPanel";
+import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 
 const PAGE_SIZE = 10;
 
@@ -115,7 +116,7 @@ const Applications = () => {
           {status === "all" && (
             <ButtonElement
               to="/adopt"
-              className="bg-teal-dark hover:bg-gold-dark"
+              className="bg-teal-dark hover:brightness-95"
             >
               Explore Pets
             </ButtonElement>
@@ -130,29 +131,7 @@ const Applications = () => {
             onViewDetails={setOpenId}
           />
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span className="font-body text-sm text-neutral-gray">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="rounded-lg border border-neutral-gray px-4 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          )}
+          <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
         </Card>
       )}
 

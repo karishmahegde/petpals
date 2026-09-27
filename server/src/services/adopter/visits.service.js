@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const storage = require("../storage");
 
 // Scalar shape returned to the client for a created visit.
 const VISIT_SELECT = {
@@ -134,7 +135,7 @@ const getVisitDetailForAdopter = async (visitID, adopterID) => {
     pet: visit.pet
       ? {
           petName: visit.pet.petName,
-          petPhoto: visit.pet.petPhoto,
+          petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, visit.pet.petPhoto),
           breedName: visit.pet.breed.breedName,
           speciesName: visit.pet.breed.species.speciesName,
         }
@@ -145,16 +146,122 @@ const getVisitDetailForAdopter = async (visitID, adopterID) => {
   };
 };
 
-// ——————————————— CANCEL VISIT (PATCH /visits/:id) ———————————————
-// Adopter-initiated only, and only to 'Cancelled'. Staff confirming or
-// completing a visit is separate, later work. A visit that has already
-// passed, or is already Cancelled/Completed, can't be cancelled.
-const cancelVisit = async (visitID, adopterID) => {
+// ——————————————— LIST VISITS FOR STAFF/ADMIN (GET /visits) ———————————————
+// Shelter-wide visit queue, distinct from listVisitsByAdopter above (which is
+// a single adopter's own visits). Includes the adopter/pet summary, since
+// staff are managing visits booked by many different adopters. Same
+// Staff-scoped-to-own-shelter / Admin-optionally-filtered convention as
+// listApplicationsForStaff in adoptionApplications.service.js.
+const STAFF_LIST_SELECT = {
+  ...VISIT_SELECT,
+  pet: { select: { petName: true } }, // null when petID is not set
+  adopter: {
+    select: {
+      adopterName: true,
+      user: { select: { userEmail: true } },
+    },
+  },
+  staff: { select: { staffName: true } }, // null until Confirmed/Completed
+};
+
+const listVisitsForStaff = async (
+  { role, userID },
+  {
+    upcomingOnly = false,
+    pastOnly = false,
+    status,
+    name,
+    shelterID,
+    page = 1,
+    limit = 20,
+  } = {},
+) => {
+  // upcomingOnly / pastOnly split the queue the same way the Appointments
+  // tab does: Upcoming = still in the future and not Cancelled; Past =
+  // already happened OR Cancelled. Neither = everything (Overview widgets).
+  // visitStatus is nullable (null = unconfirmed), and `not: "Cancelled"`
+  // alone would drop the nulls, hence the explicit OR. Each OR filter is its
+  // own AND clause so the ORs don't collide (AND only set when non-empty).
+  const where = {};
+  const and = [];
+  if (upcomingOnly) {
+    where.visitTime = { gt: new Date() };
+    and.push({
+      OR: [{ visitStatus: null }, { visitStatus: { not: "Cancelled" } }],
+    });
+  } else if (pastOnly) {
+    and.push({
+      OR: [{ visitTime: { lte: new Date() } }, { visitStatus: "Cancelled" }],
+    });
+  }
+
+  // status "Unconfirmed" is the null visitStatus.
+  if (status) {
+    where.visitStatus = status === "Unconfirmed" ? null : status;
+  }
+
+  // One search box for either side of the visit: the adopter or the
+  // assigned staff member.
+  if (name) {
+    const contains = { contains: name, mode: "insensitive" };
+    and.push({
+      OR: [{ adopter: { adopterName: contains } }, { staff: { staffName: contains } }],
+    });
+  }
+  if (and.length > 0) where.AND = and;
+
+  if (role === "Staff") {
+    // Re-fetched fresh from the STAFF table on every call — shelterID is not
+    // in the JWT payload. No shelter assigned yet -> a sentinel that can
+    // never match, so the result is an empty list rather than an error
+    // (same "searched, found nothing" convention the public catalog's
+    // location filter and listApplicationsForStaff both use).
+    const staff = await prisma.staff.findUnique({
+      where: { userID },
+      select: { shelterID: true },
+    });
+    where.shelterID = staff?.shelterID ?? -1;
+  } else if (shelterID !== undefined) {
+    where.shelterID = shelterID;
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.visit.findMany({
+      where,
+      select: STAFF_LIST_SELECT,
+      orderBy: { visitTime: pastOnly ? "desc" : "asc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.visit.count({ where }),
+  ]);
+
+  return {
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+// ——————————————— UPDATE VISIT STATUS (PATCH /visits/:id) ———————————————
+// One endpoint, two unrelated actors — matches the
+// adoptionApplications.service.js updateApplicationStatus design: which
+// transitions are valid depends on the caller's role, not a shared enum.
+// Adopter may only move their own, still-future, non-closed visit to
+// 'Cancelled'. Staff/Admin may move an unconfirmed (null) visit to
+// 'Confirmed', then a 'Confirmed' visit to 'Completed' — Staff only at their
+// own shelter (403 otherwise); Admin any shelter. staffID is only ever set
+// for a genuine Staff actor (FKs Staff.userID, which an Admin doesn't have),
+// same as staffID on AdoptionApplication.
+const describeStatus = (visitStatus) =>
+  visitStatus === null ? "unconfirmed" : visitStatus.toLowerCase();
+
+const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
   const visit = await prisma.visit.findUnique({
     where: { visitID },
     select: {
       visitID: true,
       adopterID: true,
+      shelterID: true,
       visitStatus: true,
       visitTime: true,
     },
@@ -163,24 +270,61 @@ const cancelVisit = async (visitID, adopterID) => {
   if (!visit) {
     throw notFound(`No visit exists with ID ${visitID}`);
   }
-  if (visit.adopterID !== adopterID) {
-    const err = new Error("You can only cancel your own visits");
-    err.code = "FORBIDDEN";
-    throw err;
+
+  let actingStaffID = null;
+
+  if (actor.role === "Adopter") {
+    if (visit.adopterID !== actor.userID) {
+      const err = new Error("You can only cancel your own visits");
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+    if (visit.visitStatus === "Cancelled") {
+      throw conflict("This visit is already cancelled");
+    }
+    if (visit.visitStatus === "Completed") {
+      throw conflict("A completed visit can't be cancelled");
+    }
+    if (visit.visitTime.getTime() <= Date.now()) {
+      throw conflict("A visit in the past can't be cancelled");
+    }
+  } else {
+    // Staff or Admin — controller has already restricted `visitStatus` to
+    // Confirmed/Completed for this branch.
+    if (actor.role === "Staff") {
+      const staff = await prisma.staff.findUnique({
+        where: { userID: actor.userID },
+        select: { shelterID: true },
+      });
+      if (visit.shelterID !== staff?.shelterID) {
+        const err = new Error("You may only act on visits at your own shelter");
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      actingStaffID = actor.userID;
+    }
+    // Admin: no shelter restriction.
+
+    if (visitStatus === "Confirmed" && visit.visitStatus !== null) {
+      throw conflict(
+        `A ${describeStatus(visit.visitStatus)} visit can't be confirmed`,
+      );
+    }
+    if (visitStatus === "Completed" && visit.visitStatus !== "Confirmed") {
+      throw conflict(
+        `A ${describeStatus(visit.visitStatus)} visit can't be completed`,
+      );
+    }
   }
-  if (visit.visitStatus === "Cancelled") {
-    throw conflict("This visit is already cancelled");
-  }
-  if (visit.visitStatus === "Completed") {
-    throw conflict("A completed visit can't be cancelled");
-  }
-  if (visit.visitTime.getTime() <= Date.now()) {
-    throw conflict("A visit in the past can't be cancelled");
+
+  const data = { visitStatus };
+  if (actingStaffID !== null) {
+    data.staffID = actingStaffID;
   }
 
   return prisma.visit.update({
     where: { visitID },
-    data: { visitStatus: "Cancelled" },
+    data,
     select: LIST_SELECT,
   });
 };
@@ -188,6 +332,7 @@ const cancelVisit = async (visitID, adopterID) => {
 module.exports = {
   createVisit,
   listVisitsByAdopter,
+  listVisitsForStaff,
   getVisitDetailForAdopter,
-  cancelVisit,
+  updateVisitStatus,
 };

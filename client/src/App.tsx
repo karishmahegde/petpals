@@ -12,6 +12,7 @@ import Register from "./pages/public/auth/Register";
 import WorkerLogin from "./pages/public/auth/WorkerLogin";
 import WorkerRegister from "./pages/public/auth/WorkerRegister";
 import Adopt from "./pages/public/adopt/Adopt";
+import Events from "./pages/public/events/Events";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -20,6 +21,8 @@ import AdoptApply from "./pages/protected/adopter/apply/AdoptApply";
 import AdoptApplyConfirmation from "./pages/protected/adopter/apply/AdoptApplyConfirmation";
 import OnboardingWizard from "./pages/protected/adopter/onboarding/OnboardingWizard";
 import StaffDashboardRoutes from "./pages/protected/staff/dashboard/DashboardRoutes";
+import StaffOnboardingWizard from "./pages/protected/staff/onboarding/StaffOnboardingWizard";
+import AwaitingApproval from "./pages/protected/staff/pending/AwaitingApproval";
 import VetDashboard from "./pages/protected/vet/VetDashboard";
 import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
 import DonorDashboard from "./pages/protected/donor/DonorDashboard";
@@ -63,6 +66,7 @@ const App = () => {
           <Route path="/staff-portal/login" element={<WorkerLogin />} />
           <Route path="/staff-portal/register" element={<WorkerRegister />} />
           <Route path="/adopt" element={<Adopt />} />
+          <Route path="/events" element={<Events />} />
           <Route path="/forbidden" element={<Forbidden />} />
           <Route path="*" element={<NotFound />} />
         </Route>
@@ -98,6 +102,32 @@ const App = () => {
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Adopter"]}>
                 <OnboardingWizard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Staff onboarding wizard and the "awaiting approval" page a
+            Pending staff member waits on afterwards. Outside the dashboard
+            layout, and more specific than /staff/* so they match first.
+            OnboardingGate keeps a Pending staff member on whichever of the
+            two fits their state. */}
+        <Route
+          path="/staff/onboarding/step/:step"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Staff"]}>
+                <StaffOnboardingWizard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff/pending"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Staff"]}>
+                <AwaitingApproval />
               </RoleRoute>
             </ProtectedRoute>
           }

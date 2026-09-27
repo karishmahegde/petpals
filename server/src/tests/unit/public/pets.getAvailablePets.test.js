@@ -66,7 +66,7 @@ describe("GET /api/v1/pets", () => {
 
       await request(app)
         .get("/api/v1/pets")
-        .query({ adoptionStatus: "pending" });
+        .query({ adoptionStatus: "adopted" });
 
       expect(prisma.pet.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

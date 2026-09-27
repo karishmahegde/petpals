@@ -1,27 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import useEndSession from "../../logic/hooks/useEndSession";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
+import ButtonElement from "../ui/ButtonElement";
 import logoNav from "../../static/assets/images/branding/logoNav.png";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { logout as logoutApi } from "../../logic/api/authApi";
+import {
+  dashboardPathFor,
+  logoutDestinationFor,
+} from "../../logic/route/resolveDestination";
 
 const navLinks = [
   { label: "home", to: "/" },
   { label: "about", to: "/about" },
   { label: "volunteer", to: "/volunteerinfo" },
   { label: "adopt", to: "/adopt" },
+  { label: "events", to: "/events" },
 ];
-
-// DB role enum → client route
-const ROLE_ROUTES: Record<string, string> = {
-  Admin: "/admin",
-  Adopter: "/adopter",
-  Staff: "/staff",
-  Veterinarian: "/vet",
-  Volunteer: "/volunteer",
-  Donor: "/donor",
-};
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `font-body font-light text-md px-5 py-1.5 rounded-lg transition-colors ${
@@ -33,16 +30,14 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 const Navbar = () => {
   const navigate = useNavigate();
   const { user, role } = useAuthStore();
-  const storeLogout = useAuthStore((state) => state.logout);
+  const endSession = useEndSession();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const firstName = user?.name?.split(" ")[0] ?? "";
-  const dashboardRoute = role
-    ? (ROLE_ROUTES[role] ?? `/${role.toLowerCase()}`)
-    : "/";
+  const dashboardRoute = role ? dashboardPathFor(role) : "/";
 
   // Close desktop dropdown on outside click
   useEffect(() => {
@@ -62,10 +57,11 @@ const Navbar = () => {
     try {
       await logoutApi();
     } finally {
-      storeLogout();
-      navigate("/");
       setMenuOpen(false);
       setDropdownOpen(false);
+      // Leave and clear the session in one render (see useEndSession).
+      // Workers go back to the worker login page, everyone else home.
+      endSession(logoutDestinationFor(role));
     }
   };
 
@@ -88,8 +84,10 @@ const Navbar = () => {
           {user ? (
             // Logged-in: user chip + dropdown
             <div className="relative" ref={dropdownRef}>
-              <button
+              <ButtonElement
                 onClick={() => setDropdownOpen((prev) => !prev)}
+                size="bare"
+                variant="outline"
                 className="flex items-center gap-2 font-body text-sm font-medium text-neutral-dark bg-gold-md px-4 py-2 rounded-xl hover:brightness-95 transition-colors"
               >
                 {user.avatarSeed ? (
@@ -116,25 +114,29 @@ const Navbar = () => {
                     d="m19 9-7 7-7-7"
                   />
                 </svg>
-              </button>
+              </ButtonElement>
 
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg border border-neutral-offwhite overflow-hidden">
-                  <button
+                  <ButtonElement
                     onClick={() => {
                       navigate(dashboardRoute);
                       setDropdownOpen(false);
                     }}
+                    size="bare"
+                    variant="outline"
                     className="w-full text-left px-4 py-3 font-body text-sm text-neutral-dark hover:bg-gold-light transition-colors"
                   >
                     Dashboard
-                  </button>
-                  <button
+                  </ButtonElement>
+                  <ButtonElement
                     onClick={handleLogout}
+                    size="bare"
+                    variant="outline"
                     className="w-full text-left px-4 py-3 font-body text-sm text-rose-dark hover:bg-gold-light transition-colors border-t border-neutral-offwhite"
                   >
                     Logout
-                  </button>
+                  </ButtonElement>
                 </div>
               )}
             </div>
@@ -142,7 +144,7 @@ const Navbar = () => {
             // Logged-out: login button
             <NavLink
               to="/login"
-              className="font-body text-sm font-medium bg-rose-dark text-white px-5 py-2 rounded-xl hover:brightness-90 transition-colors"
+              className="font-body text-sm font-medium bg-rose-dark text-white px-5 py-2 rounded-xl hover:bg-gold-dark transition-colors"
             >
               login
             </NavLink>
@@ -151,7 +153,9 @@ const Navbar = () => {
 
         {/* Hamburger button (mobile) */}
         <div className="md:hidden flex items-center gap-2">
-          <button
+          <ButtonElement
+            size="bare"
+            variant="outline"
             className="text-rose-dark"
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label="Toggle menu"
@@ -187,7 +191,7 @@ const Navbar = () => {
                 />
               </svg>
             )}
-          </button>
+          </ButtonElement>
         </div>
       </div>
 
@@ -227,21 +231,23 @@ const Navbar = () => {
                   {firstName}
                 </span>
               </div>
-              <button
+              <ButtonElement
+                size="bare"
                 onClick={() => {
                   navigate(dashboardRoute);
                   setMenuOpen(false);
                 }}
-                className="text-left font-body text-sm font-medium text-white bg-gold-md/80 px-4 py-2.5 rounded-lg"
+                className="text-left font-body text-sm font-medium bg-gold-md/80 px-4 py-2.5 rounded-lg"
               >
                 Dashboard
-              </button>
-              <button
+              </ButtonElement>
+              <ButtonElement
+                size="bare"
                 onClick={handleLogout}
-                className="text-left font-body text-sm font-medium text-white bg-rose-dark/80 px-4 py-2.5 rounded-lg"
+                className="text-left font-body text-sm font-medium bg-rose-dark/80 px-4 py-2.5 rounded-lg"
               >
                 Logout
-              </button>
+              </ButtonElement>
             </div>
           ) : (
             <NavLink

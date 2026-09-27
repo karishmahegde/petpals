@@ -3,6 +3,7 @@
 // per-shelter manager-assignment dropdown on the Shelters tab.
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
+import type { Address } from "../utils/address";
 
 export type StaffDesignation = "Manager" | "Senior" | "Associate";
 // Pending = self-registered, awaiting admin approval. Filter-only — never a
@@ -27,7 +28,14 @@ export interface StaffListItem {
   accountStatus: StaffAccountStatus | null;
   shelter: { shelterName: string } | null;
   user: { userEmail: string };
+  // What an approver checks before approving a Pending sign-up: approval
+  // needs onboarding complete AND a Verified government ID (null when none
+  // has been submitted). Only the ID's status is ever exposed.
+  onboardingComplete: boolean;
+  governmentIdStatus: GovernmentIdStatus | null;
 }
+
+export type GovernmentIdStatus = "Pending" | "Verified" | "Rejected";
 
 export interface StaffDetail extends StaffListItem {
   // Shelter(s), if any, where this staff member is the currently-assigned manager.
@@ -38,6 +46,10 @@ interface StaffListParams {
   shelterID?: number;
   staffDesignation?: string;
   accountStatus?: string;
+  /** Only the Pending registrations Admin approves — at shelters with no manager. */
+  awaitingAdmin?: boolean;
+  /** Case-insensitive contains match on staffName. */
+  name?: string;
   page?: number;
   limit?: number;
 }
@@ -97,13 +109,23 @@ export const updateStaffStatus = async (
 // ———————————————— MY PROFILE API ————————————————
 // Self-service shape — same fields as StaffListItem. Update/close-account/
 // government-ID wrappers land with the Staff Profile page's own card.
-export const getMyStaffProfile = async (): Promise<StaffListItem> => {
+// The self-service shape — the list-row fields plus the address and the
+// account-level emailVerified/lastLoginAt (from Users).
+export interface StaffSelfProfile
+  extends Omit<StaffListItem, "governmentIdStatus">,
+    Address {
+  emailVerified: boolean;
+  lastLoginAt: string | null;
+  onboardingStep: number;
+}
+
+export const getMyStaffProfile = async (): Promise<StaffSelfProfile> => {
   const response = await axiosInstance.get("/staff/me");
   return response.data.data;
 };
 
-// Partial update — avatarSeed, staffName, staffPhone, staffDOB, and/or
-// staffSex only. Unlike Admin, Staff has no address field, and
+// Partial update — avatarSeed, staffName, staffPhone, staffDOB, staffSex
+// and the address fields (addressLine1/2, city, state, zip, country).
 // shelterID/staffDesignation/accountStatus are Admin-controlled (PATCH
 // /staff/:id, /staff/:id/status) — the endpoint rejects them here.
 // staffPhone must be a valid phone number (normalized server-side to
@@ -111,10 +133,33 @@ export const getMyStaffProfile = async (): Promise<StaffListItem> => {
 // to clear them.
 export const updateMyStaffProfile = async (
   payload: Record<string, unknown>,
-): Promise<StaffListItem> => {
+): Promise<StaffSelfProfile> => {
   const response = await axiosInstance.put("/staff/me", payload);
   return response.data.data;
 };
+
+// ———————————————— ONBOARDING API ————————————————
+// A new staff member onboards while still Pending, before approval (Step 2
+// Personal, 3 Address, 4 Identity, 5 Review). `step` is the step just
+// completed; server-side, onboardingStep only ever advances (max 5).
+export const advanceMyStaffOnboardingStep = async (
+  step: number,
+): Promise<StaffSelfProfile> => {
+  const response = await axiosInstance.patch("/staff/me/onboarding-step", {
+    step,
+  });
+  return response.data.data;
+};
+
+// Review step's Submit. 409 (with the missing items in its message) unless
+// phone, DOB, sex, address and a submitted government ID are all present.
+export const completeMyStaffOnboarding =
+  async (): Promise<StaffSelfProfile> => {
+    const response = await axiosInstance.patch(
+      "/staff/me/onboarding-complete",
+    );
+    return response.data.data;
+  };
 
 // 'deactivate' keeps the row (no self-service reactivation); 'delete' is
 // permanent. Both clear managerStaffID on any shelter this staff member

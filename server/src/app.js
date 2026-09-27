@@ -49,6 +49,8 @@ const petsRouter = require("./routes/public/pets.routes");
 app.use("/api/v1", petsRouter);
 const staffPetsRouter = require("./routes/staff/pets.routes");
 app.use("/api/v1", staffPetsRouter);
+const staffSpeciesRouter = require("./routes/staff/species.routes");
+app.use("/api/v1", staffSpeciesRouter);
 const sheltersRouter = require("./routes/public/shelters.routes");
 app.use("/api/v1", sheltersRouter);
 const adminSheltersRouter = require("./routes/admin/shelters.routes");
@@ -68,19 +70,35 @@ app.use("/api/v1", favoritesRouter);
 // "/staff/me" first (:id="me").
 const staffSelfRouter = require("./routes/staff/staff.routes");
 app.use("/api/v1", staffSelfRouter);
+// Also before the Admin /staff/:id router — see routes/staff/shelterStaff.routes.js.
+const shelterStaffRouter = require("./routes/staff/shelterStaff.routes");
+app.use("/api/v1", shelterStaffRouter);
+const staffVetsRouter = require("./routes/staff/vets.routes");
+app.use("/api/v1", staffVetsRouter);
 const staffRouter = require("./routes/admin/staff.routes");
 app.use("/api/v1", staffRouter);
 const adminsRouter = require("./routes/admin/admins.routes");
 app.use("/api/v1", adminsRouter);
 const analyticsRouter = require("./routes/admin/analytics.routes");
 app.use("/api/v1", analyticsRouter);
-// app.use('/api/v1/appointments',         require('./routes/appointments'));
+const eventsRouter = require("./routes/public/events.routes");
+app.use("/api/v1", eventsRouter);
+const staffEventsRouter = require("./routes/staff/events.routes");
+app.use("/api/v1", staffEventsRouter);
+const staffTransfersRouter = require("./routes/staff/transfers.routes");
+app.use("/api/v1", staffTransfersRouter);
+const staffAppointmentsRouter = require("./routes/staff/appointments.routes");
+app.use("/api/v1", staffAppointmentsRouter);
+const staffGovernmentIdsRouter = require("./routes/staff/governmentIds.routes");
+app.use("/api/v1", staffGovernmentIdsRouter);
+const staffVolunteersRouter = require("./routes/staff/volunteers.routes");
+app.use("/api/v1", staffVolunteersRouter);
+const staffTasksRouter = require("./routes/staff/tasks.routes");
+app.use("/api/v1", staffTasksRouter);
+const staffDonationsRouter = require("./routes/staff/donations.routes");
+app.use("/api/v1", staffDonationsRouter);
 // app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));
-// app.use('/api/v1/tasks',                require('./routes/tasks'));
-// app.use('/api/v1/events',               require('./routes/events'));
 // app.use('/api/v1/donors',               require('./routes/donors'));
-// app.use('/api/v1/donations',            require('./routes/donations'));
-// app.use('/api/v1/transfers',            require('./routes/transfers'));
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use((req, res) => {

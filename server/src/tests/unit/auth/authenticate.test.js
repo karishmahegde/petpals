@@ -17,6 +17,12 @@ const buildApp = () => {
   app.get("/protected", authenticate, (req, res) => {
     res.status(200).json({ success: true, data: req.user }); //to send the user data to the client
   });
+  // The opt-in variant used by the few routes a Pending staff member needs
+  // to onboard before approval (GET/PUT /staff/me, their government ID, the
+  // onboarding endpoints, logout).
+  app.get("/onboarding", authenticate.allowPendingStaff, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+  });
   return app;
 };
 
@@ -115,4 +121,65 @@ describe("authenticate middleware", () => {
       });
     },
   );
+
+  // —————————————————— allowPendingStaff (onboarding before approval) ——————————————————
+  describe("authenticate.allowPendingStaff", () => {
+    const tokenFor = (role) =>
+      jwt.sign({ userID: 42, role }, JWT_SECRET, { expiresIn: "1h" });
+
+    test("Pending Staff → allowed through, req.user set", async () => {
+      authService.getAccountStatus.mockResolvedValue("Pending");
+
+      const res = await request(app)
+        .get("/onboarding")
+        .set("Authorization", `Bearer ${tokenFor("Staff")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ userID: 42, role: "Staff" });
+    });
+
+    test("Active Staff → allowed through", async () => {
+      const res = await request(app)
+        .get("/onboarding")
+        .set("Authorization", `Bearer ${tokenFor("Staff")}`);
+
+      expect(res.status).toBe(200);
+    });
+
+    test.each(["Veterinarian", "Volunteer", "Admin"])(
+      "Pending %s → still 401 (only Staff onboard before approval)",
+      async (role) => {
+        authService.getAccountStatus.mockResolvedValue("Pending");
+
+        const res = await request(app)
+          .get("/onboarding")
+          .set("Authorization", `Bearer ${tokenFor(role)}`);
+
+        expect(res.status).toBe(401);
+      },
+    );
+
+    test.each(["Deactivated", "DELETED"])(
+      "%s Staff → still 401 (only Pending is let through)",
+      async (status) => {
+        authService.getAccountStatus.mockResolvedValue(status);
+
+        const res = await request(app)
+          .get("/onboarding")
+          .set("Authorization", `Bearer ${tokenFor("Staff")}`);
+
+        expect(res.status).toBe(401);
+      },
+    );
+
+    test("the plain middleware still rejects the same Pending Staff token", async () => {
+      authService.getAccountStatus.mockResolvedValue("Pending");
+
+      const res = await request(app)
+        .get("/protected")
+        .set("Authorization", `Bearer ${tokenFor("Staff")}`);
+
+      expect(res.status).toBe(401);
+    });
+  });
 });

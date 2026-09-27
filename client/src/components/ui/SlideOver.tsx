@@ -15,6 +15,7 @@
 // than a batched no-op).
 import { useEffect, useState, type ReactNode } from "react";
 import { FaTimes } from "react-icons/fa";
+import ButtonElement from "./ButtonElement";
 
 interface SlideOverProps {
   open: boolean;
@@ -72,14 +73,15 @@ const SlideOver = ({
       >
         <div className="flex shrink-0 items-center justify-between px-6 py-4">
           <h2 className="font-display text-2xl text-neutral-dark">{title}</h2>
-          <button
-            type="button"
+          <ButtonElement
             onClick={onClose}
             aria-label="Close"
+            size="bare"
+            variant="outline"
             className="text-neutral-gray hover:text-neutral-dark"
           >
             <FaTimes />
-          </button>
+          </ButtonElement>
         </div>
 
         <div className="flex-1 overflow-y-auto">{children}</div>

@@ -23,17 +23,52 @@ const ROLE_CONFIG = {
 // Roles whose table gates login behind admin/staff approval — self-registered
 // rows start Pending. Deliberately NOT relying on each table's DB-level
 // column default here (even though schema.prisma declares one to match):
-// this project hand-applies schema changes as raw SQL rather than Prisma
-// migrations (see manual-constraints.sql), and setting a column's default to
-// an enum value it just gained requires a separate transaction from the
-// ALTER TYPE that added it — so a freshly-set-up DB may still be mid-way
-// through that two-step SQL. Setting accountStatus explicitly here means
-// registration behaves correctly regardless.
-const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet"]);
+// setting a column's default to an enum value it just gained requires a
+// separate transaction from the ALTER TYPE that added it, so a DB mid-way
+// through such a two-step migration could still have the old default.
+// Setting accountStatus explicitly here means registration behaves
+// correctly regardless.
+// Volunteer is approved by staff at the shelter picked at registration.
+const PENDING_GATED_ROLES = new Set(["admin", "staff", "vet", "volunteer"]);
+
+// Roles that pick the shelter they're joining at registration.
+const SHELTER_ROLES = new Set(["volunteer", "staff", "vet"]);
+
+// Roles with an onboarding wizard — their session carries
+// onboardingComplete/onboardingStep so the frontend's OnboardingGate can
+// route them. Staff also carry accountStatus: a Pending staff member can log
+// in (to onboard before approval), so the frontend needs to know they're
+// still Pending once onboarding is done.
+const ONBOARDING_ROLES = new Set(["Adopter", "Staff"]);
 
 // ——————————————— REGISTER ———————————————
-const register = async ({ name, email, password, role }) => {
+const register = async ({ name, email, password, role, shelterID }) => {
   const { roleEnum, model, nameField } = ROLE_CONFIG[role];
+
+  // Volunteers, staff, and vets join one shelter, whose staff (volunteers)
+  // or manager (staff, vets) approve them — must be a shelter the public
+  // /shelters list offers (Open). Vets additionally need one that already
+  // has a manager: a shelter is only ready to onboard vets once it has one,
+  // and that manager is who approves them (GET /shelters?hasManager=true).
+  const joinsShelter = SHELTER_ROLES.has(role);
+  if (joinsShelter) {
+    const shelter = await prisma.shelter.findUnique({
+      where: { shelterID },
+      select: { shelterStatus: true, managerStaffID: true },
+    });
+    if (shelter?.shelterStatus !== "Open") {
+      const err = new Error("shelterID must reference an open shelter");
+      err.code = "VALIDATION_ERROR";
+      throw err;
+    }
+    if (role === "vet" && shelter.managerStaffID === null) {
+      const err = new Error(
+        "This shelter isn't onboarding veterinarians yet — it has no manager assigned",
+      );
+      err.code = "VALIDATION_ERROR";
+      throw err;
+    }
+  }
 
   //Check if email already exists
   const existing = await prisma.users.findUnique({
@@ -62,10 +97,31 @@ const register = async ({ name, email, password, role }) => {
     if (PENDING_GATED_ROLES.has(role)) {
       // Bootstrap: the very first Admin ever created has no one to approve
       // them, so they auto-activate. Every Admin after that — and every
-      // Staff/Vet — starts Pending.
+      // Staff/Vet/Volunteer — starts Pending.
       const isFirstAdmin =
         role === "admin" && (await tx.admin.count()) === 0;
       accountStatus = isFirstAdmin ? "Active" : "Pending";
+    }
+
+    // Staff: the first sign-up at a shelter with no manager (and no
+    // Manager sign-up already awaiting approval) registers as its Manager —
+    // an Admin approves them. Everyone after that signs up with no
+    // designation; their manager sets it when approving them.
+    let staffDesignation;
+    if (role === "staff") {
+      const [shelter, pendingManager] = await Promise.all([
+        tx.shelter.findUnique({
+          where: { shelterID },
+          select: { managerStaffID: true },
+        }),
+        tx.staff.findFirst({
+          where: { shelterID, staffDesignation: "Manager", accountStatus: "Pending" },
+          select: { userID: true },
+        }),
+      ]);
+      if (shelter.managerStaffID === null && !pendingManager) {
+        staffDesignation = "Manager";
+      }
     }
 
     await tx[model].create({
@@ -74,6 +130,8 @@ const register = async ({ name, email, password, role }) => {
         [nameField]: name,
         avatarSeed: crypto.randomUUID(),
         ...(accountStatus ? { accountStatus } : {}),
+        ...(joinsShelter ? { shelterID } : {}),
+        ...(staffDesignation ? { staffDesignation } : {}),
       },
     });
 
@@ -104,11 +162,13 @@ const login = async ({ email, password }) => {
   }
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
-  const isAdopter = user.role === "Adopter";
+  const tracksOnboarding = ONBOARDING_ROLES.has(user.role);
+  const isStaff = user.role === "Staff";
   let name = null;
   let avatarSeed = null;
   let onboardingComplete;
   let onboardingStep;
+  let accountStatus;
   if (config) {
     // Every role table now carries its own accountStatus field (Active/
     // Deactivated for Admin/Staff/Vet; Active/Banned/Deactivated for Adopter/
@@ -122,12 +182,13 @@ const login = async ({ email, password }) => {
         [config.nameField]: true,
         accountStatus: true,
         avatarSeed: true,
-        ...(isAdopter ? { onboardingComplete: true, onboardingStep: true } : {}),
+        ...(tracksOnboarding ? { onboardingComplete: true, onboardingStep: true } : {}),
       },
     });
     name = roleRecord?.[config.nameField] ?? null;
     avatarSeed = roleRecord?.avatarSeed ?? null;
-    if (isAdopter) {
+    accountStatus = roleRecord?.accountStatus;
+    if (tracksOnboarding) {
       onboardingComplete = roleRecord?.onboardingComplete ?? false;
       onboardingStep = roleRecord?.onboardingStep ?? 2;
     }
@@ -154,10 +215,13 @@ const login = async ({ email, password }) => {
       err.code = "UNAUTHORIZED";
       throw err;
     }
-    if (roleRecord?.accountStatus === "Pending") {
-      // Staff/Vet are approved by an Admin/Staff member; a self-registered
-      // Volunteer is approved by staff. Generic wording since "pending staff
-      // approval" was only ever true for two of the four Pending-capable roles.
+    // Pending Staff are the exception: they log in to complete onboarding
+    // before approval, and authenticate.js only lets them reach the
+    // onboarding endpoints (authenticate.allowPendingStaff) until approved.
+    if (roleRecord?.accountStatus === "Pending" && !isStaff) {
+      // Vets are approved by a shelter manager; a self-registered
+      // Volunteer is approved by staff; an Admin by another Admin. Generic
+      // wording since the approver differs by role.
       const err = new Error(
         "This account is pending approval and can't log in yet.",
       );
@@ -168,26 +232,19 @@ const login = async ({ email, password }) => {
 
   // Runs after every blocking check above, so a rejected login (wrong
   // password, Banned/Deactivated/Pending account) never counts as one.
-  // Adopter and Admin track lastLoginAt; other roles don't have the column
-  // yet.
-  if (user.role === "Adopter") {
-    await prisma.adopter.update({
-      where: { userID: user.userID },
-      data: { lastLoginAt: new Date() },
-    });
-  } else if (user.role === "Admin") {
-    await prisma.admin.update({
-      where: { userID: user.userID },
-      data: { lastLoginAt: new Date() },
-    });
-  }
+  // lastLoginAt lives on Users, so it's tracked for every role.
+  await prisma.users.update({
+    where: { userID: user.userID },
+    data: { lastLoginAt: new Date() },
+  });
 
   const { userPassword, refreshToken, ...safeUser } = user;
   return {
     ...safeUser,
     name,
     avatarSeed,
-    ...(isAdopter ? { onboardingComplete, onboardingStep } : {}),
+    ...(tracksOnboarding ? { onboardingComplete, onboardingStep } : {}),
+    ...(isStaff ? { accountStatus } : {}),
   };
 };
 
@@ -289,23 +346,27 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
   });
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
-  const isAdopter = user.role === "Adopter";
+  const tracksOnboarding = ONBOARDING_ROLES.has(user.role);
+  const isStaff = user.role === "Staff";
   let name = null;
   let avatarSeed = null;
   let onboardingComplete;
   let onboardingStep;
+  let accountStatus;
   if (config) {
     const roleRecord = await prisma[config.model].findUnique({
       where: { userID: user.userID },
       select: {
         [config.nameField]: true,
         avatarSeed: true,
-        ...(isAdopter ? { onboardingComplete: true, onboardingStep: true } : {}),
+        ...(tracksOnboarding ? { onboardingComplete: true, onboardingStep: true } : {}),
+        ...(isStaff ? { accountStatus: true } : {}),
       },
     });
     name = roleRecord?.[config.nameField] ?? null;
     avatarSeed = roleRecord?.avatarSeed ?? null;
-    if (isAdopter) {
+    accountStatus = roleRecord?.accountStatus;
+    if (tracksOnboarding) {
       onboardingComplete = roleRecord?.onboardingComplete ?? false;
       onboardingStep = roleRecord?.onboardingStep ?? 2;
     }
@@ -316,7 +377,8 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
     ...safeUser,
     name,
     avatarSeed,
-    ...(isAdopter ? { onboardingComplete, onboardingStep } : {}),
+    ...(tracksOnboarding ? { onboardingComplete, onboardingStep } : {}),
+    ...(isStaff ? { accountStatus } : {}),
   };
 };
 

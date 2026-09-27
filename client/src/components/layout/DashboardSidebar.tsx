@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+import useEndSession from "../../logic/hooks/useEndSession";
+import { useQuery } from "@tanstack/react-query";
 import type { IconType } from "react-icons";
 import {
   PiHouse,
@@ -16,16 +18,21 @@ import {
   PiArrowsClockwise,
   PiHandHeart,
   PiCalendarCheck,
-  PiHouseLine,
   PiConfettiFill,
   PiHandCoins,
   PiGearSix,
   PiIdentificationBadge,
+  PiFirstAidKit,
+  PiUserList,
+  PiIdentificationCard,
 } from "react-icons/pi";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
+import ButtonElement from "../ui/ButtonElement";
 import useAuthStore from "../../logic/store/useAuthStore";
+import { logoutDestinationFor } from "../../logic/route/resolveDestination";
 import { logout as logoutApi } from "../../logic/api/authApi";
+import { getMyStaffProfile } from "../../logic/api/staffApi";
 
 // A flat entry is a single clickable link. A group is a non-clickable
 // section header (label + icon) followed by its own links, indented one
@@ -38,6 +45,8 @@ interface NavLinkItem {
   to: string;
   icon: IconType;
   end?: boolean;
+  /** Staff only: shown just to the shelter's manager. */
+  managerOnly?: boolean;
 }
 
 interface NavGroupItem {
@@ -73,6 +82,12 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
     },
     { type: "link", label: "Staff", to: "/admin/staff", icon: PiUsersThree },
     { type: "link", label: "Admins", to: "/admin/admins", icon: PiShieldCheck },
+    {
+      type: "link",
+      label: "ID Verification",
+      to: "/admin/id-verification",
+      icon: PiIdentificationCard,
+    },
   ],
   Adopter: [
     {
@@ -130,10 +145,11 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
         },
       ],
     },
+    // The adoption pipeline, in the order staff work it.
     {
       type: "group",
-      label: "People",
-      icon: PiUsersThree,
+      label: "Adoptions",
+      icon: PiHeart,
       items: [
         {
           type: "link",
@@ -143,23 +159,29 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
         },
         {
           type: "link",
-          label: "Volunteers",
-          to: "/staff/volunteers",
-          icon: PiHandHeart,
-        },
-        {
-          type: "link",
           label: "Visits",
           to: "/staff/visits",
           icon: PiCalendarCheck,
+        },
+        {
+          type: "link",
+          label: "Adopters",
+          to: "/staff/adopters",
+          icon: PiUserList,
         },
       ],
     },
     {
       type: "group",
-      label: "Shelter",
-      icon: PiHouseLine,
+      label: "Community",
+      icon: PiUsersThree,
       items: [
+        {
+          type: "link",
+          label: "Volunteers",
+          to: "/staff/volunteers",
+          icon: PiHandHeart,
+        },
         {
           type: "link",
           label: "Events",
@@ -174,6 +196,9 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
         },
       ],
     },
+    // Who may act at this shelter. ID Verification is open to all staff
+    // (adopter/volunteer IDs); Staff and Vets are manager-only, and so are
+    // staff/vet IDs within ID Verification (enforced server-side).
     {
       type: "group",
       label: "Management",
@@ -184,6 +209,20 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
           label: "Staff",
           to: "/staff/team",
           icon: PiIdentificationBadge,
+          managerOnly: true,
+        },
+        {
+          type: "link",
+          label: "Vets",
+          to: "/staff/vets",
+          icon: PiFirstAidKit,
+          managerOnly: true,
+        },
+        {
+          type: "link",
+          label: "ID Verification",
+          to: "/staff/id-verification",
+          icon: PiIdentificationCard,
         },
       ],
     },
@@ -211,17 +250,31 @@ const DashboardSidebar = ({
   onClose,
   role: roleProp,
 }: DashboardSidebarProps) => {
-  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const storeRole = useAuthStore((state) => state.role);
-  const storeLogout = useAuthStore((state) => state.logout);
+  const endSession = useEndSession();
   const role = roleProp ?? storeRole ?? undefined;
 
   const [acctOpen, setAcctOpen] = useState(false);
 
+  // Staff: whether this user manages their shelter (same cached query as the
+  // staff pages) — hides managerOnly links otherwise (and a group left with
+  // no links).
+  const { data: staffProfile } = useQuery({
+    queryKey: ["staff", "me"],
+    queryFn: getMyStaffProfile,
+    enabled: role === "Staff",
+  });
+  const isManager = staffProfile?.staffDesignation === "Manager";
+
+  const isVisible = (link: NavLinkItem) => !link.managerOnly || isManager;
   const items: NavEntry[] =
     role && ROLE_NAV[role]
-      ? ROLE_NAV[role]
+      ? ROLE_NAV[role].flatMap((entry): NavEntry[] => {
+          if (entry.type === "link") return isVisible(entry) ? [entry] : [];
+          const links = entry.items.filter(isVisible);
+          return links.length > 0 ? [{ ...entry, items: links }] : [];
+        })
       : [
           {
             type: "link",
@@ -262,10 +315,14 @@ const DashboardSidebar = ({
     try {
       await logoutApi();
     } finally {
-      storeLogout();
       setAcctOpen(false);
       onClose?.();
-      navigate("/");
+      // Leave the protected page and clear the session in one render —
+      // otherwise ProtectedRoute sees the token vanish first and redirects
+      // to /login?redirect=<this page> (see useEndSession). Workers
+      // (Admin/Staff/Vet) go back to the worker login page, everyone else
+      // home.
+      endSession(logoutDestinationFor(storeRole));
     }
   };
 
@@ -339,15 +396,16 @@ const DashboardSidebar = ({
             <p className="font-body text-xs text-neutral-lightgray">{role}</p>
           )}
         </div>
-        <button
-          type="button"
+        <ButtonElement
           onClick={() => setAcctOpen((prev) => !prev)}
           aria-label="Account menu"
           aria-expanded={acctOpen}
+          size="bare"
+          variant="outline"
           className="shrink-0 text-neutral-lightgray transition-colors hover:text-white"
         >
           <PiDotsThreeVertical className="h-5 w-5" />
-        </button>
+        </ButtonElement>
       </div>
 
       {acctOpen && (
@@ -362,12 +420,14 @@ const DashboardSidebar = ({
           >
             Profile
           </Link>
-          <button
+          <ButtonElement
             onClick={handleLogout}
+            size="bare"
+            variant="outline"
             className="block w-full border-t border-neutral-offwhite px-4 py-3 text-left font-body text-sm text-rose-dark transition-colors hover:bg-gold-light"
           >
             Log out
-          </button>
+          </ButtonElement>
         </div>
       )}
     </div>

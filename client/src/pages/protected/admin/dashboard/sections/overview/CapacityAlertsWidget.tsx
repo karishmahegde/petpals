@@ -5,8 +5,7 @@
 // assigned (nothing to notify otherwise, same as the Shelters tab row).
 import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
-import Card from "../../../../../../components/ui/Card";
-import DashboardWidgetHeader from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
+import { OverviewWidgetCard } from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
 import {
   DashboardListRow,
   RowActionButton,
@@ -56,47 +55,39 @@ const CapacityAlertsWidget = () => {
     );
 
   return (
-    <Card className="p-4 sm:p-6">
-      <DashboardWidgetHeader
-        icon="🏢"
-        title="Capacity Alerts"
-        action={{ label: "View All", to: "/admin/shelters" }}
-      />
-
-      {isLoading ? (
-        <p className="py-8 text-center font-body text-sm text-neutral-gray">
-          Loading capacity alerts…
-        </p>
-      ) : alerts.length === 0 ? (
-        <p className="py-8 text-center font-body text-sm text-neutral-gray">
-          No shelters near capacity.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-4">
-          {alerts.map(({ shelter, level }) => (
-            <li key={shelter.shelterID}>
-              <DashboardListRow
-                className="bg-teal-light"
-                title={shelter.shelterName}
-                lines={[{ text: `${shelter.petCount}/${shelter.shelterSize}` }]}
-                badge={{ label: level, tone: ALERT_TONE[level] }}
-                actions={
-                  shelter.managerStaffID != null && (
-                    <RowActionButton
-                      onClick={() =>
-                        notifyManager(shelter.shelterName, shelter.managerName)
-                      }
-                    >
-                      Notify Manager
-                    </RowActionButton>
-                  )
-                }
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+    <OverviewWidgetCard
+      icon="🏢"
+      title="Capacity Alerts"
+      action={{ label: "View All", to: "/admin/shelters" }}
+      isLoading={isLoading}
+      loadingMessage="Loading capacity alerts…"
+      isEmpty={alerts.length === 0}
+      emptyMessage="No shelters near capacity."
+    >
+      <ul className="flex flex-col gap-4">
+        {alerts.map(({ shelter, level }) => (
+          <li key={shelter.shelterID}>
+            <DashboardListRow
+              className="bg-teal-light"
+              title={shelter.shelterName}
+              lines={[{ text: `${shelter.petCount}/${shelter.shelterSize}` }]}
+              badge={{ label: level, tone: ALERT_TONE[level] }}
+              actions={
+                shelter.managerStaffID != null && (
+                  <RowActionButton
+                    onClick={() =>
+                      notifyManager(shelter.shelterName, shelter.managerName)
+                    }
+                  >
+                    Notify Manager
+                  </RowActionButton>
+                )
+              }
+            />
+          </li>
+        ))}
+      </ul>
+    </OverviewWidgetCard>
   );
 };
 

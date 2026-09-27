@@ -10,10 +10,6 @@ const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 const stripe = require("../../../config/stripe");
 
-// Real Stripe Checkout Session creation + a locally-signed webhook delivery
-// on top of the usual register/login/HTTP chains.
-jest.setTimeout(20000);
-
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 

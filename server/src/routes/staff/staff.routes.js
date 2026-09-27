@@ -10,6 +10,11 @@ const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
 const { singleFile } = require("../../middleware/upload");
 const router = express.Router();
 
+// GET/PUT /staff/me, GET/POST /staff/me/government-id and the two onboarding
+// endpoints use authenticate.allowPendingStaff: a new staff member onboards
+// while still Pending, before approval. Every other staff route (including
+// DELETE /staff/me) keeps plain authenticate, which rejects Pending accounts.
+
 /**
  * @swagger
  * /staff/me:
@@ -56,15 +61,83 @@ const router = express.Router();
  */
 router.get(
   "/staff/me",
-  authenticate,
+  authenticate.allowPendingStaff,
   authorizeRoles(ROLES.STAFF),
   staffController.getMyProfile,
 );
 router.put(
   "/staff/me",
-  authenticate,
+  authenticate.allowPendingStaff,
   authorizeRoles(ROLES.STAFF),
   staffController.updateMyProfile,
+);
+
+/**
+ * @swagger
+ * /staff/me/onboarding-step:
+ *   patch:
+ *     summary: Advance the logged-in staff member's onboarding progress
+ *     description: >
+ *       Called after a wizard step's own data has been saved (Step 2
+ *       Personal, 3 Address, 4 Identity, 5 Review). Body `step` is the step
+ *       just completed. The server sets onboardingStep = min(max(current,
+ *       step + 1), 5) — it only ever advances. Available to Pending staff:
+ *       onboarding happens before approval.
+ *     tags: [Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [step]
+ *             properties:
+ *               step: { type: integer, minimum: 2, maximum: 5 }
+ *     responses:
+ *       200:
+ *         description: The updated staff profile (same shape as GET /staff/me)
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch(
+  "/staff/me/onboarding-step",
+  authenticate.allowPendingStaff,
+  authorizeRoles(ROLES.STAFF),
+  staffController.advanceOnboardingStep,
+);
+
+/**
+ * @swagger
+ * /staff/me/onboarding-complete:
+ *   patch:
+ *     summary: Mark the logged-in staff member's onboarding as complete
+ *     description: >
+ *       Final submit of the onboarding wizard's Review step. Requires
+ *       staffPhone, staffDOB, staffSex, addressLine1, city, state, zip,
+ *       country and a submitted government ID — 409 lists whatever is
+ *       missing. Sets onboardingComplete = true, onboardingStep = 5. A
+ *       Pending staff member then waits for approval, which also requires
+ *       their government ID to be Verified.
+ *     tags: [Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The updated staff profile (same shape as GET /staff/me)
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409: { $ref: '#/components/responses/Conflict' }
+ */
+router.patch(
+  "/staff/me/onboarding-complete",
+  authenticate.allowPendingStaff,
+  authorizeRoles(ROLES.STAFF),
+  staffController.completeOnboarding,
 );
 
 /**
@@ -123,13 +196,13 @@ router.put(
  */
 router.get(
   "/staff/me/government-id",
-  authenticate,
+  authenticate.allowPendingStaff,
   authorizeRoles(ROLES.STAFF),
   staffController.getGovernmentId,
 );
 router.post(
   "/staff/me/government-id",
-  authenticate,
+  authenticate.allowPendingStaff,
   authorizeRoles(ROLES.STAFF),
   singleFile("file"),
   staffController.uploadGovernmentId,

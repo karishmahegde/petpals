@@ -2,6 +2,8 @@ const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const {
   getPetDetails,
+  formatPetDetail,
+  PET_DETAIL_SELECT,
   formatAgeFromDOBYears,
   formatSex,
   toArray,
@@ -37,6 +39,41 @@ const noShelterAssigned = () => {
 
 const forbiddenShelter = () => {
   const err = new Error("You may only act on pets at your own shelter");
+  err.code = "FORBIDDEN";
+  return err;
+};
+
+// Statuses only the system sets — a pet in one is read-only here (edit,
+// photos, delete all 409):
+// - 'transferred': an In_Progress transfer (staff/transfers.service.js);
+//   approving, declining, or cancelling it moves the pet on.
+// - 'adopted': an Accepted application; the adopter withdrawing it puts
+//   the pet back to 'available' (adopter/adoptionApplications.service.js).
+//   Staff may still change an adopted pet's status on its own (a PUT whose
+//   only field is adoptionStatus) — e.g. back to 'incoming' when the pet is
+//   surrendered back to the shelter — but nothing else about it.
+// The controller also refuses either as a hand-set adoptionStatus.
+const LOCKED_STATUS_MESSAGE = {
+  transferred:
+    "This pet is being transferred and can't be changed until the transfer is resolved",
+  adopted: "This pet has been adopted — only its status can be changed",
+};
+
+const isStatusOnlyUpdate = (data, photoFile) =>
+  !photoFile && Object.keys(data).length === 1 && "adoptionStatus" in data;
+
+const assertPetEditable = (adoptionStatus, { statusOnly = false } = {}) => {
+  if (adoptionStatus === "adopted" && statusOnly) return;
+  const message = LOCKED_STATUS_MESSAGE[adoptionStatus];
+  if (message) {
+    const err = new Error(message);
+    err.code = "CONFLICT";
+    throw err;
+  }
+};
+
+const managerOnlyDelete = () => {
+  const err = new Error("Only the shelter's manager may delete a pet");
   err.code = "FORBIDDEN";
   return err;
 };
@@ -104,7 +141,7 @@ const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) =
 // ——————————————— LIST MY SHELTER'S PETS (GET /staff/me/pets) ———————————————
 // GET /pets (public/pets.service.js's getAvailablePets) is hardcoded to
 // adoptionStatus: "available" — fine for the public catalog, useless for a
-// staff management list that also needs to show incoming/pending/adopted/
+// staff management list that also needs to show incoming/adopted/fostered/
 // etc. pets at the staff member's own shelter. Same PetCard-ish shape as
 // the public list (reuses its age/sex formatters, and its
 // toArray/matchFilter/buildAgeFilter filter-building helpers, so the two
@@ -124,6 +161,7 @@ const listMyShelterPets = async (
     size,
     minAge,
     maxAge,
+    sort,
   } = {},
 ) => {
   const staff = await prisma.staff.findUnique({
@@ -163,13 +201,19 @@ const listMyShelterPets = async (
     where.petDOB = ageFilter;
   }
 
+  // sort is closed/fixed-value validated by the controller — 'newest' orders
+  // by intakeDate descending (Staff Overview's New Arrivers widget); omitted,
+  // this keeps the existing petID-descending default the Pets tab already
+  // relies on.
+  const orderBy = sort === "newest" ? { intakeDate: "desc" } : { petID: "desc" };
+
   const skip = (page - 1) * limit;
   const [pets, total] = await Promise.all([
     prisma.pet.findMany({
       where,
       skip,
       take: limit,
-      orderBy: { petID: "desc" },
+      orderBy,
       select: {
         petID: true,
         petName: true,
@@ -177,6 +221,7 @@ const listMyShelterPets = async (
         petPhoto: true,
         petSex: true,
         adoptionStatus: true,
+        intakeDate: true,
         breed: {
           select: {
             breedName: true,
@@ -195,6 +240,7 @@ const listMyShelterPets = async (
     petSex: formatSex(pet.petSex),
     petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, pet.petPhoto),
     adoptionStatus: pet.adoptionStatus,
+    intakeDate: pet.intakeDate,
     breed: {
       breedName: pet.breed.breedName,
       speciesName: pet.breed.species.speciesName,
@@ -204,6 +250,174 @@ const listMyShelterPets = async (
   return {
     data,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+// ——————————————— GET SHELTER PET DETAIL (GET /staff/me/pets/:id) ———————————————
+// Richer than public GET /pets/:id (which staff also uses for the same pet,
+// via the same underlying formatPetDetail) — adds the fields staff actually
+// manage but the public catalog has no reason to expose: petCode,
+// microchipID, petSize, petBGroup, raw petDOB (the public shape only ever
+// returns the formatted petAge), intakeDate, intakeType, and featuredFlag.
+// Powers the Pets tab's read-only detail view (categorized fields) and
+// pre-fills the edit form with real values instead of leaving them blank
+// for staff to re-enter.
+const STAFF_PET_DETAIL_SELECT = {
+  ...PET_DETAIL_SELECT,
+  shelterID: true, // PET_DETAIL_SELECT only nests shelter.shelterID; assertStaffOwnsShelter needs the plain FK
+  petCode: true,
+  petSize: true,
+  petBGroup: true,
+  microchipID: true,
+  intakeDate: true,
+  intakeType: true,
+  featuredFlag: true,
+};
+
+const getShelterPetDetail = async (petID, { role, userID }) => {
+  const pet = await prisma.pet.findUnique({
+    where: { petID },
+    select: STAFF_PET_DETAIL_SELECT,
+  });
+  if (!pet) {
+    throw notFound(petID);
+  }
+
+  await assertStaffOwnsShelter(role, userID, pet.shelterID);
+
+  // Adopted pets carry their adopter (from the Accepted application) so the
+  // detail panel can show who took them home and link to the adopter's full
+  // details. Skipped for every other status.
+  const acceptedApplication =
+    pet.adoptionStatus === "adopted"
+      ? await prisma.adoptionApplication.findFirst({
+          where: { petID, applicationStatus: "Accepted" },
+          orderBy: { createdAt: "desc" },
+          select: {
+            adopterID: true,
+            adopter: {
+              select: {
+                adopterName: true,
+                user: { select: { userEmail: true } },
+              },
+            },
+          },
+        })
+      : null;
+
+  return {
+    ...formatPetDetail(pet),
+    petCode: pet.petCode,
+    petDOB: pet.petDOB,
+    petSize: pet.petSize,
+    petBGroup: pet.petBGroup,
+    microchipID: pet.microchipID,
+    intakeDate: pet.intakeDate,
+    intakeType: pet.intakeType,
+    featuredFlag: pet.featuredFlag,
+    adopter: acceptedApplication
+      ? {
+          adopterID: acceptedApplication.adopterID,
+          adopterName: acceptedApplication.adopter.adopterName,
+          adopterEmail: acceptedApplication.adopter.user.userEmail,
+        }
+      : null,
+  };
+};
+
+// ——————————————— GET HEALTH PASSPORT (GET /staff/me/pets/:id/health-passport) ———————————————
+// Read-only aggregate view for the pet's own full-page "passport" — reuses
+// getShelterPetDetail for identity (and its ownership check — a Staff caller
+// may only view a passport for a pet at their own shelter) and reads
+// HealthRecord/VaccinationRecord/TransferHistory fresh alongside it. Unlike
+// staff/transfers.service.js's listTransfers, transferHistory here is NOT
+// scoped to the caller's own shelter — a passport is meant to show the
+// pet's full cross-shelter history regardless of which shelter currently
+// holds it or which shelter the viewing staff member belongs to.
+const DUE_SOON_WINDOW_DAYS = 30;
+
+// administeredDate/dueDate are both non-nullable in the schema — every row
+// represents a dose that WAS given, with a next-dose dueDate to track. So
+// status is driven purely by how soon/overdue that next dose is, not by
+// whether the pet has ever been vaccinated at all.
+const vaccinationStatus = (dueDate) => {
+  const daysUntilDue = (new Date(dueDate) - Date.now()) / 86400000;
+  if (daysUntilDue < 0) return "Overdue";
+  if (daysUntilDue <= DUE_SOON_WINDOW_DAYS) return "Due Soon";
+  return "Up to Date";
+};
+
+const getHealthPassport = async (petID, { role, userID }) => {
+  const pet = await getShelterPetDetail(petID, { role, userID });
+
+  const [healthRecordRows, vaccinationRows, transferRows] = await Promise.all([
+    prisma.healthRecord.findMany({
+      where: { petID },
+      orderBy: { createdAt: "desc" },
+      select: {
+        recordID: true,
+        createdAt: true,
+        recordDesc: true,
+        vet: {
+          select: {
+            vetName: true,
+            shelter: { select: { shelterName: true } },
+          },
+        },
+      },
+    }),
+    prisma.vaccinationRecord.findMany({
+      where: { petID },
+      orderBy: { dueDate: "asc" },
+      select: {
+        recordID: true,
+        administeredDate: true,
+        dueDate: true,
+        vaccine: { select: { vaccineName: true } },
+      },
+    }),
+    prisma.transferHistory.findMany({
+      where: { petID },
+      orderBy: { transferDate: "desc" },
+      select: {
+        recordID: true,
+        transferDate: true,
+        transferReason: true,
+        transferStatus: true,
+        fromShelter: { select: { shelterName: true } },
+        toShelter: { select: { shelterName: true } },
+        fromStaff: { select: { staffName: true } },
+        toStaff: { select: { staffName: true } },
+      },
+    }),
+  ]);
+
+  return {
+    pet,
+    healthRecords: healthRecordRows.map((r) => ({
+      recordID: r.recordID,
+      createdAt: r.createdAt,
+      recordDesc: r.recordDesc,
+      vetName: r.vet?.vetName ?? null,
+      shelterName: r.vet?.shelter?.shelterName ?? null,
+    })),
+    vaccinations: vaccinationRows.map((r) => ({
+      recordID: r.recordID,
+      vaccineName: r.vaccine.vaccineName,
+      administeredDate: r.administeredDate,
+      dueDate: r.dueDate,
+      status: vaccinationStatus(r.dueDate),
+    })),
+    transferHistory: transferRows.map((r) => ({
+      recordID: r.recordID,
+      transferDate: r.transferDate,
+      transferReason: r.transferReason,
+      transferStatus: r.transferStatus,
+      fromShelterName: r.fromShelter.shelterName,
+      toShelterName: r.toShelter.shelterName,
+      fromStaffName: r.fromStaff?.staffName ?? null,
+      toStaffName: r.toStaff?.staffName ?? null,
+    })),
   };
 };
 
@@ -229,11 +443,12 @@ const getPhotos = async (petID, { role, userID }) => {
 // `data` is already validated and whitelisted by the controller (the
 // schema-required fields — see the controller's CREATE_REQUIRED_FIELDS
 // design note for why petName/petWeight/petHeight are required here despite
-// the ticket framing them as PUT-only). Two fields are set here rather than
-// accepted from the client at all: adoptionStatus always starts "available"
-// so the pet is immediately visible in the public catalog (the column has
-// no DB default despite being effectively required for the pet to be
-// useful), and petPhoto gets a placeholder until POST /pets/:id/photos (a
+// the ticket framing them as PUT-only). adoptionStatus defaults to
+// "incoming" when the client doesn't send one (the column has no DB
+// default) — a new arrival stays out of the public catalog, and shows in
+// the Overview's New Arrivers and the Pets tab's Incoming Pets, until staff
+// mark it available. petPhoto is never accepted from the client: it gets a
+// placeholder until POST /pets/:id/photos (a
 // later Sprint 5.1 card) supplies a real one — the column is NOT NULL with
 // no default, so pet creation can't leave it empty even though photo
 // upload is a separate step.
@@ -245,7 +460,7 @@ const createPet = async ({ data, actor, requestedShelterID }) => {
     data: {
       ...data,
       shelterID,
-      adoptionStatus: "available",
+      adoptionStatus: data.adoptionStatus ?? "incoming",
       petPhoto: "placeholder.jpg",
     },
   });
@@ -256,39 +471,137 @@ const createPet = async ({ data, actor, requestedShelterID }) => {
   return getPetDetails(pet.petID);
 };
 
+// ——————————————— SHARED PHOTO-REPLACE HELPERS ———————————————
+// v1 supports exactly one photo per pet, not a gallery — every upload
+// REPLACES whatever was there before, rather than adding to it. Shared by
+// updatePet (an optional photo can now ride along with a PUT, saved
+// together in one request/transaction — see logic/api/staffPetsApi.ts) and
+// the standalone addPhoto (kept for API callers that only want to change
+// the photo). PetPhoto stays a one-to-many table and all the photo
+// endpoints are unchanged, so reintroducing a real gallery later is just a
+// logic change here, no migration.
+//
+// Ordering matters for safety: the new file is uploaded and the DB
+// committed to it FIRST; only once that succeeds is what was there before
+// deleted (cleanupOldPhotoFiles, called after the caller's own transaction
+// commits). That way a failure at any point before the commit leaves the
+// old photo fully intact — the alternative order (delete old, then upload
+// new) risks leaving the pet with no photo at all if the upload or DB
+// write then fails. The final cleanup delete is best-effort
+// (deletePrivateFile never throws) — a failure there leaves one orphaned
+// object in the bucket, not a broken pet record.
+const PLACEHOLDER_PHOTO = "placeholder.jpg";
+
+const EXT_BY_MIME = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+// Uploads `file` to a fresh path and returns the Prisma write operations
+// that point the pet's single PetPhoto row at it — the caller batches these
+// into its own $transaction (updatePet also needs to write the pet's other
+// field changes in that same transaction).
+const preparePhotoReplacement = async (petID, file) => {
+  const ext = EXT_BY_MIME[file.mimetype] || "jpg";
+  const objectPath = `pets/${petID}/photo-${Date.now()}.${ext}`;
+
+  await storage.uploadPrivateFile(
+    storage.PET_IMAGES_BUCKET,
+    objectPath,
+    file.buffer,
+    file.mimetype,
+  );
+
+  return {
+    objectPath,
+    operations: [
+      prisma.petPhoto.deleteMany({ where: { petID } }),
+      prisma.petPhoto.create({ data: { petID, photoURL: objectPath } }),
+    ],
+  };
+};
+
+// Deletes whatever photo(s) existed before a just-committed replacement —
+// never the shared placeholder every photo-less pet points at (deleting it
+// would break the fallback image for every other pet still using it).
+const cleanupOldPhotoFiles = async (existing) => {
+  const staleObjectPaths = new Set(existing.photos.map((p) => p.photoURL));
+  if (existing.petPhoto !== PLACEHOLDER_PHOTO) {
+    staleObjectPaths.add(existing.petPhoto);
+  }
+  await Promise.all(
+    [...staleObjectPaths].map((photoURL) =>
+      storage.deletePrivateFile(storage.PET_IMAGES_BUCKET, photoURL),
+    ),
+  );
+};
+
 // ——————————————— UPDATE PET (PUT /pets/:id) ———————————————
 // `data` is already validated, whitelisted, and non-empty by the
 // controller. shelterID reassignment is out of scope here (that's a
 // transfer, not a profile edit) — Staff is scoped to their own shelter's
-// pets only, Admin may edit any.
-const updatePet = async (petID, data, { role, userID }) => {
+// pets only, Admin may edit any. `photoFile`, when present, replaces the
+// pet's photo in the SAME transaction as the field updates — see the
+// design note on preparePhotoReplacement above.
+const updatePet = async (petID, data, { role, userID }, photoFile) => {
   const existing = await prisma.pet.findUnique({
     where: { petID },
-    select: { shelterID: true },
+    select: {
+      shelterID: true,
+      adoptionStatus: true,
+      petPhoto: true,
+      photos: { select: { photoURL: true } },
+    },
   });
   if (!existing) {
     throw notFound(petID);
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  assertPetEditable(existing.adoptionStatus, {
+    statusOnly: isStatusOnlyUpdate(data, photoFile),
+  });
 
   if ("breedID" in data) {
     await assertBreedExists(data.breedID);
   }
 
+  let newPhoto = null;
+  if (photoFile) {
+    newPhoto = await preparePhotoReplacement(petID, photoFile);
+  }
+
   try {
-    await prisma.pet.update({ where: { petID }, data });
+    const operations = newPhoto ? [...newPhoto.operations] : [];
+    operations.push(
+      prisma.pet.update({
+        where: { petID },
+        data: newPhoto ? { ...data, petPhoto: newPhoto.objectPath } : data,
+      }),
+    );
+    await prisma.$transaction(operations);
   } catch (err) {
+    if (newPhoto) {
+      await storage.deletePrivateFile(storage.PET_IMAGES_BUCKET, newPhoto.objectPath);
+    }
     if (err.code === "P2025") {
       throw notFound(petID);
     }
     throw err;
   }
 
+  if (newPhoto) {
+    await cleanupOldPhotoFiles(existing);
+  }
+
   return getPetDetails(petID);
 };
 
 // ——————————————— DELETE PET (DELETE /pets/:id) ———————————————
+// Manager-only for Staff: only the pet's own shelter manager
+// (Shelter.managerStaffID, same check as transfer reassignment) may delete
+// it — permanent, and takes the pet's photos with it. Admin may too.
 // Blocked while the pet has a Pending or Accepted application — those are
 // the two non-terminal statuses (see the adoption-applications design
 // notes elsewhere in this codebase); Rejected/Withdrawn don't block since
@@ -301,7 +614,9 @@ const deletePet = async (petID, { role, userID }) => {
     where: { petID },
     select: {
       shelterID: true,
+      adoptionStatus: true,
       photos: { select: { photoURL: true } },
+      shelter: { select: { managerStaffID: true } },
     },
   });
   if (!existing) {
@@ -309,6 +624,10 @@ const deletePet = async (petID, { role, userID }) => {
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  if (role === "Staff" && existing.shelter.managerStaffID !== userID) {
+    throw managerOnlyDelete();
+  }
+  assertPetEditable(existing.adoptionStatus);
 
   const activeApplication = await prisma.adoptionApplication.findFirst({
     where: { petID, applicationStatus: { in: ["Pending", "Accepted"] } },
@@ -344,12 +663,6 @@ const photoNotFound = (photoID, petID) => {
   return err;
 };
 
-const EXT_BY_MIME = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
 // The pet's full gallery, in upload order, each flagged against the pet's
 // current primary (Pet.petPhoto) — there's no isPrimary column on PetPhoto
 // itself, primary-ness is just "this row's URL happens to match
@@ -372,52 +685,46 @@ const listPhotos = async (petID, primaryPhotoURL) => {
   }));
 };
 
-// `file` is already validated by the controller (JPEG/PNG/WebP only, ≤5MB —
-// the shared upload middleware allows a wider set, so the controller narrows
-// it further for this endpoint specifically). Becomes the pet's primary
-// petPhoto if this is the pet's first photo ever, or if the caller passed
-// makePrimary explicitly — otherwise it's just added to the gallery.
-const addPhoto = async (petID, { role, userID }, { file, makePrimary }) => {
+// Standalone counterpart to updatePet's optional photoFile — for API
+// callers that only want to change the photo, without also editing other
+// fields. Same replace-not-add semantics and safe ordering; see
+// preparePhotoReplacement/cleanupOldPhotoFiles's shared design note above.
+// `file` is already validated by the controller (JPEG/PNG/WebP only,
+// ≤5MB — the shared upload middleware allows a wider set, so the
+// controller narrows it further for this endpoint specifically).
+const addPhoto = async (petID, { role, userID }, { file }) => {
   const existing = await prisma.pet.findUnique({
     where: { petID },
-    select: { shelterID: true, petPhoto: true, photos: { select: { photoID: true } } },
+    select: {
+      shelterID: true,
+      adoptionStatus: true,
+      petPhoto: true,
+      photos: { select: { photoURL: true } },
+    },
   });
   if (!existing) {
     throw notFound(petID);
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  assertPetEditable(existing.adoptionStatus);
 
-  const isFirstPhoto = existing.photos.length === 0;
-  const ext = EXT_BY_MIME[file.mimetype] || "jpg";
-  const objectPath = `pets/${petID}/photo-${Date.now()}.${ext}`;
+  const newPhoto = await preparePhotoReplacement(petID, file);
 
-  await storage.uploadPrivateFile(
-    storage.PET_IMAGES_BUCKET,
-    objectPath,
-    file.buffer,
-    file.mimetype,
-  );
-
-  let primaryPhotoURL = existing.petPhoto;
   try {
-    const operations = [
-      prisma.petPhoto.create({ data: { petID, photoURL: objectPath } }),
-    ];
-    if (isFirstPhoto || makePrimary) {
-      primaryPhotoURL = objectPath;
-      operations.push(
-        prisma.pet.update({ where: { petID }, data: { petPhoto: objectPath } }),
-      );
-    }
-    await prisma.$transaction(operations);
+    await prisma.$transaction([
+      ...newPhoto.operations,
+      prisma.pet.update({ where: { petID }, data: { petPhoto: newPhoto.objectPath } }),
+    ]);
   } catch (err) {
-    // DB write failed after the file landed — remove the orphaned object.
-    await storage.deletePrivateFile(storage.PET_IMAGES_BUCKET, objectPath);
+    // DB write failed after the new file landed — remove the orphaned object.
+    await storage.deletePrivateFile(storage.PET_IMAGES_BUCKET, newPhoto.objectPath);
     throw err;
   }
 
-  return listPhotos(petID, primaryPhotoURL);
+  await cleanupOldPhotoFiles(existing);
+
+  return listPhotos(petID, newPhoto.objectPath);
 };
 
 // Removes both the Storage object and the PetPhoto row. If the removed
@@ -428,13 +735,14 @@ const addPhoto = async (petID, { role, userID }, { file, makePrimary }) => {
 const deletePhoto = async (petID, photoID, { role, userID }) => {
   const existing = await prisma.pet.findUnique({
     where: { petID },
-    select: { shelterID: true, petPhoto: true },
+    select: { shelterID: true, adoptionStatus: true, petPhoto: true },
   });
   if (!existing) {
     throw notFound(petID);
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+  assertPetEditable(existing.adoptionStatus);
 
   const photo = await prisma.petPhoto.findFirst({
     where: { photoID, petID },
@@ -466,6 +774,8 @@ const deletePhoto = async (petID, photoID, { role, userID }) => {
 
 module.exports = {
   listMyShelterPets,
+  getShelterPetDetail,
+  getHealthPassport,
   createPet,
   updatePet,
   deletePet,

@@ -1,5 +1,6 @@
-// What it does: Defines the Admin-only adopter oversight routes — mounted at
-// /api/v1/adopters in app.js, alongside (not instead of) the adopter's own
+// What it does: Defines the adopter oversight routes — list and detail are
+// Admin + Staff (the Staff dashboard's read-only Adopters tab), status
+// changes Admin-only — mounted at /api/v1/adopters in app.js, alongside (not instead of) the adopter's own
 // /adopters/me routes in routes/adopter/adopters.routes.js.
 const express = require("express");
 const adoptersController = require("../../controllers/admin/adopters.controller");
@@ -11,10 +12,10 @@ const router = express.Router();
  * @swagger
  * /adopters:
  *   get:
- *     summary: List every adopter account (Admin only)
+ *     summary: List every adopter account (Admin, Staff)
  *     description: >
- *       Paginated, org-wide adopter listing for admin oversight. Never
- *       includes governmentID or stripeCustomerID.
+ *       Paginated, org-wide adopter listing (adopters aren't tied to one
+ *       shelter). Never includes governmentID or stripeCustomerID.
  *     tags: [Adopters, Admin]
  *     security:
  *       - bearerAuth: []
@@ -32,6 +33,10 @@ const router = express.Router();
  *         name: adopterRiskFlag
  *         schema: { type: boolean }
  *         description: When exactly "true", returns only flagged adopters
+ *       - in: query
+ *         name: name
+ *         schema: { type: string }
+ *         description: Case-insensitive contains match on adopterName
  *     responses:
  *       200:
  *         description: Paginated adopter list, ordered by adopterName ascending
@@ -53,8 +58,40 @@ const router = express.Router();
 router.get(
   "/",
   authenticate,
-  authorizeRoles(ROLES.ADMIN),
+  authorizeRoles(ROLES.ADMIN, ROLES.STAFF),
   adoptersController.listAdopters,
+);
+
+/**
+ * @swagger
+ * /adopters/{id}:
+ *   get:
+ *     summary: Get one adopter's full profile (Admin, Staff)
+ *     description: >
+ *       Every profile field the adopter fills in, plus login email,
+ *       preferred breed name, and government ID verification status only
+ *       (never the ID itself or stripeCustomerID).
+ *     tags: [Adopters, Admin, Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The adopter's profile
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  "/:id",
+  authenticate,
+  authorizeRoles(ROLES.ADMIN, ROLES.STAFF),
+  adoptersController.getAdopter,
 );
 
 /**

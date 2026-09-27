@@ -1,8 +1,14 @@
 const prisma = require("../../config/prisma");
 const stripe = require("../../config/stripe");
+const storage = require("../storage");
 const { APPLICATION_FEE_CENTS, APPLICATION_FEE_USD } = require("../../config/fees");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
-const { formatAgeFromDOBYears, formatSex } = require("../public/pets.service");
+const {
+  formatAgeFromDOBYears,
+  formatSex,
+  toArray,
+  matchFilter,
+} = require("../public/pets.service");
 
 // Scalar shape returned to the client for an application. Stripe reference
 // IDs (session/payment intent) are deliberately excluded — no adopter-facing
@@ -213,6 +219,16 @@ const getApplicationByCheckoutSession = async (adopterID, sessionId) => {
   return toClientShape(application);
 };
 
+// Only the application's own shelter manager (Shelter.managerStaffID — kept
+// in sync with staffDesignation 'Manager' by admin/staff.service.js) may
+// assign its staff, and only while it's still Pending (Accept overwrites
+// staffID with the deciding staff member anyway). Admin may too, same as the
+// transfer reassign in staff/transfers.service.js.
+const canAssignStaff = (application, actor) =>
+  application.applicationStatus === "Pending" &&
+  (actor.role === "Admin" ||
+    (actor.role === "Staff" && application.shelter.managerStaffID === actor.userID));
+
 // ——————————————— GET APPLICATION BY ID (GET /adoption-applications/:id) ———————————————
 // Powers the Applications section's detail slide-over: the scalar fields plus
 // the pet summary, assigned staff name, and the shelter's closing remark.
@@ -235,10 +251,20 @@ const getApplicationById = async (applicationID, user) => {
           },
         },
       },
-      shelter: { select: { shelterName: true } },
+      shelter: { select: { shelterName: true, managerStaffID: true } },
       staff: { select: { staffName: true } },
       adopter: {
-        select: { adopterName: true, user: { select: { userEmail: true } } },
+        select: {
+          adopterName: true,
+          adopterPhone: true,
+          housingType: true,
+          ownsOrRents: true,
+          landlordContact: true,
+          householdSize: true,
+          numChildren: true,
+          preQualifyFlag: true,
+          user: { select: { userEmail: true } },
+        },
       },
     },
   });
@@ -258,6 +284,36 @@ const getApplicationById = async (applicationID, user) => {
     throw err;
   }
 
+  // Government ID is Staff/Admin-only here (an adopter reviewing their own
+  // application already has this in their own Profile's GovernmentIdSection
+  // — no need to duplicate it). Only the verification status is exposed —
+  // no idType/idNumber, not even masked (see CLAUDE.md's "Never expose ...
+  // governmentID" rule); the full record lives in the dedicated ID
+  // Verification tab (staff/governmentIds.service.js) for the actual
+  // review workflow.
+  let governmentIdStatus = null;
+  // Staff/Admin only: how many OTHER Pending applications this pet has —
+  // accepting this one declines all of them (see updateApplicationStatus),
+  // so the Accept confirmation can say so up front.
+  let otherPendingCount = null;
+  if (user.role !== "Adopter") {
+    const [record, pendingCount] = await Promise.all([
+      prisma.governmentID.findFirst({
+        where: { userID: application.adopterID, userType: "Adopter" },
+        select: { verificationStatus: true },
+      }),
+      prisma.adoptionApplication.count({
+        where: {
+          petID: application.petID,
+          applicationStatus: "Pending",
+          applicationID: { not: application.applicationID },
+        },
+      }),
+    ]);
+    governmentIdStatus = record?.verificationStatus ?? null;
+    otherPendingCount = pendingCount;
+  }
+
   return {
     applicationID: application.applicationID,
     applicationCode: application.applicationCode,
@@ -274,7 +330,7 @@ const getApplicationById = async (applicationID, user) => {
     createdAt: application.createdAt,
     pet: {
       petName: application.pet.petName,
-      petPhoto: application.pet.petPhoto,
+      petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, application.pet.petPhoto),
       breedName: application.pet.breed.breedName,
       speciesName: application.pet.breed.species.speciesName,
     },
@@ -287,7 +343,17 @@ const getApplicationById = async (applicationID, user) => {
     adopter: {
       adopterName: application.adopter.adopterName,
       adopterEmail: application.adopter.user.userEmail,
+      adopterPhone: application.adopter.adopterPhone,
+      housingType: application.adopter.housingType,
+      ownsOrRents: application.adopter.ownsOrRents,
+      landlordContact: application.adopter.landlordContact,
+      householdSize: application.adopter.householdSize,
+      numChildren: application.adopter.numChildren,
+      preQualifyFlag: application.adopter.preQualifyFlag,
     },
+    governmentIdStatus,
+    otherPendingCount,
+    canAssignStaff: canAssignStaff(application, user),
   };
 };
 
@@ -332,7 +398,13 @@ const listApplicationsByAdopter = async (
   ]);
 
   return {
-    data,
+    data: data.map((row) => ({
+      ...row,
+      pet: {
+        ...row.pet,
+        petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, row.pet.petPhoto),
+      },
+    })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -377,7 +449,7 @@ const listAdoptedPetsByAdopter = async (adopterID) => {
     petName: row.pet.petName,
     petAge: formatAgeFromDOBYears(row.pet.petDOB),
     petSex: formatSex(row.pet.petSex),
-    petPhoto: row.pet.petPhoto,
+    petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, row.pet.petPhoto),
     breed: {
       breedName: row.pet.breed.breedName,
       speciesName: row.pet.breed.species.speciesName,
@@ -420,20 +492,22 @@ const STAFF_LIST_SELECT = {
   },
 };
 
-// Pending (needs review) first, then Rejected, then Accepted, then
-// Withdrawn — not a plain createdAt sort, so it can't be expressed as a
-// single Prisma `orderBy` without leaning on the ApplicationStatus enum's
-// declaration order (fragile/coincidental, and not this priority anyway).
-const STATUS_SORT_PRIORITY = { Pending: 0, Rejected: 1, Accepted: 2, Withdrawn: 3 };
+// "active" = Pending (needs review); "past" = everything already resolved
+// (Accepted/Rejected/Withdrawn) — this replaces the old single-list +
+// manual status filter with the same Active/Past section split as the
+// Transfers and Appointments tabs.
+const ACTIVE_APPLICATION_STATUSES = ["Pending"];
+const PAST_APPLICATION_STATUSES = ["Accepted", "Rejected", "Withdrawn"];
 
 const listApplicationsForStaff = async (
   { role, userID },
-  { status, shelterID, page = 1, limit = 20 } = {},
+  { section, species, adopterName, petName, shelterID, page = 1, limit = 20 } = {},
 ) => {
-  const where = {};
-  if (status) {
-    where.applicationStatus = status;
-  }
+  const where = {
+    applicationStatus: {
+      in: section === "active" ? ACTIVE_APPLICATION_STATUSES : PAST_APPLICATION_STATUSES,
+    },
+  };
 
   if (role === "Staff") {
     // Re-fetched fresh from the STAFF table on every call — shelterID is
@@ -450,25 +524,27 @@ const listApplicationsForStaff = async (
     where.shelterID = shelterID;
   }
 
-  // The status-priority sort can't be pushed into the DB query without raw
-  // SQL, so this fetches every matching row (a single shelter's queue,
-  // never network-wide) and sorts/paginates in memory instead.
-  const allRows = await prisma.adoptionApplication.findMany({
-    where,
-    select: STAFF_LIST_SELECT,
-    orderBy: { createdAt: "desc" },
-  });
+  const speciesValues = toArray(species);
+  if (speciesValues.length > 0) {
+    where.pet = { breed: { speciesID: matchFilter(speciesValues) } };
+  }
+  if (petName) {
+    where.pet = { ...where.pet, petName: { contains: petName, mode: "insensitive" } };
+  }
+  if (adopterName) {
+    where.adopter = { adopterName: { contains: adopterName, mode: "insensitive" } };
+  }
 
-  allRows.sort((a, b) => {
-    const priorityDiff =
-      STATUS_SORT_PRIORITY[a.applicationStatus] -
-      STATUS_SORT_PRIORITY[b.applicationStatus];
-    if (priorityDiff !== 0) return priorityDiff;
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  });
-
-  const total = allRows.length;
-  const rows = allRows.slice((page - 1) * limit, (page - 1) * limit + limit);
+  const [rows, total] = await Promise.all([
+    prisma.adoptionApplication.findMany({
+      where,
+      select: STAFF_LIST_SELECT,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.adoptionApplication.count({ where }),
+  ]);
 
   const data = rows.map((app) => ({
     applicationID: app.applicationID,
@@ -482,7 +558,7 @@ const listApplicationsForStaff = async (
     createdAt: app.createdAt,
     pet: {
       petName: app.pet.petName,
-      petPhoto: app.pet.petPhoto,
+      petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, app.pet.petPhoto),
       breedName: app.pet.breed.breedName,
       speciesName: app.pet.breed.species.speciesName,
     },
@@ -506,6 +582,16 @@ const listApplicationsForStaff = async (
 // index on (adopterID, petID) (scoped to Pending/Accepted only), so the
 // adopter can re-apply for the same pet afterwards.
 const WITHDRAWABLE_STATUSES = ["Pending", "Accepted"];
+
+// Staff remark on the applications declined automatically when another
+// application for the same pet is accepted — shown to those adopters.
+const AUTO_DECLINE_REMARK =
+  "Another applicant was approved for this pet. Thank you for your interest — we hope you'll find another match.";
+
+const petNoLongerAvailable = (petName) =>
+  conflict(
+    `${petName} is no longer available — another application has already been accepted`,
+  );
 const STAFF_TARGET_STATUSES = ["Accepted", "Rejected"];
 
 const updateApplicationStatus = async (applicationID, { status, staffRemark }, actor) => {
@@ -517,6 +603,7 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
       shelterID: true,
       petID: true,
       applicationStatus: true,
+      pet: { select: { petName: true, adoptionStatus: true } },
     },
   });
 
@@ -572,6 +659,11 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
         `A ${application.applicationStatus.toLowerCase()} application can't be ${status.toLowerCase()}`,
       );
     }
+    // A pet goes to one applicant: once it's adopted (or otherwise no
+    // longer available), none of its other applications can be accepted.
+    if (status === "Accepted" && application.pet.adoptionStatus !== "available") {
+      throw petNoLongerAvailable(application.pet.petName);
+    }
   }
 
   const data = { applicationStatus: status };
@@ -595,17 +687,105 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
   ];
   // Accept marks the pet adopted; Reject deliberately leaves the pet's
   // adoptionStatus untouched — still 'available' for other applicants.
+  // Withdrawing an Accepted application undoes the Accept: the pet goes
+  // back to 'available'. Staff can't do that by hand (an adopted pet is
+  // read-only — see staff/pets.service.js), so this is the only way back.
+  // updateMany + the 'adopted' guard so a pet that has since moved on
+  // isn't clobbered.
+  // Accepting also declines the pet's other Pending applications, with a
+  // remark the applicant sees — rather than leaving them "Under
+  // Consideration" for a pet that's gone.
   if (status === "Accepted") {
     operations.push(
       prisma.pet.update({
         where: { petID: application.petID },
         data: { adoptionStatus: "adopted" },
       }),
+      prisma.adoptionApplication.updateMany({
+        where: {
+          petID: application.petID,
+          applicationStatus: "Pending",
+          applicationID: { not: applicationID },
+        },
+        data: { applicationStatus: "Rejected", staffRemark: AUTO_DECLINE_REMARK },
+      }),
+    );
+  } else if (status === "Withdrawn" && application.applicationStatus === "Accepted") {
+    operations.push(
+      prisma.pet.updateMany({
+        where: { petID: application.petID, adoptionStatus: "adopted" },
+        data: { adoptionStatus: "available" },
+      }),
     );
   }
 
-  const [updated] = await prisma.$transaction(operations);
-  return toClientShape(updated);
+  try {
+    const [updated] = await prisma.$transaction(operations);
+    return toClientShape(updated);
+  } catch (err) {
+    // Another application for this pet was accepted at the same moment —
+    // the one-Accepted-per-pet partial unique index fired (migration
+    // …_one_accepted_application_per_pet). Nothing was written.
+    if (status === "Accepted" && isUniqueViolation(err)) {
+      throw petNoLongerAvailable(application.pet.petName);
+    }
+    throw err;
+  }
+};
+
+// ——————————————— ASSIGN STAFF (PATCH /adoption-applications/:id) ———————————————
+// The only editable field on an application. The new assignee must be an
+// Active staff member at the application's shelter.
+const assignApplicationStaff = async (applicationID, { staffID }, actor) => {
+  const application = await prisma.adoptionApplication.findUnique({
+    where: { applicationID },
+    select: {
+      shelterID: true,
+      applicationStatus: true,
+      shelter: { select: { managerStaffID: true } },
+    },
+  });
+
+  if (!application) {
+    const err = new Error(
+      `No adoption application exists with ID ${applicationID}`,
+    );
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+
+  if (actor.role === "Staff" && application.shelter.managerStaffID !== actor.userID) {
+    const err = new Error(
+      "Only the shelter's manager may assign staff to this application",
+    );
+    err.code = "FORBIDDEN";
+    throw err;
+  }
+
+  if (application.applicationStatus !== "Pending") {
+    throw conflict(
+      `A ${application.applicationStatus.toLowerCase()} application can't be reassigned`,
+    );
+  }
+
+  const assignee = await prisma.staff.findUnique({
+    where: { userID: staffID },
+    select: { shelterID: true, accountStatus: true },
+  });
+  if (assignee?.shelterID !== application.shelterID || assignee.accountStatus !== "Active") {
+    const err = new Error(
+      "staffID must be an active staff member at the application's shelter",
+    );
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+
+  await prisma.adoptionApplication.update({
+    where: { applicationID },
+    data: { staffID },
+  });
+
+  return getApplicationById(applicationID, actor);
 };
 
 module.exports = {
@@ -619,4 +799,5 @@ module.exports = {
   listApplicationsForStaff,
   listAdoptedPetsByAdopter,
   updateApplicationStatus,
+  assignApplicationStaff,
 };

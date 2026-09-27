@@ -25,12 +25,12 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 | **Multi-shelter network**      | Unified animal listings and workflows across all branches of an organisation      |
 | **Inter-shelter transfers**    | Capacity-aware transfer requests with full transfer history                       |
 | **Universal health passport**  | Medical records that travel with an animal across shelter relocations             |
-| **AI compatibility matcher**   | OpenAI-powered pet–adopter matching to improve adoption success rates _(planned)_ |
+| **AI compatibility matcher**   | OpenAI-powered pet–adopter matching to improve adoption success rates             |
 | **Role-based access control**  | Six distinct roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor |
 | **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                     |
 | **Two-token JWT auth**         | Short-lived access token + httpOnly refresh cookie, with post-login redirect-back |
 | **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                         |
-| **Donation management**        | Stripe-integrated donor flow with impact tracking _(planned)_                     |
+| **Donation management**        | Stripe-integrated donor flow with impact tracking                                 |
 
 ## 🟤 Tech Stack
 
@@ -71,49 +71,31 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 ### Prerequisites
 
 - **Node.js 18+** and **Git**
-- **Docker + Docker Compose** _(Option A only)_
+- **Docker + Docker Compose** _(Option B only)_
 - A free **[Supabase](https://supabase.com)** account — the project's database (Postgres + PostGIS) and file storage both run on it, even in local dev
 
-### Option A: Quick Start with Docker - to run the app end-to-end without installing Node locally.
+### Option A: Local Setup (recommended)
 
 ```bash
 # 1. Clone the repo
 git clone https://github.com/karishmahegde/petpals.git
 cd petpals
 
-# 2. Copy the env template and fill in your Supabase / JWT / Stripe values
-cp server/.env.example server/.env
+# 2. Configure the server — fill in your Supabase / JWT (/ optional Stripe) values
+cd server
+npm install
+cp .env.example .env
 
-# 3. Build and start everything (Postgres, API, client) in one command
-docker-compose up --build
+# 3. Build the database, create the storage buckets, upload the seed photos, load sample data
+npm run setup
+
+# 4. Configure the client
+cd ../client
+npm install
+echo "VITE_API_URL=http://localhost:5000/api/v1" > .env.local
 ```
 
-| Service              | URL                   |
-| -------------------- | --------------------- |
-| Client               | http://localhost:3000 |
-| API                  | http://localhost:5000 |
-| DB (local container) | localhost:5432        |
-
-> ⚠️ The bundled Docker Postgres container does **not** include PostGIS or object storage — features like "nearby shelters" search and photo/ID uploads need `DATABASE_URL` pointed at Supabase regardless of whether you use Docker for the app containers. See [`setup/SETUP.md`](./setup/SETUP.md) for the full explanation.
-
-### Option B: Local Contributor Setup
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/karishmahegde/petpals.git
-cd petpals
-```
-
-Then follow **[`setup/SETUP.md`](./setup/SETUP.md)** end-to-end, which covers:
-
-1. Creating a free Supabase project (database + file storage)
-2. Configuring `server/.env` and `client/.env.local`
-3. Applying the Prisma schema (`prisma migrate deploy` — **never** `migrate dev`, see the guide for why)
-4. Running the one-time SQL script for PostGIS / generated columns / storage buckets
-5. Seeding sample data — prints 6 ready-to-use test logins (Admin, Staff, Vet, Adopter, Volunteer, Donor)
-6. Starting the server and client dev servers
-
-Once both are running:
+Then start both dev servers:
 
 ```bash
 # Terminal 1
@@ -122,6 +104,33 @@ cd server && npm run dev      # → http://localhost:5000
 # Terminal 2
 cd client && npm run dev      # → http://localhost:3000
 ```
+
+Log in with any of the seeded test accounts, e.g. `adopter@petpals.com` / `Adopter@123`.
+
+**[`setup/SETUP.md`](./setup/SETUP.md)** is the full guide: where to find each Supabase value, what `npm run setup` does, the complete test-account list, and troubleshooting.
+
+> ⚠️ `npm run setup` is for **first-time setup only** — its last step re-seeds, which wipes the database. Afterwards, re-seed with `npx prisma db seed`.
+
+### Option B: Docker
+
+Runs the API and client in containers against your Supabase project — the database and file storage stay on Supabase, configured through `server/.env`.
+
+```bash
+# 1. Configure the server — same values as Option A
+cp server/.env.example server/.env
+
+# 2. One-time: build the database, storage buckets and sample data
+cd server && npm install && npm run setup && cd ..
+
+# 3. Build and start the API and client
+docker-compose up --build
+```
+
+| Service | URL                   |
+| ------- | --------------------- |
+| Client  | http://localhost:3000 |
+| API     | http://localhost:5000 |
+
 ---
 
 ## 🟤 Project Structure
@@ -134,7 +143,10 @@ petpals/
 ├── server/                # Node.js + Express REST API (Prisma + PostgreSQL)
 ├── setup/                 # ⭐ Everything needed to get the project running locally
 │   ├── SETUP.md           #    Step-by-step setup guide (start here)
-│   └── manual-constraints.sql  # One-time SQL for PostGIS / hand-applied DB pieces
+│   ├── setup-storage.js   #    Creates storage buckets + uploads seed photos (run by `npm run setup`)
+│   ├── pet-images/        #    Seed pet photos, one per seeded pet
+│   ├── government-ids/    #    Sample ID documents for the seeded ID verifications
+│   └── placeholder.jpg    #    Photo a new pet shows until staff upload one
 ├── docs/                  # Project documentation (design PDFs, diagrams, screenshots)
 ├── docker-compose.yml     # Orchestrates Postgres + server + client — `docker-compose up`
 ├── CLAUDE.md              # Full architecture, API, and conventions reference
@@ -185,5 +197,5 @@ Distributed under the MIT License. See [`LICENSE`](./LICENSE) for details.
 ---
 
 <div align="center">
-Made with 🐾 by <a href="https://github.com/your-username">Karishma</a>
+Made with 🐾 by <a href="https://github.com/karishmahegde">Karishma</a>
 </div>

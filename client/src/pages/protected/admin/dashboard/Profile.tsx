@@ -5,6 +5,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { PiArrowsClockwiseBold } from "react-icons/pi";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import Avatar from "../../../../components/ui/Avatar";
 import Badge, { type BadgeTone } from "../../../../components/ui/Badge";
 import PhoneInputField from "../../../../components/ui/PhoneInputField";
@@ -21,6 +22,9 @@ import {
   formatShortDate,
   formatFullDate,
 } from "../../../../logic/utils/datetime";
+import type { Address } from "../../../../logic/utils/address";
+import ProfileAddressSection from "../../../../components/ui/profile/ProfileAddressSection";
+import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
 
 const STATUS_TONE: Record<AdminAccountStatus, BadgeTone> = {
   Pending: "gold",
@@ -36,11 +40,10 @@ const SEX_LABELS: Record<string, string> = {
   O: "Other",
 };
 
-interface EditableProfile {
+interface EditableProfile extends Address {
   avatarSeed: string;
   adminName: string;
   adminPhone: string | null;
-  adminAddress: string | null;
   adminDOB: string | null; // "YYYY-MM-DD"
   adminSex: string | null;
 }
@@ -49,7 +52,12 @@ const toEditable = (p: AdminListItem): EditableProfile => ({
   avatarSeed: p.avatarSeed,
   adminName: p.adminName,
   adminPhone: p.adminPhone,
-  adminAddress: p.adminAddress,
+  addressLine1: p.addressLine1,
+  addressLine2: p.addressLine2,
+  city: p.city,
+  state: p.state,
+  zip: p.zip,
+  country: p.country,
   adminDOB: p.adminDOB ? p.adminDOB.slice(0, 10) : null,
   adminSex: p.adminSex,
 });
@@ -165,18 +173,19 @@ const Profile = () => {
                   className="h-16 w-16 shrink-0 rounded-full border border-rose-light bg-white md:h-[72px] md:w-[72px]"
                 />
                 {isEditing && (
-                  <button
-                    type="button"
+                  <ButtonElement
                     onClick={() => patch({ avatarSeed: crypto.randomUUID() })}
                     aria-label="Randomize avatar"
                     title="Randomize avatar"
-                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm transition-colors hover:brightness-90"
+                    size="bare"
+                    variant="outline"
+                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-dark text-white shadow-sm transition-colors hover:brightness-95"
                   >
                     <PiArrowsClockwiseBold
                       className="h-3.5 w-3.5"
                       aria-hidden
                     />
-                  </button>
+                  </ButtonElement>
                 )}
               </div>
               <div>
@@ -195,11 +204,14 @@ const Profile = () => {
                 </p>
               </div>
             </div>
-            {profile.accountStatus && (
-              <Badge tone={STATUS_TONE[profile.accountStatus]}>
-                {profile.accountStatus}
-              </Badge>
-            )}
+            <div className="flex items-center gap-3">
+              <EmailVerificationStatus verified={profile.emailVerified} />
+              {profile.accountStatus && (
+                <Badge tone={STATUS_TONE[profile.accountStatus]}>
+                  {profile.accountStatus}
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Sections */}
@@ -290,28 +302,6 @@ const Profile = () => {
                     )}
                   </dd>
                 </div>
-                <div>
-                  <dt className="font-body text-xs text-neutral-gray">
-                    Address
-                  </dt>
-                  <dd className="mt-1 font-body text-sm text-neutral-dark">
-                    {isEditing && formState ? (
-                      <input
-                        type="text"
-                        value={formState.adminAddress ?? ""}
-                        maxLength={45}
-                        onChange={(e) =>
-                          patch({ adminAddress: e.target.value || null })
-                        }
-                        className={inputClass}
-                      />
-                    ) : (
-                      (profile.adminAddress ?? (
-                        <span className="text-neutral-gray">—</span>
-                      ))
-                    )}
-                  </dd>
-                </div>
                 {profile.statusChangedAt && (
                   <div>
                     <dt className="font-body text-xs text-neutral-gray">
@@ -328,6 +318,13 @@ const Profile = () => {
               </dl>
               <GovernmentIdSection isEditing={isEditing} />
             </section>
+
+            <ProfileAddressSection
+              value={profile}
+              isEditing={isEditing}
+              draft={formState}
+              onChange={patch}
+            />
           </div>
 
           {/* Save error */}
@@ -341,31 +338,31 @@ const Profile = () => {
           <div className="mt-6 flex justify-end gap-3">
             {isEditing ? (
               <>
-                <button
-                  type="button"
+                <ButtonElement
                   onClick={cancelEdit}
                   disabled={mutation.isPending}
-                  className="rounded-xl border border-neutral-gray px-5 py-2 font-body text-sm font-medium text-neutral-dark transition-colors hover:bg-neutral-lightgray disabled:opacity-50"
+                  size="bare"
+                  className="rounded-xl bg-red px-5 py-2 font-body text-sm font-medium hover:brightness-95 disabled:opacity-50"
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
+                </ButtonElement>
+                <ButtonElement
                   onClick={handleSave}
                   disabled={mutation.isPending}
-                  className="rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium text-white transition-colors hover:brightness-90 disabled:opacity-50"
+                  size="bare"
+                  className="rounded-xl bg-teal-dark px-5 py-2 font-body text-sm font-medium hover:brightness-95 disabled:opacity-50"
                 >
                   {mutation.isPending ? "Saving…" : "Save"}
-                </button>
+                </ButtonElement>
               </>
             ) : (
-              <button
-                type="button"
+              <ButtonElement
                 onClick={beginEdit}
-                className="rounded-xl bg-rose-dark px-5 py-2 font-body text-sm font-medium text-white transition-colors hover:brightness-90"
+                size="bare"
+                className="rounded-xl bg-teal-dark px-5 py-2 font-body text-sm font-medium hover:brightness-95"
               >
                 Edit profile
-              </button>
+              </ButtonElement>
             )}
           </div>
 
@@ -376,13 +373,13 @@ const Profile = () => {
               Closing your account deactivates or permanently deletes it. This
               can't be undone.
             </p>
-            <button
-              type="button"
+            <ButtonElement
               onClick={() => setIsCloseAccountOpen(true)}
-              className="mt-4 rounded-xl border border-rose-dark px-4 py-2 font-body text-sm font-medium text-rose-dark transition-colors hover:bg-rose-dark hover:text-white"
+              size="bare"
+              className="mt-4 rounded-xl bg-red px-4 py-2 font-body text-sm font-medium hover:brightness-95"
             >
               Close account
-            </button>
+            </ButtonElement>
           </div>
         </>
       )}
