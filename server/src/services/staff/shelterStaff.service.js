@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const { staffStatusDates } = require("../../utils/staffDates");
 const { withGovernmentIdStatus, assertReadyForApproval } = require("./staffApproval.service");
+const { ADDRESS_FIELDS, ADDRESS_SELECT } = require("../../utils/address");
 
 // Shelter-level staff management for the shelter's manager (Management →
 // Staff tab) — distinct from Admin's org-wide admin/staff.service.js. Every
@@ -53,6 +54,8 @@ const SHELTER_STAFF_SELECT = {
   staffDOS: true,
   accountStatus: true,
   onboardingComplete: true,
+  // The manager reviews a Pending member's full profile before approving.
+  ...ADDRESS_SELECT,
   user: { select: { userEmail: true } },
 };
 
@@ -72,6 +75,7 @@ const formatMember = (row) => ({
   accountStatus: row.accountStatus,
   onboardingComplete: row.onboardingComplete,
   governmentIdStatus: row.governmentIdStatus,
+  ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [field, row[field]])),
 });
 
 const formatOne = async (row) => formatMember((await withGovernmentIdStatus([row]))[0]);

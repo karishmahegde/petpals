@@ -708,6 +708,12 @@ const schemas = {
       staffDOJ: { type: "string", format: "date-time", nullable: true, description: "Date of Joining — stamped on first approval." },
       staffDOS: { type: "string", format: "date-time", nullable: true, description: "Date of Separation — stamped on deactivation, cleared on reactivation." },
       accountStatus: { type: "string", enum: ["Pending", "Active", "Deactivated"] },
+      addressLine1: { type: "string" },
+      addressLine2: { type: "string", nullable: true },
+      city: { type: "string" },
+      state: { type: "string" },
+      zip: { type: "string" },
+      country: { type: "string" },
       onboardingComplete: {
         type: "boolean",
         description: "Whether they've finished the staff onboarding wizard. Required (with a Verified government ID) before a Pending account can be approved.",

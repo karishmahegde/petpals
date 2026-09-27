@@ -1,12 +1,6 @@
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { Navigate } from "react-router-dom";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
@@ -16,7 +10,6 @@ import Card from "../../../../components/ui/Card";
 import SelectField from "../../../../components/ui/SelectField";
 import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import {
-  DashboardActionList,
   DashboardListRow,
   RowActionButton,
 } from "../../../../components/ui/dashboard/DashboardList";
@@ -26,13 +19,11 @@ import {
 } from "../../../../logic/api/staffApi";
 import {
   getShelterStaffMembers,
-  updateShelterStaffStatus,
-  type AssignableDesignation,
   type ShelterStaffMember,
 } from "../../../../logic/api/shelterStaffApi";
-import ConfirmActionModal from "../../../../components/ui/ConfirmActionModal";
 import { approvalBlockers } from "../../../../logic/staff/approvalReadiness";
 import StaffDetailPanel from "./sections/staff/StaffDetailPanel";
+import StaffApprovalPanel from "./sections/staff/StaffApprovalPanel";
 
 const PAGE_SIZE = 20;
 
@@ -90,14 +81,14 @@ const memberRowProps = (member: ShelterStaffMember) => ({
 // (approved: Active or Deactivated, with designation filter + name search;
 // "View Details" opens StaffDetailPanel, which also lets the manager change
 // another Active member's designation or deactivate them) and Staff Approvals
-// (Pending registrations at this shelter; Approve opens a dialog to pick
-// their designation — staff sign up without one — Decline behind a
-// confirm — same pattern as the Volunteers tab). Manager-only: everyone
-// else is sent to /forbidden, and GET/PATCH /staff/me/team 403 them too.
+// (Pending registrations at this shelter; "View Details" opens
+// StaffApprovalPanel — their full profile, onboarding and ID status, a
+// designation picker, and Approve/Decline). Manager-only: everyone else is
+// sent to /forbidden, and GET/PATCH /staff/me/team 403 them too.
 const Staff = () => {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [viewing, setViewing] = useState<ShelterStaffMember | null>(null);
+  // The Pending member whose approval panel is open.
+  const [reviewing, setReviewing] = useState<ShelterStaffMember | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ["staff", "me"],
@@ -130,34 +121,6 @@ const Staff = () => {
     enabled: isManager,
   });
   const pendingMembers = pendingQuery.data?.data ?? [];
-
-  // The Pending member being approved, and the designation picked for them.
-  const [approving, setApproving] = useState<ShelterStaffMember | null>(null);
-  const [newDesignation, setNewDesignation] = useState<
-    AssignableDesignation | ""
-  >("");
-
-  const closeApprove = () => {
-    setApproving(null);
-    setNewDesignation("");
-  };
-
-  const approve = useMutation({
-    mutationFn: ({
-      userID,
-      staffDesignation,
-    }: {
-      userID: number;
-      staffDesignation: AssignableDesignation;
-    }) => updateShelterStaffStatus(userID, "Active", staffDesignation),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "staff-members"] });
-      toast.success("Staff member approved");
-      closeApprove();
-    },
-    onError: () =>
-      toast.error("Couldn't approve this staff member. Please try again."),
-  });
 
   if (profile && !isManager) {
     return <Navigate to="/forbidden" replace />;
@@ -193,72 +156,36 @@ const Staff = () => {
         )}
 
         {pendingMembers.length > 0 && (
-          <DashboardActionList
-            items={pendingMembers}
-            getKey={(member) => member.userID}
-            renderRow={(member, confirm) => {
-              // Approval needs onboarding complete AND a Verified ID — the
-              // server refuses otherwise, so Approve stays disabled with
-              // the reason shown until both are true.
+          <ul className="flex flex-col gap-4">
+            {pendingMembers.map((member) => {
+              // Approval needs onboarding complete AND a Verified ID — shown
+              // here at a glance; the panel has the details and the actions.
               const rowProps = memberRowProps(member);
               const blockers = approvalBlockers(member);
               return (
-                <DashboardListRow
-                  {...rowProps}
-                  lines={[
-                    ...rowProps.lines,
-                    {
-                      text:
-                        blockers.length > 0
-                          ? `Can't approve yet: ${blockers.join(" · ")}`
-                          : "Ready to approve — onboarding done, ID verified",
-                      strong: blockers.length === 0,
-                    },
-                  ]}
-                  actions={
-                    <>
-                      {member.governmentIdStatus === "Pending" && (
-                        <RowActionButton
-                          onClick={() => navigate("/staff/id-verification")}
-                        >
-                          Verify ID
-                        </RowActionButton>
-                      )}
-                      <RowActionButton
-                        variant="success"
-                        disabled={blockers.length > 0}
-                        onClick={() => setApproving(member)}
-                      >
-                        Approve
+                <li key={member.userID}>
+                  <DashboardListRow
+                    {...rowProps}
+                    lines={[
+                      ...rowProps.lines,
+                      {
+                        text:
+                          blockers.length > 0
+                            ? `Can't approve yet: ${blockers.join(" · ")}`
+                            : "Ready to approve — onboarding done, ID verified",
+                        strong: blockers.length === 0,
+                      },
+                    ]}
+                    actions={
+                      <RowActionButton onClick={() => setReviewing(member)}>
+                        View Details
                       </RowActionButton>
-                      <RowActionButton
-                        variant="danger"
-                        onClick={() => confirm(member)}
-                      >
-                        Decline
-                      </RowActionButton>
-                    </>
-                  }
-                />
+                    }
+                  />
+                </li>
               );
-            }}
-            confirmAction={{
-              mutationFn: (member) =>
-                updateShelterStaffStatus(member.userID, "Deactivated"),
-              invalidateKeys: [["staff", "staff-members"]],
-              successToast: "Staff member declined",
-              errorToast:
-                "Couldn't decline this staff member. Please try again.",
-              modalTitle: "Decline this staff member?",
-              confirmLabel: "Decline",
-              renderBody: (member) => (
-                <>
-                  This declines {member.staffName}'s registration and
-                  deactivates their account.
-                </>
-              ),
-            }}
-          />
+            })}
+          </ul>
         )}
       </Card>
 
@@ -335,58 +262,6 @@ const Staff = () => {
         />
       </Card>
 
-      <ConfirmActionModal
-        isOpen={approving !== null}
-        title="Approve this staff member?"
-        confirmLabel="Approve"
-        cancelLabel="Cancel"
-        isPending={approve.isPending}
-        onCancel={closeApprove}
-        onConfirm={() => {
-          if (!approving) return;
-          if (!newDesignation) {
-            toast.error("Pick a designation to approve them");
-            return;
-          }
-          approve.mutate({
-            userID: approving.userID,
-            staffDesignation: newDesignation,
-          });
-        }}
-      >
-        {approving && (
-          <div className="flex flex-col gap-3">
-            <p>
-              This activates {approving.staffName}'s account at your shelter.
-              Choose their designation.
-            </p>
-            <div>
-              <label
-                htmlFor="approve-designation"
-                className="font-body text-xs text-neutral-gray"
-              >
-                Designation
-              </label>
-              <select
-                id="approve-designation"
-                value={newDesignation}
-                disabled={approve.isPending}
-                onChange={(e) =>
-                  setNewDesignation(e.target.value as AssignableDesignation)
-                }
-                className={`mt-1 ${filterInputClass}`}
-              >
-                <option value="" disabled>
-                  - Select -
-                </option>
-                <option value="Senior">Senior</option>
-                <option value="Associate">Associate</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </ConfirmActionModal>
-
       {/* key remounts the panel per member so it seeds that member's designation. */}
       <StaffDetailPanel
         key={viewing?.userID ?? "none"}
@@ -399,6 +274,12 @@ const Staff = () => {
           viewing.accountStatus === "Active"
         }
         onClose={() => setViewing(null)}
+      />
+      {/* key remounts the panel per member so its designation picker starts empty. */}
+      <StaffApprovalPanel
+        key={`review-${reviewing?.userID ?? "none"}`}
+        member={reviewing}
+        onClose={() => setReviewing(null)}
       />
     </div>
   );

@@ -9,8 +9,11 @@ import type {
   StaffAccountStatus,
   StaffDesignation,
 } from "./staffApi";
+import type { Address } from "../utils/address";
 
-export interface ShelterStaffMember {
+// Includes their address — the manager reviews a Pending member's full
+// profile before approving.
+export interface ShelterStaffMember extends Address {
   userID: number;
   avatarSeed: string;
   staffName: string;
