@@ -216,7 +216,7 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 | 5 | Vet, volunteer, donor flows (incl. vet-managed appointments/vaccinations) | — |
 | 6 | AI compatibility matcher (OpenAI API) | — |
 | 7 | Testing to 70% + cleanup (remove TokenDenylist → RefreshTokens table) | — |
-| 8 | Deployment, polish, final report | — |
+| 8 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README marks Docker "not working yet" until then | — |
 
 ---
 
