@@ -10,6 +10,7 @@ For architecture, folder structure, and API reference, see [`CLAUDE.md`](../CLAU
 | `setup-storage.js` | creates the Supabase Storage buckets and uploads the seed pet photos. Run by `npm run setup`, so you never call it directly |
 | `pet-images/` | the 21 seed pet photos, one per seeded pet (`apollo.webp`, …) |
 | `placeholder.jpg` | the photo a pet created through the app shows until staff upload a real one |
+| `government-ids/` | 4 sample ID documents (clearly marked SAMPLE) that the seeded ID-verification records point at |
 
 The sample-data seed itself lives with the schema, in `server/src/prisma/seed.js`, because it changes whenever the schema does.
 
@@ -66,14 +67,14 @@ One command, four steps:
 
 1. **`prisma migrate deploy`** builds the entire schema, including the parts `schema.prisma` can't describe: PostGIS and the shelter-location column, the human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`, …) as Postgres generated columns, and the partial unique indexes. They're written directly into the baseline migration's SQL.
 2. **`prisma generate`** builds the Prisma client from the schema.
-3. **`setup-storage.js`** creates the two Supabase Storage buckets if they're missing (`pet-images`, public; `government-ids`, private), uploads `setup/pet-images/` to `pet-images/seed/`, and uploads `placeholder.jpg` to the bucket root. Buckets live in Supabase's own `storage` schema, not the app's, which is why this is a script and not a migration.
+3. **`setup-storage.js`** creates the two Supabase Storage buckets if they're missing (`pet-images`, public; `government-ids`, private), uploads `setup/pet-images/` to `pet-images/seed/`, uploads `placeholder.jpg` to the bucket root, and uploads `setup/government-ids/` to `government-ids/seed/`. Buckets live in Supabase's own `storage` schema, not the app's, which is why this is a script and not a migration.
 4. **`prisma db seed`** loads the sample data.
 
 > ⚠️ **`npm run setup` is for first-time setup — its last step wipes the database.** The seed empties every table and restarts IDs at 1, so every run produces exactly the same data (it refuses to run with `NODE_ENV=production`). Once you're set up, use the individual commands instead:
 >
 > - re-seed: `npx prisma db seed`
 > - new migrations after a pull: `npx prisma migrate deploy && npx prisma generate`
-> - re-upload the seed photos and placeholder: `npm run setup:storage` (only ever writes `pet-images/seed/` and `pet-images/placeholder.jpg` — app uploads are left alone)
+> - re-upload the seed photos, placeholder and sample IDs: `npm run setup:storage` (only ever writes `pet-images/seed/`, `pet-images/placeholder.jpg` and `government-ids/seed/` — app uploads are left alone)
 
 > ⚠️ **Use `migrate deploy`, never `migrate dev`.** (`npm run prisma:migrate` runs `migrate deploy`, so it's safe.) Prisma can't model the PostGIS/generated columns, so `migrate dev` sees them as drift and offers to reset your database. `migrate deploy` just applies the tracked migrations and never prompts. Full explanation in `CLAUDE.md` → Permanent Known Issues.
 
@@ -135,7 +136,7 @@ The public site and the Adopter, Staff and Admin dashboards are built; the Vet, 
 
 - **Prisma asks to reset the database / mentions drift** — you (or a script) ran `migrate dev` instead of `migrate deploy`. Don't confirm the reset; re-read the callout in step 3.
 - **`npm run setup` stops at the storage step** — check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `server/.env` (the service-role key, not the anon key). If it says a bucket "exists but is public/private", someone changed it by hand: fix it in **Supabase → Storage → bucket settings** (`government-ids` must be private) and re-run `npm run setup:storage`.
-- **Pet photos look broken** — the seed photos or the new-pet placeholder weren't uploaded, or were deleted through the staff UI. Run `npm run setup:storage` from `server/`; it doesn't touch the database.
+- **Pet photos or ID documents look broken** — the seed files weren't uploaded, or were deleted through the app. Run `npm run setup:storage` from `server/`; it doesn't touch the database.
 - **`/shelters/nearby` returns nothing / errors** — usually means the `postgis` extension didn't enable during `migrate deploy` (check **Database → Extensions** in Supabase, then re-run `npx prisma migrate deploy`).
 - **Adoption application never appears after "paying"** — the `AdoptionApplication` row is only created by the Stripe webhook after a successful checkout, not by the initial POST (see `CLAUDE.md`). Without Stripe configured, you can exercise everything up to checkout but the row won't be created — this is expected, not a bug.
 

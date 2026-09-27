@@ -175,11 +175,37 @@ const GovernmentIdDetailPanel = ({
             <div className={divider} />
             <h2 className={sectionTitle}>Submitted Document</h2>
             {data.documentURL ? (
-              <img
-                src={data.documentURL}
-                alt="Submitted government ID document"
-                className="mt-3 w-full rounded-lg border border-neutral-lightgray object-contain"
-              />
+              <>
+                {data.documentKind === "image" && (
+                  <img
+                    src={data.documentURL}
+                    alt="Submitted government ID document"
+                    className="mt-3 w-full rounded-lg border border-neutral-lightgray object-contain"
+                  />
+                )}
+                {data.documentKind === "pdf" && (
+                  <iframe
+                    src={data.documentURL}
+                    title="Submitted government ID document (PDF)"
+                    className="mt-3 h-[32rem] w-full rounded-lg border border-neutral-lightgray"
+                  />
+                )}
+                {data.documentKind === "file" && (
+                  <p className="mt-2 font-body text-xs text-neutral-gray">
+                    This file type can&apos;t be previewed in the browser.
+                  </p>
+                )}
+                {/* The signed URL expires after 5 minutes — reopen the
+                    panel for a fresh one if the link stops working. */}
+                <a
+                  href={data.documentURL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block font-body text-xs text-teal-dark underline"
+                >
+                  Open document in a new tab
+                </a>
+              </>
             ) : (
               <p className="mt-2 font-body text-xs text-neutral-gray">
                 No document on file.

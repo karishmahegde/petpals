@@ -543,6 +543,13 @@ const schemas = {
             description:
               "Short-lived (5 min) signed URL for the document image, generated fresh on every read — never cached or persisted.",
           },
+          documentKind: {
+            type: "string",
+            enum: ["image", "pdf", "file"],
+            nullable: true,
+            description:
+              "How to display documentURL, from the stored file's extension: 'image' (JPEG/PNG/WebP) in an <img>, 'pdf' in the browser's PDF viewer, 'file' (HEIC or unrecognized) as an open/download link only. Null when there's no document.",
+          },
         },
       },
     ],

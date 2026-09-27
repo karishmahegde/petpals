@@ -346,6 +346,19 @@ const findReviewableRecord = async (governmentIDID) => {
 // idNumber and a real, viewable document image — this is the dedicated,
 // authorized verification workflow the field and the private bucket exist
 // for (see plan's "Unmasking exception").
+// How the detail panel can show a stored document, from its extension (every
+// upload is saved as id-<timestamp>.<ext>, the ext picked from its MIME type):
+// "image" renders in an <img>, "pdf" in the browser's PDF viewer, and "file"
+// (HEIC — only Safari decodes it — or anything unrecognized) can only be
+// opened/downloaded, not previewed.
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const documentKind = (objectPath) => {
+  const ext = objectPath.split(".").pop().toLowerCase();
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+  return "file";
+};
+
 const getGovernmentIdDetail = async (governmentIDID, actor) => {
   const record = await findReviewableRecord(governmentIDID);
   await assertOwnership(record, actor);
@@ -366,6 +379,7 @@ const getGovernmentIdDetail = async (governmentIDID, actor) => {
     idNumber: record.idNumber,
     verificationStatus: record.verificationStatus,
     documentURL,
+    documentKind: record.documentURL ? documentKind(record.documentURL) : null,
   };
 };
 

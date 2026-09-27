@@ -1635,15 +1635,16 @@ async function main() {
   });
 
   // ── GOVERNMENT IDS: every VerificationStatus, several roles ──
-  // documentURL points at sample files already in the private
-  // government-ids bucket (the paths are just storage keys, so they're
+  // documentURL points at the sample documents in setup/government-ids/,
+  // uploaded to the private government-ids bucket's seed/ folder by
+  // setup/setup-storage.js (the paths are just storage keys, so they're
   // reused across users). Some accounts deliberately have none.
   console.log("Creating government IDs...");
   const ID_FILES = {
-    passport: "adopter/4/id-1788705867254.png",
-    license: "adopter/363/id-1788887945995.png",
-    stateId: "adopter/259/id-1788707252142.pdf",
-    other: "adopter/4/id-1788327272037.png",
+    passport: "seed/passport.png",
+    license: "seed/drivers-license.png",
+    stateId: "seed/state-id.png",
+    other: "seed/other.png",
   };
   const pendingStaff = await prisma.users.findUnique({ where: { userEmail: "staff.pending@petpals.com" } });
   const pendingVet = await prisma.users.findUnique({ where: { userEmail: "vet.pending@petpals.com" } });

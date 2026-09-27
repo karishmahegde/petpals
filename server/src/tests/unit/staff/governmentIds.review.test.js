@@ -30,6 +30,7 @@ jest.mock("../../../services/auth/auth.service", () => ({
 }));
 
 const prisma = require("../../../config/prisma");
+const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -351,6 +352,54 @@ describe("Government ID review — who may review which person types", () => {
         .send({ verificationStatus: "Verified" });
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe("GET /api/v1/government-ids/:id (document display)", () => {
+    // A manager viewing a vet's ID at their own shelter — the same access
+    // path as the PATCH test above, so only the stored file varies.
+    const getDetail = (documentURL) => {
+      prisma.governmentID.findUnique.mockResolvedValueOnce(
+        idRecord({ userType: "Veterinarian", userID: 80, documentURL }),
+      );
+      mockCaller();
+      prisma.veterinarian.findUnique
+        .mockResolvedValueOnce({ shelterID: 9 })
+        .mockResolvedValueOnce({
+          userID: 80,
+          vetName: "Adrian Nicholes",
+          avatarSeed: "seed",
+          user: { userEmail: "adrian@petpals.com" },
+        });
+      // resetAllMocks in beforeEach clears the storage mock's default.
+      storage.createSignedUrl.mockResolvedValueOnce("https://signed.test/doc");
+      return request(app)
+        .get("/api/v1/government-ids/5")
+        .set("Authorization", `Bearer ${staffToken(MANAGER_ID)}`);
+    };
+
+    test.each([
+      ["vet/80/id-1.jpg", "image"],
+      ["vet/80/id-1.JPEG", "image"],
+      ["vet/80/id-1.png", "image"],
+      ["vet/80/id-1.webp", "image"],
+      ["vet/80/id-1.pdf", "pdf"],
+      ["vet/80/id-1.heic", "file"],
+      ["vet/80/id-1.bin", "file"],
+    ])("%s → documentKind %p, with a signed URL", async (documentURL, kind) => {
+      const res = await getDetail(documentURL);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.documentKind).toBe(kind);
+      expect(res.body.data.documentURL).toBe("https://signed.test/doc");
+    });
+
+    test("no document on file → documentURL and documentKind are both null", async () => {
+      const res = await getDetail(null);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.documentURL).toBeNull();
+      expect(res.body.data.documentKind).toBeNull();
     });
   });
 });

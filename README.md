@@ -140,6 +140,7 @@ petpals/
 │   ├── SETUP.md           #    Step-by-step setup guide (start here)
 │   ├── setup-storage.js   #    Creates storage buckets + uploads seed photos (run by `npm run setup`)
 │   ├── pet-images/        #    Seed pet photos, one per seeded pet
+│   ├── government-ids/    #    Sample ID documents for the seeded ID verifications
 │   └── placeholder.jpg    #    Photo a new pet shows until staff upload one
 ├── docs/                  # Project documentation (design PDFs, diagrams, screenshots)
 ├── docker-compose.yml     # Orchestrates Postgres + server + client — `docker-compose up`

@@ -32,6 +32,9 @@ export interface GovernmentIdQueueItem {
 export interface GovernmentIdDetail extends GovernmentIdQueueItem {
   idNumber: string;
   documentURL: string | null;
+  // How documentURL can be shown: an <img>, the browser's PDF viewer, or
+  // (HEIC / unrecognized) only an open-in-new-tab link. Null with no document.
+  documentKind: "image" | "pdf" | "file" | null;
 }
 
 interface GovernmentIdsQueueParams {

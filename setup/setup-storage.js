@@ -9,9 +9,13 @@
 // 3. Uploads setup/placeholder.jpg to pet-images/placeholder.jpg — the photo
 //    every pet created through the app starts with until staff upload one
 //    (PLACEHOLDER_PHOTO in server/src/services/staff/pets.service.js).
+// 4. Uploads the sample ID documents in setup/government-ids/ to
+//    government-ids/seed/<name>.png. seed.js points the seeded GovernmentID
+//    rows at these (several accounts share one — they're just storage keys).
 //
-// Safe to re-run. It only writes pet-images/seed/ and pet-images/placeholder.jpg,
-// so photos and ID documents uploaded through the app are left alone.
+// Safe to re-run. It only writes pet-images/seed/, pet-images/placeholder.jpg
+// and government-ids/seed/, so photos and ID documents uploaded through the
+// app are left alone.
 //
 // Buckets live in Supabase's own `storage` schema rather than the app schema,
 // which is why they're created here instead of in a Prisma migration.
@@ -25,6 +29,7 @@ const path = require("path");
 const storage = require("../server/src/services/storage");
 
 const PHOTOS_DIR = path.join(__dirname, "pet-images");
+const IDS_DIR = path.join(__dirname, "government-ids");
 const SEED_PREFIX = "seed";
 const PLACEHOLDER = "placeholder.jpg";
 
@@ -58,6 +63,18 @@ const main = async () => {
     { upsert: true },
   );
   console.log(`Uploaded the new-pet placeholder to ${storage.PET_IMAGES_BUCKET}/${PLACEHOLDER}`);
+
+  const idDocs = fs.readdirSync(IDS_DIR).filter((f) => f.endsWith(".png"));
+  for (const file of idDocs) {
+    await storage.uploadPrivateFile(
+      storage.GOVERNMENT_IDS_BUCKET,
+      `${SEED_PREFIX}/${file}`,
+      fs.readFileSync(path.join(IDS_DIR, file)),
+      "image/png",
+      { upsert: true },
+    );
+  }
+  console.log(`Uploaded ${idDocs.length} sample ID documents to ${storage.GOVERNMENT_IDS_BUCKET}/${SEED_PREFIX}/`);
 };
 
 main().catch((err) => {
