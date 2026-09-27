@@ -32,10 +32,6 @@ const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 
-// Chained register/login/HTTP round trips (several per journey) against the
-// remote Supabase instance can exceed Jest's 5s default.
-jest.setTimeout(20000);
-
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 

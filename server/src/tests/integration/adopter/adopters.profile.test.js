@@ -2,10 +2,6 @@ const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 
-// Chained register + login + GET/PUT round trips against the remote Supabase
-// instance can exceed Jest's 5s default.
-jest.setTimeout(20000);
-
 // Runs against the DATABASE_URL configured in server/.env, same convention as
 // adopters.updateProfile.test.js — seeds via API calls, cleans up via Prisma
 // in each test (no shared fixtures needed here).

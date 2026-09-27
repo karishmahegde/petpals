@@ -12,9 +12,6 @@ const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 
-// Chained register/login/HTTP round trips against the remote database.
-jest.setTimeout(30000);
-
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 

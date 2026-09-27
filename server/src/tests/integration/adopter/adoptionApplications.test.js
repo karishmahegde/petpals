@@ -2,11 +2,6 @@ const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
 
-// Stripe Checkout Session creation (real, test-mode API calls) on top of the
-// usual register + login + HTTP round trips — the 5s Jest default is too
-// tight for that.
-jest.setTimeout(20000);
-
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 
