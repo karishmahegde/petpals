@@ -410,6 +410,179 @@ describe("Staff self-service endpoints", () => {
     });
   });
 
+  // ————————————————————————————— PATCH /staff/me/onboarding-step —————————————————————————————
+  describe("PATCH /api/v1/staff/me/onboarding-step", () => {
+    const advance = (step) =>
+      request(app)
+        .patch("/api/v1/staff/me/onboarding-step")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ step });
+
+    test.each([
+      ["advances to the next step", 2, 2, 3],
+      ["never moves backward", 4, 2, 4],
+      ["stops at the last step (5)", 5, 5, 5],
+    ])("%s (at %i, completed %i → %i)", async (_label, current, step, expected) => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ onboardingStep: current });
+      prisma.staff.update.mockResolvedValueOnce(
+        buildStaffProfile({ onboardingStep: expected }),
+      );
+
+      const res = await advance(step);
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userID: 42 },
+          data: { onboardingStep: expected },
+        }),
+      );
+    });
+
+    test.each([1, 6, "abc", undefined])(
+      "step %p → 400 BAD_REQUEST, nothing read or written",
+      async (step) => {
+        const res = await advance(step);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe("BAD_REQUEST");
+        expect(prisma.staff.findUnique).not.toHaveBeenCalled();
+        expect(prisma.staff.update).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  // ————————————————————————————— PATCH /staff/me/onboarding-complete —————————————————————————————
+  describe("PATCH /api/v1/staff/me/onboarding-complete", () => {
+    const complete = () =>
+      request(app)
+        .patch("/api/v1/staff/me/onboarding-complete")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+    const filledIn = {
+      staffPhone: "+12125550105",
+      staffDOB: new Date("1990-01-01"),
+      staffSex: "F",
+      addressLine1: "1 Main St",
+      city: "New York",
+      state: "New York",
+      zip: "10001",
+      country: "United States",
+    };
+
+    test("everything filled in and an ID submitted → 200, onboarding marked complete at step 5", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce(filledIn);
+      prisma.governmentID.findFirst.mockResolvedValueOnce({ governmentIDID: 7 });
+      prisma.staff.update.mockResolvedValueOnce(
+        buildStaffProfile({ onboardingComplete: true, onboardingStep: 5 }),
+      );
+
+      const res = await complete();
+
+      expect(res.status).toBe(200);
+      expect(prisma.governmentID.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userID: 42, userType: "Staff" } }),
+      );
+      expect(prisma.staff.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { onboardingComplete: true, onboardingStep: 5 },
+        }),
+      );
+    });
+
+    test("missing fields and no ID → 409 naming each one, nothing written", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({
+        ...filledIn,
+        staffPhone: null,
+        addressLine1: "",
+        zip: "",
+      });
+      prisma.governmentID.findFirst.mockResolvedValueOnce(null);
+
+      const res = await complete();
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
+      expect(res.body.message).toBe(
+        "Onboarding is incomplete — missing: Phone, Address line 1, ZIP, Government ID",
+      );
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
+
+    test("only the government ID missing → 409 naming just that", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce(filledIn);
+      prisma.governmentID.findFirst.mockResolvedValueOnce(null);
+
+      const res = await complete();
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe(
+        "Onboarding is incomplete — missing: Government ID",
+      );
+    });
+  });
+
+  // ————————————————————————————— PENDING STAFF (onboarding before approval) —————————————————————————————
+  describe("a Pending staff member", () => {
+    beforeEach(() => {
+      authService.getAccountStatus.mockResolvedValue("Pending");
+    });
+
+    test("can read their own profile", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce(
+        buildStaffProfile({ accountStatus: "Pending" }),
+      );
+
+      const res = await request(app)
+        .get("/api/v1/staff/me")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(200);
+    });
+
+    test("can save a wizard step", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ onboardingStep: 2 });
+      prisma.staff.update.mockResolvedValueOnce(
+        buildStaffProfile({ accountStatus: "Pending", onboardingStep: 3 }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/onboarding-step")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ step: 2 });
+
+      expect(res.status).toBe(200);
+    });
+
+    test("can check their government ID", async () => {
+      prisma.governmentID.findFirst.mockResolvedValueOnce(buildGovernmentIdRow());
+
+      const res = await request(app)
+        .get("/api/v1/staff/me/government-id")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(200);
+    });
+
+    test.each([
+      ["delete", "/api/v1/staff/me"],
+      ["get", "/api/v1/staff/me/pets"],
+      ["get", "/api/v1/staff/me/team?section=pending"],
+      ["get", "/api/v1/adoption-applications?section=active"],
+      ["get", "/api/v1/visits"],
+    ])("is blocked from %s %s → 401, nothing read or written", async (method, path) => {
+      const res = await request(app)
+        [method](path)
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ mode: "deactivate" });
+
+      expect(res.status).toBe(401);
+      expect(prisma.staff.findUnique).not.toHaveBeenCalled();
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+      expect(prisma.staff.delete).not.toHaveBeenCalled();
+    });
+  });
+
   // ————————————————————————————— ROLE ENFORCEMENT —————————————————————————————
   describe("role enforcement", () => {
     // /staff/me/* is Staff-only — unlike the pet-management routes, Admin is
@@ -421,6 +594,8 @@ describe("Staff self-service endpoints", () => {
       ["delete", "/api/v1/staff/me"],
       ["get", "/api/v1/staff/me/government-id"],
       ["post", "/api/v1/staff/me/government-id"],
+      ["patch", "/api/v1/staff/me/onboarding-step"],
+      ["patch", "/api/v1/staff/me/onboarding-complete"],
     ])("%s %s: Admin role → 403 FORBIDDEN, nothing written", async (method, path) => {
       const res = await request(app)
         [method](path)

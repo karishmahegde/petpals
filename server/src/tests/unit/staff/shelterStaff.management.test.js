@@ -90,6 +90,40 @@ describe("Shelter manager staff management", () => {
       });
     });
 
+    test("each pending member carries onboardingComplete and their ID's status (one ID lookup for the page)", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findMany.mockResolvedValueOnce([
+        memberRow({ userID: 50, accountStatus: "Pending", onboardingComplete: true }),
+        memberRow({ userID: 51, accountStatus: "Pending", onboardingComplete: false }),
+      ]);
+      prisma.staff.count.mockResolvedValueOnce(2);
+      prisma.governmentID.findMany.mockResolvedValueOnce([
+        { userID: 50, verificationStatus: "Pending" },
+      ]);
+
+      const res = await request(app)
+        .get("/api/v1/staff/me/team")
+        .query({ section: "pending" })
+        .set("Authorization", `Bearer ${managerToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.governmentID.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.governmentID.findMany.mock.calls[0][0].where).toEqual({
+        userID: { in: [50, 51] },
+        userType: "Staff",
+      });
+      expect(
+        res.body.data.map(({ userID, onboardingComplete, governmentIdStatus }) => ({
+          userID,
+          onboardingComplete,
+          governmentIdStatus,
+        })),
+      ).toEqual([
+        { userID: 50, onboardingComplete: true, governmentIdStatus: "Pending" },
+        { userID: 51, onboardingComplete: false, governmentIdStatus: null },
+      ]);
+    });
+
     test("staff who aren't a shelter's manager -> 403", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce(null);
 
@@ -232,6 +266,71 @@ describe("Shelter manager staff management", () => {
 
       expect(res.status).toBe(400);
       expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
+
+    // Approving needs onboarding complete AND a Verified government ID
+    // (staffApproval.service.js) — otherwise 409 naming what's missing.
+    test.each([
+      ["onboarding unfinished (ID Verified)", { onboardingComplete: false }, "Verified", "they haven't finished onboarding"],
+      ["no government ID submitted", {}, null, "they haven't submitted a government ID"],
+      ["government ID still Pending", {}, "Pending", "their government ID is Pending, not Verified"],
+      ["government ID Rejected", {}, "Rejected", "their government ID is Rejected, not Verified"],
+    ])("approve blocked — %s → 409, nothing written", async (_label, overrides, idStatus, reason) => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce(pendingMember(overrides));
+      prisma.governmentID.findMany.mockResolvedValueOnce(
+        idStatus ? [{ userID: 50, verificationStatus: idStatus }] : [],
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Active", staffDesignation: "Senior" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
+      expect(res.body.message).toBe(
+        `This staff member can't be approved yet — ${reason}`,
+      );
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
+
+    test("approve blocked by both at once → 409 naming both", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce(
+        pendingMember({ onboardingComplete: false }),
+      );
+      prisma.governmentID.findMany.mockResolvedValueOnce([]);
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Active", staffDesignation: "Senior" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe(
+        "This staff member can't be approved yet — they haven't finished onboarding and they haven't submitted a government ID",
+      );
+    });
+
+    test("decline is allowed even before onboarding is done or the ID is verified", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce(
+        pendingMember({ onboardingComplete: false }),
+      );
+      prisma.staff.update.mockResolvedValueOnce(
+        memberRow({ accountStatus: "Deactivated" }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Deactivated" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+      );
     });
 
     test("decline needs no designation", async () => {
