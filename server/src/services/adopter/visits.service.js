@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const storage = require("../storage");
 
 // Scalar shape returned to the client for a created visit.
 const VISIT_SELECT = {
@@ -134,7 +135,7 @@ const getVisitDetailForAdopter = async (visitID, adopterID) => {
     pet: visit.pet
       ? {
           petName: visit.pet.petName,
-          petPhoto: visit.pet.petPhoto,
+          petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, visit.pet.petPhoto),
           breedName: visit.pet.breed.breedName,
           speciesName: visit.pet.breed.species.speciesName,
         }

@@ -22,6 +22,10 @@ const app = require("../../../app");
 const signToken = (role, userID = 7) =>
   jwt.sign({ userID, role }, process.env.JWT_SECRET, { expiresIn: "1h" });
 const adopterToken = () => signToken("Adopter", 7);
+
+// A bare pet-images object path ("biscuit.jpg", how app uploads are stored)
+// must come back as its public URL, or the <img> can't load it.
+const PUBLIC_PET_PHOTO = `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-images/biscuit.jpg`;
 const staffToken = () => signToken("Staff", 42);
 
 // The access rule shared by both appointment endpoints.
@@ -172,7 +176,7 @@ describe("Adopter appointments + adopted-pet detail", () => {
         pet: {
           petID: 12,
           petName: "Biscuit",
-          petPhoto: "biscuit.jpg",
+          petPhoto: PUBLIC_PET_PHOTO,
           breedName: "Beagle",
           speciesName: "Dog",
         },
@@ -335,6 +339,7 @@ describe("Adopter appointments + adopted-pet detail", () => {
       expect(res.body.data).toMatchObject({
         petID: 12,
         petName: "Biscuit",
+        petPhoto: PUBLIC_PET_PHOTO,
         petAge: "2 years, 3 months",
         petSex: "Male",
         breed: { breedName: "Beagle", speciesName: "Dog" },

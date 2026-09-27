@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const storage = require("../storage");
 
 // ——————————————— LIST APPOINTMENTS FOR AN ADOPTER (GET /adopters/me/appointments) ———————————————
 // Vet appointments for every pet the adopter has an Accepted application for —
@@ -94,7 +95,7 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
     pet: {
       petID: appointment.pet.petID,
       petName: appointment.pet.petName,
-      petPhoto: appointment.pet.petPhoto,
+      petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, appointment.pet.petPhoto),
       breedName: appointment.pet.breed.breedName,
       speciesName: appointment.pet.breed.species.speciesName,
     },
