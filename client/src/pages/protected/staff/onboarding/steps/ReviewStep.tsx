@@ -1,41 +1,44 @@
-// ReviewStep.tsx — onboarding Step 7
-// Read-only summary of Steps 2-6 + government ID status. Each section links
-// back to its step for in-place editing (?from=review — see
-// OnboardingWizard.tsx for how that routes the post-save navigation back
-// here instead of forward through the remaining steps).
-import { useMutation, useQuery } from "@tanstack/react-query";
+// ReviewStep.tsx — staff onboarding Step 5
+// Read-only summary of Steps 2-4. Each section links back to its step for
+// editing (?from=review — see StaffOnboardingWizard.tsx). Submit completes
+// onboarding; a still-Pending account then waits on the "awaiting approval"
+// screen (OnboardingGate routes it there).
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { PiClipboardTextBold } from "react-icons/pi";
 import OnboardingStepHeader from "../../../../../components/ui/onboarding/OnboardingStepHeader";
 import OnboardingStepNav from "../../../../../components/ui/onboarding/OnboardingStepNav";
 import ButtonElement from "../../../../../components/ui/ButtonElement";
+import PhoneDisplay from "../../../../../components/ui/PhoneDisplay";
 import {
-  completeOnboarding,
-  getGovernmentId,
-  type AdopterProfile as AdopterProfileData,
-} from "../../../../../logic/api/adoptersApi";
+  completeMyStaffOnboarding,
+  getMyStaffGovernmentId,
+  type StaffSelfProfile,
+} from "../../../../../logic/api/staffApi";
+import { formatAddress } from "../../../../../logic/utils/address";
 import useAuthStore from "../../../../../logic/store/useAuthStore";
 
 interface ReviewStepProps {
-  profile: AdopterProfileData;
+  profile: StaffSelfProfile;
   onBack?: () => void;
 }
+
+const SEX_LABELS: Record<string, string> = { M: "Male", F: "Female", O: "Other" };
 
 const extractError = (err: unknown): string =>
   axios.isAxiosError(err) && err.response?.data?.message
     ? String(err.response.data.message)
     : "Something went wrong. Please try again.";
 
-const humanize = (value: string) => value.replace(/_/g, " ");
-
 const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const updateUser = useAuthStore((state) => state.updateUser);
 
   const governmentIdQuery = useQuery({
-    queryKey: ["adopter", "government-id"],
-    queryFn: getGovernmentId,
+    queryKey: ["staff", "government-id"],
+    queryFn: getMyStaffGovernmentId,
     retry: (failureCount, err) =>
       axios.isAxiosError(err) && err.response?.status === 404
         ? false
@@ -43,44 +46,38 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
   });
 
   const mutation = useMutation({
-    mutationFn: completeOnboarding,
-    onSuccess: (adopter) => {
+    mutationFn: completeMyStaffOnboarding,
+    onSuccess: (staff) => {
       updateUser({
         onboardingComplete: true,
-        onboardingStep: adopter.onboardingStep,
+        onboardingStep: staff.onboardingStep,
+        accountStatus: staff.accountStatus ?? undefined,
       });
-      navigate("/adopter", { replace: true });
+      queryClient.invalidateQueries({ queryKey: ["staff", "me"] });
+      navigate(staff.accountStatus === "Pending" ? "/staff/pending" : "/staff", {
+        replace: true,
+      });
     },
   });
 
-  const address = [
-    profile.addressLine1,
-    profile.addressLine2,
-    profile.city,
-    profile.state,
-    profile.zip,
-    profile.country,
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  const sections: { title: string; step: number; rows: [string, string][] }[] = [
+  const sections: { title: string; step: number; rows: [string, React.ReactNode][] }[] = [
     {
       title: "Personal",
       step: 2,
       rows: [
-        [
-          "Date of birth",
-          profile.adopterDOB ? profile.adopterDOB.slice(0, 10) : "—",
-        ],
-        ["Sex", profile.adopterSex ?? "—"],
-        ["Phone", profile.adopterPhone ?? "—"],
-        ["Address", address || "—"],
+        ["Date of birth", profile.staffDOB ? profile.staffDOB.slice(0, 10) : "—"],
+        ["Sex", profile.staffSex ? (SEX_LABELS[profile.staffSex] ?? profile.staffSex) : "—"],
+        ["Phone", profile.staffPhone ? <PhoneDisplay value={profile.staffPhone} /> : "—"],
       ],
     },
     {
-      title: "Identity",
+      title: "Address",
       step: 3,
+      rows: [["Address", formatAddress(profile) || "—"]],
+    },
+    {
+      title: "Identity",
+      step: 4,
       rows: [
         [
           "Government ID",
@@ -90,40 +87,6 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
         ],
       ],
     },
-    {
-      title: "Household",
-      step: 4,
-      rows: [
-        ["Housing type", profile.housingType ?? "—"],
-        ["Owns or rents", profile.ownsOrRents ?? "—"],
-        ["Landlord contact", profile.landlordContact ?? "—"],
-        ["Household size", String(profile.householdSize ?? "—")],
-        ["Number of children", String(profile.numChildren ?? "—")],
-      ],
-    },
-    {
-      title: "Lifestyle",
-      step: 5,
-      rows: [
-        [
-          "Employment status",
-          profile.employmentStatus ? humanize(profile.employmentStatus) : "—",
-        ],
-        ["Activity level", profile.activityLevel ?? "—"],
-        ["Yard available", profile.yardAvailable ? "Yes" : "No"],
-        ["Pet experience", profile.petExperience ?? "—"],
-        ["Current pets", String(profile.currentPets)],
-      ],
-    },
-    {
-      title: "Preferences",
-      step: 6,
-      rows: [
-        ["Preferred age range", profile.preferredAgeRange ?? "No preference"],
-        ["Preferred size", profile.preferredSize ?? "No preference"],
-        ["Open to special needs", profile.openToSpecialNeeds ? "Yes" : "No"],
-      ],
-    },
   ];
 
   return (
@@ -131,7 +94,7 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
       <OnboardingStepHeader
         icon={<PiClipboardTextBold />}
         title="Review"
-        description="Double check everything below, then submit to finish onboarding."
+        description="Double check everything below, then submit it for approval."
       />
 
       <div className="flex flex-col gap-4">
@@ -146,7 +109,7 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
               </h3>
               <ButtonElement
                 onClick={() =>
-                  navigate(`/onboarding/step/${section.step}?from=review`)
+                  navigate(`/staff/onboarding/step/${section.step}?from=review`)
                 }
                 size="bare"
                 variant="outline"
@@ -180,7 +143,7 @@ const ReviewStep = ({ profile, onBack }: ReviewStepProps) => {
       <OnboardingStepNav
         onBack={onBack}
         onContinue={() => mutation.mutate()}
-        continueLabel="Submit"
+        continueLabel="Submit for approval"
         pendingLabel="Submitting…"
         isPending={mutation.isPending}
       />

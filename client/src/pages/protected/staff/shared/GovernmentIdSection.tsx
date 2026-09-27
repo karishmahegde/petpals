@@ -8,12 +8,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { PiClock, PiSealCheck, PiXCircle } from "react-icons/pi";
-import ButtonElement from "../../../../../components/ui/ButtonElement";
+import ButtonElement from "../../../../components/ui/ButtonElement";
 import {
   getMyStaffGovernmentId,
   uploadMyStaffGovernmentId,
   type StaffGovernmentIdRecord,
-} from "../../../../../logic/api/staffApi";
+} from "../../../../logic/api/staffApi";
 
 const ID_TYPE_OPTIONS = [
   "Passport",

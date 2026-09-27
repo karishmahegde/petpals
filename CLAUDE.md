@@ -65,6 +65,7 @@ client/src/
       marketing/ SectionContainer, SectionHeading[Center]
       pets/      PetCatalogCard, PetDetailsModal, FilterControls
       dashboard/ DashboardHeading, DashboardWidgetHeader, DashboardList, StatTile
+      onboarding/ OnboardingProgress, OnboardingStepHeader, OnboardingStepNav, PersonalFields, AddressFields (shared by every role's wizard)
     layout/      Navbar, Footer, PublicLayout, DashboardNavbar, DashboardSidebar
   pages/
     public/      home/ · adopt/ (PetCatalog.tsx owns filter state; PetFilterBar, ShelterLocationFilter) · auth/ · about/ · volunteer-info/
@@ -77,7 +78,12 @@ client/src/
                    (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
         overview/  *Widget.tsx
         shared/    ApplicationsList, VisitsList
-    (staff/ vet/ volunteer/ donor/ admin/ — planned)
+    protected/staff/
+      onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
+      pending/     AwaitingApproval   (/staff/pending — Pending staff wait here once onboarded)
+      shared/      GovernmentIdSection   (used by onboarding + Profile)
+      dashboard/   DashboardLayout routes + one file per tab
+    (vet/ volunteer/ donor/ — planned)
   App.tsx        routes + session restore on mount
 
 server/src/

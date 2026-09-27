@@ -1,18 +1,15 @@
-// PersonalStep.tsx - onboarding Step 2
+// AddressStep.tsx — staff onboarding Step 3
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
-import { PiUserBold } from "react-icons/pi";
+import { PiHouseLineBold } from "react-icons/pi";
 import OnboardingStepHeader from "../../../../../components/ui/onboarding/OnboardingStepHeader";
 import OnboardingStepNav from "../../../../../components/ui/onboarding/OnboardingStepNav";
-import PersonalFields, {
-  type PersonalValues,
-} from "../../../../../components/ui/onboarding/PersonalFields";
 import AddressFields from "../../../../../components/ui/onboarding/AddressFields";
 import {
-  updateAdopterProfile,
-  type AdopterProfile as AdopterProfileData,
-} from "../../../../../logic/api/adoptersApi";
+  updateMyStaffProfile,
+  type StaffSelfProfile,
+} from "../../../../../logic/api/staffApi";
 import {
   isAddressComplete,
   isValidZipForCountry,
@@ -20,8 +17,8 @@ import {
   type Address,
 } from "../../../../../logic/utils/address";
 
-interface PersonalStepProps {
-  profile: AdopterProfileData;
+interface AddressStepProps {
+  profile: StaffSelfProfile;
   onContinue: () => void;
   onBack?: () => void;
 }
@@ -31,13 +28,7 @@ const extractError = (err: unknown): string =>
     ? String(err.response.data.message)
     : "Something went wrong. Please try again.";
 
-const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
-  const [personal, setPersonal] = useState<PersonalValues>({
-    avatarSeed: profile.avatarSeed,
-    dob: profile.adopterDOB ? profile.adopterDOB.slice(0, 10) : "",
-    sex: profile.adopterSex ?? "",
-    phone: profile.adopterPhone ?? undefined,
-  });
+const AddressStep = ({ profile, onContinue, onBack }: AddressStepProps) => {
   const [address, setAddress] = useState<Address>({
     addressLine1: profile.addressLine1 ?? "",
     addressLine2: profile.addressLine2 ?? "",
@@ -49,18 +40,13 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: updateAdopterProfile,
+    mutationFn: updateMyStaffProfile,
     onSuccess: () => onContinue(),
     onError: (err) => setError(extractError(err)),
   });
 
   const handleContinue = () => {
-    if (
-      !personal.dob ||
-      !personal.sex ||
-      !personal.phone ||
-      !isAddressComplete(address)
-    ) {
+    if (!isAddressComplete(address)) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -71,34 +57,21 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
       return;
     }
     setError(null);
-    mutation.mutate({
-      avatarSeed: personal.avatarSeed,
-      adopterDOB: personal.dob,
-      adopterSex: personal.sex,
-      adopterPhone: personal.phone,
-      ...toAddressPayload(address),
-    });
+    mutation.mutate({ ...toAddressPayload(address) });
   };
 
   return (
     <div>
       <OnboardingStepHeader
-        icon={<PiUserBold />}
-        title="About You"
-        description="A few basics so shelters know who they're talking to."
+        icon={<PiHouseLineBold />}
+        title="Your Address"
+        description="Where you live — kept on your staff record, never shown to adopters."
       />
 
-      <PersonalFields
-        value={personal}
-        onChange={(patch) => setPersonal((prev) => ({ ...prev, ...patch }))}
+      <AddressFields
+        value={address}
+        onChange={(patch) => setAddress((prev) => ({ ...prev, ...patch }))}
       />
-
-      <div className="mt-6">
-        <AddressFields
-          value={address}
-          onChange={(patch) => setAddress((prev) => ({ ...prev, ...patch }))}
-        />
-      </div>
 
       {error && (
         <p className="mt-4 rounded-lg bg-rose-lightest px-4 py-2 font-body text-sm text-rose-dark">
@@ -115,4 +88,4 @@ const PersonalStep = ({ profile, onContinue, onBack }: PersonalStepProps) => {
   );
 };
 
-export default PersonalStep;
+export default AddressStep;

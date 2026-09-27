@@ -11,7 +11,9 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Navbar from "../../../../components/layout/Navbar";
 import Card from "../../../../components/ui/Card";
-import OnboardingProgress from "./OnboardingProgress";
+import OnboardingProgress, {
+  type OnboardingStepDef,
+} from "../../../../components/ui/onboarding/OnboardingProgress";
 import PersonalStep from "./steps/PersonalStep";
 import IdentityStep from "./steps/IdentityStep";
 import HouseholdStep from "./steps/HouseholdStep";
@@ -24,6 +26,16 @@ import {
 } from "../../../../logic/api/adoptersApi";
 import { setOnboardingSkipped } from "../../../../logic/onboardingSkip";
 import useAuthStore from "../../../../logic/store/useAuthStore";
+
+const ADOPTER_STEPS: OnboardingStepDef[] = [
+  { step: 1, label: "Account" },
+  { step: 2, label: "Personal" },
+  { step: 3, label: "Identity" },
+  { step: 4, label: "Household" },
+  { step: 5, label: "Lifestyle" },
+  { step: 6, label: "Preferences" },
+  { step: 7, label: "Review" },
+];
 
 const OnboardingWizard = () => {
   const { step: stepParam } = useParams();
@@ -100,9 +112,11 @@ const OnboardingWizard = () => {
         ) : (
           <div className="mx-auto max-w-2xl">
             <OnboardingProgress
+              steps={ADOPTER_STEPS}
               currentStep={step}
               furthestStep={furthestStep}
               onSkip={step !== 7 ? handleSkip : undefined}
+              skipHint="These details are required for adoption applications."
             />
 
             <Card className="p-6 md:p-8">

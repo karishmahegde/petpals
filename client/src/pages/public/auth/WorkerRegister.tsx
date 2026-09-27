@@ -8,6 +8,9 @@
 // Staff/Admin approvals have a review UI (Staff tab / Admins tab); Vet
 // approval doesn't yet (no Staff dashboard to host it). Staff also pick the
 // shelter they're joining — its manager approves them (Management → Staff).
+// Staff are signed straight in after registering: they complete onboarding
+// (profile, address, government ID) BEFORE approval, so their approver sees
+// a complete profile. Vet/Admin still wait for approval to sign in.
 // Route: /staff-portal/register
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
@@ -16,7 +19,10 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
-import { register as registerApi } from "../../../logic/api/authApi";
+import {
+  register as registerApi,
+  login as loginApi,
+} from "../../../logic/api/authApi";
 import {
   getShelters,
   getSheltersWithManager,
@@ -85,6 +91,7 @@ const ROLE_OPTIONS: RoleOption[] = [
 
 const WorkerRegister = () => {
   const { token, role: sessionRole } = useAuthStore();
+  const storeLogin = useAuthStore((state) => state.login);
   const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState("");
@@ -159,6 +166,16 @@ const WorkerRegister = () => {
         role,
         shelterID: needsShelter ? Number(shelterID) : undefined,
       });
+      if (role === "staff") {
+        // Staff onboard before they're approved: sign them straight in and
+        // start the wizard (OnboardingGate keeps a Pending staff member on
+        // it, then on /staff/pending until they're approved).
+        const { token: newToken, user } = await loginApi({ email, password });
+        storeLogin(user, newToken, user.role);
+        toast.success("Account created! Let's set up your profile.");
+        navigate("/staff/onboarding/step/2", { replace: true });
+        return;
+      }
       toast.success(
         "Registered! Your account needs approval before you can sign in.",
       );

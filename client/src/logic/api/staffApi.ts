@@ -28,7 +28,14 @@ export interface StaffListItem {
   accountStatus: StaffAccountStatus | null;
   shelter: { shelterName: string } | null;
   user: { userEmail: string };
+  // What an approver checks before approving a Pending sign-up: approval
+  // needs onboarding complete AND a Verified government ID (null when none
+  // has been submitted). Only the ID's status is ever exposed.
+  onboardingComplete: boolean;
+  governmentIdStatus: GovernmentIdStatus | null;
 }
+
+export type GovernmentIdStatus = "Pending" | "Verified" | "Rejected";
 
 export interface StaffDetail extends StaffListItem {
   // Shelter(s), if any, where this staff member is the currently-assigned manager.
@@ -104,9 +111,12 @@ export const updateStaffStatus = async (
 // government-ID wrappers land with the Staff Profile page's own card.
 // The self-service shape — the list-row fields plus the address and the
 // account-level emailVerified/lastLoginAt (from Users).
-export interface StaffSelfProfile extends StaffListItem, Address {
+export interface StaffSelfProfile
+  extends Omit<StaffListItem, "governmentIdStatus">,
+    Address {
   emailVerified: boolean;
   lastLoginAt: string | null;
+  onboardingStep: number;
 }
 
 export const getMyStaffProfile = async (): Promise<StaffSelfProfile> => {
@@ -114,8 +124,8 @@ export const getMyStaffProfile = async (): Promise<StaffSelfProfile> => {
   return response.data.data;
 };
 
-// Partial update — avatarSeed, staffName, staffPhone, staffDOB, and/or
-// staffSex only. Unlike Admin, Staff has no address field, and
+// Partial update — avatarSeed, staffName, staffPhone, staffDOB, staffSex
+// and the address fields (addressLine1/2, city, state, zip, country).
 // shelterID/staffDesignation/accountStatus are Admin-controlled (PATCH
 // /staff/:id, /staff/:id/status) — the endpoint rejects them here.
 // staffPhone must be a valid phone number (normalized server-side to
@@ -127,6 +137,29 @@ export const updateMyStaffProfile = async (
   const response = await axiosInstance.put("/staff/me", payload);
   return response.data.data;
 };
+
+// ———————————————— ONBOARDING API ————————————————
+// A new staff member onboards while still Pending, before approval (Step 2
+// Personal, 3 Address, 4 Identity, 5 Review). `step` is the step just
+// completed; server-side, onboardingStep only ever advances (max 5).
+export const advanceMyStaffOnboardingStep = async (
+  step: number,
+): Promise<StaffSelfProfile> => {
+  const response = await axiosInstance.patch("/staff/me/onboarding-step", {
+    step,
+  });
+  return response.data.data;
+};
+
+// Review step's Submit. 409 (with the missing items in its message) unless
+// phone, DOB, sex, address and a submitted government ID are all present.
+export const completeMyStaffOnboarding =
+  async (): Promise<StaffSelfProfile> => {
+    const response = await axiosInstance.patch(
+      "/staff/me/onboarding-complete",
+    );
+    return response.data.data;
+  };
 
 // 'deactivate' keeps the row (no self-service reactivation); 'delete' is
 // permanent. Both clear managerStaffID on any shelter this staff member

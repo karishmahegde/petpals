@@ -1,6 +1,6 @@
-// OnboardingStepHeader.tsx
-// Icon chip + heading + helper sentence — the header every wizard step
-// (2-7) opens with, per the mockup's "About your Home" treatment.
+// components/ui/onboarding/OnboardingStepHeader.tsx
+// Icon chip + heading + helper sentence — the header every onboarding
+// wizard step opens with, per the mockup's "About your Home" treatment.
 import { ReactNode } from "react";
 
 interface OnboardingStepHeaderProps {

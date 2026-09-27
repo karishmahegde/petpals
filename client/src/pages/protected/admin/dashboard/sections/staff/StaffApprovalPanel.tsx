@@ -6,6 +6,9 @@
 // Read-only profile plus Approve/Decline in the footer, both going through
 // the existing PATCH /staff/:id/status endpoint (Active = approve,
 // Deactivated = decline — there's no dedicated approve/decline endpoint).
+// Approving needs their onboarding complete AND their government ID
+// Verified (the server refuses otherwise), so Approve stays disabled, with
+// what's missing shown, until both are true.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
@@ -17,6 +20,7 @@ import {
   type StaffAccountStatusTarget,
 } from "../../../../../../logic/api/staffApi";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
+import { approvalBlockers } from "../../../../../../logic/staff/approvalReadiness";
 
 interface StaffApprovalPanelProps {
   userID: number | null;
@@ -60,6 +64,8 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
       ),
   });
 
+  const blockers = data ? approvalBlockers(data) : [];
+
   return (
     <SlideOver
       open={userID !== null}
@@ -70,7 +76,7 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
           <div className="flex gap-3">
             <ButtonElement
               onClick={() => mutation.mutate("Active")}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || blockers.length > 0}
               size="panel"
               className="flex-1 bg-green hover:brightness-95 disabled:cursor-not-allowed"
             >
@@ -128,7 +134,32 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
               k="Applied on"
               v={data.staffDOJ ? formatFullDate(new Date(data.staffDOJ)) : "—"}
             />
+            <InfoRow
+              k="Onboarding"
+              v={data.onboardingComplete ? "Complete" : "Not finished"}
+            />
+            <InfoRow
+              k="Government ID"
+              v={data.governmentIdStatus ?? "Not submitted"}
+            />
           </dl>
+
+          {blockers.length > 0 && (
+            <div className="mt-5 rounded-lg bg-gold-lightest px-4 py-3 font-body text-sm text-neutral-charcoal">
+              <p className="font-semibold">Can't approve yet</p>
+              <p className="mt-1">{blockers.join(" · ")}</p>
+              {data.governmentIdStatus === "Pending" && (
+                <ButtonElement
+                  to="/admin/id-verification"
+                  size="bare"
+                  variant="outline"
+                  className="mt-2 text-sm font-medium text-teal-dark underline"
+                >
+                  Review their ID in ID Verification
+                </ButtonElement>
+              )}
+            </div>
+          )}
 
           <p className="mt-5 font-body text-xs text-neutral-gray">
             Approving activates this account and lets them log in. Shelter and

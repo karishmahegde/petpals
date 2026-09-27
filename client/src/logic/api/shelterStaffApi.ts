@@ -4,7 +4,11 @@
 // caller manages (403 for anyone else).
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
-import type { StaffAccountStatus, StaffDesignation } from "./staffApi";
+import type {
+  GovernmentIdStatus,
+  StaffAccountStatus,
+  StaffDesignation,
+} from "./staffApi";
 
 export interface ShelterStaffMember {
   userID: number;
@@ -18,6 +22,10 @@ export interface ShelterStaffMember {
   staffDOJ: string | null; // Date of Joining — set on first approval
   staffDOS: string | null; // Date of Separation — set on deactivation
   accountStatus: StaffAccountStatus;
+  // Approving a Pending member needs both: onboarding complete and a
+  // Verified government ID (null = none submitted).
+  onboardingComplete: boolean;
+  governmentIdStatus: GovernmentIdStatus | null;
 }
 
 interface ShelterStaffParams {

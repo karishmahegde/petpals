@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import {
   keepPreviousData,
   useMutation,
@@ -31,6 +31,7 @@ import {
   type ShelterStaffMember,
 } from "../../../../logic/api/shelterStaffApi";
 import ConfirmActionModal from "../../../../components/ui/ConfirmActionModal";
+import { approvalBlockers } from "../../../../logic/staff/approvalReadiness";
 import StaffDetailPanel from "./sections/staff/StaffDetailPanel";
 
 const PAGE_SIZE = 20;
@@ -95,6 +96,7 @@ const memberRowProps = (member: ShelterStaffMember) => ({
 // else is sent to /forbidden, and GET/PATCH /staff/me/team 403 them too.
 const Staff = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [viewing, setViewing] = useState<ShelterStaffMember | null>(null);
 
   const { data: profile } = useQuery({
@@ -194,27 +196,52 @@ const Staff = () => {
           <DashboardActionList
             items={pendingMembers}
             getKey={(member) => member.userID}
-            renderRow={(member, confirm) => (
-              <DashboardListRow
-                {...memberRowProps(member)}
-                actions={
-                  <>
-                    <RowActionButton
-                      variant="success"
-                      onClick={() => setApproving(member)}
-                    >
-                      Approve
-                    </RowActionButton>
-                    <RowActionButton
-                      variant="danger"
-                      onClick={() => confirm(member)}
-                    >
-                      Decline
-                    </RowActionButton>
-                  </>
-                }
-              />
-            )}
+            renderRow={(member, confirm) => {
+              // Approval needs onboarding complete AND a Verified ID — the
+              // server refuses otherwise, so Approve stays disabled with
+              // the reason shown until both are true.
+              const rowProps = memberRowProps(member);
+              const blockers = approvalBlockers(member);
+              return (
+                <DashboardListRow
+                  {...rowProps}
+                  lines={[
+                    ...rowProps.lines,
+                    {
+                      text:
+                        blockers.length > 0
+                          ? `Can't approve yet: ${blockers.join(" · ")}`
+                          : "Ready to approve — onboarding done, ID verified",
+                      strong: blockers.length === 0,
+                    },
+                  ]}
+                  actions={
+                    <>
+                      {member.governmentIdStatus === "Pending" && (
+                        <RowActionButton
+                          onClick={() => navigate("/staff/id-verification")}
+                        >
+                          Verify ID
+                        </RowActionButton>
+                      )}
+                      <RowActionButton
+                        variant="success"
+                        disabled={blockers.length > 0}
+                        onClick={() => setApproving(member)}
+                      >
+                        Approve
+                      </RowActionButton>
+                      <RowActionButton
+                        variant="danger"
+                        onClick={() => confirm(member)}
+                      >
+                        Decline
+                      </RowActionButton>
+                    </>
+                  }
+                />
+              );
+            }}
             confirmAction={{
               mutationFn: (member) =>
                 updateShelterStaffStatus(member.userID, "Deactivated"),

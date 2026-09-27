@@ -6,8 +6,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { PiSlidersHorizontalBold } from "react-icons/pi";
 import SegmentedControl from "../../../../../components/ui/SegmentedControl";
-import ButtonElement from "../../../../../components/ui/ButtonElement";
-import OnboardingStepHeader from "../OnboardingStepHeader";
+import OnboardingStepHeader from "../../../../../components/ui/onboarding/OnboardingStepHeader";
+import OnboardingStepNav from "../../../../../components/ui/onboarding/OnboardingStepNav";
 import {
   updateAdopterProfile,
   type AdopterProfile as AdopterProfileData,
@@ -164,25 +164,11 @@ const PreferencesStep = ({ profile, onContinue, onBack }: PreferencesStepProps) 
         </p>
       )}
 
-      <div className="mt-6 flex gap-3">
-        {onBack && (
-          <ButtonElement
-            onClick={onBack}
-            size="panel"
-            className="flex-1 bg-gold hover:brightness-95 disabled:cursor-not-allowed"
-          >
-            Back
-          </ButtonElement>
-        )}
-        <ButtonElement
-          onClick={handleContinue}
-          disabled={mutation.isPending}
-          size="panel"
-          className="flex-1 bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
-        >
-          {mutation.isPending ? "Saving…" : "Continue"}
-        </ButtonElement>
-      </div>
+      <OnboardingStepNav
+        onBack={onBack}
+        onContinue={handleContinue}
+        isPending={mutation.isPending}
+      />
     </div>
   );
 };
