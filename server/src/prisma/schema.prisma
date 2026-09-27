@@ -156,6 +156,9 @@ model Veterinarian {
 
 model Species {
   speciesID   Int     @id @default(autoincrement())
+  // Unique case-insensitively — an expression index enforced in the DB only,
+  // not expressible here (migration 20260927060418_species_breed_name_ci_unique):
+  //   CREATE UNIQUE INDEX "Species_speciesName_lower_key" ON "Species" (LOWER("speciesName"));
   speciesName String  @db.VarChar(45)
   breeds      Breed[]
 }
@@ -163,6 +166,10 @@ model Species {
 model Breed {
   breedID   Int       @id @default(autoincrement())
   speciesID Int
+  // Unique case-insensitively within its species — DB-only expression index
+  // (migration 20260927060418_species_breed_name_ci_unique):
+  //   CREATE UNIQUE INDEX "Breed_speciesID_breedName_lower_key"
+  //   ON "Breed" ("speciesID", LOWER("breedName"));
   breedName String    @db.VarChar(45)
   adopters  Adopter[]
   species   Species   @relation(fields: [speciesID], references: [speciesID])

@@ -64,6 +64,38 @@ describe("Species & breed management", () => {
       expect(prisma.species.create).not.toHaveBeenCalled();
     });
 
+    // A concurrent request inserted the same name between the pre-check and
+    // this insert — the case-insensitive unique index rejects it.
+    test.each(["P2002", "23505"])(
+      "insert hits the unique index (%s) after the pre-check passed → 409 CONFLICT",
+      async (code) => {
+        prisma.species.findFirst.mockResolvedValueOnce(null);
+        prisma.species.create.mockRejectedValueOnce(
+          Object.assign(new Error("duplicate"), { code }),
+        );
+
+        const res = await request(app)
+          .post("/api/v1/species")
+          .set("Authorization", `Bearer ${signToken("Staff")}`)
+          .send({ speciesName: "Dog" });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("CONFLICT");
+      },
+    );
+
+    test("any other insert error is not reported as a duplicate → 500", async () => {
+      prisma.species.findFirst.mockResolvedValueOnce(null);
+      prisma.species.create.mockRejectedValueOnce(new Error("connection lost"));
+
+      const res = await request(app)
+        .post("/api/v1/species")
+        .set("Authorization", `Bearer ${signToken("Staff")}`)
+        .send({ speciesName: "Dog" });
+
+      expect(res.status).toBe(500);
+    });
+
     test("blank or too-long name → 400 BAD_REQUEST, nothing queried", async () => {
       for (const speciesName of ["   ", "x".repeat(46), undefined]) {
         const res = await request(app)
@@ -132,6 +164,22 @@ describe("Species & breed management", () => {
 
       expect(res.status).toBe(409);
       expect(prisma.breed.create).not.toHaveBeenCalled();
+    });
+
+    test("insert hits the unique index after the pre-check passed → 409 CONFLICT", async () => {
+      prisma.species.findUnique.mockResolvedValueOnce({ speciesName: "Dog" });
+      prisma.breed.findFirst.mockResolvedValueOnce(null);
+      prisma.breed.create.mockRejectedValueOnce(
+        Object.assign(new Error("duplicate"), { code: "23505" }),
+      );
+
+      const res = await request(app)
+        .post("/api/v1/breeds")
+        .set("Authorization", `Bearer ${signToken("Staff")}`)
+        .send({ speciesID: 1, breedName: "Beagle" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
     });
 
     test("invalid speciesID → 400 BAD_REQUEST, nothing queried", async () => {
