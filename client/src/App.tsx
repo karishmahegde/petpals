@@ -13,6 +13,7 @@ import WorkerLogin from "./pages/public/auth/WorkerLogin";
 import WorkerRegister from "./pages/public/auth/WorkerRegister";
 import Adopt from "./pages/public/adopt/Adopt";
 import Events from "./pages/public/events/Events";
+import Faqs from "./pages/public/faqs/Faqs";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -67,6 +68,7 @@ const App = () => {
           <Route path="/staff-portal/register" element={<WorkerRegister />} />
           <Route path="/adopt" element={<Adopt />} />
           <Route path="/events" element={<Events />} />
+          <Route path="/faqs" element={<Faqs />} />
           <Route path="/forbidden" element={<Forbidden />} />
           <Route path="*" element={<NotFound />} />
         </Route>

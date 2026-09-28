@@ -15,8 +15,7 @@ const Footer = () => {
         <div className="lg:w-1/3 p-3 flex flex-col items-center justify-center text-center">
           <h2 className="font-display text-2xl mb-4">Know More</h2>
           <p>
-            {/* TODO: point to real FAQs page once it's built later this sprint */}
-            <a href="#">FAQs</a>
+            <Link to="/faqs">FAQs</Link>
           </p>
           <p>
             {/* TODO: point to real Privacy Policy page once it's built later this sprint */}
