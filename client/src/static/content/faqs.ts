@@ -8,10 +8,24 @@ export interface FaqCategory {
   items: FaqItem[];
 }
 
+// `src` stays null until a real image is added under
+// assets/images/faqs/ — the page shows a labelled placeholder until then,
+// using `alt` as the hint for what the image should be.
+export interface FaqImage {
+  src: string | null;
+  alt: string;
+}
+
 export interface FaqsContent {
-  heroSection: { heading: string; description: string };
+  heroSection: { heading: string; description: string; image: FaqImage };
+  sideImage: FaqImage;
   categories: FaqCategory[];
-  contactSection: { heading: string; description: string; email: string };
+  contactSection: {
+    heading: string;
+    description: string;
+    email: string;
+    image: FaqImage;
+  };
 }
 
 export const faqsContent: FaqsContent = {
@@ -19,6 +33,14 @@ export const faqsContent: FaqsContent = {
     heading: "Frequently Asked Questions",
     description:
       "Curious about adopting, visiting, or volunteering? You're in the right place. We've fetched answers to the questions we hear most, so you can spend less time wondering and more time finding your new best friend.",
+    image: {
+      src: null,
+      alt: "A curious puppy tilting its head, as if asking a question",
+    },
+  },
+  sideImage: {
+    src: null,
+    alt: "An adopter meeting a shelter cat during a visit",
   },
   categories: [
     {
@@ -167,5 +189,9 @@ export const faqsContent: FaqsContent = {
     description:
       "If you couldn't find what you were looking for, our team is happy to help. Drop us a line and we'll get back to you faster than a puppy hearing the treat bag.",
     email: "support@petpals.com",
+    image: {
+      src: null,
+      alt: "A shelter team member cuddling a dog at the front desk",
+    },
   },
 };
