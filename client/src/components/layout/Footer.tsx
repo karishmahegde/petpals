@@ -18,19 +18,16 @@ const Footer = () => {
             <Link to="/faqs">FAQs</Link>
           </p>
           <p>
-            {/* TODO: point to real Privacy Policy page once it's built later this sprint */}
-            <a href="#">Privacy Policy</a>
+            <Link to="/privacy-policy">Privacy Policy</Link>
           </p>
           <p>
             <Link to="/about#testimonials">Testimonials</Link>
           </p>
           <p>
-            {/* TODO: point to real Support page once it's built later this sprint */}
-            <a href="#">Support</a>
+            <Link to="/faqs#contact">Support</Link>
           </p>
           <p>
-            {/* TODO: point to real Terms of Service page once it's built later this sprint */}
-            <a href="#">Terms of Service</a>
+            <Link to="/terms-of-service">Terms of Service</Link>
           </p>
           <p>
             <Link to="/staff-portal/login">Staff Portal</Link>

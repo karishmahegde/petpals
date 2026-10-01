@@ -3,11 +3,13 @@ import ButtonElement from "../../../components/ui/ButtonElement";
 import SectionContainer from "../../../components/ui/marketing/SectionContainer";
 import SectionHeading from "../../../components/ui/marketing/SectionHeading";
 import SectionHeadingCenter from "../../../components/ui/marketing/SectionHeadingCenter";
+import { useScrollToHash } from "../../../logic/hooks/useScrollToHash";
 import { faqsContent } from "../../../static/content/faqs";
 import FaqCategorySection from "./FaqCategorySection";
 import FaqImage from "./FaqImage";
 
 const Faqs = () => {
+  useScrollToHash();
   const { heroSection, categories, contactSection } = faqsContent;
   // Several answers can be open at once; questions are unique, so they
   // double as keys.
@@ -50,8 +52,8 @@ const Faqs = () => {
         </div>
       </SectionContainer>
 
-      {/* Section 3 */}
-      <SectionContainer className="bg-teal-light">
+      {/* Section 3 — the footer's Support link lands here */}
+      <SectionContainer id="contact" className="scroll-mt-20 bg-teal-light">
         <div className="grid items-center gap-8 md:grid-cols-2">
           <FaqImage
             image={contactSection.image}
@@ -67,6 +69,12 @@ const Faqs = () => {
               className="mt-4 inline-block font-semibold text-neutral-dark underline hover:text-teal-dark"
             >
               {contactSection.email}
+            </a>
+            <a
+              href={`tel:${contactSection.phone.replace(/[^\d+]/g, "")}`}
+              className="mt-1 block font-semibold text-neutral-dark underline hover:text-teal-dark"
+            >
+              {contactSection.phone}
             </a>
             <div>
               <ButtonElement

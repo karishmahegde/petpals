@@ -25,6 +25,7 @@ export interface FaqsContent {
     heading: string;
     description: string;
     email: string;
+    phone: string;
     image: FaqImage;
   };
 }
@@ -99,7 +100,8 @@ export const faqsContent: FaqsContent = {
             "Yes, as long as it's Under Consideration or Approved. Just open it from your dashboard and select Withdraw. The application fee isn't refunded, but you're always welcome to apply again later.",
         },
         {
-          question: "What happens if another adopter is approved for the same pet?",
+          question:
+            "What happens if another adopter is approved for the same pet?",
           answer:
             "Each pet can only go home with one family, so once an application is approved, any others for that pet are declined. We know that can be ruff news. There are plenty of other wonderful pets waiting to meet you!",
         },
@@ -182,10 +184,11 @@ export const faqsContent: FaqsContent = {
     },
   ],
   contactSection: {
-    heading: "Still Have Questions?",
+    heading: "Need More Help?",
     description:
-      "If you couldn't find what you were looking for, our team is happy to help. Drop us a line and we'll get back to you faster than a puppy hearing the treat bag.",
+      "If you couldn't find what you were looking for, our team is happy to help. Email or call us and we'll get back to you faster than a puppy hearing the treat bag.",
     email: "support@petpals.com",
+    phone: "+1 (706) 342-8631",
     image: {
       src: faqEndImg,
       alt: "A shelter volunteer cuddling a calico cat",

@@ -14,6 +14,8 @@ import WorkerRegister from "./pages/public/auth/WorkerRegister";
 import Adopt from "./pages/public/adopt/Adopt";
 import Events from "./pages/public/events/Events";
 import Faqs from "./pages/public/faqs/Faqs";
+import PrivacyPolicy from "./pages/public/legal/PrivacyPolicy";
+import TermsOfService from "./pages/public/legal/TermsOfService";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -69,6 +71,8 @@ const App = () => {
           <Route path="/adopt" element={<Adopt />} />
           <Route path="/events" element={<Events />} />
           <Route path="/faqs" element={<Faqs />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/forbidden" element={<Forbidden />} />
           <Route path="*" element={<NotFound />} />
         </Route>

@@ -4,9 +4,11 @@ import SectionContainer from "../../../components/ui/marketing/SectionContainer"
 import SectionHeading from "../../../components/ui/marketing/SectionHeading";
 import SectionHeadingCenter from "../../../components/ui/marketing/SectionHeadingCenter";
 import ButtonElement from "../../../components/ui/ButtonElement";
+import { useScrollToHash } from "../../../logic/hooks/useScrollToHash";
 import { aboutContent } from "../../../static/content/about";
 
 const About = () => {
+  useScrollToHash();
   const [hasAnimated, setHasAnimated] = useState(false);
   const impactRef = useRef<HTMLElement | null>(null);
 
@@ -144,7 +146,7 @@ const About = () => {
       </SectionContainer>
 
       {/* Section 6 */}
-      <SectionContainer className="bg-teal-md">
+      <SectionContainer id="testimonials" className="scroll-mt-20 bg-teal-md">
         <SectionHeading>{testimonials.heading}</SectionHeading>
         <div className="grid md:grid-cols-2 gap-4 items-stretch mb-4">
           {testimonials.body.map((t) => (
