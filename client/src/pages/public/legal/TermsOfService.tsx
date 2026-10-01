@@ -1,19 +1,15 @@
-import { useScrollToHash } from "../../../logic/hooks/useScrollToHash";
 import { termsOfServiceContent } from "../../../static/content/terms-of-service";
-import LegalContact from "./shared/LegalContact";
-import LegalHero from "./shared/LegalHero";
-import LegalSections from "./shared/LegalSections";
+import LegalPage from "./shared/LegalPage";
 
 const TermsOfService = () => {
-  useScrollToHash();
   const { heroSection, sections, contactSection } = termsOfServiceContent;
 
   return (
-    <div className="font-body">
-      <LegalHero hero={heroSection} />
-      <LegalSections sections={sections} />
-      <LegalContact contact={contactSection} />
-    </div>
+    <LegalPage
+      hero={heroSection}
+      sections={sections}
+      contact={contactSection}
+    />
   );
 };
 

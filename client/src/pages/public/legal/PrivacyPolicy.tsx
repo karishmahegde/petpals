@@ -8,14 +8,11 @@ import {
 import Card from "../../../components/ui/Card";
 import SectionContainer from "../../../components/ui/marketing/SectionContainer";
 import SectionHeadingCenter from "../../../components/ui/marketing/SectionHeadingCenter";
-import { useScrollToHash } from "../../../logic/hooks/useScrollToHash";
 import {
   privacyPolicyContent,
   type GlanceIcon,
 } from "../../../static/content/privacy-policy";
-import LegalContact from "./shared/LegalContact";
-import LegalHero from "./shared/LegalHero";
-import LegalSections from "./shared/LegalSections";
+import LegalPage from "./shared/LegalPage";
 
 const glanceIcons: Record<GlanceIcon, IconType> = {
   noSale: PiShieldCheckFill,
@@ -25,14 +22,11 @@ const glanceIcons: Record<GlanceIcon, IconType> = {
 };
 
 const PrivacyPolicy = () => {
-  useScrollToHash();
   const { heroSection, glanceSection, sections, contactSection } =
     privacyPolicyContent;
 
   return (
-    <div className="font-body">
-      <LegalHero hero={heroSection} />
-
+    <LegalPage hero={heroSection} sections={sections} contact={contactSection}>
       {/* At a glance — Privacy Policy only */}
       <SectionContainer className="bg-gold-light">
         <SectionHeadingCenter className="mt-0">
@@ -60,10 +54,7 @@ const PrivacyPolicy = () => {
           })}
         </div>
       </SectionContainer>
-
-      <LegalSections sections={sections} />
-      <LegalContact contact={contactSection} />
-    </div>
+    </LegalPage>
   );
 };
 
