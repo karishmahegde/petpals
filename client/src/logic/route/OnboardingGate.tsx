@@ -15,7 +15,7 @@
 // Pending staff member who has finished onboarding is held on
 // /staff/pending until they're approved. The server enforces the same
 // boundary — a Pending account can only reach its own onboarding
-// endpoints (authenticate.allowPendingStaff) — this just keeps the UI on
+// endpoints (authenticate.allowPending) — this just keeps the UI on
 // the one page that works for them.
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";

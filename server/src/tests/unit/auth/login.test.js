@@ -4,9 +4,9 @@ const bcrypt = require("bcrypt");
 
 // Mocked so this suite never touches a real database. Covers what the staff
 // onboarding change added to login and session restore: a Pending Staff
-// member CAN log in (to onboard before approval) while Pending accounts of
-// other roles still can't, and Staff sessions carry accountStatus plus
-// onboarding progress. The happy-path login/refresh round trip against a
+// member or Veterinarian CAN log in (to onboard before approval) while
+// Pending accounts of other roles still can't, and Staff/Vet sessions carry
+// accountStatus plus onboarding progress. The happy-path login/refresh round trip against a
 // real DB is covered by the integration suite.
 jest.mock("../../../config/prisma", () => ({
   users: { findUnique: jest.fn(), update: jest.fn() },
@@ -106,7 +106,31 @@ describe("Login and session restore", () => {
       });
     });
 
-    test.each(["Veterinarian", "Volunteer", "Admin"])(
+    test("Pending Veterinarian mid-onboarding → 200 with accountStatus and onboarding progress", async () => {
+      mockAccount("Veterinarian", {
+        accountStatus: "Pending",
+        onboardingComplete: false,
+        onboardingStep: 2,
+      });
+
+      const res = await login();
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.token).toEqual(expect.any(String));
+      expect(res.body.data.user).toMatchObject({
+        userID: 42,
+        role: "Veterinarian",
+        accountStatus: "Pending",
+        onboardingComplete: false,
+        onboardingStep: 2,
+      });
+      expect(prisma.veterinarian.findUnique.mock.calls[0][0].select).toMatchObject({
+        onboardingComplete: true,
+        onboardingStep: true,
+      });
+    });
+
+    test.each(["Volunteer", "Admin"])(
       "Pending %s → 401, can't log in until approved",
       async (role) => {
         mockAccount(role, { accountStatus: "Pending" });
@@ -150,8 +174,33 @@ describe("Login and session restore", () => {
       expect(res.body.data.user).not.toHaveProperty("accountStatus");
     });
 
-    test("Veterinarian (Active) → neither onboarding fields nor accountStatus", async () => {
-      mockAccount("Veterinarian", { accountStatus: "Active" });
+    test("Active Veterinarian → 200 with the same fields as Staff", async () => {
+      mockAccount("Veterinarian", {
+        accountStatus: "Active",
+        onboardingComplete: true,
+        onboardingStep: 5,
+      });
+
+      const res = await login();
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user).toMatchObject({
+        accountStatus: "Active",
+        onboardingComplete: true,
+        onboardingStep: 5,
+      });
+    });
+
+    test("Deactivated Veterinarian → still 401", async () => {
+      mockAccount("Veterinarian", { accountStatus: "Deactivated" });
+
+      const res = await login();
+
+      expect(res.status).toBe(401);
+    });
+
+    test("Volunteer (Active) → neither onboarding fields nor accountStatus", async () => {
+      mockAccount("Volunteer", { accountStatus: "Active" });
 
       const res = await login();
 
@@ -192,6 +241,39 @@ describe("Login and session restore", () => {
         avatarSeed: "seed-42",
         onboardingComplete: true,
         onboardingStep: 5,
+        accountStatus: "Pending",
+      });
+    });
+
+    test("Pending Veterinarian → 200, session carries accountStatus and onboarding progress", async () => {
+      const cookieToken = jwt.sign({ userID: 42 }, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+      });
+      prisma.users.findUnique.mockResolvedValueOnce({
+        userID: 42,
+        role: "Veterinarian",
+        refreshToken: await bcrypt.hash(cookieToken, 4),
+      });
+      prisma.veterinarian.findUnique.mockResolvedValueOnce({
+        vetName: "Sam Patel",
+        avatarSeed: "seed-42",
+        accountStatus: "Pending",
+        onboardingComplete: false,
+        onboardingStep: 3,
+      });
+
+      const res = await request(app)
+        .post("/api/v1/auth/refresh-token")
+        .set("Cookie", `refreshToken=${cookieToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user).toEqual({
+        userID: 42,
+        role: "Veterinarian",
+        name: "Sam Patel",
+        avatarSeed: "seed-42",
+        onboardingComplete: false,
+        onboardingStep: 3,
         accountStatus: "Pending",
       });
     });

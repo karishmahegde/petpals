@@ -70,12 +70,13 @@ router.post("/register", authController.register);
  *         description: >
  *           Login successful — returns access token in body, refresh token
  *           as httpOnly cookie. user carries onboardingComplete and
- *           onboardingStep for Adopter and Staff, plus accountStatus for
- *           Staff. A Pending Staff member CAN log in (to onboard before
- *           approval) but can only reach their own onboarding endpoints
- *           until approved; Pending accounts of other roles get 401.
+ *           onboardingStep for Adopter, Staff and Veterinarian, plus
+ *           accountStatus for Staff and Veterinarian. A Pending Staff member
+ *           or Veterinarian CAN log in (to onboard before approval) but can
+ *           only reach their own onboarding endpoints until approved;
+ *           Pending accounts of other roles get 401.
  *       401:
- *         description: Incorrect password, or a Deactivated/Banned account (or Pending, for non-Staff roles)
+ *         description: Incorrect password, or a Deactivated/Banned account (or Pending, for roles other than Staff/Veterinarian)
  *       404:
  *         description: No account found with this email
  */
@@ -95,9 +96,9 @@ router.post("/login", authController.login);
  *       401:
  *         description: Missing, invalid, or already-invalidated token
  */
-// allowPendingStaff: a Pending staff member is logged in while they onboard
+// allowPending: a Pending staff member or vet is logged in while they onboard
 // (before approval), so they must be able to log out too.
-router.post("/logout", authenticate.allowPendingStaff, authController.logout);
+router.post("/logout", authenticate.allowPending, authController.logout);
 
 /**
  * @swagger

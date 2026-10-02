@@ -1,8 +1,4 @@
-const staffService = require("../../services/staff/staff.service");
-const {
-  assertValidCloseAccountMode,
-  closeAccountMessage,
-} = require("../../services/auth/auth.service");
+const vetsService = require("../../services/vet/vets.service");
 const { successResponse } = require("../../utils/response");
 const governmentIdService = require("../../services/governmentIds/selfGovernmentId.service");
 const { normalizePhone } = require("../../utils/phone");
@@ -14,34 +10,34 @@ const badRequest = (message) => {
   return err;
 };
 
-// ——————————————— GET /staff/me ———————————————
+// ——————————————— GET /vets/me ———————————————
 const getMyProfile = async (req, res, next) => {
   try {
-    const staff = await staffService.getMyProfile(req.user.userID);
-    return successResponse(res, "Profile retrieved successfully", staff);
+    const vet = await vetsService.getMyProfile(req.user.userID);
+    return successResponse(res, "Profile retrieved successfully", vet);
   } catch (err) {
     return next(err);
   }
 };
 
-// Fields a staff member may change on their own profile — no
-// shelterID/staffDesignation like Admin manages via PATCH /staff/:id, and
-// accountStatus is explicitly NOT here: that's Admin-approval-only (PATCH
-// /staff/:id/status).
+// Fields a vet may change on their own profile. shelterID is picked at
+// sign-up and accountStatus is the shelter manager's to set (PATCH
+// /staff/me/vets/:id/status) — both rejected outright rather than silently
+// dropped.
 const SELF_UPDATABLE_FIELDS = [
   "avatarSeed",
-  "staffName",
-  "staffPhone",
-  "staffDOB",
-  "staffSex",
+  "vetName",
+  "vetPhone",
+  "vetDOB",
+  "vetSex",
 ];
-const SELF_REJECTED_FIELDS = ["shelterID", "staffDesignation", "accountStatus"];
-// Nullable (unlike avatarSeed/staffName) — clearing one of these is a valid
+const SELF_REJECTED_FIELDS = ["shelterID", "accountStatus"];
+// Nullable (unlike avatarSeed/vetName) — clearing one of these is a valid
 // update, sent as `null` rather than omitted.
-const SELF_NULLABLE_FIELDS = ["staffPhone", "staffDOB", "staffSex"];
-const STAFF_SEX_VALUES = ["M", "F", "O"];
+const SELF_NULLABLE_FIELDS = ["vetPhone", "vetDOB", "vetSex"];
+const VET_SEX_VALUES = ["M", "F", "O"];
 
-// ——————————————— PUT /staff/me ———————————————
+// ——————————————— PUT /vets/me ———————————————
 const updateMyProfile = async (req, res, next) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
 
@@ -75,28 +71,28 @@ const updateMyProfile = async (req, res, next) => {
     if (typeof value !== "string" || !value.trim()) {
       return next(badRequest(`${field} cannot be empty`));
     }
-    if (field === "staffName" && value.length > 45) {
-      return next(badRequest("staffName must be 45 characters or fewer"));
+    if (field === "vetName" && value.length > 45) {
+      return next(badRequest("vetName must be 45 characters or fewer"));
     }
     if (field === "avatarSeed" && value.length > 64) {
       return next(badRequest("avatarSeed must be 64 characters or fewer"));
     }
-    if (field === "staffSex" && !STAFF_SEX_VALUES.includes(value)) {
+    if (field === "vetSex" && !VET_SEX_VALUES.includes(value)) {
       return next(
-        badRequest(`staffSex must be one of: ${STAFF_SEX_VALUES.join(", ")}`),
+        badRequest(`vetSex must be one of: ${VET_SEX_VALUES.join(", ")}`),
       );
     }
-    if (field === "staffDOB") {
+    if (field === "vetDOB") {
       const parsed = new Date(value);
       if (Number.isNaN(parsed.getTime())) {
-        return next(badRequest("staffDOB must be a valid date"));
+        return next(badRequest("vetDOB must be a valid date"));
       }
       data[field] = parsed;
       continue;
     }
     // Stores the parsed E.164 form — never what the client sent raw, even
     // if it looks correct.
-    if (field === "staffPhone") {
+    if (field === "vetPhone") {
       try {
         data[field] = normalizePhone(value);
       } catch (err) {
@@ -112,14 +108,14 @@ const updateMyProfile = async (req, res, next) => {
   }
 
   try {
-    const staff = await staffService.updateMyProfile(req.user.userID, data);
-    return successResponse(res, "Profile updated successfully", staff);
+    const vet = await vetsService.updateMyProfile(req.user.userID, data);
+    return successResponse(res, "Profile updated successfully", vet);
   } catch (err) {
     return next(err);
   }
 };
 
-// ——————————————— PATCH /staff/me/onboarding-step ———————————————
+// ——————————————— PATCH /vets/me/onboarding-step ———————————————
 const advanceOnboardingStep = async (req, res, next) => {
   const step = Number(req.body?.step);
   if (!Number.isInteger(step) || step < 2 || step > 5) {
@@ -127,31 +123,31 @@ const advanceOnboardingStep = async (req, res, next) => {
   }
 
   try {
-    const staff = await staffService.advanceOnboardingStep(req.user.userID, step);
-    return successResponse(res, "Onboarding step updated successfully", staff);
+    const vet = await vetsService.advanceOnboardingStep(req.user.userID, step);
+    return successResponse(res, "Onboarding step updated successfully", vet);
   } catch (err) {
     return next(err);
   }
 };
 
-// ——————————————— PATCH /staff/me/onboarding-complete ———————————————
+// ——————————————— PATCH /vets/me/onboarding-complete ———————————————
 const completeOnboarding = async (req, res, next) => {
   try {
-    const staff = await staffService.completeOnboarding(req.user.userID);
-    return successResponse(res, "Onboarding completed successfully", staff);
+    const vet = await vetsService.completeOnboarding(req.user.userID);
+    return successResponse(res, "Onboarding completed successfully", vet);
   } catch (err) {
     return next(err);
   }
 };
 
-// ——————————————— GOVERNMENT ID (GET/POST /staff/me/government-id) ———————————————
+// ——————————————— GOVERNMENT ID (GET/POST /vets/me/government-id) ———————————————
 // Shared with every role's /me/government-id — see
 // services/governmentIds/selfGovernmentId.service.js.
 const uploadGovernmentId = async (req, res, next) => {
   try {
     const upload = governmentIdService.parseUpload(req);
     const record = await governmentIdService.createGovernmentId(
-      "Staff",
+      "Veterinarian",
       req.user.userID,
       upload,
     );
@@ -169,27 +165,10 @@ const uploadGovernmentId = async (req, res, next) => {
 const getGovernmentId = async (req, res, next) => {
   try {
     const record = await governmentIdService.getGovernmentId(
-      "Staff",
+      "Veterinarian",
       req.user.userID,
     );
     return successResponse(res, "Government ID retrieved successfully", record);
-  } catch (err) {
-    return next(err);
-  }
-};
-
-// ——————————————— DELETE /staff/me ———————————————
-// Deliberately no "last active manager of this shelter" guard here, same as
-// Admin's closeMyAccount — this is self-service on your own account, and
-// managerStaffID is cleared as part of the close regardless of mode (see
-// staffService.closeMyAccount), so there's nothing left dangling to guard.
-const closeMyAccount = async (req, res, next) => {
-  const { mode } = req.body ?? {};
-
-  try {
-    assertValidCloseAccountMode(mode);
-    await staffService.closeMyAccount(req.user.userID, mode);
-    return successResponse(res, closeAccountMessage(mode), null);
   } catch (err) {
     return next(err);
   }
@@ -202,5 +181,4 @@ module.exports = {
   completeOnboarding,
   uploadGovernmentId,
   getGovernmentId,
-  closeMyAccount,
 };

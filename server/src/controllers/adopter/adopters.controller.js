@@ -9,6 +9,7 @@ const {
   closeAccountMessage,
 } = require("../../services/auth/auth.service");
 const { successResponse, successListResponse } = require("../../utils/response");
+const governmentIdService = require("../../services/governmentIds/selfGovernmentId.service");
 const { normalizePhone } = require("../../utils/phone");
 
 const badRequest = (message) => {
@@ -238,43 +239,17 @@ const completeOnboarding = async (req, res, next) => {
   }
 };
 
-// ——————————————— POST /adopters/me/government-id ———————————————
-const MAX_ID_FIELD_LEN = 45; // schema.prisma: idType / idNumber are VarChar(45)
-
+// ——————————————— GOVERNMENT ID (GET/POST /adopters/me/government-id) ———————————————
+// Shared with every role's /me/government-id — see
+// services/governmentIds/selfGovernmentId.service.js.
 const uploadGovernmentId = async (req, res, next) => {
-  const idType =
-    typeof req.body.idType === "string" ? req.body.idType.trim() : "";
-  const idNumber =
-    typeof req.body.idNumber === "string" ? req.body.idNumber.trim() : "";
-
-  if (!idType || idType.length > MAX_ID_FIELD_LEN) {
-    return next(
-      badRequest(
-        `idType is required and must be at most ${MAX_ID_FIELD_LEN} characters`,
-      ),
-    );
-  }
-  if (!idNumber || idNumber.length > MAX_ID_FIELD_LEN) {
-    return next(
-      badRequest(
-        `idNumber is required and must be at most ${MAX_ID_FIELD_LEN} characters`,
-      ),
-    );
-  }
-  if (!req.file) {
-    return next(badRequest("A document file is required in the 'file' field"));
-  }
-
   try {
-    const record = await adoptersService.createGovernmentId(req.user.userID, {
-      idType,
-      idNumber,
-      file: {
-        buffer: req.file.buffer,
-        mimetype: req.file.mimetype,
-        originalname: req.file.originalname,
-      },
-    });
+    const upload = governmentIdService.parseUpload(req);
+    const record = await governmentIdService.createGovernmentId(
+      "Adopter",
+      req.user.userID,
+      upload,
+    );
     return successResponse(
       res,
       "Government ID submitted successfully",
@@ -286,15 +261,13 @@ const uploadGovernmentId = async (req, res, next) => {
   }
 };
 
-// ——————————————— GET /adopters/me/government-id ———————————————
 const getGovernmentId = async (req, res, next) => {
   try {
-    const record = await adoptersService.getGovernmentId(req.user.userID);
-    return successResponse(
-      res,
-      "Government ID retrieved successfully",
-      record,
+    const record = await governmentIdService.getGovernmentId(
+      "Adopter",
+      req.user.userID,
     );
+    return successResponse(res, "Government ID retrieved successfully", record);
   } catch (err) {
     return next(err);
   }

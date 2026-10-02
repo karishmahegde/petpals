@@ -97,7 +97,10 @@ const staffTasksRouter = require("./routes/staff/tasks.routes");
 app.use("/api/v1", staffTasksRouter);
 const staffDonationsRouter = require("./routes/staff/donations.routes");
 app.use("/api/v1", staffDonationsRouter);
-// app.use('/api/v1/vaccinations',         require('./routes/vaccinations'));
+// Veterinarian self-service (/vets/me) — profile, government ID, onboarding.
+const vetSelfRouter = require("./routes/vet/vets.routes");
+app.use("/api/v1", vetSelfRouter);
+// app.use('/api/v1/vaccinations',        require('./routes/vaccinations'));
 // app.use('/api/v1/donors',               require('./routes/donors'));
 
 // ── 404 handler ───────────────────────────────────────────────
