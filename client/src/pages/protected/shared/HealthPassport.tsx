@@ -1,34 +1,37 @@
 // HealthPassport.tsx
-// Full-page, read-only "health passport" view for one pet — reached via the
-// Pets tab's "View Health Passport" button (PetFormPanel.tsx's view-mode
-// footer). Not a SlideOver — a real routed page
-// (/staff/pets/:petID/health-passport), the same :petID-param-route shape
-// the adopter apply funnel already uses, extended to staff for the first
-// time (every other staff "detail" view today is a SlideOver). Four
-// sections: Identity Card, Health Records, Vaccinations, and Transfer
-// History (network-wide, not scoped to the viewer's own shelter — see
-// staffPetsApi.ts's getHealthPassport). Creating new health
-// records/vaccinations is out of scope here — that's the Vet role's future
-// dashboard; this only displays what already exists.
+// Full-page, read-only "health passport" view for one pet. Shared by Staff
+// (/staff/pets/:petID/health-passport — the Pets tab's "View Health
+// Passport" button) and Veterinarian
+// (/vet/health-records/:petID/health-passport — the Overview's Patients
+// widget). Both endpoints return the same shape
+// from the same server service; `role` picks the endpoint, cache key and
+// where Back goes. Not a SlideOver — a real routed page. Four sections:
+// Identity Card, Health Records, Vaccinations, and Transfer History
+// (network-wide, not scoped to the viewer's own shelter — the passport is
+// universal). Read-only — writing records/doses happens elsewhere.
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { FaArrowLeft, FaPaw } from "react-icons/fa";
-import Card from "../../../../../../components/ui/Card";
-import ButtonElement from "../../../../../../components/ui/ButtonElement";
-import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
-import DashboardEmptyMessage from "../../../../../../components/ui/dashboard/DashboardEmptyMessage";
-import { formatShortDate } from "../../../../../../logic/utils/datetime";
+import Card from "../../../components/ui/Card";
+import ButtonElement from "../../../components/ui/ButtonElement";
+import Badge, { type BadgeTone } from "../../../components/ui/Badge";
+import DashboardEmptyMessage from "../../../components/ui/dashboard/DashboardEmptyMessage";
+import { formatShortDate } from "../../../logic/utils/datetime";
 import {
   getHealthPassport,
+  type HealthPassportData,
   type VaccinationStatus,
-} from "../../../../../../logic/api/staffPetsApi";
-import { PET_STATUS_META } from "../../../../../../logic/staff/petStatus";
-import { formatVetName } from "../../../../../../logic/utils/vetName";
+} from "../../../logic/api/staffPetsApi";
+import { getMyVetPetHealthPassport } from "../../../logic/api/vetsApi";
+import { PET_STATUS_META } from "../../../logic/staff/petStatus";
+import { formatVetName } from "../../../logic/utils/vetName";
+import { formatNextDue } from "../../../logic/utils/vaccination";
 
 const VACCINATION_TONE: Record<VaccinationStatus, BadgeTone> = {
   Overdue: "red",
   "Due Soon": "gold",
   "Up to Date": "green",
+  "No Further Dose": "gray",
 };
 
 const TRANSFER_STATUS_LABEL: Record<string, string> = {
@@ -56,15 +59,45 @@ const InfoRow = ({ k, v }: { k: string; v: React.ReactNode }) => (
   </>
 );
 
-const HealthPassport = () => {
+type PassportRole = "Staff" | "Veterinarian";
+
+const ROLE_CONFIG: Record<
+  PassportRole,
+  {
+    queryKeyRoot: string;
+    fetch: (petID: number) => Promise<HealthPassportData>;
+    backTo: string;
+    backLabel: string;
+  }
+> = {
+  Staff: {
+    queryKeyRoot: "staff",
+    fetch: getHealthPassport,
+    backTo: "/staff/pets",
+    backLabel: "Back to Pets",
+  },
+  Veterinarian: {
+    queryKeyRoot: "vet",
+    fetch: getMyVetPetHealthPassport,
+    backTo: "/vet/health-records",
+    backLabel: "Back to Health Records",
+  },
+};
+
+interface HealthPassportProps {
+  role: PassportRole;
+}
+
+const HealthPassport = ({ role }: HealthPassportProps) => {
   const { petID: petIDParam } = useParams<{ petID: string }>();
   const navigate = useNavigate();
   const petID = Number(petIDParam);
   const isValidPetID = Number.isInteger(petID) && petID > 0;
+  const config = ROLE_CONFIG[role];
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["staff", "health-passport", petID],
-    queryFn: () => getHealthPassport(petID),
+    queryKey: [config.queryKeyRoot, "health-passport", petID],
+    queryFn: () => config.fetch(petID),
     enabled: isValidPetID,
   });
 
@@ -72,8 +105,8 @@ const HealthPassport = () => {
     <div>
       <div className="mb-6 flex items-center gap-3">
         <ButtonElement
-          onClick={() => navigate("/staff/pets")}
-          aria-label="Back to Pets"
+          onClick={() => navigate(config.backTo)}
+          aria-label={config.backLabel}
           size="bare"
           variant="outline"
           className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-dark hover:bg-neutral-lightgray"
@@ -221,7 +254,7 @@ const HealthPassport = () => {
                         Administered: {formatShortDate(new Date(vax.administeredDate))}
                       </p>
                       <p className="font-body text-xs text-neutral-gray">
-                        Due Date: {formatShortDate(new Date(vax.dueDate))}
+                        Next Due: {formatNextDue(vax.dueDate)}
                       </p>
                     </div>
                     <Badge tone={VACCINATION_TONE[vax.status]} className="shrink-0">

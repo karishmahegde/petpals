@@ -11,7 +11,14 @@ const badRequest = (message) => {
 // Same query params as the Staff GET /appointments (upcoming, petName, page,
 // limit) — upcoming is a closed true/false value, so anything else is a 400.
 const listMyAppointments = async (req, res, next) => {
-  const { upcoming: upcomingRaw, petName, page: pageRaw, limit: limitRaw } = req.query;
+  const {
+    upcoming: upcomingRaw,
+    petName,
+    dateFrom: dateFromRaw,
+    dateTo: dateToRaw,
+    page: pageRaw,
+    limit: limitRaw,
+  } = req.query;
 
   if (upcomingRaw !== undefined && upcomingRaw !== "true" && upcomingRaw !== "false") {
     return next(badRequest("upcoming must be 'true' or 'false'"));
@@ -34,10 +41,30 @@ const listMyAppointments = async (req, res, next) => {
     }
   }
 
+  // Optional inclusive date range (ISO date-times).
+  const parseDate = (raw, field) => {
+    if (raw === undefined) return undefined;
+    const date = new Date(raw);
+    if (typeof raw !== "string" || Number.isNaN(date.getTime())) {
+      throw badRequest(`${field} must be a valid date`);
+    }
+    return date;
+  };
+  let dateFrom;
+  let dateTo;
+  try {
+    dateFrom = parseDate(dateFromRaw, "dateFrom");
+    dateTo = parseDate(dateToRaw, "dateTo");
+  } catch (err) {
+    return next(err);
+  }
+
   try {
     const result = await appointmentsService.listMyAppointments(req.user.userID, {
       upcoming,
       petName: typeof petName === "string" ? petName.trim() : undefined,
+      dateFrom,
+      dateTo,
       page,
       limit,
     });

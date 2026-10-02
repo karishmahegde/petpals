@@ -6,6 +6,7 @@
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
 import type { Address } from "../utils/address";
+import type { GovernmentIdStatus } from "./staffApi";
 
 export type VetAccountStatus = "Pending" | "Active" | "Deactivated";
 
@@ -19,6 +20,9 @@ export interface ShelterVet extends Address {
   vetSex: "M" | "F" | null;
   createdAt: string; // when they registered
   accountStatus: VetAccountStatus;
+  // What approval waits on — see logic/staff/approvalReadiness.ts.
+  onboardingComplete: boolean;
+  governmentIdStatus: GovernmentIdStatus | null; // null = not submitted
 }
 
 interface ShelterVetsParams {
@@ -37,6 +41,8 @@ export const getShelterVets = async (
 };
 
 // Pending → Active (approve) / Deactivated (decline); Active → Deactivated.
+// Approving needs onboarding complete and a Verified government ID — 409
+// with the reason otherwise.
 export const updateShelterVetStatus = async (
   userID: number,
   accountStatus: "Active" | "Deactivated",

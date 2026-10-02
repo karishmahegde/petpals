@@ -365,11 +365,11 @@ const getShelterPetDetail = async (petID, { role, userID }) => {
 // holds it or which shelter the viewing staff member belongs to.
 const DUE_SOON_WINDOW_DAYS = 30;
 
-// administeredDate/dueDate are both non-nullable in the schema — every row
-// represents a dose that WAS given, with a next-dose dueDate to track. So
-// status is driven purely by how soon/overdue that next dose is, not by
-// whether the pet has ever been vaccinated at all.
+// Every row is a dose that WAS given (administeredDate is required). Its
+// status is driven by the next dose: how soon/overdue it is, or "No Further
+// Dose" when the vet planned none (dueDate null — never overdue).
 const vaccinationStatus = (dueDate) => {
+  if (!dueDate) return "No Further Dose";
   const daysUntilDue = (new Date(dueDate) - Date.now()) / 86400000;
   if (daysUntilDue < 0) return "Overdue";
   if (daysUntilDue <= DUE_SOON_WINDOW_DAYS) return "Due Soon";

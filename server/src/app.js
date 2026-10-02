@@ -106,6 +106,8 @@ const vaccinationsRouter = require("./routes/vet/vaccinations.routes");
 app.use("/api/v1", vaccinationsRouter);
 const vetPetsRouter = require("./routes/vet/pets.routes");
 app.use("/api/v1", vetPetsRouter);
+const vetOverviewRouter = require("./routes/vet/overview.routes");
+app.use("/api/v1", vetOverviewRouter);
 // app.use('/api/v1/donors',               require('./routes/donors'));
 
 // ── 404 handler ───────────────────────────────────────────────

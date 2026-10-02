@@ -57,7 +57,8 @@ const listAppointmentVaccinations = async (req, res, next) => {
 
 // ——————————————— POST /appointments/:id/vaccinations ———————————————
 // Missing/malformed fields are 400; well-formed dates that break the rules
-// (a future administeredDate, a dueDate not after it) are 422.
+// (a future administeredDate, a dueDate not after it) are 422. dueDate is
+// optional — omitted or null means no further dose is planned.
 const recordVaccination = async (req, res, next) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
 
@@ -65,12 +66,15 @@ const recordVaccination = async (req, res, next) => {
     const appointmentID = parseId(req.params.id, "id");
     const vaccineID = parseId(body.vaccineID, "vaccineID");
     const administeredDate = parseDate(body.administeredDate, "administeredDate");
-    const dueDate = parseDate(body.dueDate, "dueDate");
+    const dueDate =
+      body.dueDate === undefined || body.dueDate === null || body.dueDate === ""
+        ? null
+        : parseDate(body.dueDate, "dueDate");
 
     if (administeredDate.getTime() > Date.now()) {
       throw validationError("administeredDate can't be in the future");
     }
-    if (dueDate.getTime() <= administeredDate.getTime()) {
+    if (dueDate && dueDate.getTime() <= administeredDate.getTime()) {
       throw validationError("dueDate must be after administeredDate");
     }
 

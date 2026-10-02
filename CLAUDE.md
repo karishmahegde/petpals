@@ -53,7 +53,7 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 ```
 client/src/
   logic/
-    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi
+    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me), selfGovernmentIdApi (per-role /me/government-id calls)
     route/       ProtectedRoute, RoleRoute
     store/       useAuthStore (Zustand: { user, token, role })
     toast/       shared toast helpers
@@ -78,12 +78,15 @@ client/src/
                    (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
         overview/  *Widget.tsx
         shared/    ApplicationsList, VisitsList
+    protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending: Pending staff/vets wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport) · idVerification/
     protected/staff/
       onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
-      pending/     AwaitingApproval   (/staff/pending — Pending staff wait here once onboarded)
-      shared/      GovernmentIdSection   (used by onboarding + Profile)
       dashboard/   DashboardLayout routes + one file per tab
-    (vet/ volunteer/ donor/ — planned)
+    protected/vet/
+      onboarding/  VetOnboardingWizard + steps/   (same 2–5 wizard as staff, /vet/onboarding/step/:step; OnboardingGate routes Pending vets here, then to /vet/pending)
+      dashboard/   DashboardRoutes (inside the shared components/layout/DashboardLayout; sidebar menu = ROLE_NAV.Veterinarian) + one file per tab (Overview, Appointments, Health Records, Vaccinations, Profile)
+        overview/  StatsWidget + *Widget.tsx (Today's Appointments — useTodaysAppointments merges the upcoming and past halves so earlier-today ones count; Overdue Vaccinations; Shelter Details). Tile and widget share each query
+    (volunteer/ donor/ — planned)
   App.tsx        routes + session restore on mount
 
 server/src/
@@ -155,13 +158,15 @@ Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.ap
 | GET / POST | `/vets/me/government-id` | shared `selfGovernmentId.service.js` |
 | DELETE | `/vets/me` | mirrors `DELETE /staff/me`: `{ mode: deactivate|delete }` (422 otherwise); 409 while the vet has upcoming Scheduled appointments. `delete` removes Veterinarian + Users rows and the government ID + its Storage file; history survives because `Appointment.vetID` (nullable since migration `…_appointment_vet_set_null`), `HealthRecord.vetID` and `VaccinationRecord.administeredBy` are all `ON DELETE SET NULL` — so an appointment's `vetName` can be null (client `formatVetName` shows "Former vet") |
 | PATCH | `/vets/me/onboarding-step` · `/onboarding-complete` | 2–5, same wizard as staff |
-| GET | `/vets/me/appointments` · `/:id` | own queue only (`vetID` = caller); list reuses the Staff `/appointments` select, item shape, `deriveAppointmentStatus` and upcoming/past split (exported from `staff/appointments.service.js`); `upcoming` strictly `true`/`false`; another vet's `:id` → 404 |
+| GET | `/vets/me/appointments` · `/:id` | own queue only (`vetID` = caller); list reuses the Staff `/appointments` select, item shape, `deriveAppointmentStatus` and upcoming/past split (exported from `staff/appointments.service.js`); `upcoming` strictly `true`/`false`; optional `dateFrom`/`dateTo` (inclusive ISO range — the client computes "today"/"next 7 days" in local time); another vet's `:id` → 404. Detail also returns the stored `appointmentStatus` next to the displayed `status` (a past Scheduled one *displays* Completed but can still be completed — the vet UI's Mark Completed keys off the stored value) |
 | PATCH | `/appointments/:id/status` | `{ appointmentStatus: "Completed", notes? }` — the only real write of Completed; assigned vet only (another vet's → 404, like the GETs), stored Scheduled only (409), not before `appointmentDate` (409); `notes` → a `HealthRecord` linked via `HealthRecord.appointmentID` (nullable, like `VaccinationRecord.appointmentID`; migration `…_health_record_appointment`) in the same `$transaction`. Staff `PATCH /appointments/:id/cancel` is separate. Displayed status everywhere (Staff, vet, adopter) goes through `deriveAppointmentStatus`: written Completed and past-Scheduled both read Completed |
+| PATCH | `/appointments/:id` | Staff's edit route, also open to the **assigned vet** for `appointmentDate` + `appointmentReason` only (400 for vetID/staffID/volunteerID; another vet's → 404; vet gets the `/vets/me/appointments/:id` shape back, no adopter details). Vets can't cancel — `/appointments/:id/cancel` stays Staff/Admin |
 | GET | `/vaccines` | catalog, alphabetical — Admin/Staff/Veterinarian |
+| GET | `/vets/me/vaccinations/overdue` · `/vets/me/stats` | Overview data. Overdue: per active (not adopted/deceased) pet at the vet's shelter and vaccine, only the **latest** dose counts; `doseNumber` = doses given + 1, `daysOverdue`; most overdue first. Stats: `petsTreated` = distinct pets at the vet's past, non-cancelled appointments |
 | GET | `/vets/me/pets` · `/:id` · `/:id/health-passport` | pets at the vet's shelter. List: Staff `/staff/me/pets` params via the shared `parseShelterPetsQuery` + `listShelterPets` core, plus `petName`. Detail/passport reuse the Staff handlers; `getShelterPetDetail` scopes a Veterinarian to their shelter (elsewhere → 404). Passport is universal — records, doses, transfers read by `petID` only, so history from shelters the pet left is included |
 | POST | `/pets/:id/health-records` | standalone note, `recordDesc` ≤500; `vetID` = caller; pet must be at the vet's shelter (403) |
 | PUT | `/health-records/:id` | `recordDesc` only; only the vet who wrote it (403), incl. appointment-completion notes |
-| GET / POST | `/appointments/:id/vaccinations` | doses given at the appointment. POST: assigned vet only; body `vaccineID`, `administeredDate`, `dueDate` — `petID`, `administeredBy`, `administeredAt` (appointment's shelter) and `appointmentID` set server-side; any status but Cancelled (409); future `administeredDate` or `dueDate` not after it → 422; unknown vaccineID → 404. GET: assigned vet, Staff at that shelter (403 otherwise), Admin. Another vet's appointment → 404 on both |
+| GET / POST | `/appointments/:id/vaccinations` | doses given at the appointment. POST: assigned vet only; body `vaccineID`, `administeredDate`, optional `dueDate` (null = no further dose planned — never overdue; passport status "No Further Dose"; client wording via `logic/utils/vaccination.ts`; nullable since migration `…_vaccination_due_date_optional`) — `petID`, `administeredBy`, `administeredAt` (appointment's shelter) and `appointmentID` set server-side; any status but Cancelled (409); future `administeredDate` or `dueDate` not after it → 422; unknown vaccineID → 404. GET: assigned vet, Staff at that shelter (403 otherwise), Admin. Another vet's appointment → 404 on both |
 
 ### Domains not yet built
 

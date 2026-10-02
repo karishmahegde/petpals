@@ -99,7 +99,8 @@ const listAppointmentVaccinations = async (actor, appointmentID) => {
 // ——————————————— RECORD A DOSE (POST /appointments/:id/vaccinations) ———————————————
 // Only the appointment's assigned vet (enforced by loadAppointmentFor's
 // vetID scoping). Any status but Cancelled — doses are often written up
-// after the appointment has been completed. petID, administeredBy,
+// after the appointment has been completed. dueDate may be null (no further
+// dose planned). petID, administeredBy,
 // administeredAt and appointmentID all come from the appointment and the
 // caller, never the body. Dates are already validated by the controller.
 const recordVaccination = async (vetID, appointmentID, { vaccineID, administeredDate, dueDate }) => {

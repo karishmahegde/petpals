@@ -395,7 +395,10 @@ model VaccinationRecord {
   petID            Int
   vaccineID        Int
   administeredDate DateTime
-  dueDate          DateTime
+  // When the next dose is due. Null = no further dose planned (a vet's
+  // decision: senior/immunocompromised pet, titer shows immunity, a non-core
+  // vaccine discontinued) — never overdue.
+  dueDate          DateTime?
   administeredBy   Int?
   administeredAt   Int?
   // The appointment this dose was given at — what an appointment detail's

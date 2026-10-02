@@ -9,6 +9,7 @@ jest.mock("../../../config/prisma", () => {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       count: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
     },
     healthRecord: { create: jest.fn() },
@@ -157,8 +158,36 @@ describe("Veterinarian appointment queue", () => {
       expect(res.body.pagination).toEqual({ page: 3, limit: 10, total: 45, totalPages: 5 });
     });
 
+    test("dateFrom/dateTo narrow the upcoming half (merged with its own lower bound)", async () => {
+      prisma.appointment.findMany.mockResolvedValueOnce([]);
+      prisma.appointment.count.mockResolvedValueOnce(0);
+
+      const res = await list({ upcoming: "true", dateTo: "2026-10-09T23:59:59.999Z" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.appointment.findMany.mock.calls[0][0].where.appointmentDate).toEqual({
+        gt: expect.any(Date),
+        lte: new Date("2026-10-09T23:59:59.999Z"),
+      });
+    });
+
+    test("dateFrom/dateTo on the past half sit alongside its OR", async () => {
+      prisma.appointment.findMany.mockResolvedValueOnce([]);
+      prisma.appointment.count.mockResolvedValueOnce(0);
+
+      await list({ dateFrom: "2026-09-01T00:00:00.000Z", dateTo: "2026-09-30T00:00:00.000Z" });
+
+      const where = prisma.appointment.findMany.mock.calls[0][0].where;
+      expect(where.OR).toBeDefined();
+      expect(where.appointmentDate).toEqual({
+        gte: new Date("2026-09-01T00:00:00.000Z"),
+        lte: new Date("2026-09-30T00:00:00.000Z"),
+      });
+    });
+
     test.each([
       ["upcoming=yes", { upcoming: "yes" }],
+      ["dateTo=garbage", { dateTo: "not-a-date" }],
       ["page=0", { page: "0" }],
       ["page=abc", { page: "abc" }],
       ["limit=0", { limit: "0" }],
@@ -194,6 +223,7 @@ describe("Veterinarian appointment queue", () => {
         appointmentCode: "APT-00011",
         appointmentReason: "Annual check-up",
         status: "Scheduled",
+        appointmentStatus: "Scheduled",
         pet: { petCode: "PE000005", petName: "Rex", breedName: "Beagle", speciesName: "Dog" },
         shelterID: 1,
         shelterName: "PetPals Downtown",
@@ -373,6 +403,75 @@ describe("Veterinarian appointment queue", () => {
         .set("Authorization", `Bearer ${vetToken()}`);
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  // ————————————————————————————— PATCH /appointments/:id (vet edit) —————————————————————————————
+  describe("PATCH /api/v1/appointments/:id as the assigned vet", () => {
+    const edit = (body, id = 11) =>
+      request(app)
+        .patch(`/api/v1/appointments/${id}`)
+        .set("Authorization", `Bearer ${vetToken()}`)
+        .send(body);
+
+    // What updateAppointment's findUnique reads.
+    const existing = (overrides = {}) => ({
+      petID: 5,
+      vetID: 70,
+      shelterID: 1,
+      appointmentDate: new Date(Date.now() + 3 * DAY),
+      appointmentStatus: "Scheduled",
+      ...overrides,
+    });
+
+    test("own upcoming appointment → 200, date + reason saved, vet detail shape back (no adopter)", async () => {
+      const newDate = new Date(Date.now() + 5 * DAY).toISOString();
+      prisma.appointment.findUnique.mockResolvedValueOnce(existing());
+      prisma.appointment.findFirst
+        .mockResolvedValueOnce(null) // double-booking check
+        .mockResolvedValueOnce(detailRow({ appointmentReason: "Follow-up" })); // vet detail
+      prisma.appointment.update.mockResolvedValueOnce({});
+
+      const res = await edit({ appointmentDate: newDate, appointmentReason: " Follow-up " });
+
+      expect(res.status).toBe(200);
+      expect(prisma.appointment.update).toHaveBeenCalledWith({
+        where: { appointmentID: 11 },
+        data: { appointmentDate: new Date(newDate), appointmentReason: "Follow-up" },
+      });
+      expect(res.body.data.appointmentReason).toBe("Follow-up");
+      expect(res.body.data).not.toHaveProperty("adopter");
+    });
+
+    test.each(["vetID", "staffID", "volunteerID"])(
+      "%s in the body → 400, nothing read or written",
+      async (field) => {
+        const res = await edit({ [field]: 3 });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe(`Only staff can change: ${field}`);
+        expect(prisma.appointment.findUnique).not.toHaveBeenCalled();
+      },
+    );
+
+    test("another vet's appointment → 404, nothing written", async () => {
+      prisma.appointment.findUnique.mockResolvedValueOnce(existing({ vetID: 71 }));
+
+      const res = await edit({ appointmentReason: "Follow-up" });
+
+      expect(res.status).toBe(404);
+      expect(prisma.appointment.update).not.toHaveBeenCalled();
+    });
+
+    test("an appointment whose time has passed → 409, nothing written", async () => {
+      prisma.appointment.findUnique.mockResolvedValueOnce(
+        existing({ appointmentDate: new Date(Date.now() - DAY) }),
+      );
+
+      const res = await edit({ appointmentReason: "Follow-up" });
+
+      expect(res.status).toBe(409);
+      expect(prisma.appointment.update).not.toHaveBeenCalled();
     });
   });
 

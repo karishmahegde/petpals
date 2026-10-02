@@ -25,6 +25,7 @@ import {
   PiFirstAidKit,
   PiUserList,
   PiIdentificationCard,
+  PiSyringe,
 } from "react-icons/pi";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
@@ -117,6 +118,27 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
       icon: PiFileText,
     },
     { type: "link", label: "Visits", to: "/adopter/visits", icon: PiBuildings },
+  ],
+  Veterinarian: [
+    { type: "link", label: "Overview", to: "/vet", icon: PiHouse, end: true },
+    {
+      type: "link",
+      label: "Appointments",
+      to: "/vet/appointments",
+      icon: PiStethoscope,
+    },
+    {
+      type: "link",
+      label: "Health Records",
+      to: "/vet/health-records",
+      icon: PiFileText,
+    },
+    {
+      type: "link",
+      label: "Vaccinations",
+      to: "/vet/vaccinations",
+      icon: PiSyringe,
+    },
   ],
   // Full information architecture scaffolded now per product direction — most
   // sub-pages are placeholders until their own sprint builds real content

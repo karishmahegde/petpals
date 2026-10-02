@@ -25,8 +25,9 @@ import AdoptApplyConfirmation from "./pages/protected/adopter/apply/AdoptApplyCo
 import OnboardingWizard from "./pages/protected/adopter/onboarding/OnboardingWizard";
 import StaffDashboardRoutes from "./pages/protected/staff/dashboard/DashboardRoutes";
 import StaffOnboardingWizard from "./pages/protected/staff/onboarding/StaffOnboardingWizard";
-import AwaitingApproval from "./pages/protected/staff/pending/AwaitingApproval";
-import VetDashboard from "./pages/protected/vet/VetDashboard";
+import AwaitingApproval from "./pages/protected/shared/AwaitingApproval";
+import VetDashboardRoutes from "./pages/protected/vet/dashboard/DashboardRoutes";
+import VetOnboardingWizard from "./pages/protected/vet/onboarding/VetOnboardingWizard";
 import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
 import DonorDashboard from "./pages/protected/donor/DonorDashboard";
 import AdminDashboardRoutes from "./pages/protected/admin/dashboard/DashboardRoutes";
@@ -133,7 +134,31 @@ const App = () => {
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Staff"]}>
-                <AwaitingApproval />
+                <AwaitingApproval role="Staff" />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Vet onboarding wizard and pending page — same pattern as Staff's
+            above: a new vet onboards, then waits for their shelter
+            manager's approval. More specific than /vet so they match first. */}
+        <Route
+          path="/vet/onboarding/step/:step"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Veterinarian"]}>
+                <VetOnboardingWizard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vet/pending"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Veterinarian"]}>
+                <AwaitingApproval role="Veterinarian" />
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -165,11 +190,13 @@ const App = () => {
           }
         />
         <Route
-          path="/vet"
+          path="/vet/*"
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Veterinarian"]}>
-                <VetDashboard />
+                <DashboardLayout>
+                  <VetDashboardRoutes />
+                </DashboardLayout>
               </RoleRoute>
             </ProtectedRoute>
           }

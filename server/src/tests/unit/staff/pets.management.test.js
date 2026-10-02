@@ -417,10 +417,11 @@ describe("Staff pet management endpoints", () => {
           [1, "Rabies", -1],
           [2, "DHPP", 10],
           [3, "Bordetella", 60],
+          [4, "FVRCP", null], // no further dose planned
         ].map(([recordID, vaccineName, daysUntilDue]) => ({
           recordID,
           administeredDate: new Date(Date.now() - 300 * DAY),
-          dueDate: new Date(Date.now() + daysUntilDue * DAY),
+          dueDate: daysUntilDue === null ? null : new Date(Date.now() + daysUntilDue * DAY),
           vaccine: { vaccineName },
         })),
       );
@@ -432,6 +433,7 @@ describe("Staff pet management endpoints", () => {
         ["Rabies", "Overdue"],
         ["DHPP", "Due Soon"],
         ["Bordetella", "Up to Date"],
+        ["FVRCP", "No Further Dose"],
       ]);
     });
 

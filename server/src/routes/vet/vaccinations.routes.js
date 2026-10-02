@@ -103,11 +103,11 @@ router.get(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [vaccineID, administeredDate, dueDate]
+ *             required: [vaccineID, administeredDate]
  *             properties:
  *               vaccineID: { type: integer }
  *               administeredDate: { type: string, format: date-time, description: Not in the future }
- *               dueDate: { type: string, format: date-time, description: After administeredDate — when the next dose is due }
+ *               dueDate: { type: string, format: date-time, nullable: true, description: "Optional — when the next dose is due (after administeredDate). Omit or null: no further dose planned" }
  *     responses:
  *       201:
  *         description: The recorded dose
@@ -120,7 +120,7 @@ router.get(
  *                   properties:
  *                     data: { $ref: '#/components/schemas/VaccinationDose' }
  *       400:
- *         description: Missing or malformed id, vaccineID, administeredDate or dueDate
+ *         description: Missing or malformed id, vaccineID or administeredDate, or a malformed dueDate
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -137,7 +137,7 @@ router.get(
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       422:
- *         description: administeredDate is in the future, or dueDate isn't after it
+ *         description: administeredDate is in the future, or a given dueDate isn't after it
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

@@ -33,6 +33,14 @@ const router = express.Router();
  *         schema: { type: string }
  *         description: Case-insensitive contains match
  *       - in: query
+ *         name: dateFrom
+ *         schema: { type: string, format: date-time }
+ *         description: Optional inclusive lower bound on appointmentDate
+ *       - in: query
+ *         name: dateTo
+ *         schema: { type: string, format: date-time }
+ *         description: Optional inclusive upper bound on appointmentDate
+ *       - in: query
  *         name: page
  *         schema: { type: integer, minimum: 1, default: 1 }
  *       - in: query
@@ -53,7 +61,7 @@ const router = express.Router();
  *                       items: { $ref: '#/components/schemas/AppointmentQueueItem' }
  *                     pagination: { $ref: '#/components/schemas/Pagination' }
  *       400:
- *         description: Invalid upcoming, page or limit
+ *         description: Invalid upcoming, dateFrom, dateTo, page or limit
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

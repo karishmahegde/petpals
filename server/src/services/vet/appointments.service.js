@@ -30,11 +30,20 @@ const conflict = (message) => {
 };
 
 // ——————————————— LIST (GET /vets/me/appointments) ———————————————
+// dateFrom/dateTo (optional, inclusive) narrow either half to a date range
+// — the client works out "today" / "next 7 days" in the vet's own timezone.
 const listMyAppointments = async (
   vetID,
-  { upcoming = false, petName, page = 1, limit = 20 } = {},
+  { upcoming = false, petName, dateFrom, dateTo, page = 1, limit = 20 } = {},
 ) => {
   const where = { vetID, ...timeframeWhere(upcoming) };
+  if (dateFrom || dateTo) {
+    where.appointmentDate = {
+      ...where.appointmentDate,
+      ...(dateFrom && { gte: dateFrom }),
+      ...(dateTo && { lte: dateTo }),
+    };
+  }
   if (petName) {
     where.pet = { petName: { contains: petName, mode: "insensitive" } };
   }
@@ -102,6 +111,10 @@ const getMyAppointment = async (vetID, appointmentID) => {
     appointmentDate: appointment.appointmentDate,
     appointmentReason: appointment.appointmentReason,
     status: deriveAppointmentStatus(appointment),
+    // The stored value, alongside the displayed `status`: a past Scheduled
+    // appointment *displays* as Completed but can still be completed by the
+    // vet (PATCH /appointments/:id/status), so the vet's UI needs both.
+    appointmentStatus: appointment.appointmentStatus,
     pet: formatPetSummary(appointment.pet),
     vetName: appointment.vet ? appointment.vet.vetName : null,
     shelterID: appointment.shelter.shelterID,

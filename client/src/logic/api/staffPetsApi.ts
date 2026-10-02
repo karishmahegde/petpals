@@ -155,13 +155,14 @@ export interface HealthRecordItem {
   shelterName: string | null;
 }
 
-export type VaccinationStatus = "Overdue" | "Due Soon" | "Up to Date";
+// "No Further Dose" — the vet planned none (dueDate null); never overdue.
+export type VaccinationStatus = "Overdue" | "Due Soon" | "Up to Date" | "No Further Dose";
 
 export interface VaccinationItem {
   recordID: number;
   vaccineName: string;
   administeredDate: string;
-  dueDate: string;
+  dueDate: string | null;
   status: VaccinationStatus;
 }
 

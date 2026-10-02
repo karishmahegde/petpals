@@ -1574,6 +1574,16 @@ async function main() {
         administeredAt: D,
         appointmentID: hazelCheckup.appointmentID,
       },
+      {
+        // No further dose planned (dueDate null) — the vet decided against
+        // another booster; shows as "No Further Dose" and is never overdue.
+        petID: pet.Hazel,
+        vaccineID: vaccine.Rabies,
+        administeredDate: daysFromNow(-200),
+        dueDate: null,
+        administeredBy: vet.userID,
+        administeredAt: D,
+      },
     ],
   });
 

@@ -196,7 +196,7 @@ export interface AdoptedPetVaccination {
   recordID: number;
   vaccineName: string;
   administeredDate: string;
-  dueDate: string;
+  dueDate: string | null; // null = no further dose planned
   vetName: string | null;
 }
 
@@ -332,7 +332,7 @@ export interface AppointmentDetail {
   vaccinesAdministered: {
     recordID: number;
     vaccineName: string;
-    dueDate: string;
+    dueDate: string | null; // null = no further dose planned
   }[];
 }
 

@@ -19,6 +19,7 @@ import {
   formatTime,
 } from "../../../../../../logic/utils/datetime";
 import { formatVetName } from "../../../../../../logic/utils/vetName";
+import { describeNextDue, isDoseOverdue } from "../../../../../../logic/utils/vaccination";
 
 type HealthTab = "vaccinations" | "appointments";
 const HEALTH_TABS = [
@@ -167,7 +168,7 @@ const PetDetailPanel = ({ petID, onClose }: PetDetailPanelProps) => {
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
                 {vaccinations.map((v) => {
-                  const isOverdue = new Date(v.dueDate).getTime() < Date.now();
+                  const isOverdue = isDoseOverdue(v.dueDate);
                   return (
                     <li
                       key={v.recordID}
@@ -186,7 +187,7 @@ const PetDetailPanel = ({ petID, onClose }: PetDetailPanelProps) => {
                             isOverdue ? "font-semibold text-red" : undefined
                           }
                         >
-                          due {formatShortDate(new Date(v.dueDate))}
+                          {describeNextDue(v.dueDate, "due")}
                         </span>
                         {v.vetName ? ` · ${formatVetName(v.vetName)}` : ""}
                       </p>

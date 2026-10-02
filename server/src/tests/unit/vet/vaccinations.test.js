@@ -131,6 +131,23 @@ describe("Vaccine catalog + appointment vaccinations", () => {
       });
     });
 
+    test.each([
+      ["omitted", undefined],
+      ["null", null],
+    ])("dueDate %s → 201, stored as null (no further dose planned)", async (_label, dueDate) => {
+      prisma.appointment.findFirst.mockResolvedValueOnce(appointment());
+      prisma.vaccine.findUnique.mockResolvedValueOnce({ vaccineID: 2 });
+      prisma.vaccinationRecord.create.mockResolvedValueOnce(doseRow({ dueDate: null }));
+
+      const body = { vaccineID: 2, administeredDate: yesterday() };
+      if (dueDate !== undefined) body.dueDate = dueDate;
+      const res = await post(body);
+
+      expect(res.status).toBe(201);
+      expect(prisma.vaccinationRecord.create.mock.calls[0][0].data.dueDate).toBeNull();
+      expect(res.body.data.dueDate).toBeNull();
+    });
+
     test("a Completed appointment still accepts doses", async () => {
       prisma.appointment.findFirst.mockResolvedValueOnce(appointment({ appointmentStatus: "Completed" }));
       prisma.vaccine.findUnique.mockResolvedValueOnce({ vaccineID: 2 });

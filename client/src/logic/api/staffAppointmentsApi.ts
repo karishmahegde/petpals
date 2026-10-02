@@ -15,6 +15,7 @@ export interface AppointmentQueueItem {
   status: AppointmentStatus;
   pet: {
     petID: number;
+    petCode: string | null; // e.g. "PE000042"
     petName: string;
     petPhoto: string | null;
     breedName: string;
@@ -35,7 +36,7 @@ export interface AppointmentDetail extends AppointmentQueueItem {
   vaccinesAdministered: {
     recordID: number;
     vaccineName: string;
-    dueDate: string;
+    dueDate: string | null; // null = no further dose planned
   }[];
   adopter: {
     adopterName: string;

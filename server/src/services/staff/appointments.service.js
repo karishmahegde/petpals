@@ -433,7 +433,11 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
 
 // ——————————————— UPDATE APPOINTMENT (PATCH /appointments/:id) ———————————————
 // Reschedule/reassign an appointment that is still Scheduled and upcoming —
-// same rule as cancelAppointment. petID, shelterID and status are never
+// same rule as cancelAppointment. The appointment's assigned vet may also
+// edit it (date/time and reason only — the controller rejects anything
+// else); another vet's appointment answers like a missing one (404), and a
+// vet caller gets no detail back here — the controller returns the vet's
+// own detail shape instead, which has no adopter contact details. petID, shelterID and status are never
 // editable (a different pet is a different appointment; status has its own
 // Cancel flow, and completion is the vet's, Sprint 5). Partial: only fields
 // present in `data` change; volunteerID may be null to unassign. Re-runs
@@ -450,6 +454,9 @@ const updateAppointment = async (appointmentID, data, actor) => {
     },
   });
   if (!existing) {
+    throw notFound(appointmentID);
+  }
+  if (actor.role === "Veterinarian" && existing.vetID !== actor.userID) {
     throw notFound(appointmentID);
   }
 
@@ -476,6 +483,7 @@ const updateAppointment = async (appointmentID, data, actor) => {
     throw err;
   }
 
+  if (actor.role === "Veterinarian") return null;
   return getShelterAppointmentDetail(appointmentID, actor);
 };
 

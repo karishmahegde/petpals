@@ -21,7 +21,16 @@ const VET_SELF_SELECT = {
   onboardingComplete: true,
   onboardingStep: true,
   ...ADDRESS_SELECT,
-  shelter: { select: { shelterName: true } },
+  // Contact details for the dashboard's Shelter Details card — the same
+  // fields the public GET /shelters already shows.
+  shelter: {
+    select: {
+      shelterName: true,
+      shelterAddress: true,
+      shelterPhone: true,
+      shelterEmail: true,
+    },
+  },
   // emailVerified/lastLoginAt live on Users — flattened by toSelfProfile.
   user: { select: { userEmail: true, emailVerified: true, lastLoginAt: true } },
 };

@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
@@ -16,18 +10,18 @@ import Card from "../../../../components/ui/Card";
 import SelectField from "../../../../components/ui/SelectField";
 import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import {
-  DashboardActionList,
   DashboardListRow,
   RowActionButton,
 } from "../../../../components/ui/dashboard/DashboardList";
 import { getMyStaffProfile } from "../../../../logic/api/staffApi";
 import {
   getShelterVets,
-  updateShelterVetStatus,
   type ShelterVet,
 } from "../../../../logic/api/shelterVetsApi";
 import VetDetailPanel from "./sections/vets/VetDetailPanel";
+import VetApprovalPanel from "./sections/vets/VetApprovalPanel";
 import { formatVetName } from "../../../../logic/utils/vetName";
+import { approvalBlockers } from "../../../../logic/staff/approvalReadiness";
 
 const PAGE_SIZE = 20;
 
@@ -78,14 +72,16 @@ const vetRowProps = (vet: ShelterVet) => ({
 
 // Vets tab (Management → Vets) — the shelter manager's veterinarian roster,
 // same structure as the Staff tab (Staff.tsx): Vet Approvals (Pending
-// registrations at this shelter; Approve inline, Decline behind a confirm)
-// and All Vets (approved: Active or Deactivated, with status filter + name
-// search; "View Details" opens VetDetailPanel, which also lets the manager
-// deactivate an Active vet). Manager-only: everyone else is sent to
-// /forbidden, and GET/PATCH /staff/me/vets 403 them too.
+// registrations at this shelter; each row shows what approval is waiting
+// on, and "View Details" opens VetApprovalPanel — profile, onboarding and ID
+// status, Approve/Decline) and All Vets (approved: Active or Deactivated,
+// with status filter + name search; "View Details" opens VetDetailPanel,
+// which also lets the manager deactivate an Active vet). Manager-only:
+// everyone else is sent to /forbidden, and GET/PATCH /staff/me/vets 403
+// them too.
 const Vets = () => {
-  const queryClient = useQueryClient();
   const [viewing, setViewing] = useState<ShelterVet | null>(null);
+  const [reviewing, setReviewing] = useState<ShelterVet | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ["staff", "me"],
@@ -118,16 +114,6 @@ const Vets = () => {
     enabled: isManager,
   });
   const pendingVets = pendingQuery.data?.data ?? [];
-
-  const approve = useMutation({
-    mutationFn: (userID: number) => updateShelterVetStatus(userID, "Active"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "vets"] });
-      toast.success("Veterinarian approved");
-    },
-    onError: () =>
-      toast.error("Couldn't approve this veterinarian. Please try again."),
-  });
 
   if (profile && !isManager) {
     return <Navigate to="/forbidden" replace />;
@@ -163,48 +149,36 @@ const Vets = () => {
         )}
 
         {pendingVets.length > 0 && (
-          <DashboardActionList
-            items={pendingVets}
-            getKey={(vet) => vet.userID}
-            renderRow={(vet, confirm) => (
-              <DashboardListRow
-                {...vetRowProps(vet)}
-                actions={
-                  <>
-                    <RowActionButton
-                      variant="success"
-                      disabled={approve.isPending}
-                      onClick={() => approve.mutate(vet.userID)}
-                    >
-                      Approve
-                    </RowActionButton>
-                    <RowActionButton
-                      variant="danger"
-                      onClick={() => confirm(vet)}
-                    >
-                      Decline
-                    </RowActionButton>
-                  </>
-                }
-              />
-            )}
-            confirmAction={{
-              mutationFn: (vet) =>
-                updateShelterVetStatus(vet.userID, "Deactivated"),
-              invalidateKeys: [["staff", "vets"]],
-              successToast: "Veterinarian declined",
-              errorToast:
-                "Couldn't decline this veterinarian. Please try again.",
-              modalTitle: "Decline this veterinarian?",
-              confirmLabel: "Decline",
-              renderBody: (vet) => (
-                <>
-                  This declines {formatVetName(vet.vetName)}'s registration and deactivates
-                  their account.
-                </>
-              ),
-            }}
-          />
+          <ul className="flex flex-col gap-4">
+            {pendingVets.map((vet) => {
+              // Approval needs onboarding complete AND a Verified ID — shown
+              // here at a glance; the panel has the details and the actions.
+              const rowProps = vetRowProps(vet);
+              const blockers = approvalBlockers(vet);
+              return (
+                <li key={vet.userID}>
+                  <DashboardListRow
+                    {...rowProps}
+                    lines={[
+                      ...rowProps.lines,
+                      {
+                        text:
+                          blockers.length > 0
+                            ? `Can't approve yet: ${blockers.join(" · ")}`
+                            : "Ready to approve — onboarding done, ID verified",
+                        strong: blockers.length === 0,
+                      },
+                    ]}
+                    actions={
+                      <RowActionButton onClick={() => setReviewing(vet)}>
+                        View Details
+                      </RowActionButton>
+                    }
+                  />
+                </li>
+              );
+            })}
+          </ul>
         )}
       </Card>
 
@@ -282,6 +256,7 @@ const Vets = () => {
       </Card>
 
       <VetDetailPanel vet={viewing} onClose={() => setViewing(null)} />
+      <VetApprovalPanel vet={reviewing} onClose={() => setReviewing(null)} />
     </div>
   );
 };
