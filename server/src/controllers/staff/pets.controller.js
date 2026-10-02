@@ -249,51 +249,60 @@ const validateField = (field, rawValue) => {
 // species/breed/size/minAge/maxAge use the exact same query param names and
 // repeatable-value convention as public GET /pets (routes/public/pets.routes.js)
 // so the frontend's staff filter bar can reuse that same request-building logic.
-const listMyShelterPets = async (req, res, next) => {
-  const page = Number(req.query.page) || 1;
-  const limit = Math.min(Number(req.query.limit) || 20, 100);
+// Shared with the vet's GET /vets/me/pets (vet/pets.controller.js), so both
+// lists take exactly the same query params. Throws BAD_REQUEST.
+const parseShelterPetsQuery = (query) => {
+  const page = Number(query.page) || 1;
+  const limit = Math.min(Number(query.limit) || 20, 100);
   const adoptionStatus =
-    typeof req.query.adoptionStatus === "string"
-      ? req.query.adoptionStatus
-      : undefined;
+    typeof query.adoptionStatus === "string" ? query.adoptionStatus : undefined;
 
   if (adoptionStatus && !ADOPTION_STATUS_VALUES.includes(adoptionStatus)) {
-    return next(
-      badRequest(
-        `adoptionStatus must be one of: ${ADOPTION_STATUS_VALUES.join(", ")}`,
-      ),
+    throw badRequest(
+      `adoptionStatus must be one of: ${ADOPTION_STATUS_VALUES.join(", ")}`,
     );
   }
 
   // sort is closed/fixed-value, so an unrecognized value is a 400 — same
   // convention as public GET /pets's own sort param.
-  const { sort } = req.query;
+  const { sort } = query;
   if (sort !== undefined && !VALID_SORTS.includes(sort)) {
-    return next(badRequest(`sort must be one of: ${VALID_SORTS.join(", ")}`));
+    throw badRequest(`sort must be one of: ${VALID_SORTS.join(", ")}`);
   }
 
   // species is numeric (speciesID) — same conversion/validation as public
   // GET /pets's own species param (public/pets.controller.js). Without this,
   // Prisma rejects the string query-param values matchFilter passes through.
-  const speciesValues = toArray(req.query.species).map((raw) => Number(raw));
+  const speciesValues = toArray(query.species).map((raw) => Number(raw));
   if (speciesValues.some((s) => !Number.isInteger(s))) {
-    return next(badRequest("species must be an array of integers (speciesID)"));
+    throw badRequest("species must be an array of integers (speciesID)");
+  }
+
+  return {
+    page,
+    limit,
+    adoptionStatus,
+    species: speciesValues,
+    breed: query.breed,
+    size: query.size,
+    minAge: query.minAge,
+    maxAge: query.maxAge,
+    sort,
+  };
+};
+
+const listMyShelterPets = async (req, res, next) => {
+  let filters;
+  try {
+    filters = parseShelterPetsQuery(req.query);
+  } catch (err) {
+    return next(err);
   }
 
   try {
     const { data, pagination } = await petsService.listMyShelterPets(
       req.user.userID,
-      {
-        page,
-        limit,
-        adoptionStatus,
-        species: speciesValues,
-        breed: req.query.breed,
-        size: req.query.size,
-        minAge: req.query.minAge,
-        maxAge: req.query.maxAge,
-        sort,
-      },
+      filters,
     );
     return successListResponse(
       res,
@@ -543,6 +552,7 @@ const deletePhoto = async (req, res, next) => {
 };
 
 module.exports = {
+  parseShelterPetsQuery,
   listMyShelterPets,
   getShelterPetDetail,
   getHealthPassport,

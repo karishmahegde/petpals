@@ -8,12 +8,19 @@ jest.mock("../../../config/prisma", () => ({
   veterinarian: {
     findUnique: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   },
   governmentID: {
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    deleteMany: jest.fn(),
   },
+  appointment: { findFirst: jest.fn() },
+  users: { update: jest.fn(), delete: jest.fn() },
+  // The service passes an array of already-invoked prisma calls (each a
+  // Promise) — Promise.all is a faithful enough stand-in.
+  $transaction: jest.fn((operations) => Promise.all(operations)),
 }));
 
 // Private bucket — never actually hit; every call is asserted, not executed.
@@ -499,6 +506,116 @@ describe("Veterinarian self-service endpoints", () => {
         .set("Authorization", `Bearer ${vetToken()}`);
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // ————————————————————————————— DELETE /vets/me —————————————————————————————
+  describe("DELETE /api/v1/vets/me", () => {
+    const close = (body) =>
+      request(app)
+        .delete("/api/v1/vets/me")
+        .set("Authorization", `Bearer ${vetToken()}`)
+        .send(body);
+
+    test("mode=deactivate → 200, status Deactivated, refresh token nulled, nothing deleted", async () => {
+      prisma.appointment.findFirst.mockResolvedValueOnce(null);
+      prisma.veterinarian.update.mockResolvedValueOnce({});
+      prisma.users.update.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "deactivate" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Account deactivated");
+      expect(prisma.veterinarian.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { accountStatus: "Deactivated" },
+      });
+      expect(prisma.users.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { refreshToken: null },
+      });
+      expect(prisma.veterinarian.delete).not.toHaveBeenCalled();
+      expect(prisma.governmentID.deleteMany).not.toHaveBeenCalled();
+    });
+
+    test("mode=delete → 200, vet + users rows and government ID removed, then its stored file", async () => {
+      prisma.appointment.findFirst.mockResolvedValueOnce(null);
+      prisma.governmentID.findFirst.mockResolvedValueOnce({ documentURL: "vet/42/id-1.jpg" });
+      prisma.governmentID.deleteMany.mockResolvedValueOnce({ count: 1 });
+      prisma.veterinarian.delete.mockResolvedValueOnce({});
+      prisma.users.delete.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "delete" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Account deleted");
+      expect(prisma.governmentID.deleteMany).toHaveBeenCalledWith({
+        where: { userID: 42, userType: "Veterinarian" },
+      });
+      expect(prisma.veterinarian.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
+      expect(prisma.users.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
+      expect(storage.deletePrivateFile).toHaveBeenCalledWith("government-ids", "vet/42/id-1.jpg");
+    });
+
+    test("mode=delete with no government ID → nothing to remove from storage", async () => {
+      prisma.appointment.findFirst.mockResolvedValueOnce(null);
+      prisma.governmentID.findFirst.mockResolvedValueOnce(null);
+      prisma.governmentID.deleteMany.mockResolvedValueOnce({ count: 0 });
+      prisma.veterinarian.delete.mockResolvedValueOnce({});
+      prisma.users.delete.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "delete" });
+
+      expect(res.status).toBe(200);
+      expect(storage.deletePrivateFile).not.toHaveBeenCalled();
+    });
+
+    test.each(["deactivate", "delete"])(
+      "upcoming Scheduled appointments → 409 for mode=%s, nothing written",
+      async (mode) => {
+        prisma.appointment.findFirst.mockResolvedValueOnce({ appointmentID: 11 });
+
+        const res = await close({ mode });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("CONFLICT");
+        expect(prisma.appointment.findFirst.mock.calls[0][0].where).toEqual({
+          vetID: 42,
+          appointmentStatus: "Scheduled",
+          appointmentDate: { gt: expect.any(Date) },
+        });
+        expect(prisma.veterinarian.update).not.toHaveBeenCalled();
+        expect(prisma.veterinarian.delete).not.toHaveBeenCalled();
+        expect(prisma.users.delete).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each([undefined, "archive"])(
+      "mode %p → 422 VALIDATION_ERROR, nothing read or written",
+      async (mode) => {
+        const res = await close(mode === undefined ? {} : { mode });
+
+        expect(res.status).toBe(422);
+        expect(res.body.error.code).toBe("VALIDATION_ERROR");
+        expect(prisma.appointment.findFirst).not.toHaveBeenCalled();
+      },
+    );
+
+    test("a Pending vet can't close their account here → 401", async () => {
+      authService.getAccountStatus.mockResolvedValue("Pending");
+
+      const res = await close({ mode: "deactivate" });
+
+      expect(res.status).toBe(401);
+    });
+
+    test("Staff role → 403", async () => {
+      const res = await request(app)
+        .delete("/api/v1/vets/me")
+        .set("Authorization", `Bearer ${signToken("Staff")}`)
+        .send({ mode: "deactivate" });
+
+      expect(res.status).toBe(403);
     });
   });
 

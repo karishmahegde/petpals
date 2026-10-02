@@ -297,7 +297,7 @@ export interface AppointmentListItem {
   appointmentReason: string;
   pet: { petID: number; petName: string };
   shelter: { shelterName: string };
-  vet: { vetName: string };
+  vet: { vetName: string } | null; // null once the vet has deleted their account
 }
 
 // Ordered by appointmentDate ascending. `upcoming` narrows to future ones.

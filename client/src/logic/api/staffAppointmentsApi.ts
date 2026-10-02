@@ -20,14 +20,14 @@ export interface AppointmentQueueItem {
     breedName: string;
     speciesName: string;
   };
-  vetName: string;
+  vetName: string | null; // null once the vet has deleted their account
 }
 
 // Richer shape from GET /appointments/:id — for the detail slide-over.
 export interface AppointmentDetail extends AppointmentQueueItem {
   appointmentCode: string | null;
   shelterName: string;
-  vetID: number;
+  vetID: number | null;
   staffID: number | null;
   volunteerID: number | null;
   staffName: string | null;

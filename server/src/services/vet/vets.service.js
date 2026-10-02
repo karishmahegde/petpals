@@ -1,4 +1,6 @@
 const prisma = require("../../config/prisma");
+const storage = require("../storage");
+const { nullifyRefreshToken } = require("../auth/auth.service");
 const { ADDRESS_SELECT } = require("../../utils/address");
 
 // Self-service shape — everything a vet may see about their own row. Email
@@ -163,9 +165,74 @@ const completeOnboarding = async (userID) => {
   );
 };
 
+// ——————————————— CLOSE MY ACCOUNT (DELETE /vets/me) ———————————————
+// Mirrors staff.service.js's closeMyAccount. Blocked in either mode while the
+// vet still has upcoming Scheduled appointments — staff must reassign them
+// first (PATCH /appointments/:id), or the pets would be left with a booked
+// visit and no vet.
+const upcomingAppointmentsConflict = () => {
+  const err = new Error(
+    "You have upcoming appointments — ask your shelter's staff to reassign them before closing your account",
+  );
+  err.code = "CONFLICT";
+  return err;
+};
+
+// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// cleared). 'delete' removes the Veterinarian and Users rows (the refresh
+// token goes with Users) plus their government ID and its stored file. The
+// pets' history survives: HealthRecord.vetID,
+// VaccinationRecord.administeredBy and Appointment.vetID are all
+// ON DELETE SET NULL, so those rows stay and just lose the vet link.
+const closeMyAccount = async (userID, mode) => {
+  const upcoming = await prisma.appointment.findFirst({
+    where: {
+      vetID: userID,
+      appointmentStatus: "Scheduled",
+      appointmentDate: { gt: new Date() },
+    },
+    select: { appointmentID: true },
+  });
+  if (upcoming) {
+    throw upcomingAppointmentsConflict();
+  }
+
+  if (mode === "deactivate") {
+    await prisma.$transaction([
+      prisma.veterinarian.update({
+        where: { userID },
+        data: { accountStatus: "Deactivated" },
+      }),
+      nullifyRefreshToken(prisma, userID),
+    ]);
+    return;
+  }
+
+  // Capture the government ID's stored file path before the transaction — a
+  // network call has no place inside a DB transaction (same as staff's).
+  const governmentId = await prisma.governmentID.findFirst({
+    where: { userID, userType: "Veterinarian" },
+    select: { documentURL: true },
+  });
+
+  await prisma.$transaction([
+    prisma.governmentID.deleteMany({ where: { userID, userType: "Veterinarian" } }),
+    prisma.veterinarian.delete({ where: { userID } }),
+    prisma.users.delete({ where: { userID } }),
+  ]);
+
+  if (governmentId?.documentURL) {
+    await storage.deletePrivateFile(
+      storage.GOVERNMENT_IDS_BUCKET,
+      governmentId.documentURL,
+    );
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   advanceOnboardingStep,
   completeOnboarding,
+  closeMyAccount,
 };

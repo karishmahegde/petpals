@@ -439,7 +439,11 @@ model Appointment {
   //   CREATE UNIQUE INDEX "Appointment_appointmentCode_key" ON "Appointment" ("appointmentCode");
   appointmentCode   String?             @unique @db.Text
   petID             Int
-  vetID             Int
+  // Nullable only so a vet can delete their account (DELETE /vets/me)
+  // without losing the pet's appointment history — set to NULL when the
+  // vet's row goes, same as HealthRecord.vetID / VaccinationRecord
+  // .administeredBy. Every create still requires one (the controllers do).
+  vetID             Int?
   shelterID         Int
   // Optional — never client-supplied on create; auto-set to the acting
   // Staff member's own userID (same convention as Event.staffID), null for
@@ -465,7 +469,7 @@ model Appointment {
   //   CREATE UNIQUE INDEX "Appointment_pet_vet_date_scheduled_key" ON "Appointment" ("petID", "vetID", "appointmentDate") WHERE "appointmentStatus" = 'Scheduled';
   pet               Pet                 @relation(fields: [petID], references: [petID])
   shelter           Shelter             @relation(fields: [shelterID], references: [shelterID])
-  vet               Veterinarian        @relation(fields: [vetID], references: [userID])
+  vet               Veterinarian?       @relation(fields: [vetID], references: [userID], onDelete: SetNull)
   staff             Staff?              @relation(fields: [staffID], references: [userID])
   volunteer         Volunteer?          @relation(fields: [volunteerID], references: [userID])
   vaccinations      VaccinationRecord[]

@@ -153,13 +153,19 @@ Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.ap
 | --- | --- | --- |
 | GET / PUT | `/vets/me` | profile; `allowPending` (onboarding) — see Staff onboarding above |
 | GET / POST | `/vets/me/government-id` | shared `selfGovernmentId.service.js` |
+| DELETE | `/vets/me` | mirrors `DELETE /staff/me`: `{ mode: deactivate|delete }` (422 otherwise); 409 while the vet has upcoming Scheduled appointments. `delete` removes Veterinarian + Users rows and the government ID + its Storage file; history survives because `Appointment.vetID` (nullable since migration `…_appointment_vet_set_null`), `HealthRecord.vetID` and `VaccinationRecord.administeredBy` are all `ON DELETE SET NULL` — so an appointment's `vetName` can be null (client `formatVetName` shows "Former vet") |
 | PATCH | `/vets/me/onboarding-step` · `/onboarding-complete` | 2–5, same wizard as staff |
 | GET | `/vets/me/appointments` · `/:id` | own queue only (`vetID` = caller); list reuses the Staff `/appointments` select, item shape, `deriveAppointmentStatus` and upcoming/past split (exported from `staff/appointments.service.js`); `upcoming` strictly `true`/`false`; another vet's `:id` → 404 |
 | PATCH | `/appointments/:id/status` | `{ appointmentStatus: "Completed", notes? }` — the only real write of Completed; assigned vet only (another vet's → 404, like the GETs), stored Scheduled only (409), not before `appointmentDate` (409); `notes` → a `HealthRecord` linked via `HealthRecord.appointmentID` (nullable, like `VaccinationRecord.appointmentID`; migration `…_health_record_appointment`) in the same `$transaction`. Staff `PATCH /appointments/:id/cancel` is separate. Displayed status everywhere (Staff, vet, adopter) goes through `deriveAppointmentStatus`: written Completed and past-Scheduled both read Completed |
+| GET | `/vaccines` | catalog, alphabetical — Admin/Staff/Veterinarian |
+| GET | `/vets/me/pets` · `/:id` · `/:id/health-passport` | pets at the vet's shelter. List: Staff `/staff/me/pets` params via the shared `parseShelterPetsQuery` + `listShelterPets` core, plus `petName`. Detail/passport reuse the Staff handlers; `getShelterPetDetail` scopes a Veterinarian to their shelter (elsewhere → 404). Passport is universal — records, doses, transfers read by `petID` only, so history from shelters the pet left is included |
+| POST | `/pets/:id/health-records` | standalone note, `recordDesc` ≤500; `vetID` = caller; pet must be at the vet's shelter (403) |
+| PUT | `/health-records/:id` | `recordDesc` only; only the vet who wrote it (403), incl. appointment-completion notes |
+| GET / POST | `/appointments/:id/vaccinations` | doses given at the appointment. POST: assigned vet only; body `vaccineID`, `administeredDate`, `dueDate` — `petID`, `administeredBy`, `administeredAt` (appointment's shelter) and `appointmentID` set server-side; any status but Cancelled (409); future `administeredDate` or `dueDate` not after it → 422; unknown vaccineID → 404. GET: assigned vet, Staff at that shelter (403 otherwise), Admin. Another vet's appointment → 404 on both |
 
 ### Domains not yet built
 
-Staff `/staff` · Appointments (vet CRUD) `/appointments` · Vaccinations `/appointments/:id/vaccinations` · Tasks `/tasks` · Events `/events` · Donors `/donors` · Donations `/donations` · Transfers `/transfers`.
+Staff `/staff` · Appointments (vet CRUD) `/appointments` · Tasks `/tasks` · Events `/events` · Donors `/donors` · Donations `/donations` · Transfers `/transfers`.
 
 ---
 

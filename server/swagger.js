@@ -468,7 +468,25 @@ const schemas = {
           speciesName: { type: "string" },
         },
       },
-      vetName: { type: "string" },
+      vetName: {
+        type: "string",
+        nullable: true,
+        description: "null once the vet has deleted their account",
+      },
+    },
+  },
+  VaccinationDose: {
+    type: "object",
+    description: "One dose given at an appointment (VaccinationRecord).",
+    properties: {
+      recordID: { type: "integer" },
+      appointmentID: { type: "integer" },
+      vaccineID: { type: "integer" },
+      vaccineName: { type: "string" },
+      administeredDate: { type: "string", format: "date-time" },
+      dueDate: { type: "string", format: "date-time" },
+      vetName: { type: "string", nullable: true },
+      shelterName: { type: "string", nullable: true },
     },
   },
   VetAppointmentDetail: {
@@ -520,7 +538,7 @@ const schemas = {
         properties: {
           appointmentCode: { type: "string", example: "APT-00123" },
           shelterName: { type: "string" },
-          vetID: { type: "integer" },
+          vetID: { type: "integer", nullable: true },
           staffID: { type: "integer", nullable: true },
           volunteerID: { type: "integer", nullable: true },
           staffName: { type: "string", nullable: true },

@@ -9,17 +9,18 @@ const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
 const { singleFile } = require("../../middleware/upload");
 const router = express.Router();
 
-// Every route here uses authenticate.allowPending: a new vet onboards while
-// still Pending, before their shelter manager approves them. Keep this file
-// to onboarding needs only — every other vet route uses plain authenticate,
-// which rejects Pending accounts.
+// Every route here except DELETE /vets/me uses authenticate.allowPending: a
+// new vet onboards while still Pending, before their shelter manager
+// approves them. Keep that set to onboarding needs only — DELETE /vets/me
+// and every other vet route use plain authenticate, which rejects Pending
+// accounts (same as DELETE /staff/me).
 
 /**
  * @swagger
  * /vets/me:
  *   get:
  *     summary: Get the full profile of the currently logged-in veterinarian
- *     tags: [Veterinarians]
+ *     tags: [Vets]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -37,7 +38,7 @@ const router = express.Router();
  *       shelterID and accountStatus are rejected with 400 — the shelter is
  *       picked at sign-up and approval is the shelter manager's (PATCH
  *       /staff/me/vets/:id/status). Available to Pending vets.
- *     tags: [Veterinarians]
+ *     tags: [Vets]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -90,7 +91,7 @@ router.put(
  *       just completed. The server sets onboardingStep = min(max(current,
  *       step + 1), 5) — it only ever advances. Available to Pending vets:
  *       onboarding happens before approval.
- *     tags: [Veterinarians]
+ *     tags: [Vets]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -128,7 +129,7 @@ router.patch(
  *       and a submitted government ID — 409 lists whatever is missing. Sets
  *       onboardingComplete = true, onboardingStep = 5. A Pending vet then
  *       waits for their shelter manager's approval.
- *     tags: [Veterinarians]
+ *     tags: [Vets]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -154,7 +155,7 @@ router.patch(
  *     description: >
  *       idNumber is masked (e.g. *****4567) on this response, same as the
  *       POST response — never returned in full on either route.
- *     tags: [Veterinarians]
+ *     tags: [Vets]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -174,7 +175,7 @@ router.patch(
  *       submission is rejected with 409, except a Rejected record, which can
  *       be resubmitted (overwrites the row, resets it to Pending). Stored in
  *       the private government-ids bucket.
- *     tags: [Veterinarians]
+ *     tags: [Vets]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -212,6 +213,54 @@ router.post(
   authorizeRoles(ROLES.VETERINARIAN),
   singleFile("file"),
   vetsController.uploadGovernmentId,
+);
+
+/**
+ * @swagger
+ * /vets/me:
+ *   delete:
+ *     summary: Deactivate or permanently delete your own veterinarian account (Veterinarian only)
+ *     description: >
+ *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       token cleared); 'delete' permanently removes the Veterinarian and
+ *       Users rows and the government ID with its stored file. The pets'
+ *       history survives a delete — health records, vaccinations and
+ *       appointments keep existing with the vet link set to null. Either
+ *       mode is blocked with 409 while the vet has upcoming Scheduled
+ *       appointments; staff must reassign them first.
+ *     tags: [Vets]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [mode]
+ *             properties:
+ *               mode: { type: string, enum: [deactivate, delete] }
+ *     responses:
+ *       200:
+ *         description: Account deactivated or deleted
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       409:
+ *         description: The vet still has upcoming Scheduled appointments
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       422:
+ *         description: mode is missing or not one of 'deactivate'/'delete'
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.delete(
+  "/vets/me",
+  authenticate,
+  authorizeRoles(ROLES.VETERINARIAN),
+  vetsController.closeMyAccount,
 );
 
 module.exports = router;

@@ -172,7 +172,8 @@ const formatListItem = (row) => ({
   appointmentReason: row.appointmentReason,
   status: deriveAppointmentStatus(row),
   pet: formatPetSummary(row.pet),
-  vetName: row.vet.vetName,
+  // null once the vet has deleted their account (Appointment.vetID SET NULL).
+  vetName: row.vet ? row.vet.vetName : null,
 });
 
 const listShelterAppointments = async (
@@ -287,7 +288,7 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
     vetID: appointment.vetID,
     staffID: appointment.staffID,
     volunteerID: appointment.volunteerID,
-    vetName: appointment.vet.vetName,
+    vetName: appointment.vet ? appointment.vet.vetName : null,
     shelterName: appointment.shelter.shelterName,
     staffName: appointment.staff ? appointment.staff.staffName : null,
     volunteerName: appointment.volunteer ? appointment.volunteer.volunteerName : null,

@@ -21,7 +21,7 @@ const router = express.Router();
  *       future appointmentDate (soonest first); omitted/false scopes to
  *       everything else — past-dated or Cancelled (most recent first). A
  *       past Scheduled appointment is reported as Completed.
- *     tags: [Veterinarians, Appointments]
+ *     tags: [Appointments, Vets]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -77,7 +77,7 @@ router.get(
  *       and the vaccine doses already linked to the appointment. Another
  *       vet's appointment returns 404, exactly like a missing one, so the
  *       response never confirms it exists.
- *     tags: [Veterinarians, Appointments]
+ *     tags: [Appointments, Vets]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -126,7 +126,7 @@ router.get(
  *       Cancelled or already Completed), and only once appointmentDate has
  *       passed (409 if it's still in the future). Optional notes become a
  *       HealthRecord for the pet, written in the same transaction.
- *     tags: [Veterinarians, Appointments]
+ *     tags: [Appointments, Vets]
  *     security:
  *       - bearerAuth: []
  *     parameters:

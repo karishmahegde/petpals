@@ -103,7 +103,7 @@ const getMyAppointment = async (vetID, appointmentID) => {
     appointmentReason: appointment.appointmentReason,
     status: deriveAppointmentStatus(appointment),
     pet: formatPetSummary(appointment.pet),
-    vetName: appointment.vet.vetName,
+    vetName: appointment.vet ? appointment.vet.vetName : null,
     shelterID: appointment.shelter.shelterID,
     shelterName: appointment.shelter.shelterName,
     staffName: appointment.staff ? appointment.staff.staffName : null,

@@ -1,4 +1,8 @@
 const vetsService = require("../../services/vet/vets.service");
+const {
+  assertValidCloseAccountMode,
+  closeAccountMessage,
+} = require("../../services/auth/auth.service");
 const { successResponse } = require("../../utils/response");
 const governmentIdService = require("../../services/governmentIds/selfGovernmentId.service");
 const { normalizePhone } = require("../../utils/phone");
@@ -174,6 +178,21 @@ const getGovernmentId = async (req, res, next) => {
   }
 };
 
+// ——————————————— DELETE /vets/me ———————————————
+// Same mode validation and response message as every role's close-account
+// flow (auth.service.js) — 422 for a missing/invalid mode.
+const closeMyAccount = async (req, res, next) => {
+  const { mode } = req.body ?? {};
+
+  try {
+    assertValidCloseAccountMode(mode);
+    await vetsService.closeMyAccount(req.user.userID, mode);
+    return successResponse(res, closeAccountMessage(mode), null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
@@ -181,4 +200,5 @@ module.exports = {
   completeOnboarding,
   uploadGovernmentId,
   getGovernmentId,
+  closeMyAccount,
 };
