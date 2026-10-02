@@ -78,7 +78,8 @@ const formatMember = (row) => ({
   ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [field, row[field]])),
 });
 
-const formatOne = async (row) => formatMember((await withGovernmentIdStatus([row]))[0]);
+const formatOne = async (row) =>
+  formatMember((await withGovernmentIdStatus("Staff", [row]))[0]);
 
 // The shelter the caller manages — the gate for every endpoint here.
 const resolveManagedShelterID = async (userID) => {
@@ -153,7 +154,7 @@ const listShelterStaff = async (
   ]);
 
   return {
-    data: (await withGovernmentIdStatus(rows)).map(formatMember),
+    data: (await withGovernmentIdStatus("Staff", rows)).map(formatMember),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -204,7 +205,7 @@ const updateStatus = async (managerID, targetID, accountStatus, staffDesignation
     );
   }
   if (approving) {
-    await assertReadyForApproval(targetID, member.onboardingComplete);
+    await assertReadyForApproval("Staff", targetID, member.onboardingComplete);
   }
 
   // Approving stamps staffDOJ; deactivating stamps staffDOS — see

@@ -100,6 +100,8 @@ app.use("/api/v1", staffDonationsRouter);
 // Veterinarian self-service (/vets/me) — profile, government ID, onboarding.
 const vetSelfRouter = require("./routes/vet/vets.routes");
 app.use("/api/v1", vetSelfRouter);
+const vetAppointmentsRouter = require("./routes/vet/appointments.routes");
+app.use("/api/v1", vetAppointmentsRouter);
 // app.use('/api/v1/vaccinations',        require('./routes/vaccinations'));
 // app.use('/api/v1/donors',               require('./routes/donors'));
 

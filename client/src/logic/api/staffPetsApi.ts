@@ -148,6 +148,9 @@ export interface HealthRecordItem {
   recordID: number;
   createdAt: string;
   recordDesc: string;
+  // Set when written at an appointment (a vet's notes on completing it).
+  appointmentID: number | null;
+  appointmentCode: string | null; // e.g. "APT-00123"
   vetName: string | null;
   shelterName: string | null;
 }

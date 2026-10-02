@@ -461,6 +461,7 @@ const schemas = {
         type: "object",
         properties: {
           petID: { type: "integer" },
+          petCode: { type: "string", example: "PE000042" },
           petName: { type: "string" },
           petPhoto: { type: "string", nullable: true },
           breedName: { type: "string" },
@@ -469,6 +470,47 @@ const schemas = {
       },
       vetName: { type: "string" },
     },
+  },
+  VetAppointmentDetail: {
+    description:
+      "One of the vet's own appointments (GET /vets/me/appointments/:id) — no adopter contact details.",
+    allOf: [
+      { $ref: "#/components/schemas/AppointmentQueueItem" },
+      {
+        type: "object",
+        properties: {
+          appointmentCode: { type: "string", example: "APT-00123" },
+          shelterID: { type: "integer" },
+          shelterName: { type: "string" },
+          staffName: { type: "string", nullable: true },
+          volunteerName: { type: "string", nullable: true },
+          vaccinesAdministered: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                recordID: { type: "integer" },
+                vaccineName: { type: "string" },
+                administeredDate: { type: "string", format: "date-time" },
+                dueDate: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          healthRecords: {
+            type: "array",
+            description: "Health notes written at this appointment",
+            items: {
+              type: "object",
+              properties: {
+                recordID: { type: "integer" },
+                recordDesc: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+        },
+      },
+    ],
   },
   AppointmentDetail: {
     allOf: [
@@ -574,6 +616,8 @@ const schemas = {
             recordID: { type: "integer" },
             createdAt: { type: "string", format: "date-time" },
             recordDesc: { type: "string", maxLength: 500 },
+            appointmentID: { type: "integer", nullable: true, description: "Set when written at an appointment" },
+            appointmentCode: { type: "string", nullable: true, example: "APT-00123" },
             vetName: { type: "string", nullable: true },
             shelterName: { type: "string", nullable: true },
           },

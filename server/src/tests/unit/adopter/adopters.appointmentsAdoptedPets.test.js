@@ -74,6 +74,39 @@ describe("Adopter appointments + adopted-pet detail", () => {
       ]);
     });
 
+    // Same derived label as the Staff tab and the vet's queue
+    // (deriveAppointmentStatus): a vet-completed row and a past Scheduled one
+    // both read Completed; the raw appointmentStatus isn't returned.
+    test("status: stored Completed and past Scheduled both read Completed", async () => {
+      const base = {
+        appointmentReason: "Checkup",
+        pet: { petID: 12, petName: "Biscuit" },
+        shelter: { shelterName: "Downtown Shelter" },
+        vet: { vetName: "Dr. Vee" },
+      };
+      const past = new Date(Date.now() - 86400000);
+      const future = new Date(Date.now() + 86400000);
+      prisma.appointment.findMany.mockResolvedValueOnce([
+        { ...base, appointmentID: 1, appointmentDate: past, appointmentStatus: "Completed" },
+        { ...base, appointmentID: 2, appointmentDate: past, appointmentStatus: "Scheduled" },
+        { ...base, appointmentID: 3, appointmentDate: past, appointmentStatus: "Cancelled" },
+        { ...base, appointmentID: 4, appointmentDate: future, appointmentStatus: "Scheduled" },
+      ]);
+
+      const res = await request(app)
+        .get("/api/v1/adopters/me/appointments")
+        .set("Authorization", `Bearer ${adopterToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.map((a) => a.status)).toEqual([
+        "Completed",
+        "Completed",
+        "Cancelled",
+        "Scheduled",
+      ]);
+      expect(res.body.data[0]).not.toHaveProperty("appointmentStatus");
+    });
+
     test("upcoming=true -> also appointmentDate > now", async () => {
       prisma.appointment.findMany.mockResolvedValueOnce([]);
       const before = Date.now();

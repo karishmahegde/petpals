@@ -364,14 +364,22 @@ model Notification {
 }
 
 model HealthRecord {
-  recordID    Int           @id @default(autoincrement())
-  petID       Int
-  createdAt   DateTime      @default(now())
-  lastUpdated DateTime      @updatedAt
-  vetID       Int?
-  recordDesc  String        @db.VarChar(500)
-  pet         Pet           @relation(fields: [petID], references: [petID])
-  vet         Veterinarian? @relation(fields: [vetID], references: [userID])
+  recordID      Int           @id @default(autoincrement())
+  petID         Int
+  createdAt     DateTime      @default(now())
+  lastUpdated   DateTime      @updatedAt
+  vetID         Int?
+  recordDesc    String        @db.VarChar(500)
+  // The appointment this note was written at (a vet's notes when completing
+  // it — PATCH /appointments/:id/status). Optional, same as
+  // VaccinationRecord.appointmentID: a note made outside any appointment
+  // (e.g. recorded by staff, or history carried in at intake) has none.
+  appointmentID Int?
+  pet           Pet           @relation(fields: [petID], references: [petID])
+  vet           Veterinarian? @relation(fields: [vetID], references: [userID])
+  appointment   Appointment?  @relation(fields: [appointmentID], references: [appointmentID], onDelete: SetNull)
+
+  @@index([appointmentID])
 }
 
 model Vaccine {
@@ -442,12 +450,11 @@ model Appointment {
   volunteerID       Int?
   appointmentDate   DateTime
   appointmentReason String              @db.VarChar(300)
-  // Only real write-transition today is Scheduled -> Cancelled (see
-  // cancelAppointment). "Completed" is never written back — it's a derived
-  // display label for a Scheduled row whose appointmentDate has passed
-  // (see staff/appointments.service.js's deriveAppointmentStatus), since
-  // there's no "mark complete" action and no cron/scheduler in this
-  // codebase to flip it automatically.
+  // Write-transitions: Scheduled -> Cancelled (staff, cancelAppointment) and
+  // Scheduled -> Completed (the assigned vet, once appointmentDate has
+  // passed — PATCH /appointments/:id/status). A past Scheduled row no vet
+  // has completed still displays as Completed (staff/appointments.service.js's
+  // deriveAppointmentStatus), since there's no cron to flip it.
   appointmentStatus AppointmentStatus   @default(Scheduled)
   // Hand-applied partial unique index (see CLAUDE.md — migrate dev is
   // banned) guarding against the double-submit case (a slow/dropped
@@ -462,6 +469,7 @@ model Appointment {
   staff             Staff?              @relation(fields: [staffID], references: [userID])
   volunteer         Volunteer?          @relation(fields: [volunteerID], references: [userID])
   vaccinations      VaccinationRecord[]
+  healthRecords     HealthRecord[]
 }
 
 model VolunteerApplication {

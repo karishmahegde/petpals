@@ -64,7 +64,7 @@ const listStaff = async ({
   ]);
 
   return {
-    data: await withGovernmentIdStatus(data),
+    data: await withGovernmentIdStatus("Staff", data),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -91,7 +91,7 @@ const getStaffDetail = async (userID) => {
   if (!staff) {
     throw notFound(userID);
   }
-  return (await withGovernmentIdStatus([staff]))[0];
+  return (await withGovernmentIdStatus("Staff", [staff]))[0];
 };
 
 // ——————————————— UPDATE STAFF (PATCH /staff/:id) ———————————————
@@ -222,7 +222,7 @@ const updateStaffStatus = async (userID, accountStatus) => {
       throw err;
     }
     if (approvingManager) {
-      await assertReadyForApproval(userID, current.onboardingComplete);
+      await assertReadyForApproval("Staff", userID, current.onboardingComplete);
     }
   }
 

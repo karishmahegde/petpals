@@ -358,6 +358,7 @@ const getHealthPassport = async (petID, { role, userID }) => {
         recordID: true,
         createdAt: true,
         recordDesc: true,
+        appointment: { select: { appointmentID: true, appointmentCode: true } },
         vet: {
           select: {
             vetName: true,
@@ -398,6 +399,10 @@ const getHealthPassport = async (petID, { role, userID }) => {
       recordID: r.recordID,
       createdAt: r.createdAt,
       recordDesc: r.recordDesc,
+      // Set when the note was written at an appointment (the vet's notes
+      // on completing it); null for one made outside any appointment.
+      appointmentID: r.appointment?.appointmentID ?? null,
+      appointmentCode: r.appointment?.appointmentCode ?? null,
       vetName: r.vet?.vetName ?? null,
       shelterName: r.vet?.shelter?.shelterName ?? null,
     })),
