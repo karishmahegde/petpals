@@ -8,4 +8,15 @@
 const APPLICATION_FEE_CENTS = 1500;
 const APPLICATION_FEE_USD = APPLICATION_FEE_CENTS / 100;
 
-module.exports = { APPLICATION_FEE_CENTS, APPLICATION_FEE_USD };
+// Donations (POST /donations/checkout) — any whole-dollar amount in this
+// range. The floor sits above Stripe's $0.50 card minimum; the ceiling stops
+// a typo'd extra zero or two turning into a real charge.
+const DONATION_MIN_USD = 1;
+const DONATION_MAX_USD = 10000;
+
+module.exports = {
+  APPLICATION_FEE_CENTS,
+  APPLICATION_FEE_USD,
+  DONATION_MIN_USD,
+  DONATION_MAX_USD,
+};

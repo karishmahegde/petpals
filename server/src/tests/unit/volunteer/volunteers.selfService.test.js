@@ -8,12 +8,22 @@ jest.mock("../../../config/prisma", () => ({
   volunteer: {
     findUnique: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   },
   governmentID: {
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    deleteMany: jest.fn(),
   },
+  appointment: { findFirst: jest.fn() },
+  task: { findFirst: jest.fn() },
+  volunteerEvent: { deleteMany: jest.fn() },
+  volunteerTask: { deleteMany: jest.fn() },
+  users: { update: jest.fn(), delete: jest.fn() },
+  // The service passes an array of already-invoked prisma calls (each a
+  // Promise) — Promise.all is a faithful enough stand-in.
+  $transaction: jest.fn((operations) => Promise.all(operations)),
 }));
 
 // Private bucket — never actually hit; every call is asserted, not executed.
@@ -598,6 +608,155 @@ describe("Volunteer self-service endpoints", () => {
         .set("Authorization", `Bearer ${volunteerToken()}`);
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // ————————————————————————————— DELETE /volunteers/me —————————————————————————————
+  describe("DELETE /api/v1/volunteers/me", () => {
+    const close = (body) =>
+      request(app)
+        .delete("/api/v1/volunteers/me")
+        .set("Authorization", `Bearer ${volunteerToken()}`)
+        .send(body);
+
+    const noOpenWork = () => {
+      prisma.appointment.findFirst.mockResolvedValueOnce(null);
+      prisma.task.findFirst.mockResolvedValueOnce(null);
+    };
+
+    test("mode=deactivate → 200, leaves future events, status Deactivated, refresh token nulled, nothing deleted", async () => {
+      noOpenWork();
+      prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });
+      prisma.volunteer.update.mockResolvedValueOnce({});
+      prisma.users.update.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "deactivate" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Account deactivated");
+      // Only events that haven't happened yet — past assignments stay as history.
+      expect(prisma.volunteerEvent.deleteMany).toHaveBeenCalledWith({
+        where: { volunteerID: 42, event: { eventDate: { gt: expect.any(Date) } } },
+      });
+      expect(prisma.volunteer.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { accountStatus: "Deactivated" },
+      });
+      expect(prisma.users.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { refreshToken: null },
+      });
+      expect(prisma.volunteerTask.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.volunteer.delete).not.toHaveBeenCalled();
+      expect(prisma.governmentID.deleteMany).not.toHaveBeenCalled();
+    });
+
+    test("mode=delete → 200, every task/event assignment, ID, volunteer + users rows removed, then the stored file", async () => {
+      noOpenWork();
+      prisma.governmentID.findFirst.mockResolvedValueOnce({ documentURL: "volunteer/42/id-1.jpg" });
+      prisma.volunteerEvent.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.volunteerTask.deleteMany.mockResolvedValueOnce({ count: 3 });
+      prisma.governmentID.deleteMany.mockResolvedValueOnce({ count: 1 });
+      prisma.volunteer.delete.mockResolvedValueOnce({});
+      prisma.users.delete.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "delete" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Account deleted");
+      // Both join tables' FKs to Volunteer are RESTRICT — every row has to go.
+      expect(prisma.volunteerEvent.deleteMany).toHaveBeenCalledWith({ where: { volunteerID: 42 } });
+      expect(prisma.volunteerTask.deleteMany).toHaveBeenCalledWith({ where: { volunteerID: 42 } });
+      expect(prisma.governmentID.deleteMany).toHaveBeenCalledWith({
+        where: { userID: 42, userType: "Volunteer" },
+      });
+      expect(prisma.volunteer.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
+      expect(prisma.users.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
+      expect(storage.deletePrivateFile).toHaveBeenCalledWith("government-ids", "volunteer/42/id-1.jpg");
+    });
+
+    test("mode=delete with no government ID → nothing to remove from storage", async () => {
+      noOpenWork();
+      prisma.governmentID.findFirst.mockResolvedValueOnce(null);
+      prisma.volunteerEvent.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.volunteerTask.deleteMany.mockResolvedValueOnce({ count: 0 });
+      prisma.governmentID.deleteMany.mockResolvedValueOnce({ count: 0 });
+      prisma.volunteer.delete.mockResolvedValueOnce({});
+      prisma.users.delete.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "delete" });
+
+      expect(res.status).toBe(200);
+      expect(storage.deletePrivateFile).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ["upcoming appointments", { appointmentID: 11 }, null, "You have upcoming appointments — ask your shelter's staff to reassign them before closing your account"],
+      ["open tasks", null, { taskID: 7 }, "You have open tasks — ask your shelter's staff to reassign them before closing your account"],
+      ["both", { appointmentID: 11 }, { taskID: 7 }, "You have upcoming appointments and open tasks — ask your shelter's staff to reassign them before closing your account"],
+    ])("%s → 409 for either mode, nothing written", async (_label, appointment, task, message) => {
+      for (const mode of ["deactivate", "delete"]) {
+        jest.clearAllMocks();
+        prisma.appointment.findFirst.mockResolvedValueOnce(appointment);
+        prisma.task.findFirst.mockResolvedValueOnce(task);
+
+        const res = await close({ mode });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("CONFLICT");
+        expect(res.body.message).toBe(message);
+        expect(prisma.volunteerEvent.deleteMany).not.toHaveBeenCalled();
+        expect(prisma.volunteer.update).not.toHaveBeenCalled();
+        expect(prisma.volunteer.delete).not.toHaveBeenCalled();
+        expect(prisma.users.delete).not.toHaveBeenCalled();
+      }
+    });
+
+    test("the open-work checks look at the right rows", async () => {
+      prisma.appointment.findFirst.mockResolvedValueOnce({ appointmentID: 11 });
+      prisma.task.findFirst.mockResolvedValueOnce(null);
+
+      await close({ mode: "deactivate" });
+
+      expect(prisma.appointment.findFirst.mock.calls[0][0].where).toEqual({
+        volunteerID: 42,
+        appointmentStatus: "Scheduled",
+        appointmentDate: { gt: expect.any(Date) },
+      });
+      expect(prisma.task.findFirst.mock.calls[0][0].where).toEqual({
+        taskStatus: "In_progress",
+        volunteers: { some: { volunteerID: 42 } },
+      });
+    });
+
+    test.each([undefined, "archive"])(
+      "mode %p → 422 VALIDATION_ERROR, nothing read or written",
+      async (mode) => {
+        const res = await close(mode === undefined ? {} : { mode });
+
+        expect(res.status).toBe(422);
+        expect(res.body.error.code).toBe("VALIDATION_ERROR");
+        expect(prisma.appointment.findFirst).not.toHaveBeenCalled();
+      },
+    );
+
+    test("a Pending volunteer can't close their account here → 401", async () => {
+      authService.getAccountStatus.mockResolvedValue("Pending");
+
+      const res = await close({ mode: "delete" });
+
+      expect(res.status).toBe(401);
+      expect(prisma.volunteer.delete).not.toHaveBeenCalled();
+    });
+
+    test("Staff role → 403", async () => {
+      const res = await request(app)
+        .delete("/api/v1/volunteers/me")
+        .set("Authorization", `Bearer ${signToken("Staff")}`)
+        .send({ mode: "delete" });
+
+      expect(res.status).toBe(403);
+      expect(prisma.volunteer.delete).not.toHaveBeenCalled();
     });
   });
 

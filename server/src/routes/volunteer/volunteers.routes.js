@@ -13,9 +13,10 @@ const router = express.Router();
 
 // Profile, government ID and onboarding use authenticate.allowPending: a new
 // volunteer onboards while still Pending, before staff at their shelter
-// approve them. Keep that set to onboarding needs only — availability and
-// every other volunteer route use plain authenticate, which rejects Pending
-// accounts (401).
+// approve them. Keep that set to onboarding needs only — availability,
+// DELETE /volunteers/me and every other volunteer route use plain
+// authenticate, which rejects Pending accounts (401), same as
+// DELETE /vets/me.
 
 /**
  * @swagger
@@ -271,6 +272,57 @@ router.post(
   authorizeRoles(ROLES.VOLUNTEER),
   singleFile("file"),
   volunteersController.uploadGovernmentId,
+);
+
+/**
+ * @swagger
+ * /volunteers/me:
+ *   delete:
+ *     summary: Deactivate or permanently delete your own volunteer account (Volunteer only)
+ *     description: >
+ *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       token cleared); 'delete' permanently removes the Volunteer and Users
+ *       rows and the government ID with its stored file. Either way the
+ *       volunteer comes off events that haven't happened yet. A delete also
+ *       removes their past task and event assignments (the tasks and events
+ *       stay), while appointments they assisted keep existing with the
+ *       volunteer link set to null. Either mode is blocked with 409 while
+ *       the volunteer is assisting an upcoming Scheduled appointment or has
+ *       an In_progress task; staff must reassign them first. Not available
+ *       to Pending volunteers.
+ *     tags: [Volunteers]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [mode]
+ *             properties:
+ *               mode: { type: string, enum: [deactivate, delete] }
+ *     responses:
+ *       200:
+ *         description: Account deactivated or deleted
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       409:
+ *         description: The volunteer still has upcoming appointments or open tasks
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       422:
+ *         description: mode is missing or not one of 'deactivate'/'delete'
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.delete(
+  "/volunteers/me",
+  authenticate,
+  authorizeRoles(ROLES.VOLUNTEER),
+  volunteersController.closeMyAccount,
 );
 
 module.exports = router;

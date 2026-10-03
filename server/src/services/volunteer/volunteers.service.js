@@ -1,4 +1,6 @@
 const prisma = require("../../config/prisma");
+const storage = require("../storage");
+const { nullifyRefreshToken } = require("../auth/auth.service");
 const { ADDRESS_SELECT } = require("../../utils/address");
 const {
   decodeAvailability,
@@ -204,10 +206,100 @@ const completeOnboarding = async (userID) => {
   );
 };
 
+// ——————————————— CLOSE MY ACCOUNT (DELETE /volunteers/me) ———————————————
+// Mirrors vet/vets.service.js's closeMyAccount. Blocked in either mode while
+// the volunteer still has work staff are counting on — an upcoming
+// Scheduled appointment they're assisting, or an In_progress task — so
+// staff reassign it first rather than finding out on the day.
+const openWorkConflict = (reasons) => {
+  const err = new Error(
+    `You have ${reasons.join(" and ")} — ask your shelter's staff to reassign them before closing your account`,
+  );
+  err.code = "CONFLICT";
+  return err;
+};
+
+// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// cleared). 'delete' removes the Volunteer and Users rows (the refresh token
+// goes with Users) plus their government ID and its stored file.
+//
+// Either way, the volunteer comes off events that haven't happened yet —
+// staff assign volunteers to events, and shouldn't be left expecting someone
+// whose account is closed. Past assignments stay as history on deactivate;
+// delete has to remove every VolunteerTask/VolunteerEvent row (both FKs to
+// Volunteer are RESTRICT), so the tasks and events themselves stay and just
+// lose this volunteer. Appointment.volunteerID and
+// VolunteerApplication.volunteerID are ON DELETE SET NULL — that history
+// survives with no volunteer attached.
+const closeMyAccount = async (userID, mode) => {
+  const now = new Date();
+  const [upcomingAppointment, openTask] = await Promise.all([
+    prisma.appointment.findFirst({
+      where: {
+        volunteerID: userID,
+        appointmentStatus: "Scheduled",
+        appointmentDate: { gt: now },
+      },
+      select: { appointmentID: true },
+    }),
+    prisma.task.findFirst({
+      where: {
+        taskStatus: "In_progress",
+        volunteers: { some: { volunteerID: userID } },
+      },
+      select: { taskID: true },
+    }),
+  ]);
+  const reasons = [
+    ...(upcomingAppointment ? ["upcoming appointments"] : []),
+    ...(openTask ? ["open tasks"] : []),
+  ];
+  if (reasons.length > 0) {
+    throw openWorkConflict(reasons);
+  }
+
+  if (mode === "deactivate") {
+    await prisma.$transaction([
+      prisma.volunteerEvent.deleteMany({
+        where: { volunteerID: userID, event: { eventDate: { gt: now } } },
+      }),
+      prisma.volunteer.update({
+        where: { userID },
+        data: { accountStatus: "Deactivated" },
+      }),
+      nullifyRefreshToken(prisma, userID),
+    ]);
+    return;
+  }
+
+  // Capture the government ID's stored file path before the transaction — a
+  // network call has no place inside a DB transaction (same as vets').
+  const governmentId = await prisma.governmentID.findFirst({
+    where: { userID, userType: "Volunteer" },
+    select: { documentURL: true },
+  });
+
+  await prisma.$transaction([
+    prisma.volunteerEvent.deleteMany({ where: { volunteerID: userID } }),
+    prisma.volunteerTask.deleteMany({ where: { volunteerID: userID } }),
+    prisma.governmentID.deleteMany({ where: { userID, userType: "Volunteer" } }),
+    prisma.volunteer.delete({ where: { userID } }),
+    prisma.users.delete({ where: { userID } }),
+  ]);
+
+  if (governmentId?.documentURL) {
+    await storage.deletePrivateFile(
+      storage.GOVERNMENT_IDS_BUCKET,
+      governmentId.documentURL,
+    );
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   updateMyAvailability,
   advanceOnboardingStep,
   completeOnboarding,
+  closeMyAccount,
 };

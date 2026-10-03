@@ -6,7 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import PhoneDisplay from "../../../../../../components/ui/PhoneDisplay";
-import { getDonation } from "../../../../../../logic/api/donationsApi";
+import { FORMER_DONOR, getDonation } from "../../../../../../logic/api/donationsApi";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
 import { formatUSD } from "../../../../../../logic/utils/currency";
 
@@ -65,20 +65,26 @@ const DonationDetailPanel = ({ donationID, onClose }: DonationDetailPanelProps) 
 
           <div className={divider} />
           <h2 className={sectionTitle}>Donor Details</h2>
-          <dl className="mt-2 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
-            <InfoRow k="Name" v={data.donor.donorName} />
-            <InfoRow k="Email" v={data.donor.donorEmail} />
-            <InfoRow
-              k="Phone"
-              v={
-                data.donor.donorPhone ? (
-                  <PhoneDisplay value={data.donor.donorPhone} />
-                ) : (
-                  "—"
-                )
-              }
-            />
-          </dl>
+          {data.donor ? (
+            <dl className="mt-2 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
+              <InfoRow k="Name" v={data.donor.donorName} />
+              <InfoRow k="Email" v={data.donor.donorEmail} />
+              <InfoRow
+                k="Phone"
+                v={
+                  data.donor.donorPhone ? (
+                    <PhoneDisplay value={data.donor.donorPhone} />
+                  ) : (
+                    "—"
+                  )
+                }
+              />
+            </dl>
+          ) : (
+            <p className="mt-2 font-body text-xs text-neutral-gray">
+              {FORMER_DONOR} — this donor has since deleted their account.
+            </p>
+          )}
         </div>
       )}
     </SlideOver>

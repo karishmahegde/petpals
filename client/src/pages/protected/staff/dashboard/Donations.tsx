@@ -12,7 +12,11 @@ import {
   DashboardListRow,
   RowActionButton,
 } from "../../../../components/ui/dashboard/DashboardList";
-import { getDonationStats, getDonations } from "../../../../logic/api/donationsApi";
+import {
+  FORMER_DONOR,
+  getDonationStats,
+  getDonations,
+} from "../../../../logic/api/donationsApi";
 import { formatShortDate } from "../../../../logic/utils/datetime";
 import { formatUSD } from "../../../../logic/utils/currency";
 import DonationDetailPanel from "./sections/donations/DonationDetailPanel";
@@ -165,7 +169,7 @@ const Donations = () => {
             {donations.map((donation) => (
               <li key={donation.donationID}>
                 <DashboardListRow
-                  title={donation.donorName}
+                  title={donation.donorName ?? FORMER_DONOR}
                   lines={[
                     { text: formatShortDate(new Date(donation.donationDate)) },
                     { text: formatUSD(donation.donationAmt), strong: true },

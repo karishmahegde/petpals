@@ -83,4 +83,7 @@ const getEventDetails = async (id) => {
   return event;
 };
 
-module.exports = { getEvents, getEventDetails };
+// LIST_SELECT is also used by volunteer/events.service.js (GET
+// /volunteers/me/events), so a volunteer's events list has the same item
+// shape as the public one.
+module.exports = { getEvents, getEventDetails, LIST_SELECT };

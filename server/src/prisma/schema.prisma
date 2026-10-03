@@ -623,14 +623,25 @@ model Donation {
   //   ALTER TABLE "Donation" ADD COLUMN "donationCode" TEXT
   //     GENERATED ALWAYS AS ('DON-' || lpad("donationID"::text, 5, '0')) STORED;
   //   CREATE UNIQUE INDEX "Donation_donationCode_key" ON "Donation" ("donationCode");
-  donationCode String?  @unique @db.Text
-  donorID      Int
-  shelterID    Int
-  donationDate DateTime @default(now())
-  donationAmt  Float
-  donationDesc String?  @db.VarChar(300)
-  donor        Donor    @relation(fields: [donorID], references: [userID])
-  shelter      Shelter  @relation(fields: [shelterID], references: [shelterID])
+  donationCode            String?  @unique @db.Text
+  // Nullable so a donor can delete their account (DELETE /donors/me)
+  // without erasing the shelter's donation history — set to NULL when the
+  // donor's row goes, same as Appointment.vetID. Every donation still
+  // records who gave it at creation time.
+  donorID                 Int?
+  shelterID               Int
+  donationDate            DateTime @default(now())
+  donationAmt             Float
+  donationDesc            String?  @db.VarChar(300)
+  // Stripe Checkout — set by the webhook that creates the row after payment
+  // (POST /donations/checkout → checkout.session.completed), the same flow
+  // as AdoptionApplication's application fee. Unique, so a replayed webhook
+  // can't record a donation twice. Nullable: donations recorded before
+  // donations went through Stripe have none.
+  stripeCheckoutSessionID String?  @unique @db.VarChar(255)
+  stripePaymentIntentID   String?  @db.VarChar(255)
+  donor                   Donor?   @relation(fields: [donorID], references: [userID], onDelete: SetNull)
+  shelter                 Shelter  @relation(fields: [shelterID], references: [shelterID])
 }
 
 enum role {
