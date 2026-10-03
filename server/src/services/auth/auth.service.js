@@ -37,11 +37,17 @@ const SHELTER_ROLES = new Set(["volunteer", "staff", "vet"]);
 
 // Roles with an onboarding wizard — their session carries
 // onboardingComplete/onboardingStep so the frontend's OnboardingGate can
-// route them. Roles in PENDING_LOGIN_ROLES (Staff, Veterinarian) also carry
-// accountStatus: a Pending account of theirs can log in (to onboard before
-// approval), so the frontend needs to know they're still Pending once
-// onboarding is done.
-const ONBOARDING_ROLES = new Set(["Adopter", "Staff", "Veterinarian"]);
+// route them. Roles in PENDING_LOGIN_ROLES (Staff, Veterinarian, Volunteer)
+// also carry accountStatus: a Pending account of theirs can log in (to
+// onboard before approval), so the frontend needs to know they're still
+// Pending once onboarding is done. Admin is the only role without one.
+const ONBOARDING_ROLES = new Set([
+  "Adopter",
+  "Staff",
+  "Veterinarian",
+  "Volunteer",
+  "Donor",
+]);
 
 // ——————————————— REGISTER ———————————————
 const register = async ({ name, email, password, role, shelterID }) => {
@@ -217,9 +223,10 @@ const login = async ({ email, password }) => {
       err.code = "UNAUTHORIZED";
       throw err;
     }
-    // Pending Staff and Vets are the exception: they log in to complete
-    // onboarding before approval, and authenticate.js only lets them reach
-    // their onboarding endpoints (authenticate.allowPending) until approved.
+    // Pending Staff, Vets and Volunteers are the exception: they log in to
+    // complete onboarding before approval, and authenticate.js only lets them
+    // reach their onboarding endpoints (authenticate.allowPending) until
+    // approved.
     if (roleRecord?.accountStatus === "Pending" && !canLoginPending) {
       // A self-registered Volunteer is approved by staff; an Admin by
       // another Admin. Generic wording since the approver differs by role.

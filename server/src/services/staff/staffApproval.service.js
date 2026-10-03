@@ -1,18 +1,23 @@
 const prisma = require("../../config/prisma");
 
-// A Pending staff member or veterinarian can only be approved (Pending →
-// Active) once they've finished onboarding AND their government ID has been
-// Verified — the approver should know exactly who they're granting access to
-// adopters' personal data and animals' medical records. Shared by every
-// approval path (a Manager's PATCH /staff/me/team/:id/status and
-// PATCH /staff/me/vets/:id/status, and Admin's PATCH /staff/:id/status for
-// Manager sign-ups) so the rule can't drift between them. Declining
+// A Pending staff member, veterinarian or volunteer can only be approved
+// (Pending → Active) once they've finished onboarding AND their government
+// ID has been Verified — the approver should know exactly who they're
+// granting access to adopters' personal data, animals' medical records and
+// the shelter itself. Shared by every approval path (a Manager's PATCH
+// /staff/me/team/:id/status and PATCH /staff/me/vets/:id/status, Admin's
+// PATCH /staff/:id/status for Manager sign-ups, and staff's PATCH
+// /volunteers/:id/status) so the rule can't drift between them. Declining
 // (Pending → Deactivated) never needs it.
 //
 // Every export takes the GovernmentID userType of the people involved.
 
 // Noun used in the CONFLICT message, by userType.
-const NOUNS = { Staff: "staff member", Veterinarian: "veterinarian" };
+const NOUNS = {
+  Staff: "staff member",
+  Veterinarian: "veterinarian",
+  Volunteer: "volunteer",
+};
 
 // userID → verificationStatus of their government ID of this userType (one
 // per user — GovernmentID's @@unique([userID, userType])).

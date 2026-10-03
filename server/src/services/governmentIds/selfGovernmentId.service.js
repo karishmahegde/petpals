@@ -1,10 +1,11 @@
 // Self-service government ID — GET/POST /<role>/me/government-id for every
-// role that submits one (Adopter, Admin, Staff, Veterinarian). One copy of
-// the rules, scoped by userType: same GovernmentID table, same private
-// government-ids bucket, one record per user (@@unique([userID, userType])),
-// a Rejected record can be resubmitted, and idNumber is masked on BOTH the
-// POST and GET responses — never returned in full. Reviewing someone else's
-// ID is a different access pattern and lives in staff/governmentIds.service.js.
+// role that submits one (Adopter, Admin, Staff, Veterinarian, Volunteer).
+// One copy of the rules, scoped by userType: same GovernmentID table, same
+// private government-ids bucket, one record per user
+// (@@unique([userID, userType])), a Rejected record can be resubmitted, and
+// idNumber is masked on BOTH the POST and GET responses — never returned in
+// full. Reviewing someone else's ID is a different access pattern and lives
+// in staff/governmentIds.service.js.
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
@@ -16,6 +17,7 @@ const OWNERS = {
   Admin: { folder: "admin", noun: "admin" },
   Staff: { folder: "staff", noun: "staff member" },
   Veterinarian: { folder: "vet", noun: "veterinarian" },
+  Volunteer: { folder: "volunteer", noun: "volunteer" },
 };
 
 // File extension by accepted MIME type — keeps stored object names sensible.

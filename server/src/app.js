@@ -91,6 +91,13 @@ const staffAppointmentsRouter = require("./routes/staff/appointments.routes");
 app.use("/api/v1", staffAppointmentsRouter);
 const staffGovernmentIdsRouter = require("./routes/staff/governmentIds.routes");
 app.use("/api/v1", staffGovernmentIdsRouter);
+// Volunteer self-service (/volunteers/me…) is mounted BEFORE the staff
+// volunteers router, whose GET /volunteers/:id would otherwise catch
+// /volunteers/me and answer a volunteer with 403.
+const volunteerSelfRouter = require("./routes/volunteer/volunteers.routes");
+app.use("/api/v1", volunteerSelfRouter);
+const volunteerTasksRouter = require("./routes/volunteer/tasks.routes");
+app.use("/api/v1", volunteerTasksRouter);
 const staffVolunteersRouter = require("./routes/staff/volunteers.routes");
 app.use("/api/v1", staffVolunteersRouter);
 const staffTasksRouter = require("./routes/staff/tasks.routes");
