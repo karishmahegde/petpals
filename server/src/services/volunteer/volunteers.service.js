@@ -211,11 +211,15 @@ const completeOnboarding = async (userID) => {
 // the volunteer still has work staff are counting on — an upcoming
 // Scheduled appointment they're assisting, or an In_progress task — so
 // staff reassign it first rather than finding out on the day.
+// `details.blockers` names each reason in a fixed form ("appointments",
+// "tasks") so the client can link to the right tab without parsing the
+// message.
 const openWorkConflict = (reasons) => {
   const err = new Error(
-    `You have ${reasons.join(" and ")} — ask your shelter's staff to reassign them before closing your account`,
+    `You have ${reasons.map((r) => r.label).join(" and ")} — ask your shelter's staff to reassign them before closing your account`,
   );
   err.code = "CONFLICT";
+  err.details = { blockers: reasons.map((r) => r.key) };
   return err;
 };
 
@@ -251,8 +255,8 @@ const closeMyAccount = async (userID, mode) => {
     }),
   ]);
   const reasons = [
-    ...(upcomingAppointment ? ["upcoming appointments"] : []),
-    ...(openTask ? ["open tasks"] : []),
+    ...(upcomingAppointment ? [{ key: "appointments", label: "upcoming appointments" }] : []),
+    ...(openTask ? [{ key: "tasks", label: "open tasks" }] : []),
   ];
   if (reasons.length > 0) {
     throw openWorkConflict(reasons);

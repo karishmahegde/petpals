@@ -16,15 +16,28 @@ const parseOptionalBoolean = (raw, field) => {
   return raw === "true";
 };
 
+// Optional inclusive upper bound (ISO date-time) — the client works out
+// "today" / "next 7 days" in the volunteer's own timezone.
+const parseOptionalDate = (raw, field) => {
+  if (raw === undefined) return undefined;
+  const date = new Date(raw);
+  if (typeof raw !== "string" || Number.isNaN(date.getTime())) {
+    throw badRequest(`${field} must be a valid date`);
+  }
+  return date;
+};
+
 // ——————————————— GET /volunteers/me/events ———————————————
 const listMyShelterEvents = async (req, res, next) => {
   const { page: pageRaw, limit: limitRaw } = req.query;
 
   let upcoming;
   let assigned;
+  let dateTo;
   try {
     upcoming = parseOptionalBoolean(req.query.upcoming, "upcoming");
     assigned = parseOptionalBoolean(req.query.assigned, "assigned");
+    dateTo = parseOptionalDate(req.query.dateTo, "dateTo");
   } catch (err) {
     return next(err);
   }
@@ -49,6 +62,7 @@ const listMyShelterEvents = async (req, res, next) => {
     const result = await eventsService.listMyShelterEvents(req.user.userID, {
       upcoming,
       assigned,
+      dateTo,
       page,
       limit,
     });

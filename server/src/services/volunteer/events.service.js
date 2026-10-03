@@ -10,10 +10,11 @@ const { LIST_SELECT } = require("../public/events.service");
 // have put this volunteer on the event. upcoming: true → not started yet,
 // soonest first; false → already started, most recent first; undefined →
 // every event, soonest first (the same split as the public list).
-// assigned: true → only events the volunteer is on.
+// assigned: true → only events the volunteer is on. dateTo (inclusive)
+// caps eventDate — with upcoming=true that's "between now and dateTo".
 const listMyShelterEvents = async (
   volunteerID,
-  { upcoming, assigned, page = 1, limit = 20 } = {},
+  { upcoming, assigned, dateTo, page = 1, limit = 20 } = {},
 ) => {
   const volunteer = await prisma.volunteer.findUnique({
     where: { userID: volunteerID },
@@ -26,6 +27,9 @@ const listMyShelterEvents = async (
     where.eventDate = { gt: new Date() };
   } else if (upcoming === false) {
     where.eventDate = { lte: new Date() };
+  }
+  if (dateTo) {
+    where.eventDate = { ...where.eventDate, lte: dateTo };
   }
   if (assigned) {
     where.volunteers = { some: { volunteerID } };

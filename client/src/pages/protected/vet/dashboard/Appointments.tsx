@@ -17,7 +17,7 @@ import type {
   AppointmentStatus,
 } from "../../../../logic/api/staffAppointmentsApi";
 import { getMyVetAppointments } from "../../../../logic/api/vetsApi";
-import { formatShortDate, formatTime } from "../../../../logic/utils/datetime";
+import { endOfDayISO, formatShortDate, formatTime } from "../../../../logic/utils/datetime";
 import AppointmentDetailPanel from "./sections/appointments/AppointmentDetailPanel";
 
 const PAGE_SIZE = 20;
@@ -43,14 +43,6 @@ const DAYS_AHEAD: Record<Exclude<DateRange, "all">, number> = {
   today: 0,
   week: 7,
   month: 30,
-};
-
-// End of the local day `days` from today, as ISO.
-const endOfDayISO = (days: number) => {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  date.setHours(23, 59, 59, 999);
-  return date.toISOString();
 };
 
 const searchInputClass =

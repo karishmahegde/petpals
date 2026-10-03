@@ -691,10 +691,10 @@ describe("Volunteer self-service endpoints", () => {
     });
 
     test.each([
-      ["upcoming appointments", { appointmentID: 11 }, null, "You have upcoming appointments — ask your shelter's staff to reassign them before closing your account"],
-      ["open tasks", null, { taskID: 7 }, "You have open tasks — ask your shelter's staff to reassign them before closing your account"],
-      ["both", { appointmentID: 11 }, { taskID: 7 }, "You have upcoming appointments and open tasks — ask your shelter's staff to reassign them before closing your account"],
-    ])("%s → 409 for either mode, nothing written", async (_label, appointment, task, message) => {
+      ["upcoming appointments", { appointmentID: 11 }, null, "You have upcoming appointments — ask your shelter's staff to reassign them before closing your account", ["appointments"]],
+      ["open tasks", null, { taskID: 7 }, "You have open tasks — ask your shelter's staff to reassign them before closing your account", ["tasks"]],
+      ["both", { appointmentID: 11 }, { taskID: 7 }, "You have upcoming appointments and open tasks — ask your shelter's staff to reassign them before closing your account", ["appointments", "tasks"]],
+    ])("%s → 409 for either mode, nothing written", async (_label, appointment, task, message, blockers) => {
       for (const mode of ["deactivate", "delete"]) {
         jest.clearAllMocks();
         prisma.appointment.findFirst.mockResolvedValueOnce(appointment);
@@ -705,6 +705,7 @@ describe("Volunteer self-service endpoints", () => {
         expect(res.status).toBe(409);
         expect(res.body.error.code).toBe("CONFLICT");
         expect(res.body.message).toBe(message);
+        expect(res.body.error.details).toEqual({ blockers });
         expect(prisma.volunteerEvent.deleteMany).not.toHaveBeenCalled();
         expect(prisma.volunteer.update).not.toHaveBeenCalled();
         expect(prisma.volunteer.delete).not.toHaveBeenCalled();

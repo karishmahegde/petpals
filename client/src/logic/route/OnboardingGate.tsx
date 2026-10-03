@@ -1,9 +1,8 @@
 // OnboardingGate.tsx
-// Cross-cutting guard: an Adopter, Staff member or Veterinarian whose
-// onboarding isn't complete is redirected to their current onboarding step
-// for every route
-// they try to access — catalog, dashboard, adoption application, everything
-// — except the wizard itself and /login. Wraps the entire route tree in
+// Cross-cutting guard: an Adopter, Staff member, Veterinarian or Volunteer
+// whose onboarding isn't complete is redirected to their current onboarding
+// step for every route they try to access — catalog, dashboard, adoption
+// application, everything — except the wizard itself and /login. Wraps the entire route tree in
 // App.tsx, so it's the single onboarding-aware code path; no other
 // route/guard needs to know about onboarding state.
 //
@@ -12,9 +11,10 @@
 // which stays blocked until onboarding is genuinely completed — matches the
 // spec's "only once they finish it, it should go to the adopt screen".
 //
-// Staff and Veterinarian: onboarding is mandatory (no skip) and happens
-// BEFORE approval. A Pending staff member or vet who has finished
-// onboarding is held on their role's pending page until they're approved.
+// Staff, Veterinarian and Volunteer: onboarding is mandatory (no skip) and
+// happens BEFORE approval. A Pending staff member, vet or volunteer who has
+// finished onboarding is held on their role's pending page until they're
+// approved.
 // The server enforces the same boundary — a Pending account can only reach
 // its own onboarding endpoints (authenticate.allowPending) — this just
 // keeps the UI on the one page that works for them.
@@ -31,6 +31,7 @@ const BLOCKED_WHEN_SKIPPED_PREFIXES = ["/adopt/apply"];
 const APPROVAL_ROLE_PATHS: Record<string, { onboarding: string; pending: string }> = {
   Staff: { onboarding: "/staff/onboarding", pending: "/staff/pending" },
   Veterinarian: { onboarding: "/vet/onboarding", pending: "/vet/pending" },
+  Volunteer: { onboarding: "/volunteer/onboarding", pending: "/volunteer/pending" },
 };
 
 interface OnboardingGateProps {

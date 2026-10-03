@@ -124,6 +124,20 @@ describe("Volunteer events + appointments", () => {
       expect(args.orderBy).toEqual({ eventDate: "desc" });
     });
 
+    test("upcoming=true + dateTo → between now and dateTo", async () => {
+      prisma.volunteer.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.event.findMany.mockResolvedValueOnce([]);
+      prisma.event.count.mockResolvedValueOnce(0);
+
+      await list({ upcoming: "true", dateTo: "2026-10-10T23:59:59.999Z" });
+
+      const args = prisma.event.findMany.mock.calls[0][0];
+      expect(args.where.eventDate).toEqual({
+        gt: expect.any(Date),
+        lte: new Date("2026-10-10T23:59:59.999Z"),
+      });
+    });
+
     test("assigned=true → only events the volunteer is on; page/limit paginate", async () => {
       prisma.volunteer.findUnique.mockResolvedValueOnce({ shelterID: 9 });
       prisma.event.findMany.mockResolvedValueOnce([]);
@@ -154,6 +168,7 @@ describe("Volunteer events + appointments", () => {
     test.each([
       [{ upcoming: "soon" }, "upcoming"],
       [{ assigned: "yes" }, "assigned"],
+      [{ dateTo: "not-a-date" }, "dateTo"],
       [{ page: 0 }, "page"],
       [{ limit: 500 }, "limit"],
     ])("invalid %j → 400, nothing read", async (query, field) => {

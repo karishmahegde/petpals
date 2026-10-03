@@ -26,6 +26,8 @@ import {
   PiUserList,
   PiIdentificationCard,
   PiSyringe,
+  PiClipboardText,
+  PiConfetti,
 } from "react-icons/pi";
 import { FaUserCircle } from "react-icons/fa";
 import Avatar from "../ui/Avatar";
@@ -138,6 +140,28 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
       label: "Vaccinations",
       to: "/vet/vaccinations",
       icon: PiSyringe,
+    },
+  ],
+  Volunteer: [
+    { type: "link", label: "Overview", to: "/volunteer", icon: PiHouse, end: true },
+    {
+      type: "link",
+      label: "My Tasks",
+      to: "/volunteer/tasks",
+      icon: PiClipboardText,
+    },
+    { type: "link", label: "Events", to: "/volunteer/events", icon: PiConfetti },
+    {
+      type: "link",
+      label: "Appointments",
+      to: "/volunteer/appointments",
+      icon: PiStethoscope,
+    },
+    {
+      type: "link",
+      label: "Availability",
+      to: "/volunteer/availability",
+      icon: PiCalendarCheck,
     },
   ],
   // Full information architecture scaffolded now per product direction — most

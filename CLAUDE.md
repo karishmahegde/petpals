@@ -53,7 +53,7 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 ```
 client/src/
   logic/
-    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), selfGovernmentIdApi (per-role /me/government-id calls)
+    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), volunteersApi (/volunteers/me self-service) vs shelterVolunteersApi (staff's /volunteers), selfGovernmentIdApi (per-role /me/government-id calls)
     route/       ProtectedRoute, RoleRoute
     store/       useAuthStore (Zustand: { user, token, role })
     toast/       shared toast helpers
@@ -78,7 +78,7 @@ client/src/
                    (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
         overview/  *Widget.tsx
         shared/    ApplicationsList, VisitsList
-    protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending: Pending staff/vets wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/
+    protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending, /volunteer/pending: Pending staff/vets/volunteers wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi / volunteerGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/
     protected/staff/
       onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
       dashboard/   DashboardLayout routes + one file per tab
@@ -88,7 +88,11 @@ client/src/
         overview/  StatsWidget + *Widget.tsx (Today's Appointments — useTodaysAppointments merges the upcoming and past halves so earlier-today ones count; Overdue Vaccinations — rows open the pet's passport, View All → Health Records; Shelter Details). Tile and widget share each query
         sections/  appointments/ (AppointmentDetailPanel, EditAppointmentForm, RecordVaccineForm) · vaccinations/ (VaccineFormPanel — Add/Edit Vaccine slide-over)
         shared/    CloseAccountModal (DELETE /vets/me; the 409 upcoming-appointments block is its own panel, not a generic error; success → worker login)
-    (volunteer/ donor/ portals — planned)
+    protected/volunteer/
+      onboarding/  VolunteerOnboardingWizard + steps/   (same 2–5 wizard, /volunteer/onboarding/step/:step; OnboardingGate → wizard, then /volunteer/pending)
+      dashboard/   DashboardRoutes (inside the shared DashboardLayout; sidebar menu = ROLE_NAV.Volunteer) + one file per tab (Overview; Tasks — status + due-date filters, Mark Completed via DashboardActionList; Events — read-only, vet-Appointments layout: Upcoming card with Status (all/assigned) + Event Date (`dateTo` on GET /volunteers/me/events) filters, Past card = events they were on; "Assigned to you" badge, since staff assign volunteers and there's no self sign-up; Appointments — read-only Upcoming/Past cards; Availability — editable AvailabilityGrid, local draft until Save → PUT /volunteers/me/availability; Profile — same as the vet Profile) · shared/ DateBlock, CloseAccountModal (DELETE /volunteers/me; the 409 carries `error.details.blockers` — "appointments"/"tasks" — and the blocked panel links to each; success → home, volunteers aren't workers)
+        overview/  StatsWidget + MyTasks/NextEvents/AppointmentsWidget; overviewQueries.ts holds each query, shared by its tile (pagination.total) and widget. Shelter Details is protected/shared/ShelterDetailsWidget (vet + volunteer)
+    (donor/ portal — planned)
   App.tsx        routes + session restore on mount
 
 server/src/

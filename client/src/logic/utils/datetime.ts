@@ -78,6 +78,15 @@ export const relativeDateBadge = (
   return diffMs <= 7 * 24 * 60 * 60 * 1000 ? "Soon" : "Upcoming";
 };
 
+// End of the local day `days` from today, as ISO — the upper bound for
+// "Today" / "Next 7 days" date filters, worked out in the viewer's timezone.
+export const endOfDayISO = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  date.setHours(23, 59, 59, 999);
+  return date.toISOString();
+};
+
 // Date -> the "YYYY-MM-DDTHH:mm" string an <input type="datetime-local">
 // expects, in the viewer's local time (toISOString() would give UTC).
 export const toDateTimeLocalValue = (date: Date): string => {

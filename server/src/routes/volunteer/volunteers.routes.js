@@ -348,7 +348,9 @@ router.post(
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       409:
- *         description: The volunteer still has upcoming appointments or open tasks
+ *         description: >
+ *           The volunteer still has upcoming appointments or open tasks —
+ *           error.details.blockers lists which ("appointments", "tasks")
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

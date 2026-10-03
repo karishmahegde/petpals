@@ -20,7 +20,9 @@ const router = express.Router();
  *       (only their own assignment is shown, never who else is on it).
  *       upcoming=true → not started yet, soonest first; upcoming=false →
  *       already started, most recent first; omitted → every event, soonest
- *       first. assigned=true → only events the volunteer is on.
+ *       first. assigned=true → only events the volunteer is on. dateTo
+ *       (inclusive) caps the event date — with upcoming=true, events
+ *       between now and dateTo.
  *     tags: [Events, Volunteers]
  *     security:
  *       - bearerAuth: []
@@ -31,6 +33,9 @@ const router = express.Router();
  *       - in: query
  *         name: assigned
  *         schema: { type: string, enum: ["true", "false"] }
+ *       - in: query
+ *         name: dateTo
+ *         schema: { type: string, format: date-time }
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }

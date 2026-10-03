@@ -1,9 +1,9 @@
-// Approving a Pending staff member or veterinarian needs BOTH onboarding
-// complete and a Verified government ID — the server enforces it
+// Approving a Pending staff member, veterinarian or volunteer needs BOTH
+// onboarding complete and a Verified government ID — the server enforces it
 // (services/staff/staffApproval.service.js, 409 otherwise); these helpers
 // just describe it the same way on every screen that shows it (the
-// Manager's Staff and Vets tabs, Admin's Staff Approval panel, and the
-// staff member's own "awaiting approval" screen).
+// Manager's Staff and Vets tabs, the Volunteers tab, Admin's Staff Approval
+// panel, and the "awaiting approval" screen).
 import type { GovernmentIdStatus } from "../api/staffApi";
 
 interface ApprovalFacts {

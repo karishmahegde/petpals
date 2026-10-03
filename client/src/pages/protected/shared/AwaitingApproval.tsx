@@ -1,8 +1,8 @@
 // AwaitingApproval.tsx
-// Route element for /staff/pending and /vet/pending (ProtectedRoute +
-// RoleRoute for that role). Where a new staff member or vet waits after
-// finishing onboarding, until they're approved — OnboardingGate sends every
-// other route here while their account is still Pending. Shows what
+// Route element for /staff/pending, /vet/pending and /volunteer/pending
+// (ProtectedRoute + RoleRoute for that role). Where a new staff member, vet
+// or volunteer waits after finishing onboarding, until they're approved —
+// OnboardingGate sends every other route here while their account is still Pending. Shows what
 // approval is waiting on (their ID's verification, then the approver's
 // decision) and re-checks their account in the background: once approved,
 // it moves straight to their dashboard. A declined sign-up is Deactivated,
@@ -30,6 +30,11 @@ import {
   vetGovernmentIdApi,
   type VetSelfProfile,
 } from "../../../logic/api/vetsApi";
+import {
+  getMyVolunteerProfile,
+  volunteerGovernmentIdApi,
+  type VolunteerSelfProfile,
+} from "../../../logic/api/volunteersApi";
 import type { SelfGovernmentIdApi } from "../../../logic/api/selfGovernmentIdApi";
 import useAuthStore from "../../../logic/store/useAuthStore";
 
@@ -37,7 +42,7 @@ import useAuthStore from "../../../logic/store/useAuthStore";
 // re-checks whenever the window regains focus).
 const RECHECK_MS = 30_000;
 
-type PendingRole = "Staff" | "Veterinarian";
+type PendingRole = "Staff" | "Veterinarian" | "Volunteer";
 
 // What this page needs from either role's profile.
 interface PendingSummary {
@@ -96,6 +101,23 @@ const ROLE_CONFIG: Record<
     dashboardPath: "/vet",
     welcome: "You're approved — welcome to the team!",
     governmentIdApi: vetGovernmentIdApi,
+  },
+  Volunteer: {
+    profileKey: ["volunteer", "me"],
+    fetchProfile: getMyVolunteerProfile,
+    summarize: (profile) => {
+      const volunteer = profile as VolunteerSelfProfile;
+      return {
+        accountStatus: volunteer.accountStatus,
+        firstName: volunteer.volunteerName.split(" ")[0],
+        shelterName: volunteer.shelter?.shelterName ?? null,
+        // Any staff member at the shelter can approve a volunteer.
+        approver: "Your shelter's staff",
+      };
+    },
+    dashboardPath: "/volunteer",
+    welcome: "You're approved — thank you for volunteering!",
+    governmentIdApi: volunteerGovernmentIdApi,
   },
 };
 
