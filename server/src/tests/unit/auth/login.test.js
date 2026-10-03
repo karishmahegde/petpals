@@ -199,6 +199,25 @@ describe("Login and session restore", () => {
       expect(res.status).toBe(401);
     });
 
+    // Only Staff and Veterinarian are in PENDING_LOGIN_ROLES — every other
+    // role's Pending account is still refused, and never gets a session.
+    test.each(["Volunteer", "Admin"])(
+      "Pending %s → still 401, no session issued",
+      async (role) => {
+        mockAccount(role, { accountStatus: "Pending" });
+
+        const res = await login();
+
+        expect(res.status).toBe(401);
+        expect(res.body.error.code).toBe("UNAUTHORIZED");
+        expect(res.body.message).toBe(
+          "This account is pending approval and can't log in yet.",
+        );
+        expect(res.headers["set-cookie"]).toBeUndefined();
+        expect(prisma.users.update).not.toHaveBeenCalled();
+      },
+    );
+
     test("Volunteer (Active) → neither onboarding fields nor accountStatus", async () => {
       mockAccount("Volunteer", { accountStatus: "Active" });
 

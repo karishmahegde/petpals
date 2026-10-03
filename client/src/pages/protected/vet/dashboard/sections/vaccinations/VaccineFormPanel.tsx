@@ -113,7 +113,7 @@ const VaccineFormPanel = ({ open, onClose, vaccine }: VaccineFormPanelProps) => 
         </ButtonElement>
       }
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 p-6 pt-2">
         <div>
           <label htmlFor="vaccine-name" className={labelClass}>
             Vaccine Name

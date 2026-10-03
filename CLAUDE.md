@@ -1,6 +1,6 @@
 # PetPals — Animal Adoption Management System
 
-Multi-shelter pet adoption platform (solo full-stack learning project). Unifies animal listings, adoption workflows, and medical records across every branch of a shelter organisation. Differentiators: (1) network-wide search & workflows, (2) universal health passport that travels with an animal across inter-shelter transfers, (3) AI pet–adopter compatibility matcher (OpenAI, Sprint 6).
+Multi-shelter pet adoption platform (solo full-stack learning project). Unifies animal listings, adoption workflows, and medical records across every branch of a shelter organisation. Differentiators: (1) network-wide search & workflows, (2) universal health passport that travels with an animal across inter-shelter transfers, (3) AI pet–adopter compatibility matcher (OpenAI, planned — Sprint 7).
 
 **Roles:** Admin (org oversight, shelters, analytics) · Shelter Staff (pets, applications, volunteers, events, donations) · Adopter (browse, apply, schedule visits, track status) · Veterinarian (appointments, vaccinations, health passport) · Volunteer (assigned tasks) · Donor (donations + history).
 
@@ -53,7 +53,7 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 ```
 client/src/
   logic/
-    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me), selfGovernmentIdApi (per-role /me/government-id calls)
+    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), selfGovernmentIdApi (per-role /me/government-id calls)
     route/       ProtectedRoute, RoleRoute
     store/       useAuthStore (Zustand: { user, token, role })
     toast/       shared toast helpers
@@ -78,19 +78,21 @@ client/src/
                    (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
         overview/  *Widget.tsx
         shared/    ApplicationsList, VisitsList
-    protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending: Pending staff/vets wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport) · idVerification/
+    protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending: Pending staff/vets wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/
     protected/staff/
       onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
       dashboard/   DashboardLayout routes + one file per tab
     protected/vet/
       onboarding/  VetOnboardingWizard + steps/   (same 2–5 wizard as staff, /vet/onboarding/step/:step; OnboardingGate routes Pending vets here, then to /vet/pending)
-      dashboard/   DashboardRoutes (inside the shared components/layout/DashboardLayout; sidebar menu = ROLE_NAV.Veterinarian) + one file per tab (Overview, Appointments, Health Records, Vaccinations, Profile)
-        overview/  StatsWidget + *Widget.tsx (Today's Appointments — useTodaysAppointments merges the upcoming and past halves so earlier-today ones count; Overdue Vaccinations; Shelter Details). Tile and widget share each query
-    (volunteer/ donor/ — planned)
+      dashboard/   DashboardRoutes (inside the shared components/layout/DashboardLayout; sidebar menu = ROLE_NAV.Veterinarian) + one file per tab (Overview, Appointments, HealthRecords, Vaccinations, Profile)
+        overview/  StatsWidget + *Widget.tsx (Today's Appointments — useTodaysAppointments merges the upcoming and past halves so earlier-today ones count; Overdue Vaccinations — rows open the pet's passport, View All → Health Records; Shelter Details). Tile and widget share each query
+        sections/  appointments/ (AppointmentDetailPanel, EditAppointmentForm, RecordVaccineForm) · vaccinations/ (VaccineFormPanel — Add/Edit Vaccine slide-over)
+        shared/    CloseAccountModal (DELETE /vets/me; the 409 upcoming-appointments block is its own panel, not a generic error; success → worker login)
+    (volunteer/ donor/ portals — planned)
   App.tsx        routes + session restore on mount
 
 server/src/
-  routes/ controllers/ services/   grouped auth/ public/ adopter/ — one <domain>.<layer>.js per file
+  routes/ controllers/ services/   grouped auth/ public/ adopter/ staff/ admin/ vet/ webhooks/ — one <domain>.<layer>.js per file
   middleware/   authenticate, authorizeRoles, errorHandler, upload
   services/geocoding/   index.js is the ONLY import; usPostalCodeGeocoder.js the only US-aware file
   services/storage/     index.js is the ONLY import (Supabase Storage)
@@ -98,7 +100,7 @@ server/src/
   utils/        errors.js, response.js
   config/prisma.js   singleton Prisma client (PrismaPg adapter)
   prisma/       schema.prisma, seed.js
-  tests/        unit/ integration/
+  tests/        unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys)
   app.js / index.js
 ```
 
@@ -146,11 +148,11 @@ Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.ap
 | PATCH | `/adoption-applications/:id/status` | `{ status: "Withdrawn" }` — adopter, from `Pending`/`Accepted`; fee non-refundable, re-apply OK. Staff transitions TBD |
 | GET / POST | `/adopters/me/visits` · `/visits` | `?upcoming=true` |
 | PATCH | `/visits/:id` | `{ visitStatus: "Cancelled" }` — adopter, future non-closed visits. Staff confirm/complete TBD |
-| GET | `/adopters/me/appointments` | `?upcoming=true`; vet appointments for pets the adopter has an **Accepted** application for. Vet CRUD is Sprint 5 |
+| GET | `/adopters/me/appointments` | `?upcoming=true`; vet appointments for pets the adopter has an **Accepted** application for |
 | GET | `/adopters/me/favorites` · `/adopters/me/adopted-pets` | favorites = full pet-detail shape; adopted-pets = `PetCard` shape |
 | GET / POST | `/adopters/me/government-id` | ID-doc upload → `government-ids` bucket |
 
-### Vet portal (Sprint 6 — in progress)
+### Vet portal (Sprint 6 ✅)
 
 | Method | Endpoint | Notes |
 | --- | --- | --- |
@@ -170,7 +172,7 @@ Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.ap
 
 ### Domains not yet built
 
-Staff `/staff` · Appointments (vet CRUD) `/appointments` · Tasks `/tasks` · Events `/events` · Donors `/donors` · Donations `/donations` · Transfers `/transfers`.
+Volunteer portal (volunteer self-service — staff-side `/volunteers` and `/tasks` exist) · Donor portal `/donors` (staff-side `/donations` exists) · AI compatibility matcher.
 
 ---
 
@@ -186,7 +188,7 @@ Public catalog (`/adopt`), six independent filters. Full ref: `docs/09-Filter_Sy
 
 ---
 
-## Adopter Portal (Sprint 3 — in progress)
+## Adopter Portal (Sprint 3 ✅)
 
 **PetDetailsModal** (`components/ui/pets/`) — opens over `/adopt` via card click or `?petID=X` deep link. `openId` + URL-reading logic live in the *page* (`PetCatalog.tsx`, or `Overview.tsx` for the dashboard widgets), never in `PetCatalogCard` — the card takes `openId` + `onKnowMore(petID)` props (it's reused on `/adopt`, Home Featured Pets, and dashboard `PetsWidget`/`FavoritesWidget`). "Adopt" button: not logged in → `/login?redirect=/adopt/apply/:petID`; Adopter + pet `available` → `/adopt/apply/:petID`; otherwise the modal closes + a toast (same copy as the `/login` non-adopter toast).
 
@@ -206,6 +208,14 @@ Public catalog (`/adopt`), six independent filters. Full ref: `docs/09-Filter_Sy
 Appointments has no destructive action, so `AppointmentsWidget` uses `DashboardListRow` directly.
 
 Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`: Pending → "Under Consideration", Accepted → "Approved", Rejected → "Declined".
+
+---
+
+## Vet Portal (Sprint 6 ✅)
+
+Tabs under `/vet/*`: **Overview** · **Appointments** (queue + `AppointmentDetailPanel`: edit date/reason, record doses, complete with notes) · **Health Records** (pets at the vet's shelter via `GET /vets/me/pets` — pet-name search + the shared `PetsFilterBar`; every filter and the search are in the `queryKey`; rows → View Health Passport) · **Vaccinations** (the network-wide vaccine catalogue — search, Add/Edit via `VaccineFormPanel`; saving invalidates every `["vaccines"]` query so the appointment dose picker updates) · **Profile** (same layout as the Staff profile; edit mode uses the onboarding `PersonalFields` + `AddressFields` and the same required-field/ZIP validation as the wizard; government ID via the shared `GovernmentIdSection`; Close account → `vet/dashboard/shared/CloseAccountModal`).
+
+**Health passport** (`protected/shared/HealthPassport.tsx`) is one component for Staff and Vet. Read-only for Staff; a vet also gets **Add Record** (`POST /pets/:id/health-records`). Doses are only recorded against an appointment (no standalone dose endpoint), so the passport has no Record Vaccination button. Summarize with AI is a disabled placeholder until the matcher sprint. Editing a vet's own notes isn't wired in the UI — the passport payload doesn't carry the author's `vetID` yet.
 
 ---
 
@@ -241,12 +251,15 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 | --- | --- | --- |
 | 1 | Auth + project setup | ✅ |
 | 2 | Public portal — catalog, filter system, Home, PetDetailsModal | ✅ |
-| 3 | Adopter portal — profile, dashboard, application flow + withdraw, visits (list + cancel), appointments (read-only), favorites, /login redirect-back | 🚧 |
-| 4 | Shelter staff + admin operations | — |
-| 5 | Vet, volunteer, donor flows (incl. vet-managed appointments/vaccinations) | — |
-| 6 | AI compatibility matcher (OpenAI API) | — |
-| 7 | Testing to 70% + cleanup (remove TokenDenylist → RefreshTokens table) | — |
-| 8 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
+| 3 | Adopter portal — profile, dashboard, application flow + withdraw, visits (list + cancel), appointments (read-only), favorites, /login redirect-back | ✅ |
+| 4 | Admin operations — shelters, admins, staff oversight, adopters, analytics | ✅ |
+| 5.1 | Shelter staff operations — pet management, adoption application review, staff profile | ✅ |
+| 5.2 | Shelter staff operations — appointments, visits, transfers, events, volunteers + tasks, donations, species/breeds, team + vet approval, government ID review, staff onboarding before approval | ✅ |
+| 6 | Veterinarian portal — onboarding before approval, appointment queue + completion, vaccinations + vaccine catalogue, health records, universal health passport, profile/close account | ✅ |
+| 7 | AI compatibility matcher (OpenAI API) | — |
+| 8 | Volunteer + donor portals | — |
+| 9 | Testing to 70% + cleanup (remove TokenDenylist → RefreshTokens table) | — |
+| 10 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
 
 ---
 
