@@ -22,7 +22,7 @@ import {
   type PetAdoptionStatus,
 } from "../../../../../../logic/api/staffPetsApi";
 import { PET_STATUS_META } from "../../../../../../logic/staff/petStatus";
-import PetsFilterBar, { type PetsCatalogFilters } from "./PetsFilterBar";
+import PetsFilterBar, { type PetsCatalogFilters } from "../../../../shared/PetsFilterBar";
 
 const PAGE_SIZE = 20;
 

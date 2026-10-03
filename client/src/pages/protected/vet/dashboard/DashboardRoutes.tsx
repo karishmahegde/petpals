@@ -7,8 +7,7 @@ import Profile from "./Profile";
 import HealthPassport from "../../shared/HealthPassport";
 
 // Renders the vet dashboard section that matches the current /vet/* route
-// (driven by the sidebar nav in DashboardSidebar.tsx). Health Records,
-// Vaccinations and Profile are placeholders until their own cards build
+// (driven by the sidebar nav in DashboardSidebar.tsx).
 // them.
 const DashboardRoutes = () => (
   <Routes>

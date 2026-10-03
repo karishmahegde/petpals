@@ -46,7 +46,7 @@ const RecordVaccineForm = ({
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const vaccinesQuery = useQuery({ queryKey: ["vaccines"], queryFn: getVaccines });
+  const vaccinesQuery = useQuery({ queryKey: ["vaccines"], queryFn: () => getVaccines() });
 
   // When the dose counts as given — see the header note.
   const administeredAt = () => {

@@ -2,7 +2,7 @@
 // "Overdue Vaccinations" on the vet Overview — pets at the vet's shelter
 // whose latest dose of a vaccine is past due (GET
 // /vets/me/vaccinations/overdue), most overdue first. Each opens the pet's
-// health passport; "View All" goes to the Vaccinations tab.
+// health passport; "View All" goes to the Health Records tab.
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { OverviewWidgetCard } from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
@@ -23,7 +23,7 @@ const OverdueVaccinationsWidget = () => {
     <OverviewWidgetCard
       icon="💉"
       title="Overdue Vaccinations"
-      action={{ label: "View All", to: "/vet/vaccinations" }}
+      action={{ label: "View All", to: "/vet/health-records" }}
       className="min-h-[420px]"
       isLoading={isLoading}
       isEmpty={overdue.length === 0}

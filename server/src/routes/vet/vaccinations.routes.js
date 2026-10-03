@@ -1,4 +1,5 @@
-// What it does: Defines the vaccine catalog (GET /vaccines) and the doses
+// What it does: Defines the vaccine catalog (GET/POST /vaccines, PUT
+// /vaccines/:id — writes are Veterinarian and Admin) and the doses
 // given at an appointment (GET/POST /appointments/:id/vaccinations) —
 // mounted at /api/v1 in app.js. Recording a dose is the appointment's
 // assigned vet's; reading them is open to that vet, Staff at the
@@ -19,6 +20,11 @@ const WORKER_ROLES = [ROLES.ADMIN, ROLES.STAFF, ROLES.VETERINARIAN];
  *     tags: [Vaccines, Vets]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema: { type: string }
+ *         description: Case-insensitive contains match on vaccineName
  *     responses:
  *       200:
  *         description: Every vaccine, by vaccineName
@@ -46,6 +52,97 @@ router.get(
   authenticate,
   authorizeRoles(...WORKER_ROLES),
   vaccinationsController.listVaccines,
+);
+
+/**
+ * @swagger
+ * /vaccines:
+ *   post:
+ *     summary: Add a vaccine to the network-wide catalog (Veterinarian, Admin)
+ *     description: >
+ *       The same vaccineName from the same manufacturer (case-insensitive)
+ *       is a 409.
+ *     tags: [Vaccines, Vets]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [vaccineName]
+ *             properties:
+ *               vaccineName: { type: string, maxLength: 45 }
+ *               manufacturer: { type: string, maxLength: 45, nullable: true }
+ *               vaccineDesc: { type: string, maxLength: 500, nullable: true }
+ *     responses:
+ *       201:
+ *         description: The created vaccine (same shape as a GET /vaccines item)
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       409: { $ref: '#/components/responses/Conflict' }
+ *       422:
+ *         description: A field is longer than its column allows
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.post(
+  "/vaccines",
+  authenticate,
+  authorizeRoles(ROLES.ADMIN, ROLES.VETERINARIAN),
+  vaccinationsController.createVaccine,
+);
+
+/**
+ * @swagger
+ * /vaccines/{id}:
+ *   put:
+ *     summary: Edit a catalog vaccine (Veterinarian, Admin)
+ *     description: >
+ *       Partial — send any of the three fields; "" or null clears
+ *       manufacturer/vaccineDesc. Doses already given keep pointing at this
+ *       vaccine, so changes show on every passport. Same 409 duplicate rule
+ *       as POST.
+ *     tags: [Vaccines, Vets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               vaccineName: { type: string, maxLength: 45 }
+ *               manufacturer: { type: string, maxLength: 45, nullable: true }
+ *               vaccineDesc: { type: string, maxLength: 500, nullable: true }
+ *     responses:
+ *       200:
+ *         description: The updated vaccine
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409: { $ref: '#/components/responses/Conflict' }
+ *       422:
+ *         description: A field is longer than its column allows
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.put(
+  "/vaccines/:id",
+  authenticate,
+  authorizeRoles(ROLES.ADMIN, ROLES.VETERINARIAN),
+  vaccinationsController.updateVaccine,
 );
 
 /**

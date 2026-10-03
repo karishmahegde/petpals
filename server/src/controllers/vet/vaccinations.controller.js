@@ -32,10 +32,85 @@ const parseDate = (value, field) => {
 const actorOf = (req) => ({ role: req.user.role, userID: req.user.userID });
 
 // ——————————————— GET /vaccines ———————————————
+// Optional ?name= — open/free-text, so unmatched just means zero rows.
 const listVaccines = async (req, res, next) => {
   try {
-    const vaccines = await vaccinationsService.listVaccines();
+    const name =
+      typeof req.query.name === "string" ? req.query.name.trim() : "";
+    const vaccines = await vaccinationsService.listVaccines({
+      name: name || undefined,
+    });
     return successResponse(res, "Vaccines retrieved successfully", vaccines);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// schema.prisma: Vaccine.vaccineName/manufacturer VarChar(45), vaccineDesc
+// VarChar(500). vaccineName is required; the other two are optional, and
+// "" or null clears them.
+const VACCINE_FIELDS = {
+  vaccineName: { max: 45, required: true },
+  manufacturer: { max: 45, required: false },
+  vaccineDesc: { max: 500, required: false },
+};
+
+// Picks and validates the vaccine fields present in the body (all of them
+// when `partial` is false). Wrong types are 400; too long is 422.
+const parseVaccineFields = (rawBody, { partial }) => {
+  const body = rawBody && typeof rawBody === "object" ? rawBody : {};
+  const fields = {};
+
+  Object.entries(VACCINE_FIELDS).forEach(([key, { max, required }]) => {
+    if (partial && !(key in body)) return;
+    const raw = body[key];
+
+    if (raw === undefined || raw === null || raw === "") {
+      if (required) throw badRequest(`${key} is required`);
+      fields[key] = null;
+      return;
+    }
+    if (typeof raw !== "string") {
+      throw badRequest(`${key} must be a string`);
+    }
+    const value = raw.trim();
+    if (!value) {
+      if (required) throw badRequest(`${key} is required`);
+      fields[key] = null;
+      return;
+    }
+    if (value.length > max) {
+      throw validationError(`${key} must be at most ${max} characters`);
+    }
+    fields[key] = value;
+  });
+
+  if (partial && Object.keys(fields).length === 0) {
+    throw badRequest(
+      "Send at least one of vaccineName, manufacturer, vaccineDesc",
+    );
+  }
+  return fields;
+};
+
+// ——————————————— POST /vaccines ———————————————
+const createVaccine = async (req, res, next) => {
+  try {
+    const fields = parseVaccineFields(req.body, { partial: false });
+    const vaccine = await vaccinationsService.createVaccine(fields);
+    return successResponse(res, "Vaccine created successfully", vaccine, 201);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— PUT /vaccines/:id ———————————————
+const updateVaccine = async (req, res, next) => {
+  try {
+    const vaccineID = parseId(req.params.id, "id");
+    const fields = parseVaccineFields(req.body, { partial: true });
+    const vaccine = await vaccinationsService.updateVaccine(vaccineID, fields);
+    return successResponse(res, "Vaccine updated successfully", vaccine);
   } catch (err) {
     return next(err);
   }
@@ -89,4 +164,10 @@ const recordVaccination = async (req, res, next) => {
   }
 };
 
-module.exports = { listVaccines, listAppointmentVaccinations, recordVaccination };
+module.exports = {
+  listVaccines,
+  createVaccine,
+  updateVaccine,
+  listAppointmentVaccinations,
+  recordVaccination,
+};

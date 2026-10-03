@@ -13,6 +13,7 @@ import type {
 } from "./staffAppointmentsApi";
 import type {
   HealthPassportData,
+  HealthRecordItem,
   PaginatedStaffPets,
   PetAdoptionStatus,
 } from "./staffPetsApi";
@@ -202,6 +203,18 @@ export const getMyVetPetHealthPassport = async (
   petID: number,
 ): Promise<HealthPassportData> => {
   const response = await axiosInstance.get(`/vets/me/pets/${petID}/health-passport`);
+  return response.data.data;
+};
+
+// A standalone health note (POST /pets/:id/health-records), written by the
+// caller. recordDesc ≤500 chars; 403 if the pet isn't at the vet's shelter.
+export const createMyVetHealthRecord = async (
+  petID: number,
+  recordDesc: string,
+): Promise<HealthRecordItem> => {
+  const response = await axiosInstance.post(`/pets/${petID}/health-records`, {
+    recordDesc,
+  });
   return response.data.data;
 };
 

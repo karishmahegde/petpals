@@ -27,12 +27,68 @@ const conflict = (message) => {
   return err;
 };
 
-// ——————————————— CATALOG (GET /vaccines) ———————————————
-const listVaccines = () =>
+// ——————————————— CATALOG (GET/POST /vaccines, PUT /vaccines/:id) ———————————————
+// One network-wide catalog (Vaccine has no shelter). name narrows to a
+// case-insensitive contains match on vaccineName.
+const VACCINE_SELECT = {
+  vaccineID: true,
+  vaccineName: true,
+  manufacturer: true,
+  vaccineDesc: true,
+};
+
+const listVaccines = ({ name } = {}) =>
   prisma.vaccine.findMany({
-    select: { vaccineID: true, vaccineName: true, manufacturer: true, vaccineDesc: true },
+    where: name ? { vaccineName: { contains: name, mode: "insensitive" } } : {},
+    select: VACCINE_SELECT,
     orderBy: { vaccineName: "asc" },
   });
+
+// The same vaccine name from the same manufacturer (both case-insensitive,
+// a missing manufacturer matching only another missing one) is a 409 — two
+// catalog rows nobody could tell apart in the record-dose picker.
+const assertNotDuplicate = async ({ vaccineName, manufacturer }, exceptID) => {
+  const existing = await prisma.vaccine.findFirst({
+    where: {
+      vaccineName: { equals: vaccineName, mode: "insensitive" },
+      manufacturer: manufacturer
+        ? { equals: manufacturer, mode: "insensitive" }
+        : null,
+      ...(exceptID ? { NOT: { vaccineID: exceptID } } : {}),
+    },
+    select: { vaccineID: true },
+  });
+  if (existing) {
+    throw conflict(
+      `${vaccineName}${manufacturer ? ` (${manufacturer})` : ""} is already in the vaccine catalog`,
+    );
+  }
+};
+
+const createVaccine = async (fields) => {
+  await assertNotDuplicate(fields);
+  return prisma.vaccine.create({ data: fields, select: VACCINE_SELECT });
+};
+
+// Partial — only the fields sent change. Doses already given keep pointing
+// at this row, so a rename shows on every passport.
+const updateVaccine = async (vaccineID, fields) => {
+  const existing = await prisma.vaccine.findUnique({
+    where: { vaccineID },
+    select: VACCINE_SELECT,
+  });
+  if (!existing) {
+    throw notFound(`No vaccine exists with ID ${vaccineID}`);
+  }
+  if ("vaccineName" in fields || "manufacturer" in fields) {
+    await assertNotDuplicate({ ...existing, ...fields }, vaccineID);
+  }
+  return prisma.vaccine.update({
+    where: { vaccineID },
+    data: fields,
+    select: VACCINE_SELECT,
+  });
+};
 
 const DOSE_SELECT = {
   recordID: true,
@@ -135,4 +191,10 @@ const recordVaccination = async (vetID, appointmentID, { vaccineID, administered
   return formatDose(record);
 };
 
-module.exports = { listVaccines, listAppointmentVaccinations, recordVaccination };
+module.exports = {
+  listVaccines,
+  createVaccine,
+  updateVaccine,
+  listAppointmentVaccinations,
+  recordVaccination,
+};
