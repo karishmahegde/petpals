@@ -30,7 +30,8 @@ import VetDashboardRoutes from "./pages/protected/vet/dashboard/DashboardRoutes"
 import VetOnboardingWizard from "./pages/protected/vet/onboarding/VetOnboardingWizard";
 import VolunteerOnboardingWizard from "./pages/protected/volunteer/onboarding/VolunteerOnboardingWizard";
 import VolunteerDashboardRoutes from "./pages/protected/volunteer/dashboard/DashboardRoutes";
-import DonorDashboard from "./pages/protected/donor/DonorDashboard";
+import DonorDashboardRoutes from "./pages/protected/donor/dashboard/DashboardRoutes";
+import DonorOnboardingWizard from "./pages/protected/donor/onboarding/DonorOnboardingWizard";
 import AdminDashboardRoutes from "./pages/protected/admin/dashboard/DashboardRoutes";
 import { refreshToken } from "./logic/api/authApi";
 import useAuthStore from "./logic/store/useAuthStore";
@@ -238,12 +239,26 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+        {/* Donor onboarding — skippable, like the adopter wizard (see
+            OnboardingGate). More specific than /donor/* so it matches first. */}
         <Route
-          path="/donor"
+          path="/donor/onboarding/step/:step"
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Donor"]}>
-                <DonorDashboard />
+                <DonorOnboardingWizard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor/*"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Donor"]}>
+                <DashboardLayout>
+                  <DonorDashboardRoutes />
+                </DashboardLayout>
               </RoleRoute>
             </ProtectedRoute>
           }

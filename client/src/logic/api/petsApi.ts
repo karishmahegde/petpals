@@ -121,6 +121,15 @@ export const getSheltersWithManager = async (): Promise<Shelter[]> => {
   return response.data.data;
 };
 
+// Open and Full shelters — every one that can take a donation (only a
+// Closed shelter can't). The donor's Donate picker.
+export const getSheltersAcceptingDonations = async (): Promise<Shelter[]> => {
+  const response = await axiosInstance.get("/shelters", {
+    params: { acceptingDonations: true },
+  });
+  return response.data.data;
+};
+
 export interface NearbySearchLocation {
   lat?: number;
   lng?: number;

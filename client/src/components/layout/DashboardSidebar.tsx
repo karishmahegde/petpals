@@ -164,6 +164,16 @@ const ROLE_NAV: Record<string, NavEntry[]> = {
       icon: PiCalendarCheck,
     },
   ],
+  Donor: [
+    { type: "link", label: "Overview", to: "/donor", icon: PiHouse, end: true },
+    { type: "link", label: "Donate", to: "/donor/donate", icon: PiHandCoins },
+    {
+      type: "link",
+      label: "Donation History",
+      to: "/donor/history",
+      icon: PiFileText,
+    },
+  ],
   // Full information architecture scaffolded now per product direction — most
   // sub-pages are placeholders until their own sprint builds real content
   // (see each page's own file). Only "Overview" here doubles as the index

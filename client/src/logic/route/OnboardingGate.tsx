@@ -1,15 +1,18 @@
 // OnboardingGate.tsx
-// Cross-cutting guard: an Adopter, Staff member, Veterinarian or Volunteer
-// whose onboarding isn't complete is redirected to their current onboarding
-// step for every route they try to access — catalog, dashboard, adoption
-// application, everything — except the wizard itself and /login. Wraps the entire route tree in
-// App.tsx, so it's the single onboarding-aware code path; no other
+// Cross-cutting guard: an Adopter, Donor, Staff member, Veterinarian or
+// Volunteer whose onboarding isn't complete is redirected to their current
+// onboarding step for every route they try to access — catalog, dashboard,
+// adoption application, everything — except the wizard itself and /login.
+// Wraps the entire route tree in App.tsx, so it's the single onboarding-aware code path; no other
 // route/guard needs to know about onboarding state.
 //
-// Adopter: "Skip for now" (see OnboardingWizard.tsx) sets a sessionStorage
-// flag that lifts this gate everywhere EXCEPT the adopt-application flow,
-// which stays blocked until onboarding is genuinely completed — matches the
-// spec's "only once they finish it, it should go to the adopt screen".
+// Adopter and Donor: "Skip for now" (OnboardingWizard.tsx,
+// DonorOnboardingWizard.tsx) sets a sessionStorage flag that lifts this
+// gate for the session — for an adopter everywhere EXCEPT the
+// adopt-application flow, which stays blocked until onboarding is genuinely
+// completed (the spec's "only once they finish it, it should go to the
+// adopt screen"). A donor's skip lifts it everywhere: donating never waits
+// on onboarding.
 //
 // Staff, Veterinarian and Volunteer: onboarding is mandatory (no skip) and
 // happens BEFORE approval. A Pending staff member, vet or volunteer who has
@@ -23,9 +26,12 @@ import { Navigate, useLocation } from "react-router-dom";
 import useAuthStore from "../../logic/store/useAuthStore";
 import { isOnboardingSkipped } from "../../logic/onboardingSkip";
 
-const ALWAYS_EXEMPT_PREFIXES = ["/onboarding", "/login"];
-// Still gated even when onboarding was skipped for this session.
-const BLOCKED_WHEN_SKIPPED_PREFIXES = ["/adopt/apply"];
+// Roles with a skippable wizard → its path, and the routes still gated
+// even when onboarding was skipped for this session.
+const SKIPPABLE_ROLE_PATHS: Record<string, { onboarding: string; blockedWhenSkipped: string[] }> = {
+  Adopter: { onboarding: "/onboarding", blockedWhenSkipped: ["/adopt/apply"] },
+  Donor: { onboarding: "/donor/onboarding", blockedWhenSkipped: [] },
+};
 
 // Roles that onboard before approval → their wizard and pending page.
 const APPROVAL_ROLE_PATHS: Record<string, { onboarding: string; pending: string }> = {
@@ -64,19 +70,21 @@ const OnboardingGate = ({ children }: OnboardingGateProps) => {
     return <>{children}</>;
   }
 
-  const alwaysExempt = startsWithAny(ALWAYS_EXEMPT_PREFIXES);
-  const blockedEvenWhenSkipped = startsWithAny(BLOCKED_WHEN_SKIPPED_PREFIXES);
+  const skippablePaths = role ? SKIPPABLE_ROLE_PATHS[role] : undefined;
+  if (!skippablePaths || user?.onboardingComplete !== false) {
+    return <>{children}</>;
+  }
+
+  const exempt = startsWithAny([skippablePaths.onboarding, "/login"]);
+  const blockedEvenWhenSkipped = startsWithAny(skippablePaths.blockedWhenSkipped);
   const skipped = isOnboardingSkipped();
 
-  const shouldGate =
-    role === "Adopter" &&
-    user?.onboardingComplete === false &&
-    !alwaysExempt &&
-    (!skipped || blockedEvenWhenSkipped);
-
-  if (shouldGate) {
+  if (!exempt && (!skipped || blockedEvenWhenSkipped)) {
     return (
-      <Navigate to={`/onboarding/step/${user.onboardingStep ?? 2}`} replace />
+      <Navigate
+        to={`${skippablePaths.onboarding}/step/${user.onboardingStep ?? 2}`}
+        replace
+      />
     );
   }
 

@@ -53,7 +53,7 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 ```
 client/src/
   logic/
-    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), volunteersApi (/volunteers/me self-service) vs shelterVolunteersApi (staff's /volunteers), selfGovernmentIdApi (per-role /me/government-id calls)
+    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), donorsApi (/donors/me/*, /donations/checkout), volunteersApi (/volunteers/me self-service) vs shelterVolunteersApi (staff's /volunteers), selfGovernmentIdApi (per-role /me/government-id calls)
     route/       ProtectedRoute, RoleRoute
     store/       useAuthStore (Zustand: { user, token, role })
     toast/       shared toast helpers
@@ -92,7 +92,11 @@ client/src/
       onboarding/  VolunteerOnboardingWizard + steps/   (same 2–5 wizard, /volunteer/onboarding/step/:step; OnboardingGate → wizard, then /volunteer/pending)
       dashboard/   DashboardRoutes (inside the shared DashboardLayout; sidebar menu = ROLE_NAV.Volunteer) + one file per tab (Overview; Tasks — status + due-date filters, Mark Completed via DashboardActionList; Events — read-only, vet-Appointments layout: Upcoming card with Status (all/assigned) + Event Date (`dateTo` on GET /volunteers/me/events) filters, Past card = events they were on; "Assigned to you" badge, since staff assign volunteers and there's no self sign-up; Appointments — read-only Upcoming/Past cards; Availability — editable AvailabilityGrid, local draft until Save → PUT /volunteers/me/availability; Profile — same as the vet Profile) · shared/ DateBlock, CloseAccountModal (DELETE /volunteers/me; the 409 carries `error.details.blockers` — "appointments"/"tasks" — and the blocked panel links to each; success → home, volunteers aren't workers)
         overview/  StatsWidget + MyTasks/NextEvents/AppointmentsWidget; overviewQueries.ts holds each query, shared by its tile (pagination.total) and widget. Shelter Details is protected/shared/ShelterDetailsWidget (vet + volunteer)
-    (donor/ portal — planned)
+    protected/donor/
+      onboarding/  DonorOnboardingWizard + steps/   (2 Personal, 3 Address, 4 Review — no ID; skippable like the adopter's: OnboardingGate's SKIPPABLE_ROLE_PATHS)
+      dashboard/   DashboardRoutes (shared DashboardLayout; ROLE_NAV.Donor = Overview, Donate, Donation History) — Overview (stats tiles, donate form, Recent Donations), Donate, DonateConfirmation (/donor/donate/confirmation — Stripe success_url; polls ?checkoutSessionId= until the webhook records the donation, then invalidates ["donor","donations"]); History (shelter + date-range filters → dateFrom/dateTo, rows with donationCode, plus a By Shelter totals card from the stats byShelter, which also feeds the shelter filter); Profile (vet/volunteer Profile layout, no government ID; shared/CloseAccountModal — no 409 case, ends on / like Log out)
+        shared/    DonateForm (Open + Full shelters via public GET /shelters?acceptingDonations=true, $25/$50/$100/$200/custom whole dollars, optional message → POST /donations/checkout → Stripe)
+        overview/  donorQueries.ts (keys under ["donor","donations"]), StatsWidget, RecentDonationsWidget
   App.tsx        routes + session restore on mount
 
 server/src/
