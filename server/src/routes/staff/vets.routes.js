@@ -18,7 +18,10 @@ const router = express.Router();
  *     description: >
  *       section=pending lists vets awaiting approval; section=all lists
  *       approved vets (Active or Deactivated), optionally narrowed by
- *       accountStatus. name is a case-insensitive contains match.
+ *       accountStatus. name is a case-insensitive contains match. Each vet
+ *       carries onboardingComplete and governmentIdStatus (Pending,
+ *       Verified, Rejected, or null if none submitted) — what the manager
+ *       needs before approving.
  *     tags: [Staff]
  *     security:
  *       - bearerAuth: []
@@ -80,7 +83,10 @@ router.get(
  *     description: >
  *       Pending → Active (approve), Pending → Deactivated (decline),
  *       Active → Deactivated (deactivate); anything else is 409. The vet
- *       must be at the caller's shelter.
+ *       must be at the caller's shelter. Approving also needs the vet's
+ *       onboarding complete and their government ID Verified — 409 naming
+ *       what's missing otherwise. Declining is allowed at any onboarding
+ *       stage.
  *     tags: [Staff]
  *     security:
  *       - bearerAuth: []
@@ -122,7 +128,7 @@ router.get(
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: Transition not allowed from the current status
+ *         description: Transition not allowed from the current status, or approving a vet whose onboarding isn't complete or whose government ID isn't Verified
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

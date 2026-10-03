@@ -5,6 +5,7 @@
 
 const jwt = require("jsonwebtoken");
 const { getAccountStatus } = require("../services/auth/auth.service");
+const { PENDING_LOGIN_ROLES } = require("../services/auth/pendingRoles");
 
 // A 15-minute access token otherwise stays valid for its whole life no
 // matter what happens to the account after it was issued — login() only
@@ -16,13 +17,13 @@ const { getAccountStatus } = require("../services/auth/auth.service");
 // sentinel getAccountStatus returns when the role row is gone entirely.
 const BLOCKED_STATUSES = ["Deactivated", "Banned", "Pending", "DELETED"];
 
-// A Pending Staff member can log in before approval, but only to finish
-// onboarding (profile, address, government ID) — see auth.service.js's
-// login(). Routes that onboarding needs opt in with
-// authenticate.allowPendingStaff; every other route keeps rejecting Pending
-// accounts, so the boundary is enforced here, not by the frontend. Pending
-// accounts of any other role stay blocked everywhere.
-const buildAuthenticate = ({ allowPendingStaff }) => async (req, res, next) => {
+// A Pending Staff member or Veterinarian can log in before approval, but
+// only to finish onboarding (profile, address, government ID) — see
+// auth.service.js's login() and services/auth/pendingRoles.js. Routes that
+// onboarding needs opt in with authenticate.allowPending; every other route
+// keeps rejecting Pending accounts, so the boundary is enforced here, not by
+// the frontend. Pending accounts of any other role stay blocked everywhere.
+const buildAuthenticate = ({ allowPending }) => async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1]; // Check if acessToken is available
   if (!token) {
     return res.status(401).json({
@@ -36,9 +37,11 @@ const buildAuthenticate = ({ allowPendingStaff }) => async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verfify accessToken
 
     const accountStatus = await getAccountStatus(decoded.userID, decoded.role);
-    const pendingStaffAllowed =
-      allowPendingStaff && decoded.role === "Staff" && accountStatus === "Pending";
-    if (BLOCKED_STATUSES.includes(accountStatus) && !pendingStaffAllowed) {
+    const pendingAllowed =
+      allowPending &&
+      PENDING_LOGIN_ROLES.has(decoded.role) &&
+      accountStatus === "Pending";
+    if (BLOCKED_STATUSES.includes(accountStatus) && !pendingAllowed) {
       return res.status(401).json({
         success: false,
         message: "This account is no longer active",
@@ -62,8 +65,8 @@ const buildAuthenticate = ({ allowPendingStaff }) => async (req, res, next) => {
   }
 };
 
-const authenticate = buildAuthenticate({ allowPendingStaff: false });
-authenticate.allowPendingStaff = buildAuthenticate({ allowPendingStaff: true });
+const authenticate = buildAuthenticate({ allowPending: false });
+authenticate.allowPending = buildAuthenticate({ allowPending: true });
 
 //Exporting the authenticate middleware
 module.exports = authenticate;

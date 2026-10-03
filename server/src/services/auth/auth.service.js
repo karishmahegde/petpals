@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const prisma = require("../../config/prisma");
+const { PENDING_LOGIN_ROLES } = require("./pendingRoles");
 
 // Maps the incoming role string to the Prisma enum value, model accessor, and name field
 const ROLE_CONFIG = {
@@ -36,10 +37,11 @@ const SHELTER_ROLES = new Set(["volunteer", "staff", "vet"]);
 
 // Roles with an onboarding wizard — their session carries
 // onboardingComplete/onboardingStep so the frontend's OnboardingGate can
-// route them. Staff also carry accountStatus: a Pending staff member can log
-// in (to onboard before approval), so the frontend needs to know they're
-// still Pending once onboarding is done.
-const ONBOARDING_ROLES = new Set(["Adopter", "Staff"]);
+// route them. Roles in PENDING_LOGIN_ROLES (Staff, Veterinarian) also carry
+// accountStatus: a Pending account of theirs can log in (to onboard before
+// approval), so the frontend needs to know they're still Pending once
+// onboarding is done.
+const ONBOARDING_ROLES = new Set(["Adopter", "Staff", "Veterinarian"]);
 
 // ——————————————— REGISTER ———————————————
 const register = async ({ name, email, password, role, shelterID }) => {
@@ -163,7 +165,7 @@ const login = async ({ email, password }) => {
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
   const tracksOnboarding = ONBOARDING_ROLES.has(user.role);
-  const isStaff = user.role === "Staff";
+  const canLoginPending = PENDING_LOGIN_ROLES.has(user.role);
   let name = null;
   let avatarSeed = null;
   let onboardingComplete;
@@ -215,13 +217,12 @@ const login = async ({ email, password }) => {
       err.code = "UNAUTHORIZED";
       throw err;
     }
-    // Pending Staff are the exception: they log in to complete onboarding
-    // before approval, and authenticate.js only lets them reach the
-    // onboarding endpoints (authenticate.allowPendingStaff) until approved.
-    if (roleRecord?.accountStatus === "Pending" && !isStaff) {
-      // Vets are approved by a shelter manager; a self-registered
-      // Volunteer is approved by staff; an Admin by another Admin. Generic
-      // wording since the approver differs by role.
+    // Pending Staff and Vets are the exception: they log in to complete
+    // onboarding before approval, and authenticate.js only lets them reach
+    // their onboarding endpoints (authenticate.allowPending) until approved.
+    if (roleRecord?.accountStatus === "Pending" && !canLoginPending) {
+      // A self-registered Volunteer is approved by staff; an Admin by
+      // another Admin. Generic wording since the approver differs by role.
       const err = new Error(
         "This account is pending approval and can't log in yet.",
       );
@@ -244,7 +245,7 @@ const login = async ({ email, password }) => {
     name,
     avatarSeed,
     ...(tracksOnboarding ? { onboardingComplete, onboardingStep } : {}),
-    ...(isStaff ? { accountStatus } : {}),
+    ...(canLoginPending ? { accountStatus } : {}),
   };
 };
 
@@ -347,7 +348,7 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
 
   const config = Object.values(ROLE_CONFIG).find((c) => c.roleEnum === user.role);
   const tracksOnboarding = ONBOARDING_ROLES.has(user.role);
-  const isStaff = user.role === "Staff";
+  const canLoginPending = PENDING_LOGIN_ROLES.has(user.role);
   let name = null;
   let avatarSeed = null;
   let onboardingComplete;
@@ -360,7 +361,7 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
         [config.nameField]: true,
         avatarSeed: true,
         ...(tracksOnboarding ? { onboardingComplete: true, onboardingStep: true } : {}),
-        ...(isStaff ? { accountStatus: true } : {}),
+        ...(canLoginPending ? { accountStatus: true } : {}),
       },
     });
     name = roleRecord?.[config.nameField] ?? null;
@@ -378,7 +379,7 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
     name,
     avatarSeed,
     ...(tracksOnboarding ? { onboardingComplete, onboardingStep } : {}),
-    ...(isStaff ? { accountStatus } : {}),
+    ...(canLoginPending ? { accountStatus } : {}),
   };
 };
 

@@ -6,10 +6,10 @@
 import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
 import { PiIdentificationCardBold } from "react-icons/pi";
-import GovernmentIdSection from "../../shared/GovernmentIdSection";
+import GovernmentIdSection from "../../../shared/GovernmentIdSection";
 import OnboardingStepHeader from "../../../../../components/ui/onboarding/OnboardingStepHeader";
 import OnboardingStepNav from "../../../../../components/ui/onboarding/OnboardingStepNav";
-import { getMyStaffGovernmentId } from "../../../../../logic/api/staffApi";
+import { staffGovernmentIdApi } from "../../../../../logic/api/staffApi";
 
 interface IdentityStepProps {
   onContinue: () => void;
@@ -18,8 +18,8 @@ interface IdentityStepProps {
 
 const IdentityStep = ({ onContinue, onBack }: IdentityStepProps) => {
   const query = useQuery({
-    queryKey: ["staff", "government-id"],
-    queryFn: getMyStaffGovernmentId,
+    queryKey: staffGovernmentIdApi.queryKey,
+    queryFn: staffGovernmentIdApi.get,
     retry: (failureCount, err) =>
       axios.isAxiosError(err) && err.response?.status === 404
         ? false
@@ -34,7 +34,7 @@ const IdentityStep = ({ onContinue, onBack }: IdentityStepProps) => {
         description="Your shelter verifies this ID before your account is approved."
       />
 
-      <GovernmentIdSection isEditing />
+      <GovernmentIdSection api={staffGovernmentIdApi} isEditing />
 
       <OnboardingStepNav
         onBack={onBack}

@@ -15,9 +15,10 @@ import Badge, { type BadgeTone } from "../../../../components/ui/Badge";
 import PhoneInputField from "../../../../components/ui/PhoneInputField";
 import PhoneDisplay from "../../../../components/ui/PhoneDisplay";
 import CloseAccountModal from "./shared/CloseAccountModal";
-import GovernmentIdSection from "../shared/GovernmentIdSection";
+import GovernmentIdSection from "../../shared/GovernmentIdSection";
 import {
   getMyStaffProfile,
+  staffGovernmentIdApi,
   updateMyStaffProfile,
   type StaffAccountStatus,
   type StaffSelfProfile,
@@ -309,7 +310,7 @@ const Profile = () => {
                   </dd>
                 </div>
               </dl>
-              <GovernmentIdSection isEditing={isEditing} />
+              <GovernmentIdSection api={staffGovernmentIdApi} isEditing={isEditing} />
             </section>
 
             <ProfileAddressSection

@@ -56,7 +56,7 @@ const AppointmentsList = ({
             title={`${appointment.pet.petName} — ${appointment.appointmentReason}`}
             lines={[
               {
-                text: `${formatTime(when)} | ${formatVetName(appointment.vet.vetName)} | ${appointment.shelter.shelterName}`,
+                text: `${formatTime(when)} | ${formatVetName(appointment.vet?.vetName)} | ${appointment.shelter.shelterName}`,
               },
             ]}
             badge={

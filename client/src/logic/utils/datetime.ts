@@ -49,6 +49,17 @@ export const formatNumericDate = (date = new Date()): string =>
     year: "numeric",
   });
 
+// True when the given date/ISO string falls on today's local calendar day.
+export const isToday = (value: Date | string): boolean => {
+  const date = new Date(value);
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+};
+
 /** Time of day, e.g. "5:30 PM". */
 export const formatTime = (date = new Date()): string =>
   date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });

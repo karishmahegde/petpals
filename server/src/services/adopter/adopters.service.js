@@ -1,6 +1,5 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
-const { isUniqueViolation } = require("../../utils/prismaErrors");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 
 // The public shape of an adopter profile — shared by GET and PUT /adopters/me so
@@ -202,129 +201,6 @@ const completeOnboarding = async (userID) => {
   }
 };
 
-// ——————————————— CREATE GOVERNMENT ID (POST /adopters/me/government-id) ———————————————
-
-// File extension by accepted MIME type — keeps stored object names sensible.
-const EXT_BY_MIME = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/heic": "heic",
-  "application/pdf": "pdf",
-};
-
-// Shape returned to the client. idNumber is masked before it leaves the service.
-const GOVERNMENT_ID_SELECT = {
-  governmentIDID: true,
-  userID: true,
-  userType: true,
-  idType: true,
-  idNumber: true,
-  verificationStatus: true,
-  documentURL: true,
-};
-
-// Show only the last 4 characters of an ID number in responses.
-const maskIdNumber = (idNumber) => {
-  const tail = idNumber.slice(-4);
-  return `${"*".repeat(Math.max(idNumber.length - tail.length, 0))}${tail}`;
-};
-
-const alreadySubmitted = () => {
-  const err = new Error(
-    "A government ID has already been submitted for this adopter",
-  );
-  err.code = "CONFLICT";
-  return err;
-};
-
-const createGovernmentId = async (userID, { idType, idNumber, file }) => {
-  // Fast path only — the real guarantee is the @@unique([userID, userType])
-  // constraint, caught as a unique violation after create() below. A
-  // Rejected record is the one exception: the adopter can resubmit, which
-  // overwrites that same row (and resets it to Pending) instead of blocking.
-  const existing = await prisma.governmentID.findFirst({
-    where: { userID, userType: "Adopter" },
-    select: { governmentIDID: true, verificationStatus: true, documentURL: true },
-  });
-  if (existing && existing.verificationStatus !== "Rejected") {
-    throw alreadySubmitted();
-  }
-
-  const ext = EXT_BY_MIME[file.mimetype] || "bin";
-  const objectPath = `adopter/${userID}/id-${Date.now()}.${ext}`;
-
-  await storage.uploadPrivateFile(
-    storage.GOVERNMENT_IDS_BUCKET,
-    objectPath,
-    file.buffer,
-    file.mimetype,
-  );
-
-  let record;
-  try {
-    record = existing
-      ? await prisma.governmentID.update({
-          where: { governmentIDID: existing.governmentIDID },
-          data: {
-            idType,
-            idNumber,
-            verificationStatus: "Pending",
-            documentURL: objectPath,
-          },
-          select: GOVERNMENT_ID_SELECT,
-        })
-      : await prisma.governmentID.create({
-          data: {
-            userID,
-            userType: "Adopter",
-            idType,
-            idNumber,
-            verificationStatus: "Pending",
-            documentURL: objectPath,
-          },
-          select: GOVERNMENT_ID_SELECT,
-        });
-  } catch (err) {
-    // DB write failed after the file landed — remove the orphaned object.
-    await storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, objectPath);
-    // Lost a race with a concurrent submission — the unique constraint fired.
-    if (isUniqueViolation(err)) {
-      throw alreadySubmitted();
-    }
-    throw err;
-  }
-
-  // Resubmission replaced the stored file — the previous one is now
-  // orphaned. Best-effort, same as the failure-path cleanup above.
-  if (existing?.documentURL) {
-    await storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, existing.documentURL);
-  }
-
-  return { ...record, idNumber: maskIdNumber(record.idNumber) };
-};
-
-// ——————————————— GET GOVERNMENT ID (GET /adopters/me/government-id) ———————————————
-const getGovernmentId = async (userID) => {
-  const record = await prisma.governmentID.findFirst({
-    where: { userID, userType: "Adopter" },
-    select: GOVERNMENT_ID_SELECT,
-  });
-
-  if (!record) {
-    const err = new Error("No government ID has been submitted for this adopter");
-    err.code = "NOT_FOUND";
-    // Expected on every load before an adopter has submitted one — the
-    // client already treats this 404 as a normal "not submitted yet" state
-    // (see GovernmentIdSection.tsx/IdentityStep.tsx), not a real error, so
-    // it shouldn't spam a stack trace to the server console every time.
-    err.quiet = true;
-    throw err;
-  }
-
-  return { ...record, idNumber: maskIdNumber(record.idNumber) };
-};
-
 // ——————————————— CLOSE ACCOUNT (DELETE /adopters/me) ———————————————
 
 const activeAdoptionConflict = () => {
@@ -391,7 +267,5 @@ module.exports = {
   updateAdopterProfile,
   advanceOnboardingStep,
   completeOnboarding,
-  createGovernmentId,
-  getGovernmentId,
   closeAccount,
 };

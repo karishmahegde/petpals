@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const { formatSex } = require("../public/pets.service");
 const storage = require("../storage");
+const { deriveAppointmentStatus } = require("../staff/appointments.service");
 
 // ——————————————— ADOPTED-PET DETAIL (GET /adopters/me/adopted-pets/:petId) ———————————————
 // One consolidated payload for the My Pets side panel: basic details, intake,
@@ -94,6 +95,7 @@ const getAdoptedPetDetailForAdopter = async (adopterID, petID) => {
         appointmentID: true,
         appointmentDate: true,
         appointmentReason: true,
+        appointmentStatus: true,
         vet: { select: { vetName: true } },
         shelter: { select: { shelterName: true } },
       },
@@ -144,6 +146,7 @@ const getAdoptedPetDetailForAdopter = async (adopterID, petID) => {
         appointmentID: a.appointmentID,
         appointmentDate: a.appointmentDate,
         appointmentReason: a.appointmentReason,
+        status: deriveAppointmentStatus(a),
         vetName: a.vet ? a.vet.vetName : null,
         shelterName: a.shelter ? a.shelter.shelterName : null,
       })),

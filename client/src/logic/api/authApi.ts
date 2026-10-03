@@ -8,12 +8,13 @@ export interface AuthUser {
   name?: string; // present on login, absent on refresh-token response
   avatarSeed?: string; // present on both login and refresh-token responses
   // Present on both login and refresh-token responses for roles with an
-  // onboarding wizard (Adopter, Staff); absent for every other role.
+  // onboarding wizard (Adopter, Staff, Veterinarian); absent for every
+  // other role.
   onboardingComplete?: boolean;
   onboardingStep?: number;
-  // Staff only. A Pending staff member can log in — to onboard before
-  // they're approved — so OnboardingGate needs to know they're still
-  // Pending once onboarding is done.
+  // Staff and Veterinarian only. A Pending staff member or vet can log in —
+  // to onboard before they're approved — so OnboardingGate needs to know
+  // they're still Pending once onboarding is done.
   accountStatus?: string;
 }
 

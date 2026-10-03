@@ -118,7 +118,8 @@ const address = (addressLine1, city, state, zip, addressLine2 = null) => ({
   country: "United States",
 });
 const ONBOARDED = { onboardingComplete: true, onboardingStep: 7 };
-// The staff wizard is shorter: 2 Personal, 3 Address, 4 Identity, 5 Review.
+// The staff and vet wizards are shorter: 2 Personal, 3 Address, 4 Identity,
+// 5 Review.
 const STAFF_ONBOARDED = { onboardingComplete: true, onboardingStep: 5 };
 const avatar = () => crypto.randomUUID();
 
@@ -257,7 +258,7 @@ async function main() {
       shelterID: shelter1.shelterID,
       accountStatus: "Active",
       ...address("789 Oak Lane", "New York", "NY", "10002"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
   });
   login("Veterinarian", "vet@petpals.com", "Vet@123", "Active — PetPals Downtown");
@@ -535,18 +536,70 @@ async function main() {
       shelterID: shelter2.shelterID,
       accountStatus: "Active",
       ...address("120 Court Street", "Brooklyn", "NY", "11201"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-4) },
   );
   login("Veterinarian", "vet.brooklyn@petpals.com", "Vet@123", "Active — PetPals Brooklyn");
 
+  // Pending sign-ups at every onboarding stage — a Pending vet can log in,
+  // but only to the onboarding wizard, and the Downtown manager can approve
+  // them (Vets tab) only once onboarding is complete and their ID Verified.
   await createVet(
-    "vet.pending@petpals.com",
-    { vetName: "Sam Patel", vetPhone: "+12125550119", shelterID: shelter1.shelterID, accountStatus: "Pending" },
+    "vet.new@petpals.com",
+    { vetName: "Nadia Rahman", vetPhone: "+12125550141", shelterID: shelter1.shelterID, accountStatus: "Pending" },
     { emailVerified: false },
   );
-  login("Veterinarian", "vet.pending@petpals.com", "Vet@123", "Pending — Downtown manager approves (Vets tab)");
+  login("Veterinarian", "vet.new@petpals.com", "Vet@123", "Pending — onboarding not started, Downtown");
+
+  // Finished Personal, stopped at Address (step 3).
+  await createVet(
+    "vet.onboarding@petpals.com",
+    {
+      vetName: "Theo Marsh",
+      vetPhone: "+12125550142",
+      vetDOB: new Date("1990-08-21"),
+      vetSex: "M",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Pending",
+      onboardingComplete: false,
+      onboardingStep: 3,
+    },
+    { emailVerified: false },
+  );
+  login("Veterinarian", "vet.onboarding@petpals.com", "Vet@123", "Pending — onboarding incomplete (step 3), Downtown");
+
+  await createVet(
+    "vet.pending@petpals.com",
+    {
+      vetName: "Sam Patel",
+      vetPhone: "+12125550119",
+      vetDOB: new Date("1987-05-12"),
+      vetSex: "M",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Pending",
+      ...address("75 Wall Street", "New York", "NY", "10005"),
+      ...STAFF_ONBOARDED,
+    },
+    { emailVerified: false },
+  );
+  login("Veterinarian", "vet.pending@petpals.com", "Vet@123", "Pending, onboarded, ID awaiting verification — Downtown");
+
+  await createVet(
+    "vet.ready@petpals.com",
+    {
+      vetName: "Priya Desai",
+      vetPhone: "+12125550143",
+      vetDOB: new Date("1984-12-03"),
+      vetSex: "F",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Pending",
+      ...address("10 Hanover Square", "New York", "NY", "10005"),
+      ...STAFF_ONBOARDED,
+    },
+    { emailVerified: false },
+  );
+  login("Veterinarian", "vet.ready@petpals.com", "Vet@123", "Pending, onboarded, ID Verified — Downtown manager can approve (Vets tab)");
 
   await createVet(
     "vet.deactivated@petpals.com",
@@ -558,7 +611,7 @@ async function main() {
       shelterID: shelter1.shelterID,
       accountStatus: "Deactivated",
       ...address("25 Park Row", "New York", "NY", "10038"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-200) },
   );
@@ -1372,9 +1425,9 @@ async function main() {
   });
 
   // ── APPOINTMENTS: every stored status + derived "Completed" ──
-  // appointmentStatus is only ever written as Scheduled or Cancelled by the
-  // app; a past Scheduled one displays as Completed. One row stores
-  // Completed explicitly as well. Buddy (Emelie), Shadow and Hazel (Noah)
+  // Staff write Scheduled/Cancelled and the assigned vet writes Completed;
+  // a past Scheduled one no vet has completed still displays as Completed.
+  // One row stores Completed explicitly (as if its vet had marked it). Buddy (Emelie), Shadow and Hazel (Noah)
   // show on the adopters' own Appointments tab.
   console.log("Creating appointments...");
   const createAppointment = (data) => prisma.appointment.create({ data });
@@ -1461,7 +1514,9 @@ async function main() {
         createdAt: intakeDateMonthsAgo(1, 1),
         recordDesc: "Weight loss observed. Slight breathing issues noted. Basilac (2 doses, 4 days) prescribed.",
       },
-      { petID: pet.Buddy, vetID: vet.userID, createdAt: nyAt(-40, 10, 30), recordDesc: "Healthy. Cleared for adoption." },
+      // Written at Buddy's pre-adoption check (as if the vet had completed it
+      // with notes); the others were recorded outside any appointment.
+      { petID: pet.Buddy, vetID: vet.userID, appointmentID: buddyCheckup.appointmentID, createdAt: nyAt(-40, 10, 30), recordDesc: "Healthy. Cleared for adoption." },
       { petID: pet.Oscar, vetID: null, createdAt: daysFromNow(-20), recordDesc: "Passed away peacefully in his sleep. Recorded by shelter staff." },
     ],
   });
@@ -1518,6 +1573,16 @@ async function main() {
         administeredBy: vet.userID,
         administeredAt: D,
         appointmentID: hazelCheckup.appointmentID,
+      },
+      {
+        // No further dose planned (dueDate null) — the vet decided against
+        // another booster; shows as "No Further Dose" and is never overdue.
+        petID: pet.Hazel,
+        vaccineID: vaccine.Rabies,
+        administeredDate: daysFromNow(-200),
+        dueDate: null,
+        administeredBy: vet.userID,
+        administeredAt: D,
       },
     ],
   });
@@ -1678,6 +1743,7 @@ async function main() {
   const pendingStaff = await prisma.users.findUnique({ where: { userEmail: "staff.pending@petpals.com" } });
   const pendingManager = await prisma.users.findUnique({ where: { userEmail: "staff.manager.pending@petpals.com" } });
   const pendingVet = await prisma.users.findUnique({ where: { userEmail: "vet.pending@petpals.com" } });
+  const readyVet = await prisma.users.findUnique({ where: { userEmail: "vet.ready@petpals.com" } });
   await prisma.governmentID.createMany({
     data: [
       { userID: emelie.userID, userType: "Adopter", idType: "Passport", idNumber: "CPJ1005010", verificationStatus: "Verified", documentURL: ID_FILES.passport },
@@ -1687,6 +1753,7 @@ async function main() {
       { userID: pendingStaff.userID, userType: "Staff", idType: "Passport", idNumber: "P44412345", verificationStatus: "Pending", documentURL: ID_FILES.passport },
       { userID: pendingManager.userID, userType: "Staff", idType: "State ID", idNumber: "S52019876", verificationStatus: "Pending", documentURL: ID_FILES.stateId },
       { userID: pendingVet.userID, userType: "Veterinarian", idType: "Driver's License", idNumber: "D77712345", verificationStatus: "Pending", documentURL: ID_FILES.license },
+      { userID: readyVet.userID, userType: "Veterinarian", idType: "Passport", idNumber: "P66654321", verificationStatus: "Verified", documentURL: ID_FILES.passport },
       { userID: bryan.userID, userType: "Volunteer", idType: "State ID", idNumber: "S11122233", verificationStatus: "Verified", documentURL: ID_FILES.stateId },
       { userID: leo.userID, userType: "Volunteer", idType: "Passport", idNumber: "P88812345", verificationStatus: "Pending", documentURL: ID_FILES.passport },
       { userID: adminPendingUser.userID, userType: "Admin", idType: "Passport", idNumber: "P31415926", verificationStatus: "Pending", documentURL: ID_FILES.other },
