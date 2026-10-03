@@ -3,7 +3,12 @@ const jwt = require("jsonwebtoken");
 
 // Mocked so this suite never touches a real database.
 jest.mock("../../../config/prisma", () => ({
-  donor: { findUnique: jest.fn(), update: jest.fn() },
+  donor: { findUnique: jest.fn(), update: jest.fn(), delete: jest.fn() },
+  users: { update: jest.fn(), delete: jest.fn() },
+  donation: { deleteMany: jest.fn() },
+  // The service passes an array of already-invoked prisma calls (each a
+  // Promise) — Promise.all is a faithful enough stand-in.
+  $transaction: jest.fn((operations) => Promise.all(operations)),
 }));
 
 // Only getAccountStatus is faked (authenticate.js's live per-request check).
@@ -245,6 +250,66 @@ describe("Donor self-service endpoints", () => {
         "Onboarding is incomplete — missing: Date of birth, City, Country",
       );
       expect(prisma.donor.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ————————————————————————————— DELETE /donors/me —————————————————————————————
+  describe("DELETE /api/v1/donors/me", () => {
+    const close = (body) =>
+      request(app)
+        .delete("/api/v1/donors/me")
+        .set("Authorization", `Bearer ${donorToken()}`)
+        .send(body);
+
+    test("mode=deactivate → 200, status Deactivated, refresh token nulled, nothing deleted", async () => {
+      prisma.donor.update.mockResolvedValueOnce({});
+      prisma.users.update.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "deactivate" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Account deactivated");
+      expect(prisma.donor.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { accountStatus: "Deactivated" },
+      });
+      expect(prisma.users.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { refreshToken: null },
+      });
+      expect(prisma.donor.delete).not.toHaveBeenCalled();
+    });
+
+    test("mode=delete → 200, donor + users rows removed; donations are never deleted (donorID → NULL in the DB)", async () => {
+      prisma.donor.delete.mockResolvedValueOnce({});
+      prisma.users.delete.mockResolvedValueOnce({});
+
+      const res = await close({ mode: "delete" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe("Account deleted");
+      expect(prisma.donor.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
+      expect(prisma.users.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
+      expect(prisma.donation.deleteMany).not.toHaveBeenCalled();
+    });
+
+    test.each([undefined, "archive"])("mode %p → 422, nothing written", async (mode) => {
+      const res = await close(mode === undefined ? {} : { mode });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+      expect(prisma.donor.update).not.toHaveBeenCalled();
+      expect(prisma.donor.delete).not.toHaveBeenCalled();
+    });
+
+    test("Adopter → 403", async () => {
+      const res = await request(app)
+        .delete("/api/v1/donors/me")
+        .set("Authorization", `Bearer ${signToken("Adopter")}`)
+        .send({ mode: "delete" });
+
+      expect(res.status).toBe(403);
+      expect(prisma.donor.delete).not.toHaveBeenCalled();
     });
   });
 

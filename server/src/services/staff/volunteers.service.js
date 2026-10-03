@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const { ADDRESS_SELECT } = require("../../utils/address");
 const { decodeAvailability } = require("../../utils/availability");
+const { maskIdNumber } = require("../governmentIds/selfGovernmentId.service");
 const {
   withGovernmentIdStatus,
   assertReadyForApproval,
@@ -113,7 +114,8 @@ const listVolunteers = async (
 
 // ——————————————— VOLUNTEER DETAIL (GET /volunteers/:id) ———————————————
 // Every Volunteer column, plus the login email and the volunteer's
-// government ID type/number (GovernmentID is unique per userID+userType).
+// government ID type and masked number (GovernmentID is unique per
+// userID+userType).
 const getVolunteerDetail = async (userID, actor) => {
   const volunteer = await prisma.volunteer.findUnique({
     where: { userID },
@@ -155,8 +157,11 @@ const getVolunteerDetail = async (userID, actor) => {
     // Decoded weekly availability (null for pre-structured free text — the
     // raw volunteerSchedule is still returned above).
     availability: decodeAvailability(rest.volunteerSchedule),
+    // idNumber masked (e.g. *****4567) — the full number is only ever shown
+    // in the dedicated ID Verification review (staff/governmentIds.service.js),
+    // never on a roster/detail view (CLAUDE.md: never expose governmentID).
     governmentID: governmentID
-      ? { idType: governmentID.idType, idNumber: governmentID.idNumber }
+      ? { idType: governmentID.idType, idNumber: maskIdNumber(governmentID.idNumber) }
       : null,
     governmentIdStatus: governmentID?.verificationStatus ?? null,
   };

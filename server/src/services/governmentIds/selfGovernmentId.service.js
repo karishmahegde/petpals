@@ -194,4 +194,7 @@ const getGovernmentId = async (userType, userID) => {
   return { ...record, idNumber: maskIdNumber(record.idNumber) };
 };
 
-module.exports = { parseUpload, createGovernmentId, getGovernmentId };
+// maskIdNumber is also used wherever another role's ID number appears
+// outside the dedicated ID Verification review (e.g. staff's GET
+// /volunteers/:id), so it's masked the same way everywhere.
+module.exports = { parseUpload, createGovernmentId, getGovernmentId, maskIdNumber };

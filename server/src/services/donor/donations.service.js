@@ -127,9 +127,123 @@ const finalizeDonation = async (session) => {
   }
 };
 
+// ——————————————— DONATION HISTORY (GET /donors/me/donations[/:id], /stats) ———————————————
+// Always scoped to the caller's own donations (donorID). Never the Stripe
+// IDs — the donor sees what they gave, where and when, by donationCode.
+const DONATION_SELECT = {
+  donationID: true,
+  donationCode: true,
+  donationDate: true,
+  donationAmt: true,
+  donationDesc: true,
+  shelter: { select: { shelterID: true, shelterName: true } },
+};
+
+// Newest first. shelterID narrows to one shelter; dateFrom/dateTo
+// (client-computed, so "this year" follows the donor's timezone) bound
+// donationDate — dateFrom inclusive, dateTo exclusive, same as the staff
+// GET /donations.
+const listMyDonations = async (
+  donorID,
+  { shelterID, dateFrom, dateTo, page = 1, limit = 20 } = {},
+) => {
+  const where = { donorID };
+  if (shelterID !== undefined) where.shelterID = shelterID;
+  if (dateFrom || dateTo) {
+    where.donationDate = {
+      ...(dateFrom && { gte: dateFrom }),
+      ...(dateTo && { lt: dateTo }),
+    };
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.donation.findMany({
+      where,
+      select: DONATION_SELECT,
+      orderBy: { donationDate: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.donation.count({ where }),
+  ]);
+
+  return {
+    data: rows,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+// Another donor's donation answers exactly like a missing one (404).
+const getMyDonation = async (donorID, donationID) => {
+  const donation = await prisma.donation.findFirst({
+    where: { donationID, donorID },
+    select: DONATION_SELECT,
+  });
+  if (!donation) {
+    throw notFound(`No donation exists with ID ${donationID}`);
+  }
+  return donation;
+};
+
+// The post-payment confirmation page polls this until the webhook has
+// recorded the donation. Not a thrown 404 — "not recorded yet" is the
+// expected answer while the webhook is still in flight (same as the
+// adoption confirmation's getApplicationByCheckoutSession).
+const getMyDonationByCheckoutSession = (donorID, sessionId) =>
+  prisma.donation.findFirst({
+    where: { donorID, stripeCheckoutSessionID: sessionId },
+    select: DONATION_SELECT,
+  });
+
+// Totals over ALL of the donor's donations (not the list's filters).
+// yearStart is the client's local start of the year. byShelter is largest
+// total first.
+const getMyDonationStats = async (donorID, { yearStart }) => {
+  const where = { donorID };
+  const [all, thisYear, grouped] = await Promise.all([
+    prisma.donation.aggregate({ where, _sum: { donationAmt: true }, _count: { _all: true } }),
+    prisma.donation.aggregate({
+      where: { ...where, donationDate: { gte: yearStart } },
+      _sum: { donationAmt: true },
+    }),
+    prisma.donation.groupBy({
+      by: ["shelterID"],
+      where,
+      _sum: { donationAmt: true },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const shelters = grouped.length
+    ? await prisma.shelter.findMany({
+        where: { shelterID: { in: grouped.map((g) => g.shelterID) } },
+        select: { shelterID: true, shelterName: true },
+      })
+    : [];
+  const names = new Map(shelters.map((s) => [s.shelterID, s.shelterName]));
+
+  return {
+    totalAmount: all._sum.donationAmt ?? 0,
+    donationCount: all._count._all,
+    thisYearAmount: thisYear._sum.donationAmt ?? 0,
+    byShelter: grouped
+      .map((g) => ({
+        shelterID: g.shelterID,
+        shelterName: names.get(g.shelterID) ?? null,
+        totalAmount: g._sum.donationAmt ?? 0,
+        donationCount: g._count._all,
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount),
+  };
+};
+
 module.exports = {
   DONATION_KIND,
   ensureStripeCustomer,
   createCheckoutSession,
   finalizeDonation,
+  listMyDonations,
+  getMyDonation,
+  getMyDonationByCheckoutSession,
+  getMyDonationStats,
 };

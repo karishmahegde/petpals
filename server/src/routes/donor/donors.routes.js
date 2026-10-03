@@ -21,6 +21,14 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: The donor profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/DonorSelfProfile' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -55,6 +63,14 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: The updated donor profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/DonorSelfProfile' }
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
@@ -104,6 +120,14 @@ router.put(
  *     responses:
  *       200:
  *         description: The updated donor profile (same shape as GET /donors/me)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/DonorSelfProfile' }
  *       400: { $ref: '#/components/responses/BadRequest' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
@@ -132,6 +156,14 @@ router.patch(
  *     responses:
  *       200:
  *         description: The updated donor profile (same shape as GET /donors/me)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/DonorSelfProfile' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
@@ -142,6 +174,47 @@ router.patch(
   authenticate,
   authorizeRoles(ROLES.DONOR),
   donorsController.completeOnboarding,
+);
+
+/**
+ * @swagger
+ * /donors/me:
+ *   delete:
+ *     summary: Deactivate or permanently delete your own donor account (Donor only)
+ *     description: >
+ *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       token cleared); 'delete' permanently removes the Donor and Users
+ *       rows. The shelters' records survive either way — every donation
+ *       stays, with the donor link set to null on delete (staff see
+ *       "Former donor"). Nothing blocks a donor from closing their account.
+ *     tags: [Donors]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [mode]
+ *             properties:
+ *               mode: { type: string, enum: [deactivate, delete] }
+ *     responses:
+ *       200:
+ *         description: Account deactivated or deleted
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       422:
+ *         description: mode is missing or not one of 'deactivate'/'delete'
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.delete(
+  "/donors/me",
+  authenticate,
+  authorizeRoles(ROLES.DONOR),
+  donorsController.closeMyAccount,
 );
 
 module.exports = router;

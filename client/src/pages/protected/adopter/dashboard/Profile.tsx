@@ -24,6 +24,7 @@ import {
   type Breed,
 } from "../../../../logic/api/petsApi";
 import { formatShortDate } from "../../../../logic/utils/datetime";
+import useAuthStore from "../../../../logic/store/useAuthStore";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
 
 // ——————————————————————————————————————————————————————————————
@@ -265,6 +266,7 @@ const inputClass =
 
 const Profile = () => {
   const queryClient = useQueryClient();
+  const updateUser = useAuthStore((state) => state.updateUser);
 
   const profileQuery = useQuery({
     queryKey: ["adopter", "me"],
@@ -335,8 +337,11 @@ const Profile = () => {
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
       updateAdopterProfile(payload),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["adopter", "me"] });
+      // The sidebar reads the name and avatar from the session, not this
+      // query — patch them so a change shows immediately, not after reload.
+      updateUser({ name: saved.adopterName, avatarSeed: saved.avatarSeed });
       setIsEditing(false);
       setFormState(null);
       setSaveError(null);

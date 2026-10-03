@@ -118,9 +118,11 @@ const address = (addressLine1, city, state, zip, addressLine2 = null) => ({
   country: "United States",
 });
 const ONBOARDED = { onboardingComplete: true, onboardingStep: 7 };
-// The staff and vet wizards are shorter: 2 Personal, 3 Address, 4 Identity,
-// 5 Review.
+// The staff, vet and volunteer wizards are shorter: 2 Personal, 3 Address,
+// 4 Identity, 5 Review.
 const STAFF_ONBOARDED = { onboardingComplete: true, onboardingStep: 5 };
+// The donor wizard has no Identity step: 2 Personal, 3 Address, 4 Review.
+const DONOR_ONBOARDED = { onboardingComplete: true, onboardingStep: 4 };
 const avatar = () => crypto.randomUUID();
 
 const logins = [];
@@ -307,11 +309,13 @@ async function main() {
       volunteerPhone: "+12125550106",
       volunteerDOB: new Date("2005-09-18"),
       volunteerSex: "M",
-      volunteerSchedule: "Weekends 9am-5pm",
+      // Weekly availability, stored compactly (utils/availability.js):
+      // weekends, all day Saturday and Sunday mornings/afternoons.
+      volunteerSchedule: "Sat:MAE;Sun:MA",
       shelterID: shelter1.shelterID,
       accountStatus: "Active",
       ...address("321 Elm Street", "New York", "NY", "10013"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
   });
   login("Volunteer", "volunteer@petpals.com", "Volunteer@123", "Active — PetPals Downtown");
@@ -327,7 +331,7 @@ async function main() {
       donorSex: "F",
       accountStatus: "Active",
       ...address("654 Pine Road", "New York", "NY", "10014"),
-      ...ONBOARDED,
+      ...DONOR_ONBOARDED,
     },
   });
   login("Donor", "donor@petpals.com", "Donor@123", "Active");
@@ -718,7 +722,11 @@ async function main() {
   );
   login("Adopter", "adopter.deactivated@petpals.com", "Adopter@123", "Deactivated (closed own account)");
 
-  // ── VOLUNTEERS: every VolunteerAccountStatus ─────────────────
+  // ── VOLUNTEERS: every VolunteerAccountStatus + onboarding stage ──
+  // Approved volunteers are onboarded with structured availability. Pending
+  // sign-ups cover every onboarding stage — a Pending volunteer can log in,
+  // but only to the onboarding wizard, and staff can approve them only once
+  // onboarding is complete and their government ID Verified.
   const createVolunteer = async (email, data, userOpts, password = "Volunteer@123") => {
     const user = await createUser(email, password, "Volunteer", userOpts);
     return prisma.volunteer.create({ data: { userID: user.userID, avatarSeed: avatar(), ...data } });
@@ -730,22 +738,75 @@ async function main() {
       volunteerPhone: "+12125550126",
       volunteerDOB: new Date("2000-05-05"),
       volunteerSex: "F",
-      volunteerSchedule: "Weekday evenings",
+      volunteerSchedule: "Mon:E;Tue:E;Wed:E;Thu:E;Fri:E", // weekday evenings
       shelterID: shelter1.shelterID,
       accountStatus: "Active",
       ...address("33 Bond Street", "New York", "NY", "10012"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-1) },
   );
   login("Volunteer", "volunteer.two@petpals.com", "Volunteer@123", "Active — Downtown");
 
+  // Onboarded, government ID submitted but still Pending — can't be approved
+  // until the ID is Verified (ID Verification tab).
   const leo = await createVolunteer(
     "volunteer.pending@petpals.com",
-    { volunteerName: "Leo Martins", volunteerPhone: "+12125550127", shelterID: shelter1.shelterID, accountStatus: "Pending" },
+    {
+      volunteerName: "Leo Martins",
+      volunteerPhone: "+12125550127",
+      volunteerDOB: new Date("2001-03-09"),
+      volunteerSex: "M",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Pending",
+      ...address("18 Hester Street", "New York", "NY", "10002"),
+      ...STAFF_ONBOARDED,
+    },
     { emailVerified: false },
   );
-  login("Volunteer", "volunteer.pending@petpals.com", "Volunteer@123", "Pending — Downtown staff approve");
+  login("Volunteer", "volunteer.pending@petpals.com", "Volunteer@123", "Pending — onboarded, ID awaiting verification, Downtown staff approve");
+
+  // Onboarded with a Verified ID — ready for Downtown staff to approve.
+  const priya = await createVolunteer(
+    "volunteer.ready@petpals.com",
+    {
+      volunteerName: "Priya Nair",
+      volunteerPhone: "+12125550133",
+      volunteerDOB: new Date("1998-10-02"),
+      volunteerSex: "F",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Pending",
+      ...address("5 Doyers Street", "New York", "NY", "10013"),
+      ...STAFF_ONBOARDED,
+    },
+    { emailVerified: false },
+  );
+  login("Volunteer", "volunteer.ready@petpals.com", "Volunteer@123", "Pending — onboarded, ID Verified, ready for Downtown staff to approve");
+
+  // Mid-wizard: finished Personal, stopped at Address (step 3).
+  await createVolunteer(
+    "volunteer.onboarding@petpals.com",
+    {
+      volunteerName: "Omar Haddad",
+      volunteerPhone: "+12125550134",
+      volunteerDOB: new Date("2002-12-19"),
+      volunteerSex: "M",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Pending",
+      onboardingComplete: false,
+      onboardingStep: 3,
+    },
+    { emailVerified: false },
+  );
+  login("Volunteer", "volunteer.onboarding@petpals.com", "Volunteer@123", "Pending — onboarding incomplete (step 3), Downtown");
+
+  // Just signed up — onboarding not started (schema defaults: step 2).
+  await createVolunteer(
+    "volunteer.new@petpals.com",
+    { volunteerName: "Ava Brooks", shelterID: shelter2.shelterID, accountStatus: "Pending" },
+    { emailVerified: false },
+  );
+  login("Volunteer", "volunteer.new@petpals.com", "Volunteer@123", "Pending — onboarding not started, Brooklyn");
 
   const nina = await createVolunteer(
     "volunteer.banned@petpals.com",
@@ -757,7 +818,7 @@ async function main() {
       shelterID: shelter1.shelterID,
       accountStatus: "Banned",
       ...address("11 Mott Street", "New York", "NY", "10013"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-45) },
   );
@@ -770,11 +831,11 @@ async function main() {
       volunteerPhone: "+12125550129",
       volunteerDOB: new Date("1997-11-11"),
       volunteerSex: "M",
-      volunteerSchedule: "Saturdays",
+      volunteerSchedule: "Sat:MA", // Saturday mornings/afternoons
       shelterID: shelter1.shelterID,
       accountStatus: "Deactivated",
       ...address("60 Wall Street", "New York", "NY", "10005"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-100) },
   );
@@ -787,33 +848,41 @@ async function main() {
       volunteerPhone: "+17185550130",
       volunteerDOB: new Date("2003-02-14"),
       volunteerSex: "F",
-      volunteerSchedule: "Sundays",
+      volunteerSchedule: "Sun:MAE", // all day Sunday
       shelterID: shelter2.shelterID,
       accountStatus: "Active",
       ...address("150 Smith Street", "Brooklyn", "NY", "11201"),
-      ...ONBOARDED,
+      ...STAFF_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-5) },
   );
   login("Volunteer", "volunteer.brooklyn@petpals.com", "Volunteer@123", "Active — Brooklyn");
 
-  // ── DONORS: every DonorAccountStatus ─────────────────────────
+  // ── DONORS: every DonorAccountStatus + onboarding stage ──────
+  // Donor onboarding (2 Personal, 3 Address, 4 Review) is skippable, so
+  // donors at every stage have donated.
   const createDonor = async (email, data, userOpts) => {
     const user = await createUser(email, "Donor@123", "Donor", userOpts);
     return prisma.donor.create({ data: { userID: user.userID, avatarSeed: avatar(), ...data } });
   };
+  // Mid-wizard: finished Personal, stopped at Address (step 3).
   const jane = await createDonor("jane.smith@petpals.com", {
     donorName: "Jane Smith",
     donorPhone: "+12125550108",
+    donorDOB: new Date("1984-01-12"),
+    donorSex: "F",
     accountStatus: "Active",
+    onboardingComplete: false,
+    onboardingStep: 3,
   });
+  // Skipped onboarding entirely (schema defaults: step 2).
   const tammy = await createDonor("tammy.sings@petpals.com", {
     donorName: "Tammy Sings",
     donorPhone: "+17185550109",
     accountStatus: "Active",
   });
-  login("Donor", "jane.smith@petpals.com", "Donor@123", "Active — minimal profile");
-  login("Donor", "tammy.sings@petpals.com", "Donor@123", "Active — minimal profile");
+  login("Donor", "jane.smith@petpals.com", "Donor@123", "Active — onboarding incomplete (step 3)");
+  login("Donor", "tammy.sings@petpals.com", "Donor@123", "Active — onboarding not started (skipped)");
   const victor = await createDonor(
     "donor.banned@petpals.com",
     { donorName: "Victor Hale", donorPhone: "+12125550131", accountStatus: "Banned" },
@@ -829,7 +898,7 @@ async function main() {
       donorSex: "F",
       accountStatus: "Deactivated",
       ...address("9 Clinton Street", "Brooklyn", "NY", "11201"),
-      ...ONBOARDED,
+      ...DONOR_ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-300) },
   );
@@ -1756,6 +1825,7 @@ async function main() {
       { userID: readyVet.userID, userType: "Veterinarian", idType: "Passport", idNumber: "P66654321", verificationStatus: "Verified", documentURL: ID_FILES.passport },
       { userID: bryan.userID, userType: "Volunteer", idType: "State ID", idNumber: "S11122233", verificationStatus: "Verified", documentURL: ID_FILES.stateId },
       { userID: leo.userID, userType: "Volunteer", idType: "Passport", idNumber: "P88812345", verificationStatus: "Pending", documentURL: ID_FILES.passport },
+      { userID: priya.userID, userType: "Volunteer", idType: "Driver's License", idNumber: "D24681357", verificationStatus: "Verified", documentURL: ID_FILES.license },
       { userID: adminPendingUser.userID, userType: "Admin", idType: "Passport", idNumber: "P31415926", verificationStatus: "Pending", documentURL: ID_FILES.other },
     ],
   });
@@ -1821,18 +1891,25 @@ async function main() {
   // Spread over the past year across three shelters, several in the last
   // couple of weeks (Donations tab "This Month"), some without a message,
   // and past gifts from donors whose accounts are now Banned/Deactivated.
+  // Donations made through Stripe Checkout carry fake cs_test_/pi_test_ IDs
+  // (the same stripe() counter as the applications, so every session ID is
+  // unique); the two oldest predate Stripe donations and have none. One was
+  // given by a donor who has since deleted their account (donorID null —
+  // staff see "Former donor").
   console.log("Creating donations...");
   await prisma.donation.createMany({
     data: [
-      { donorID: charlotte.userID, shelterID: D, donationDate: daysFromNow(-3), donationAmt: 500, donationDesc: "On the special occasion of my birthday, for the animals at PetPals Downtown." },
-      { donorID: jane.userID, shelterID: D, donationDate: daysFromNow(-12), donationAmt: 120, donationDesc: "Monthly gift for food and litter." },
-      { donorID: tammy.userID, shelterID: D, donationDate: daysFromNow(-45), donationAmt: 250, donationDesc: null },
-      { donorID: jane.userID, shelterID: D, donationDate: daysFromNow(-75), donationAmt: 240, donationDesc: "In memory of Biscuit, adopted from you in 2019." },
-      { donorID: charlotte.userID, shelterID: D, donationDate: daysFromNow(-200), donationAmt: 1000, donationDesc: "Towards the new cat enclosure." },
-      { donorID: tammy.userID, shelterID: B, donationDate: daysFromNow(-8), donationAmt: 75, donationDesc: null },
-      { donorID: charlotte.userID, shelterID: B, donationDate: daysFromNow(-150), donationAmt: 300, donationDesc: "For vaccines and vet care." },
-      { donorID: victor.userID, shelterID: D, donationDate: daysFromNow(-100), donationAmt: 50, donationDesc: null },
+      { donorID: charlotte.userID, shelterID: D, donationDate: daysFromNow(-3), donationAmt: 500, donationDesc: "On the special occasion of my birthday, for the animals at PetPals Downtown.", ...stripe() },
+      { donorID: jane.userID, shelterID: D, donationDate: daysFromNow(-12), donationAmt: 120, donationDesc: "Monthly gift for food and litter.", ...stripe() },
+      { donorID: tammy.userID, shelterID: D, donationDate: daysFromNow(-45), donationAmt: 250, donationDesc: null, ...stripe() },
+      { donorID: jane.userID, shelterID: D, donationDate: daysFromNow(-75), donationAmt: 240, donationDesc: "In memory of Biscuit, adopted from you in 2019.", ...stripe() },
+      { donorID: charlotte.userID, shelterID: D, donationDate: daysFromNow(-200), donationAmt: 1000, donationDesc: "Towards the new cat enclosure.", ...stripe() },
+      { donorID: tammy.userID, shelterID: B, donationDate: daysFromNow(-8), donationAmt: 75, donationDesc: null, ...stripe() },
+      { donorID: charlotte.userID, shelterID: B, donationDate: daysFromNow(-150), donationAmt: 300, donationDesc: "For vaccines and vet care.", ...stripe() },
+      { donorID: victor.userID, shelterID: D, donationDate: daysFromNow(-100), donationAmt: 50, donationDesc: null, ...stripe() },
+      { donorID: null, shelterID: B, donationDate: daysFromNow(-60), donationAmt: 40, donationDesc: "For the kitten foster program.", ...stripe() },
       { donorID: rosa.userID, shelterID: shelter3.shelterID, donationDate: daysFromNow(-320), donationAmt: 150, donationDesc: "For the Queens bird room." },
+      { donorID: charlotte.userID, shelterID: D, donationDate: daysFromNow(-340), donationAmt: 200, donationDesc: "Holiday gift for the shelter." },
     ],
   });
 

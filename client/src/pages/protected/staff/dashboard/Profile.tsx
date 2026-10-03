@@ -27,6 +27,7 @@ import type { Address } from "../../../../logic/utils/address";
 import ProfileAddressSection from "../../../../components/ui/profile/ProfileAddressSection";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
 import { formatShortDate } from "../../../../logic/utils/datetime";
+import useAuthStore from "../../../../logic/store/useAuthStore";
 
 const STATUS_TONE: Record<StaffAccountStatus, BadgeTone> = {
   Pending: "gold",
@@ -84,6 +85,7 @@ const inputClass =
 
 const Profile = () => {
   const queryClient = useQueryClient();
+  const updateUser = useAuthStore((state) => state.updateUser);
 
   const profileQuery = useQuery({
     queryKey: ["staff", "me"],
@@ -115,8 +117,11 @@ const Profile = () => {
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
       updateMyStaffProfile(payload),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["staff", "me"] });
+      // The sidebar reads the name and avatar from the session, not this
+      // query — patch them so a change shows immediately, not after reload.
+      updateUser({ name: saved.staffName, avatarSeed: saved.avatarSeed });
       setIsEditing(false);
       setFormState(null);
       setSaveError(null);

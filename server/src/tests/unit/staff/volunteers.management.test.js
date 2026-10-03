@@ -226,13 +226,16 @@ describe("Volunteers (Staff)", () => {
         volunteerEmail: "val@ex.com",
         onboardingComplete: true,
         onboardingStep: 5,
-        governmentID: { idType: "Passport", idNumber: "X1234567" },
+        // Masked like every non-review view — only the ID Verification
+        // review shows the full number.
+        governmentID: { idType: "Passport", idNumber: "****4567" },
         governmentIdStatus: "Verified",
         volunteerSchedule: "Weekends",
         availability: null, // pre-structured free text — only the raw value
       });
       expect(res.body.data).not.toHaveProperty("shelter");
       expect(res.body.data).not.toHaveProperty("user");
+      expect(JSON.stringify(res.body)).not.toContain("X1234567");
     });
 
     test("no government ID on file -> governmentID null", async () => {

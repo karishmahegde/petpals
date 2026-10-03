@@ -1,5 +1,9 @@
 const donorsService = require("../../services/donor/donors.service");
 const { successResponse } = require("../../utils/response");
+const {
+  assertValidCloseAccountMode,
+  closeAccountMessage,
+} = require("../../services/auth/auth.service");
 const { normalizePhone } = require("../../utils/phone");
 const { pickAddressUpdate } = require("../../utils/address");
 
@@ -147,9 +151,25 @@ const completeOnboarding = async (req, res, next) => {
   }
 };
 
+// ——————————————— DELETE /donors/me ———————————————
+// Same mode validation and response message as every role's close-account
+// flow (auth.service.js) — 422 for a missing/invalid mode.
+const closeMyAccount = async (req, res, next) => {
+  const { mode } = req.body ?? {};
+
+  try {
+    assertValidCloseAccountMode(mode);
+    await donorsService.closeMyAccount(req.user.userID, mode);
+    return successResponse(res, closeAccountMessage(mode), null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   advanceOnboardingStep,
   completeOnboarding,
+  closeMyAccount,
 };
