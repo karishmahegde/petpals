@@ -306,7 +306,7 @@ router.get(
  * @swagger
  * /appointments/{id}:
  *   patch:
- *     summary: Edit a Scheduled, upcoming appointment (Staff, Admin)
+ *     summary: Edit a Scheduled, upcoming appointment (Staff, Admin, assigned Veterinarian)
  *     description: >
  *       Partial update — send only the fields that change. Only a Scheduled
  *       appointment whose date hasn't passed can be edited. petID, shelterID
@@ -314,7 +314,11 @@ router.get(
  *       active at the appointment's shelter; volunteerID may be null to
  *       unassign. The same pet+vet+time double-booking guard as create
  *       applies (409), excluding this appointment itself.
- *     tags: [Appointments, Staff]
+ *       The appointment's assigned Veterinarian may edit appointmentDate and
+ *       appointmentReason only (400 for vetID/staffID/volunteerID); another
+ *       vet's appointment is 404, and a vet gets back the GET
+ *       /vets/me/appointments/{id} shape (no adopter details).
+ *     tags: [Appointments, Staff, Vets]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -366,7 +370,7 @@ router.get(
 router.patch(
   "/appointments/:id",
   authenticate,
-  authorizeRoles(ROLES.STAFF, ROLES.ADMIN),
+  authorizeRoles(ROLES.STAFF, ROLES.ADMIN, ROLES.VETERINARIAN),
   appointmentsController.updateAppointment,
 );
 

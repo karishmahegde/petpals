@@ -9,7 +9,8 @@ export type StatTileColor = "gold" | "teal" | "rose" | "green";
 
 interface StatTileProps {
   icon: ReactNode;
-  value: string | number;
+  /** Omit for a label-only tile (e.g. the vet Overview's shelter tile). */
+  value?: string | number;
   label: string;
   color: StatTileColor;
 }
@@ -31,9 +32,11 @@ const StatTile = ({ icon, value, label, color }: StatTileProps) => {
       <div className={`mb-6 text-3xl ${iconColor}`} aria-hidden>
         {icon}
       </div>
-      <p className="font-display text-2xl font-bold text-neutral-dark">
-        {value}
-      </p>
+      {value !== undefined && (
+        <p className="font-display text-2xl font-bold text-neutral-dark">
+          {value}
+        </p>
+      )}
       <p className="font-body text-sm leading-tight text-neutral-charcoal">
         {label}
       </p>

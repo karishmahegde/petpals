@@ -11,7 +11,7 @@ const { singleFile } = require("../../middleware/upload");
 const router = express.Router();
 
 // GET/PUT /staff/me, GET/POST /staff/me/government-id and the two onboarding
-// endpoints use authenticate.allowPendingStaff: a new staff member onboards
+// endpoints use authenticate.allowPending: a new staff member onboards
 // while still Pending, before approval. Every other staff route (including
 // DELETE /staff/me) keeps plain authenticate, which rejects Pending accounts.
 
@@ -61,13 +61,13 @@ const router = express.Router();
  */
 router.get(
   "/staff/me",
-  authenticate.allowPendingStaff,
+  authenticate.allowPending,
   authorizeRoles(ROLES.STAFF),
   staffController.getMyProfile,
 );
 router.put(
   "/staff/me",
-  authenticate.allowPendingStaff,
+  authenticate.allowPending,
   authorizeRoles(ROLES.STAFF),
   staffController.updateMyProfile,
 );
@@ -105,7 +105,7 @@ router.put(
  */
 router.patch(
   "/staff/me/onboarding-step",
-  authenticate.allowPendingStaff,
+  authenticate.allowPending,
   authorizeRoles(ROLES.STAFF),
   staffController.advanceOnboardingStep,
 );
@@ -135,7 +135,7 @@ router.patch(
  */
 router.patch(
   "/staff/me/onboarding-complete",
-  authenticate.allowPendingStaff,
+  authenticate.allowPending,
   authorizeRoles(ROLES.STAFF),
   staffController.completeOnboarding,
 );
@@ -196,13 +196,13 @@ router.patch(
  */
 router.get(
   "/staff/me/government-id",
-  authenticate.allowPendingStaff,
+  authenticate.allowPending,
   authorizeRoles(ROLES.STAFF),
   staffController.getGovernmentId,
 );
 router.post(
   "/staff/me/government-id",
-  authenticate.allowPendingStaff,
+  authenticate.allowPending,
   authorizeRoles(ROLES.STAFF),
   singleFile("file"),
   staffController.uploadGovernmentId,

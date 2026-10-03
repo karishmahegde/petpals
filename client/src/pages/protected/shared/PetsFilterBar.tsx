@@ -1,26 +1,27 @@
 // PetsFilterBar.tsx
-// Staff Pets tab's filter bar — same Species/Breed/Size/Age filters as the
-// public catalog's PetFilterBar (reusing the same CheckboxDropdown/Pill
+// Shelter-scoped pet filter bar, shared by the Staff Pets tab and the vet
+// Health Records tab — same Species/Breed/Size/Age filters as the public
+// catalog's PetFilterBar (reusing the same CheckboxDropdown/Pill
 // primitives so they can't visually drift), minus the location/shelter
-// filter (a staff member only ever manages their own one shelter, so
-// there's nothing to filter by there) plus an optional Status dropdown,
-// which the public catalog has no use for (it's hardcoded to available) —
-// omitted by a section whose status is already fixed (Incoming Pets).
+// filter (staff and vets only ever see their own one shelter, so there's
+// nothing to filter by there) plus an optional Status dropdown, which the
+// public catalog has no use for (it's hardcoded to available) — omitted by
+// a section whose status is already fixed (Incoming Pets).
 // Renders unboxed, inside its section's own Card.
 import { useState } from "react";
 import { FaChevronDown, FaDna } from "react-icons/fa";
 import { BiFilterAlt } from "react-icons/bi";
 import { PiBirdBold, PiRuler } from "react-icons/pi";
 import { TbCake } from "react-icons/tb";
-import type { Species, Breed } from "../../../../../../logic/api/petsApi";
-import type { PetAdoptionStatus } from "../../../../../../logic/api/staffPetsApi";
-import ButtonElement from "../../../../../../components/ui/ButtonElement";
-import SelectField from "../../../../../../components/ui/SelectField";
+import type { Species, Breed } from "../../../logic/api/petsApi";
+import type { PetAdoptionStatus } from "../../../logic/api/staffPetsApi";
+import ButtonElement from "../../../components/ui/ButtonElement";
+import SelectField from "../../../components/ui/SelectField";
 import {
   CheckboxDropdown,
   Pill,
   type FilterOption,
-} from "../../../../../../components/ui/pets/FilterControls";
+} from "../../../components/ui/pets/FilterControls";
 
 const SIZE_OPTIONS = ["Small", "Medium", "Large"];
 

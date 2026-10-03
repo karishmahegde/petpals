@@ -461,14 +461,79 @@ const schemas = {
         type: "object",
         properties: {
           petID: { type: "integer" },
+          petCode: { type: "string", example: "PE000042" },
           petName: { type: "string" },
           petPhoto: { type: "string", nullable: true },
           breedName: { type: "string" },
           speciesName: { type: "string" },
         },
       },
-      vetName: { type: "string" },
+      vetName: {
+        type: "string",
+        nullable: true,
+        description: "null once the vet has deleted their account",
+      },
     },
+  },
+  VaccinationDose: {
+    type: "object",
+    description: "One dose given at an appointment (VaccinationRecord).",
+    properties: {
+      recordID: { type: "integer" },
+      appointmentID: { type: "integer" },
+      vaccineID: { type: "integer" },
+      vaccineName: { type: "string" },
+      administeredDate: { type: "string", format: "date-time" },
+      dueDate: { type: "string", format: "date-time", nullable: true, description: "null = no further dose planned" },
+      vetName: { type: "string", nullable: true },
+      shelterName: { type: "string", nullable: true },
+    },
+  },
+  VetAppointmentDetail: {
+    description:
+      "One of the vet's own appointments (GET /vets/me/appointments/:id) — no adopter contact details.",
+    allOf: [
+      { $ref: "#/components/schemas/AppointmentQueueItem" },
+      {
+        type: "object",
+        properties: {
+          appointmentCode: { type: "string", example: "APT-00123" },
+          appointmentStatus: {
+            type: "string",
+            enum: ["Scheduled", "Completed", "Cancelled"],
+            description: "Stored status — a past Scheduled appointment displays as Completed (status) but can still be completed",
+          },
+          shelterID: { type: "integer" },
+          shelterName: { type: "string" },
+          staffName: { type: "string", nullable: true },
+          volunteerName: { type: "string", nullable: true },
+          vaccinesAdministered: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                recordID: { type: "integer" },
+                vaccineName: { type: "string" },
+                administeredDate: { type: "string", format: "date-time" },
+                dueDate: { type: "string", format: "date-time", nullable: true, description: "null = no further dose planned" },
+              },
+            },
+          },
+          healthRecords: {
+            type: "array",
+            description: "Health notes written at this appointment",
+            items: {
+              type: "object",
+              properties: {
+                recordID: { type: "integer" },
+                recordDesc: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+        },
+      },
+    ],
   },
   AppointmentDetail: {
     allOf: [
@@ -478,7 +543,7 @@ const schemas = {
         properties: {
           appointmentCode: { type: "string", example: "APT-00123" },
           shelterName: { type: "string" },
-          vetID: { type: "integer" },
+          vetID: { type: "integer", nullable: true },
           staffID: { type: "integer", nullable: true },
           volunteerID: { type: "integer", nullable: true },
           staffName: { type: "string", nullable: true },
@@ -490,7 +555,7 @@ const schemas = {
               properties: {
                 recordID: { type: "integer" },
                 vaccineName: { type: "string" },
-                dueDate: { type: "string", format: "date-time" },
+                dueDate: { type: "string", format: "date-time", nullable: true, description: "null = no further dose planned" },
               },
             },
           },
@@ -574,6 +639,8 @@ const schemas = {
             recordID: { type: "integer" },
             createdAt: { type: "string", format: "date-time" },
             recordDesc: { type: "string", maxLength: 500 },
+            appointmentID: { type: "integer", nullable: true, description: "Set when written at an appointment" },
+            appointmentCode: { type: "string", nullable: true, example: "APT-00123" },
             vetName: { type: "string", nullable: true },
             shelterName: { type: "string", nullable: true },
           },
@@ -587,10 +654,10 @@ const schemas = {
             recordID: { type: "integer" },
             vaccineName: { type: "string" },
             administeredDate: { type: "string", format: "date-time" },
-            dueDate: { type: "string", format: "date-time" },
+            dueDate: { type: "string", format: "date-time", nullable: true, description: "null = no further dose planned" },
             status: {
               type: "string",
-              enum: ["Overdue", "Due Soon", "Up to Date"],
+              enum: ["Overdue", "Due Soon", "Up to Date", "No Further Dose"],
             },
           },
         },
@@ -891,7 +958,7 @@ const schemas = {
           properties: {
             recordID: { type: "integer" },
             vaccineName: { type: "string" },
-            dueDate: { type: "string", format: "date-time" },
+            dueDate: { type: "string", format: "date-time", nullable: true, description: "null = no further dose planned" },
           },
         },
       },
@@ -1053,7 +1120,7 @@ const schemas = {
       recordID: { type: "integer" },
       vaccineName: { type: "string" },
       administeredDate: { type: "string", format: "date-time" },
-      dueDate: { type: "string", format: "date-time" },
+      dueDate: { type: "string", format: "date-time", nullable: true, description: "null = no further dose planned" },
       vetName: { type: "string", nullable: true },
     },
   },

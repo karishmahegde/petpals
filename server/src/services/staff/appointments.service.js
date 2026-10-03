@@ -107,11 +107,13 @@ const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) =
   return staff.shelterID;
 };
 
-// "Completed" is never written to the row — there's no "mark complete"
-// action and no cron/scheduler in this codebase to flip it automatically
-// (see schema.prisma's design note on Appointment.appointmentStatus). A
-// Scheduled row whose date has passed just displays as Completed here,
-// computed the same way everywhere it's shown.
+// The one place an appointment's displayed status is computed — Staff tab,
+// the vet's queue and the adopter's Appointments all go through it, so a
+// row reads the same everywhere. "Completed" comes two ways: written by the
+// assigned vet (PATCH /appointments/:id/status — vet/appointments.service.js),
+// or derived here for a Scheduled row whose date has passed but that no vet
+// has marked complete (there's no cron to flip those). Both read as
+// "Completed"; Cancelled stays Cancelled whatever its date.
 const deriveAppointmentStatus = (row) => {
   if (row.appointmentStatus === "Scheduled" && row.appointmentDate < new Date()) {
     return "Completed";
@@ -119,8 +121,13 @@ const deriveAppointmentStatus = (row) => {
   return row.appointmentStatus;
 };
 
+// PET_SELECT/formatPetSummary, LIST_SELECT/formatListItem and
+// deriveAppointmentStatus are also used by vet/appointments.service.js
+// (GET /vets/me/appointments), so the vet's queue has exactly the same
+// list-item shape and status labels as the Staff tab's.
 const PET_SELECT = {
   petID: true,
+  petCode: true,
   petName: true,
   petPhoto: true,
   breed: {
@@ -130,6 +137,7 @@ const PET_SELECT = {
 
 const formatPetSummary = (pet) => ({
   petID: pet.petID,
+  petCode: pet.petCode,
   petName: pet.petName,
   petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, pet.petPhoto),
   breedName: pet.breed.breedName,
@@ -145,6 +153,28 @@ const LIST_SELECT = {
   pet: { select: PET_SELECT },
   vet: { select: { vetName: true } },
 };
+
+// upcoming = Scheduled with a future date (the "Upcoming" section);
+// otherwise everything else — past-dated or Cancelled (the "Past" section).
+const timeframeWhere = (upcoming) =>
+  upcoming
+    ? { appointmentStatus: "Scheduled", appointmentDate: { gt: new Date() } }
+    : {
+        OR: [
+          { appointmentDate: { lte: new Date() } },
+          { appointmentStatus: "Cancelled" },
+        ],
+      };
+
+const formatListItem = (row) => ({
+  appointmentID: row.appointmentID,
+  appointmentDate: row.appointmentDate,
+  appointmentReason: row.appointmentReason,
+  status: deriveAppointmentStatus(row),
+  pet: formatPetSummary(row.pet),
+  // null once the vet has deleted their account (Appointment.vetID SET NULL).
+  vetName: row.vet ? row.vet.vetName : null,
+});
 
 const listShelterAppointments = async (
   actor,
@@ -165,15 +195,7 @@ const listShelterAppointments = async (
   }
   // Admin with no shelterID param: unscoped, network-wide.
 
-  if (upcoming) {
-    where.appointmentStatus = "Scheduled";
-    where.appointmentDate = { gt: new Date() };
-  } else {
-    where.OR = [
-      { appointmentDate: { lte: new Date() } },
-      { appointmentStatus: "Cancelled" },
-    ];
-  }
+  Object.assign(where, timeframeWhere(upcoming));
 
   if (vetID !== undefined) {
     where.vetID = vetID;
@@ -193,17 +215,8 @@ const listShelterAppointments = async (
     prisma.appointment.count({ where }),
   ]);
 
-  const data = rows.map((row) => ({
-    appointmentID: row.appointmentID,
-    appointmentDate: row.appointmentDate,
-    appointmentReason: row.appointmentReason,
-    status: deriveAppointmentStatus(row),
-    pet: formatPetSummary(row.pet),
-    vetName: row.vet.vetName,
-  }));
-
   return {
-    data,
+    data: rows.map(formatListItem),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -275,7 +288,7 @@ const getShelterAppointmentDetail = async (appointmentID, actor) => {
     vetID: appointment.vetID,
     staffID: appointment.staffID,
     volunteerID: appointment.volunteerID,
-    vetName: appointment.vet.vetName,
+    vetName: appointment.vet ? appointment.vet.vetName : null,
     shelterName: appointment.shelter.shelterName,
     staffName: appointment.staff ? appointment.staff.staffName : null,
     volunteerName: appointment.volunteer ? appointment.volunteer.volunteerName : null,
@@ -420,7 +433,11 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
 
 // ——————————————— UPDATE APPOINTMENT (PATCH /appointments/:id) ———————————————
 // Reschedule/reassign an appointment that is still Scheduled and upcoming —
-// same rule as cancelAppointment. petID, shelterID and status are never
+// same rule as cancelAppointment. The appointment's assigned vet may also
+// edit it (date/time and reason only — the controller rejects anything
+// else); another vet's appointment answers like a missing one (404), and a
+// vet caller gets no detail back here — the controller returns the vet's
+// own detail shape instead, which has no adopter contact details. petID, shelterID and status are never
 // editable (a different pet is a different appointment; status has its own
 // Cancel flow, and completion is the vet's, Sprint 5). Partial: only fields
 // present in `data` change; volunteerID may be null to unassign. Re-runs
@@ -437,6 +454,9 @@ const updateAppointment = async (appointmentID, data, actor) => {
     },
   });
   if (!existing) {
+    throw notFound(appointmentID);
+  }
+  if (actor.role === "Veterinarian" && existing.vetID !== actor.userID) {
     throw notFound(appointmentID);
   }
 
@@ -463,6 +483,7 @@ const updateAppointment = async (appointmentID, data, actor) => {
     throw err;
   }
 
+  if (actor.role === "Veterinarian") return null;
   return getShelterAppointmentDetail(appointmentID, actor);
 };
 
@@ -549,4 +570,10 @@ module.exports = {
   listShelterVets,
   listShelterVolunteers,
   listShelterStaff,
+  deriveAppointmentStatus,
+  PET_SELECT,
+  formatPetSummary,
+  LIST_SELECT,
+  formatListItem,
+  timeframeWhere,
 };

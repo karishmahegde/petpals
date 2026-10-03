@@ -4,6 +4,11 @@
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
 import type { Address } from "../utils/address";
+import {
+  makeSelfGovernmentIdApi,
+  type GovernmentIdRecord,
+  type UploadGovernmentIdPayload,
+} from "./selfGovernmentIdApi";
 
 export type StaffDesignation = "Manager" | "Senior" | "Associate";
 // Pending = self-registered, awaiting admin approval. Filter-only — never a
@@ -175,47 +180,14 @@ export const closeMyStaffAccount = async (
 };
 
 // ———————————————— GOVERNMENT ID API ————————————————
-// Mirrors adminsApi.ts's getMyAdminGovernmentId/uploadMyAdminGovernmentId
-// exactly — self-only. Unlike Admin/Adopter, idNumber is masked on BOTH
-// GET and POST here (never returned in full on either route) — see
-// staff.service.js's createGovernmentId/getGovernmentId.
-export interface StaffGovernmentIdRecord {
-  governmentIDID: number;
-  userID: number;
-  userType: string;
-  idType: string;
-  idNumber: string; // masked — only the last 4 characters, e.g. "*****6789"
-  verificationStatus: "Pending" | "Verified" | "Rejected";
-  documentURL: string | null;
-}
-
-// 404 means no ID has been submitted yet — callers should treat that as a
-// normal "not submitted" state, not an error to surface.
-export const getMyStaffGovernmentId =
-  async (): Promise<StaffGovernmentIdRecord> => {
-    const response = await axiosInstance.get("/staff/me/government-id");
-    return response.data.data;
-  };
-
-export interface UploadStaffGovernmentIdPayload {
-  idType: string;
-  idNumber: string;
-  file: File;
-}
-
-// multipart/form-data — one government ID per staff member; a second
-// submission is rejected server-side with 409 (unless the existing one was
-// Rejected, in which case it's overwritten and reset to Pending).
-export const uploadMyStaffGovernmentId = async (
-  payload: UploadStaffGovernmentIdPayload,
-): Promise<StaffGovernmentIdRecord> => {
-  const formData = new FormData();
-  formData.append("idType", payload.idType);
-  formData.append("idNumber", payload.idNumber);
-  formData.append("file", payload.file);
-  const response = await axiosInstance.post(
-    "/staff/me/government-id",
-    formData,
-  );
-  return response.data.data;
-};
+// Built by the shared selfGovernmentIdApi.ts factory (same calls for every
+// worker role). idNumber is masked on both GET and POST. The named exports
+// below are kept for the existing callers.
+export const staffGovernmentIdApi = makeSelfGovernmentIdApi(
+  "/staff/me/government-id",
+  ["staff", "government-id"],
+);
+export type StaffGovernmentIdRecord = GovernmentIdRecord;
+export type UploadStaffGovernmentIdPayload = UploadGovernmentIdPayload;
+export const getMyStaffGovernmentId = staffGovernmentIdApi.get;
+export const uploadMyStaffGovernmentId = staffGovernmentIdApi.upload;

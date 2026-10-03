@@ -14,7 +14,7 @@ import {
 } from "../../../../../../components/ui/dashboard/DashboardList";
 import type { BadgeTone } from "../../../../../../components/ui/Badge";
 import { getVisitsQueue } from "../../../../../../logic/api/visitsApi";
-import { formatTime } from "../../../../../../logic/utils/datetime";
+import { formatTime, isToday } from "../../../../../../logic/utils/datetime";
 
 const PREVIEW_LIMIT = 5;
 // Large enough to cover a single shelter's full day without paginating —
@@ -31,16 +31,6 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   Confirmed: "teal",
   Completed: "green",
   Cancelled: "red",
-};
-
-const isToday = (isoDateTime: string) => {
-  const date = new Date(isoDateTime);
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
 };
 
 const TodaysVisitsWidget = () => {

@@ -150,8 +150,12 @@ const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) =
 // (same query param names too) so the Staff Pets tab can reuse the exact
 // same filter bar — just scoped to this shelter instead of network-wide,
 // and with no location/shelter filter (there's only ever one shelter here).
-const listMyShelterPets = async (
-  userID,
+//
+// listShelterPets is the shelter-scoped core, shared with the vet's
+// GET /vets/me/pets (vet/pets.controller.js), which also passes petName —
+// a case-insensitive contains match, same as GET /appointments'.
+const listShelterPets = async (
+  shelterID,
   {
     page = 1,
     limit = 20,
@@ -162,19 +166,15 @@ const listMyShelterPets = async (
     minAge,
     maxAge,
     sort,
+    petName,
   } = {},
 ) => {
-  const staff = await prisma.staff.findUnique({
-    where: { userID },
-    select: { shelterID: true },
-  });
-  if (!staff?.shelterID) {
-    throw noShelterAssigned();
-  }
-
-  const where = { shelterID: staff.shelterID };
+  const where = { shelterID };
   if (adoptionStatus) {
     where.adoptionStatus = adoptionStatus;
+  }
+  if (petName) {
+    where.petName = { contains: petName, mode: "insensitive" };
   }
 
   const speciesValues = toArray(species);
@@ -253,6 +253,17 @@ const listMyShelterPets = async (
   };
 };
 
+const listMyShelterPets = async (userID, filters) => {
+  const staff = await prisma.staff.findUnique({
+    where: { userID },
+    select: { shelterID: true },
+  });
+  if (!staff?.shelterID) {
+    throw noShelterAssigned();
+  }
+  return listShelterPets(staff.shelterID, filters);
+};
+
 // ——————————————— GET SHELTER PET DETAIL (GET /staff/me/pets/:id) ———————————————
 // Richer than public GET /pets/:id (which staff also uses for the same pet,
 // via the same underlying formatPetDetail) — adds the fields staff actually
@@ -274,6 +285,21 @@ const STAFF_PET_DETAIL_SELECT = {
   featuredFlag: true,
 };
 
+// Also serves the vet's GET /vets/me/pets/:id (and, through
+// getHealthPassport, /vets/me/pets/:id/health-passport): a Veterinarian
+// only sees pets at their own shelter, and a pet elsewhere answers exactly
+// like a missing one (404) rather than Staff's 403.
+const assertVetSeesPet = async (role, userID, petID, petShelterID) => {
+  if (role !== "Veterinarian") return;
+  const vet = await prisma.veterinarian.findUnique({
+    where: { userID },
+    select: { shelterID: true },
+  });
+  if (!vet?.shelterID || vet.shelterID !== petShelterID) {
+    throw notFound(petID);
+  }
+};
+
 const getShelterPetDetail = async (petID, { role, userID }) => {
   const pet = await prisma.pet.findUnique({
     where: { petID },
@@ -284,6 +310,7 @@ const getShelterPetDetail = async (petID, { role, userID }) => {
   }
 
   await assertStaffOwnsShelter(role, userID, pet.shelterID);
+  await assertVetSeesPet(role, userID, petID, pet.shelterID);
 
   // Adopted pets carry their adopter (from the Accepted application) so the
   // detail panel can show who took them home and link to the adopter's full
@@ -329,18 +356,20 @@ const getShelterPetDetail = async (petID, { role, userID }) => {
 // Read-only aggregate view for the pet's own full-page "passport" — reuses
 // getShelterPetDetail for identity (and its ownership check — a Staff caller
 // may only view a passport for a pet at their own shelter) and reads
-// HealthRecord/VaccinationRecord/TransferHistory fresh alongside it. Unlike
+// HealthRecord/VaccinationRecord/TransferHistory fresh alongside it — by
+// petID only, never by shelter, so records made at a shelter the pet was
+// transferred out of are included (the "universal" passport). Unlike
 // staff/transfers.service.js's listTransfers, transferHistory here is NOT
 // scoped to the caller's own shelter — a passport is meant to show the
 // pet's full cross-shelter history regardless of which shelter currently
 // holds it or which shelter the viewing staff member belongs to.
 const DUE_SOON_WINDOW_DAYS = 30;
 
-// administeredDate/dueDate are both non-nullable in the schema — every row
-// represents a dose that WAS given, with a next-dose dueDate to track. So
-// status is driven purely by how soon/overdue that next dose is, not by
-// whether the pet has ever been vaccinated at all.
+// Every row is a dose that WAS given (administeredDate is required). Its
+// status is driven by the next dose: how soon/overdue it is, or "No Further
+// Dose" when the vet planned none (dueDate null — never overdue).
 const vaccinationStatus = (dueDate) => {
+  if (!dueDate) return "No Further Dose";
   const daysUntilDue = (new Date(dueDate) - Date.now()) / 86400000;
   if (daysUntilDue < 0) return "Overdue";
   if (daysUntilDue <= DUE_SOON_WINDOW_DAYS) return "Due Soon";
@@ -358,6 +387,7 @@ const getHealthPassport = async (petID, { role, userID }) => {
         recordID: true,
         createdAt: true,
         recordDesc: true,
+        appointment: { select: { appointmentID: true, appointmentCode: true } },
         vet: {
           select: {
             vetName: true,
@@ -398,6 +428,10 @@ const getHealthPassport = async (petID, { role, userID }) => {
       recordID: r.recordID,
       createdAt: r.createdAt,
       recordDesc: r.recordDesc,
+      // Set when the note was written at an appointment (the vet's notes
+      // on completing it); null for one made outside any appointment.
+      appointmentID: r.appointment?.appointmentID ?? null,
+      appointmentCode: r.appointment?.appointmentCode ?? null,
       vetName: r.vet?.vetName ?? null,
       shelterName: r.vet?.shelter?.shelterName ?? null,
     })),
@@ -774,6 +808,7 @@ const deletePhoto = async (petID, photoID, { role, userID }) => {
 
 module.exports = {
   listMyShelterPets,
+  listShelterPets,
   getShelterPetDetail,
   getHealthPassport,
   createPet,

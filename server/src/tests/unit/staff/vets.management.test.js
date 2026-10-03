@@ -10,6 +10,8 @@ jest.mock("../../../config/prisma", () => ({
     count: jest.fn(),
     update: jest.fn(),
   },
+  // staffApproval.service.js's government ID status lookup.
+  governmentID: { findMany: jest.fn() },
 }));
 
 // Only getAccountStatus is faked (authenticate.js's live per-request check).
@@ -41,14 +43,20 @@ const vetRow = (overrides = {}) => ({
   vetSex: "M",
   createdAt: new Date("2026-09-01"),
   accountStatus: "Active",
+  onboardingComplete: true,
   user: { userEmail: "adrian@petpals.com" },
   ...overrides,
 });
+
+const idStatus = (verificationStatus, userID = 60) => [
+  { userID, verificationStatus },
+];
 
 describe("Shelter manager veterinarian management", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     authService.getAccountStatus.mockResolvedValue("Active");
+    prisma.governmentID.findMany.mockResolvedValue([]);
   });
 
   describe("GET /api/v1/staff/me/vets", () => {
@@ -74,6 +82,32 @@ describe("Shelter manager veterinarian management", () => {
         vetEmail: "adrian@petpals.com",
       });
       expect(res.body.data[0].user).toBeUndefined();
+    });
+
+    test("each vet carries onboardingComplete and governmentIdStatus (null when none submitted)", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.veterinarian.findMany.mockResolvedValueOnce([
+        vetRow({ accountStatus: "Pending" }),
+        vetRow({ userID: 61, accountStatus: "Pending", onboardingComplete: false }),
+      ]);
+      prisma.veterinarian.count.mockResolvedValueOnce(2);
+      prisma.governmentID.findMany.mockResolvedValueOnce(idStatus("Verified"));
+
+      const res = await request(app)
+        .get("/api/v1/staff/me/vets")
+        .query({ section: "pending" })
+        .set("Authorization", `Bearer ${managerToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.governmentID.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userID: { in: [60, 61] }, userType: "Veterinarian" },
+        }),
+      );
+      expect(res.body.data).toEqual([
+        expect.objectContaining({ userID: 60, onboardingComplete: true, governmentIdStatus: "Verified" }),
+        expect.objectContaining({ userID: 61, onboardingComplete: false, governmentIdStatus: null }),
+      ]);
     });
 
     test("section=all + accountStatus narrows to that status", async () => {
@@ -145,12 +179,14 @@ describe("Shelter manager veterinarian management", () => {
   });
 
   describe("PATCH /api/v1/staff/me/vets/:id/status", () => {
-    test("approve: Pending → Active", async () => {
+    test("approve: Pending → Active once onboarded with a Verified ID", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.veterinarian.findUnique.mockResolvedValueOnce({
         shelterID: 9,
         accountStatus: "Pending",
+        onboardingComplete: true,
       });
+      prisma.governmentID.findMany.mockResolvedValue(idStatus("Verified"));
       prisma.veterinarian.update.mockResolvedValueOnce(vetRow());
 
       const res = await request(app)
@@ -164,6 +200,76 @@ describe("Shelter manager veterinarian management", () => {
           where: { userID: 60 },
           data: { accountStatus: "Active" },
         }),
+      );
+      expect(res.body.data.governmentIdStatus).toBe("Verified");
+    });
+
+    // Same rule as staff approval (staffApproval.service.js) — 409 naming
+    // everything still missing.
+    test.each([
+      [
+        "onboarding incomplete, no ID",
+        false,
+        [],
+        "This veterinarian can't be approved yet — they haven't finished onboarding and they haven't submitted a government ID",
+      ],
+      [
+        "onboarded, ID still Pending",
+        true,
+        idStatus("Pending"),
+        "This veterinarian can't be approved yet — their government ID is Pending, not Verified",
+      ],
+      [
+        "onboarded, ID Rejected",
+        true,
+        idStatus("Rejected"),
+        "This veterinarian can't be approved yet — their government ID is Rejected, not Verified",
+      ],
+      [
+        "ID Verified but onboarding incomplete",
+        false,
+        idStatus("Verified"),
+        "This veterinarian can't be approved yet — they haven't finished onboarding",
+      ],
+    ])("approve blocked (%s) → 409, nothing written", async (_label, onboardingComplete, ids, message) => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.veterinarian.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        accountStatus: "Pending",
+        onboardingComplete,
+      });
+      prisma.governmentID.findMany.mockResolvedValueOnce(ids);
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/vets/60/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
+      expect(res.body.message).toBe(message);
+      expect(prisma.veterinarian.update).not.toHaveBeenCalled();
+    });
+
+    test("decline: Pending → Deactivated is allowed mid-onboarding with no ID", async () => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.veterinarian.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        accountStatus: "Pending",
+        onboardingComplete: false,
+      });
+      prisma.veterinarian.update.mockResolvedValueOnce(
+        vetRow({ accountStatus: "Deactivated", onboardingComplete: false }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/vets/60/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: "Deactivated" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.veterinarian.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
       );
     });
 

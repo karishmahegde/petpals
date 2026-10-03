@@ -13,6 +13,9 @@ import WorkerLogin from "./pages/public/auth/WorkerLogin";
 import WorkerRegister from "./pages/public/auth/WorkerRegister";
 import Adopt from "./pages/public/adopt/Adopt";
 import Events from "./pages/public/events/Events";
+import Faqs from "./pages/public/faqs/Faqs";
+import PrivacyPolicy from "./pages/public/legal/PrivacyPolicy";
+import TermsOfService from "./pages/public/legal/TermsOfService";
 import Forbidden from "./pages/errors/Forbidden";
 import NotFound from "./pages/errors/NotFound";
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -22,8 +25,9 @@ import AdoptApplyConfirmation from "./pages/protected/adopter/apply/AdoptApplyCo
 import OnboardingWizard from "./pages/protected/adopter/onboarding/OnboardingWizard";
 import StaffDashboardRoutes from "./pages/protected/staff/dashboard/DashboardRoutes";
 import StaffOnboardingWizard from "./pages/protected/staff/onboarding/StaffOnboardingWizard";
-import AwaitingApproval from "./pages/protected/staff/pending/AwaitingApproval";
-import VetDashboard from "./pages/protected/vet/VetDashboard";
+import AwaitingApproval from "./pages/protected/shared/AwaitingApproval";
+import VetDashboardRoutes from "./pages/protected/vet/dashboard/DashboardRoutes";
+import VetOnboardingWizard from "./pages/protected/vet/onboarding/VetOnboardingWizard";
 import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
 import DonorDashboard from "./pages/protected/donor/DonorDashboard";
 import AdminDashboardRoutes from "./pages/protected/admin/dashboard/DashboardRoutes";
@@ -67,6 +71,9 @@ const App = () => {
           <Route path="/staff-portal/register" element={<WorkerRegister />} />
           <Route path="/adopt" element={<Adopt />} />
           <Route path="/events" element={<Events />} />
+          <Route path="/faqs" element={<Faqs />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/forbidden" element={<Forbidden />} />
           <Route path="*" element={<NotFound />} />
         </Route>
@@ -127,7 +134,31 @@ const App = () => {
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Staff"]}>
-                <AwaitingApproval />
+                <AwaitingApproval role="Staff" />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Vet onboarding wizard and pending page — same pattern as Staff's
+            above: a new vet onboards, then waits for their shelter
+            manager's approval. More specific than /vet so they match first. */}
+        <Route
+          path="/vet/onboarding/step/:step"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Veterinarian"]}>
+                <VetOnboardingWizard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vet/pending"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Veterinarian"]}>
+                <AwaitingApproval role="Veterinarian" />
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -159,11 +190,13 @@ const App = () => {
           }
         />
         <Route
-          path="/vet"
+          path="/vet/*"
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Veterinarian"]}>
-                <VetDashboard />
+                <DashboardLayout>
+                  <VetDashboardRoutes />
+                </DashboardLayout>
               </RoleRoute>
             </ProtectedRoute>
           }

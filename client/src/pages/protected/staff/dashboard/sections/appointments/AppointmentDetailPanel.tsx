@@ -22,10 +22,10 @@ import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import {
   formatFullDate,
-  formatShortDate,
   formatTime,
 } from "../../../../../../logic/utils/datetime";
 import { formatVetName } from "../../../../../../logic/utils/vetName";
+import { describeNextDue } from "../../../../../../logic/utils/vaccination";
 
 interface AppointmentDetailPanelProps {
   appointmentID: number | null;
@@ -186,7 +186,7 @@ const AppointmentDetailPanel = ({
                       {v.vaccineName}
                     </span>
                     <span className="font-body text-xs italic text-neutral-gray">
-                      Next due {formatShortDate(new Date(v.dueDate))}
+                      {describeNextDue(v.dueDate, "Next due")}
                     </span>
                   </li>
                 ))}

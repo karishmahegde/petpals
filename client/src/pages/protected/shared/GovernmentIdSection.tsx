@@ -1,19 +1,20 @@
 // GovernmentIdSection.tsx
-// Mirrors the admin dashboard's GovernmentIdSection.tsx exactly (same
-// submit/resubmit flow, same file constraints) — just pointed at the
-// staff member's own /staff/me/government-id instead of
-// /admins/me/government-id.
+// A worker's own government ID — show it, or submit/resubmit one. Shared by
+// Staff (onboarding, awaiting-approval, Profile) and Veterinarian
+// (onboarding, awaiting-approval): each passes its role's calls as `api`
+// (staffApi.ts's staffGovernmentIdApi, vetsApi.ts's vetGovernmentIdApi).
+// Same submit/resubmit flow and file constraints as the admin dashboard's
+// own GovernmentIdSection.tsx.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { PiClock, PiSealCheck, PiXCircle } from "react-icons/pi";
-import ButtonElement from "../../../../components/ui/ButtonElement";
-import {
-  getMyStaffGovernmentId,
-  uploadMyStaffGovernmentId,
-  type StaffGovernmentIdRecord,
-} from "../../../../logic/api/staffApi";
+import ButtonElement from "../../../components/ui/ButtonElement";
+import type {
+  GovernmentIdRecord,
+  SelfGovernmentIdApi,
+} from "../../../logic/api/selfGovernmentIdApi";
 
 const ID_TYPE_OPTIONS = [
   "Passport",
@@ -44,7 +45,7 @@ const extractError = (err: unknown): string =>
     : "Something went wrong. Please try again.";
 
 const STATUS_STYLE: Record<
-  StaffGovernmentIdRecord["verificationStatus"],
+  GovernmentIdRecord["verificationStatus"],
   { icon: typeof PiClock; className: string }
 > = {
   Pending: { icon: PiClock, className: "text-gold-dark" },
@@ -55,7 +56,7 @@ const STATUS_STYLE: Record<
 const StatusBadge = ({
   status,
 }: {
-  status: StaffGovernmentIdRecord["verificationStatus"];
+  status: GovernmentIdRecord["verificationStatus"];
 }) => {
   const { icon: Icon, className } = STATUS_STYLE[status];
   return (
@@ -69,15 +70,16 @@ const StatusBadge = ({
 };
 
 interface GovernmentIdSectionProps {
+  api: SelfGovernmentIdApi;
   isEditing: boolean;
 }
 
-const GovernmentIdSection = ({ isEditing }: GovernmentIdSectionProps) => {
+const GovernmentIdSection = ({ api, isEditing }: GovernmentIdSectionProps) => {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ["staff", "government-id"],
-    queryFn: getMyStaffGovernmentId,
+    queryKey: api.queryKey,
+    queryFn: api.get,
     retry: (failureCount, err) =>
       // 404 means "not submitted yet" - a normal state, not worth retrying.
       axios.isAxiosError(err) && err.response?.status === 404
@@ -103,9 +105,9 @@ const GovernmentIdSection = ({ isEditing }: GovernmentIdSectionProps) => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: uploadMyStaffGovernmentId,
+    mutationFn: api.upload,
     onSuccess: (record) => {
-      queryClient.setQueryData(["staff", "government-id"], record);
+      queryClient.setQueryData(api.queryKey, record);
       toast.success("Government ID submitted successfully");
       setIdType("");
       setIdNumber("");

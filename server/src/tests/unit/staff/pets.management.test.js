@@ -331,12 +331,14 @@ describe("Staff pet management endpoints", () => {
           recordID: 2,
           createdAt: new Date("2026-05-01T10:00:00Z"),
           recordDesc: "Annual check",
+          appointment: { appointmentID: 31, appointmentCode: "APT-00031" },
           vet: { vetName: "Dr. Vee", shelter: { shelterName: "Athens Shelter" } },
         },
         {
           recordID: 1,
           createdAt: new Date("2025-01-10T10:00:00Z"),
           recordDesc: "Intake exam",
+          appointment: null,
           vet: null,
         },
       ]);
@@ -363,6 +365,8 @@ describe("Staff pet management endpoints", () => {
           recordID: 2,
           createdAt: "2026-05-01T10:00:00.000Z",
           recordDesc: "Annual check",
+          appointmentID: 31,
+          appointmentCode: "APT-00031",
           vetName: "Dr. Vee",
           shelterName: "Athens Shelter",
         },
@@ -370,6 +374,8 @@ describe("Staff pet management endpoints", () => {
           recordID: 1,
           createdAt: "2025-01-10T10:00:00.000Z",
           recordDesc: "Intake exam",
+          appointmentID: null,
+          appointmentCode: null,
           vetName: null,
           shelterName: null,
         },
@@ -411,10 +417,11 @@ describe("Staff pet management endpoints", () => {
           [1, "Rabies", -1],
           [2, "DHPP", 10],
           [3, "Bordetella", 60],
+          [4, "FVRCP", null], // no further dose planned
         ].map(([recordID, vaccineName, daysUntilDue]) => ({
           recordID,
           administeredDate: new Date(Date.now() - 300 * DAY),
-          dueDate: new Date(Date.now() + daysUntilDue * DAY),
+          dueDate: daysUntilDue === null ? null : new Date(Date.now() + daysUntilDue * DAY),
           vaccine: { vaccineName },
         })),
       );
@@ -426,6 +433,7 @@ describe("Staff pet management endpoints", () => {
         ["Rabies", "Overdue"],
         ["DHPP", "Due Soon"],
         ["Bordetella", "Up to Date"],
+        ["FVRCP", "No Further Dose"],
       ]);
     });
 

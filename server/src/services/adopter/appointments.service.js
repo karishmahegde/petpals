@@ -1,14 +1,18 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
+const { deriveAppointmentStatus } = require("../staff/appointments.service");
 
 // ——————————————— LIST APPOINTMENTS FOR AN ADOPTER (GET /adopters/me/appointments) ———————————————
 // Vet appointments for every pet the adopter has an Accepted application for —
 // same access rule as the vaccination-history endpoint. Ordered by date
 // ascending; `upcomingOnly` narrows to appointments still in the future.
+// status is the same derived label the Staff tab and the vet's queue show
+// (deriveAppointmentStatus) — the raw appointmentStatus never leaves here.
 const LIST_SELECT = {
   appointmentID: true,
   appointmentDate: true,
   appointmentReason: true,
+  appointmentStatus: true,
   pet: { select: { petID: true, petName: true } },
   shelter: { select: { shelterName: true } },
   vet: { select: { vetName: true } },
@@ -27,11 +31,15 @@ const listAppointmentsByAdopter = async (
     where.appointmentDate = { gt: new Date() };
   }
 
-  return prisma.appointment.findMany({
+  const rows = await prisma.appointment.findMany({
     where,
     select: LIST_SELECT,
     orderBy: { appointmentDate: "asc" },
   });
+  return rows.map(({ appointmentStatus, ...row }) => ({
+    ...row,
+    status: deriveAppointmentStatus({ appointmentStatus, appointmentDate: row.appointmentDate }),
+  }));
 };
 
 // ——————————————— APPOINTMENT DETAIL (GET /adopters/me/appointments/:id) ———————————————
@@ -53,6 +61,7 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
       appointmentCode: true,
       appointmentDate: true,
       appointmentReason: true,
+      appointmentStatus: true,
       pet: {
         select: {
           petID: true,
@@ -92,6 +101,7 @@ const getAppointmentDetailForAdopter = async (adopterID, appointmentID) => {
     appointmentCode: appointment.appointmentCode,
     appointmentDate: appointment.appointmentDate,
     appointmentReason: appointment.appointmentReason,
+    status: deriveAppointmentStatus(appointment),
     pet: {
       petID: appointment.pet.petID,
       petName: appointment.pet.petName,

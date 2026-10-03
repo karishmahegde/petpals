@@ -13,7 +13,7 @@ import Staff from "./Staff";
 import Vets from "./Vets";
 import Adopters from "./Adopters";
 import IdVerification from "./IdVerification";
-import HealthPassport from "./sections/pets/HealthPassport";
+import HealthPassport from "../../shared/HealthPassport";
 
 // Renders the staff dashboard section that matches the current /staff/*
 // route (driven by the sidebar nav in DashboardSidebar.tsx). Most sections
@@ -23,7 +23,7 @@ const DashboardRoutes = () => (
   <Routes>
     <Route index element={<Overview />} />
     <Route path="pets" element={<Pets />} />
-    <Route path="pets/:petID/health-passport" element={<HealthPassport />} />
+    <Route path="pets/:petID/health-passport" element={<HealthPassport role="Staff" />} />
     <Route path="transfers" element={<Transfers />} />
     <Route path="appointments" element={<Appointments />} />
     <Route path="applications" element={<Applications />} />

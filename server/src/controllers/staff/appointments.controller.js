@@ -1,4 +1,5 @@
 const appointmentsService = require("../../services/staff/appointments.service");
+const vetAppointmentsService = require("../../services/vet/appointments.service");
 const { successResponse, successListResponse } = require("../../utils/response");
 
 const badRequest = (message) => {
@@ -187,6 +188,9 @@ const getAppointment = async (req, res, next) => {
 // are rejected outright rather than silently ignored, so a caller never
 // thinks they moved an appointment to another pet or marked it done.
 const LOCKED_FIELDS = ["petID", "shelterID", "appointmentStatus", "status"];
+// The assigned vet may reschedule and reword their own appointment, but who
+// it's assigned to stays Staff's call.
+const STAFF_ONLY_FIELDS = ["vetID", "staffID", "volunteerID"];
 
 const updateAppointment = async (req, res, next) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -201,6 +205,15 @@ const updateAppointment = async (req, res, next) => {
   const locked = LOCKED_FIELDS.filter((field) => field in body);
   if (locked.length > 0) {
     return next(badRequest(`These fields can't be edited: ${locked.join(", ")}`));
+  }
+  const isVet = req.user.role === "Veterinarian";
+  if (isVet) {
+    const staffOnly = STAFF_ONLY_FIELDS.filter((field) => field in body);
+    if (staffOnly.length > 0) {
+      return next(
+        badRequest(`Only staff can change: ${staffOnly.join(", ")}`),
+      );
+    }
   }
 
   const data = {};
@@ -247,7 +260,9 @@ const updateAppointment = async (req, res, next) => {
   if (Object.keys(data).length === 0) {
     return next(
       badRequest(
-        "Provide at least one of: vetID, staffID, volunteerID, appointmentDate, appointmentReason",
+        isVet
+          ? "Provide at least one of: appointmentDate, appointmentReason"
+          : "Provide at least one of: vetID, staffID, volunteerID, appointmentDate, appointmentReason",
       ),
     );
   }
@@ -257,7 +272,11 @@ const updateAppointment = async (req, res, next) => {
       role: req.user.role,
       userID: req.user.userID,
     });
-    return successResponse(res, "Appointment updated successfully", appointment);
+    // A vet gets their own detail shape (GET /vets/me/appointments/:id).
+    const body = isVet
+      ? await vetAppointmentsService.getMyAppointment(req.user.userID, appointmentID)
+      : appointment;
+    return successResponse(res, "Appointment updated successfully", body);
   } catch (err) {
     return next(err);
   }
