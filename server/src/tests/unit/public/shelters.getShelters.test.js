@@ -47,6 +47,18 @@ describe("GET /api/v1/shelters", () => {
     });
   });
 
+  test("acceptingDonations=true → Open and Full shelters (the donor's Donate picker)", async () => {
+    prisma.shelter.findMany.mockResolvedValueOnce([]);
+
+    await request(app).get("/api/v1/shelters").query({ acceptingDonations: "true" });
+
+    expect(prisma.shelter.findMany).toHaveBeenCalledWith({
+      where: { shelterStatus: { in: ["Open", "Full"] } },
+      orderBy: { shelterName: "asc" },
+      select: { shelterID: true, shelterName: true },
+    });
+  });
+
   test("returned order is passed through unchanged, not re-sorted or reversed", async () => {
     const alreadySorted = [
       { shelterID: 2, shelterName: "PetPals Brooklyn" },

@@ -69,6 +69,27 @@ describe("Donations (Staff)", () => {
       });
     });
 
+    test("a deleted donor's donation stays listed with donorName null", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.donation.findMany.mockResolvedValueOnce([
+        {
+          donationID: 2,
+          donationCode: "DON-00002",
+          donationDate: new Date("2026-09-02"),
+          donationAmt: 25,
+          donor: null,
+        },
+      ]);
+      prisma.donation.count.mockResolvedValueOnce(1);
+
+      const res = await request(app)
+        .get("/api/v1/donations")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data[0]).toMatchObject({ donationID: 2, donorName: null });
+    });
+
     test("invalid dateFrom -> 400", async () => {
       const res = await request(app)
         .get("/api/v1/donations")
@@ -106,6 +127,11 @@ describe("Donations (Staff)", () => {
         totalAmount: 1240,
         totalDonors: 2,
         thisMonthAmount: 500,
+      });
+      // Deleted donors (donorID NULL) are left out of the donor count.
+      expect(prisma.donation.findMany.mock.calls[0][0].where).toEqual({
+        shelterID: 9,
+        donorID: { not: null },
       });
     });
 
@@ -164,6 +190,18 @@ describe("Donations (Staff)", () => {
       });
       expect(res.body.data).not.toHaveProperty("shelterID");
       expect(JSON.stringify(res.body)).not.toContain("stripeCustomerID");
+    });
+
+    test("a deleted donor's donation -> donor null, the donation still returned", async () => {
+      prisma.donation.findUnique.mockResolvedValueOnce({ ...donationRow(9), donor: null });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .get("/api/v1/donations/1")
+        .set("Authorization", `Bearer ${staffToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({ donationID: 1, donationAmt: 500, donor: null });
     });
 
     test("another shelter's donation -> 403", async () => {

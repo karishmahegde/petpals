@@ -36,6 +36,7 @@ import {
   type Address,
 } from "../../../../logic/utils/address";
 import { formatShortDate } from "../../../../logic/utils/datetime";
+import useAuthStore from "../../../../logic/store/useAuthStore";
 
 const STATUS_TONE: Record<VetAccountStatus, BadgeTone> = {
   Pending: "gold",
@@ -120,6 +121,7 @@ const inputClass =
 
 const Profile = () => {
   const queryClient = useQueryClient();
+  const updateUser = useAuthStore((state) => state.updateUser);
 
   const profileQuery = useQuery({
     queryKey: ["vet", "me"],
@@ -146,8 +148,11 @@ const Profile = () => {
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
       updateMyVetProfile(payload),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["vet", "me"] });
+      // The sidebar reads the name and avatar from the session, not this
+      // query — patch them so a change shows immediately, not after reload.
+      updateUser({ name: saved.vetName, avatarSeed: saved.avatarSeed });
       setDraft(null);
       setSaveError(null);
       toast.success("Profile updated");

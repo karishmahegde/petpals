@@ -1,5 +1,6 @@
 const stripe = require("../../config/stripe");
 const adoptionApplicationsService = require("../../services/adopter/adoptionApplications.service");
+const donationsService = require("../../services/donor/donations.service");
 
 // ——————————————— POST /webhooks/stripe ———————————————
 // req.body is the raw request Buffer here (see routes/webhooks/stripe.routes.js
@@ -28,7 +29,14 @@ const handleWebhook = async (req, res) => {
       // before funds settle for some payment methods; not expected for the
       // cards-only flow this project uses, but costs nothing to check.
       if (session.payment_status === "paid") {
-        await adoptionApplicationsService.finalizeApplication(session);
+        // One webhook, two Checkout flows: a donation session is tagged
+        // metadata.kind = "donation"; an application-fee session carries no
+        // kind, so anything else stays the application flow.
+        if (session.metadata?.kind === donationsService.DONATION_KIND) {
+          await donationsService.finalizeDonation(session);
+        } else {
+          await adoptionApplicationsService.finalizeApplication(session);
+        }
       }
     }
     // Any other event type is ignored — 200 either way, so Stripe doesn't

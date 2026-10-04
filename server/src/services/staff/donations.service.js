@@ -27,12 +27,17 @@ const resolveShelterScope = async ({ role, userID }, shelterIDParam) => {
 };
 
 // Donor fields staff may see. Never stripeCustomerID (CLAUDE.md: never
-// exposed in API responses).
-const formatDonor = (donor) => ({
-  donorName: donor.donorName,
-  donorEmail: donor.user.userEmail,
-  donorPhone: donor.donorPhone,
-});
+// exposed in API responses). null once the donor has deleted their account
+// (Donation.donorID SET NULL) — the client shows "Former donor", same as
+// "Former vet" for a deleted vet.
+const formatDonor = (donor) =>
+  donor
+    ? {
+        donorName: donor.donorName,
+        donorEmail: donor.user.userEmail,
+        donorPhone: donor.donorPhone,
+      }
+    : null;
 
 // ——————————————— LIST DONATIONS (GET /donations) ———————————————
 // Newest first. dateFrom/dateTo (client-computed, so "this month" follows
@@ -79,7 +84,7 @@ const listDonations = async (
       donationCode: row.donationCode,
       donationDate: row.donationDate,
       donationAmt: row.donationAmt,
-      donorName: row.donor.donorName,
+      donorName: row.donor?.donorName ?? null, // null = deleted account
     })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
@@ -95,7 +100,12 @@ const getDonationStats = async (actor, { monthStart, shelterID: shelterIDParam }
 
   const [total, donors, thisMonth] = await Promise.all([
     prisma.donation.aggregate({ where, _sum: { donationAmt: true } }),
-    prisma.donation.findMany({ where, distinct: ["donorID"], select: { donorID: true } }),
+    // Deleted donors (donorID NULL) aren't counted as a donor.
+    prisma.donation.findMany({
+      where: { ...where, donorID: { not: null } },
+      distinct: ["donorID"],
+      select: { donorID: true },
+    }),
     prisma.donation.aggregate({
       where: { ...where, donationDate: { gte: monthStart } },
       _sum: { donationAmt: true },

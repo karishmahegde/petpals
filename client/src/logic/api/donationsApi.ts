@@ -9,7 +9,7 @@ export interface DonationListItem {
   donationCode: string | null;
   donationDate: string;
   donationAmt: number;
-  donorName: string;
+  donorName: string | null; // null once the donor has deleted their account
 }
 
 export interface DonationDetail {
@@ -18,8 +18,12 @@ export interface DonationDetail {
   donationDate: string;
   donationAmt: number;
   donationDesc: string | null;
-  donor: { donorName: string; donorEmail: string; donorPhone: string | null };
+  // null once the donor has deleted their account — the donation stays.
+  donor: { donorName: string; donorEmail: string; donorPhone: string | null } | null;
 }
+
+// A deleted donor's donations stay on the shelter's books with no donor.
+export const FORMER_DONOR = "Former donor";
 
 export interface DonationStats {
   totalAmount: number;

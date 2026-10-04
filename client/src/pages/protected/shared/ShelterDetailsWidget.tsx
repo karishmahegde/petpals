@@ -1,13 +1,19 @@
 // ShelterDetailsWidget.tsx
-// "Shelter Details" on the vet Overview — the vet's shelter's name, address,
-// phone and email (from GET /vets/me's shelter). The page passes the
-// profile it already has.
-import { OverviewWidgetCard } from "../../../../../components/ui/dashboard/DashboardWidgetHeader";
-import PhoneDisplay from "../../../../../components/ui/PhoneDisplay";
-import type { VetSelfProfile } from "../../../../../logic/api/vetsApi";
+// "Shelter Details" on the vet and volunteer Overviews — the shelter's name,
+// address, phone and email (from GET /vets/me's or /volunteers/me's
+// shelter). The page passes the profile it already has.
+import { OverviewWidgetCard } from "../../../components/ui/dashboard/DashboardWidgetHeader";
+import PhoneDisplay from "../../../components/ui/PhoneDisplay";
+
+interface ShelterContact {
+  shelterName: string;
+  shelterAddress: string;
+  shelterPhone: string;
+  shelterEmail: string;
+}
 
 interface ShelterDetailsWidgetProps {
-  shelter: VetSelfProfile["shelter"] | undefined;
+  shelter: ShelterContact | null | undefined;
   isLoading: boolean;
 }
 

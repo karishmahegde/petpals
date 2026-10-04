@@ -1,5 +1,11 @@
 const prisma = require("../../config/prisma");
 const { ADDRESS_SELECT } = require("../../utils/address");
+const { decodeAvailability } = require("../../utils/availability");
+const { maskIdNumber } = require("../governmentIds/selfGovernmentId.service");
+const {
+  withGovernmentIdStatus,
+  assertReadyForApproval,
+} = require("./staffApproval.service");
 
 const notFound = (userID) => {
   const err = new Error(`No volunteer exists with ID ${userID}`);
@@ -33,7 +39,9 @@ const assertStaffOwnsShelter = async (role, userID, shelterID) => {
 };
 
 // Staff-driven account transitions: approve/decline a Pending registration,
-// or deactivate an Active volunteer. Banned is never set from here.
+// or deactivate an Active volunteer. Banned is never set from here. Approving
+// (Pending → Active) also needs onboarding complete and a Verified government
+// ID — the same rule as staff and vet approval (staffApproval.service.js).
 const ALLOWED_TRANSITIONS = {
   Pending: ["Active", "Deactivated"],
   Active: ["Deactivated"],
@@ -74,6 +82,7 @@ const listVolunteers = async (
         volunteerName: true,
         volunteerPhone: true,
         accountStatus: true,
+        onboardingComplete: true,
         user: { select: { userEmail: true } },
       },
       orderBy: { volunteerName: "asc" },
@@ -83,21 +92,30 @@ const listVolunteers = async (
     prisma.volunteer.count({ where }),
   ]);
 
-  return {
-    data: rows.map((row) => ({
+  // governmentIdStatus + onboardingComplete tell staff whether a Pending
+  // volunteer can be approved yet, same as the manager's Vets tab.
+  const data = await withGovernmentIdStatus(
+    "Volunteer",
+    rows.map((row) => ({
       userID: row.userID,
       volunteerName: row.volunteerName,
       volunteerPhone: row.volunteerPhone,
       volunteerEmail: row.user.userEmail,
       accountStatus: row.accountStatus,
+      onboardingComplete: row.onboardingComplete,
     })),
+  );
+
+  return {
+    data,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
 
 // ——————————————— VOLUNTEER DETAIL (GET /volunteers/:id) ———————————————
 // Every Volunteer column, plus the login email and the volunteer's
-// government ID type/number (GovernmentID is unique per userID+userType).
+// government ID type and masked number (GovernmentID is unique per
+// userID+userType).
 const getVolunteerDetail = async (userID, actor) => {
   const volunteer = await prisma.volunteer.findUnique({
     where: { userID },
@@ -114,6 +132,8 @@ const getVolunteerDetail = async (userID, actor) => {
       shelterID: true,
       createdAt: true,
       accountStatus: true,
+      onboardingComplete: true,
+      onboardingStep: true,
       shelter: { select: { shelterName: true } },
       user: { select: { userEmail: true } },
     },
@@ -126,7 +146,7 @@ const getVolunteerDetail = async (userID, actor) => {
 
   const governmentID = await prisma.governmentID.findUnique({
     where: { userID_userType: { userID, userType: "Volunteer" } },
-    select: { idType: true, idNumber: true },
+    select: { idType: true, idNumber: true, verificationStatus: true },
   });
 
   const { shelter, user, ...rest } = volunteer;
@@ -134,7 +154,16 @@ const getVolunteerDetail = async (userID, actor) => {
     ...rest,
     shelterName: shelter?.shelterName ?? null,
     volunteerEmail: user.userEmail,
-    governmentID,
+    // Decoded weekly availability (null for pre-structured free text — the
+    // raw volunteerSchedule is still returned above).
+    availability: decodeAvailability(rest.volunteerSchedule),
+    // idNumber masked (e.g. *****4567) — the full number is only ever shown
+    // in the dedicated ID Verification review (staff/governmentIds.service.js),
+    // never on a roster/detail view (CLAUDE.md: never expose governmentID).
+    governmentID: governmentID
+      ? { idType: governmentID.idType, idNumber: maskIdNumber(governmentID.idNumber) }
+      : null,
+    governmentIdStatus: governmentID?.verificationStatus ?? null,
   };
 };
 
@@ -142,7 +171,7 @@ const getVolunteerDetail = async (userID, actor) => {
 const updateVolunteerStatus = async (userID, { accountStatus }, actor) => {
   const volunteer = await prisma.volunteer.findUnique({
     where: { userID },
-    select: { shelterID: true, accountStatus: true },
+    select: { shelterID: true, accountStatus: true, onboardingComplete: true },
   });
   if (!volunteer) {
     throw notFound(userID);
@@ -153,6 +182,13 @@ const updateVolunteerStatus = async (userID, { accountStatus }, actor) => {
   if (!ALLOWED_TRANSITIONS[volunteer.accountStatus]?.includes(accountStatus)) {
     throw conflict(
       `A ${volunteer.accountStatus} volunteer can't be moved to ${accountStatus}`,
+    );
+  }
+  if (volunteer.accountStatus === "Pending" && accountStatus === "Active") {
+    await assertReadyForApproval(
+      "Volunteer",
+      userID,
+      volunteer.onboardingComplete,
     );
   }
 

@@ -1,6 +1,6 @@
 # PetPals — Animal Adoption Management System
 
-Multi-shelter pet adoption platform (solo full-stack learning project). Unifies animal listings, adoption workflows, and medical records across every branch of a shelter organisation. Differentiators: (1) network-wide search & workflows, (2) universal health passport that travels with an animal across inter-shelter transfers, (3) AI pet–adopter compatibility matcher (OpenAI, planned — Sprint 7).
+Multi-shelter pet adoption platform (solo full-stack learning project). Unifies animal listings, adoption workflows, and medical records across every branch of a shelter organisation. Differentiators: (1) network-wide search & workflows, (2) universal health passport that travels with an animal across inter-shelter transfers, (3) AI pet–adopter compatibility matcher (OpenAI, planned — Sprint 8).
 
 **Roles:** Admin (org oversight, shelters, analytics) · Shelter Staff (pets, applications, volunteers, events, donations) · Adopter (browse, apply, schedule visits, track status) · Veterinarian (appointments, vaccinations, health passport) · Volunteer (assigned tasks) · Donor (donations + history).
 
@@ -42,7 +42,7 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 
 **Guards:** FE `ProtectedRoute` (→ `/login?redirect=<path+search>` if no token, or the worker login for worker dashboards — see below), `RoleRoute` (→ `/forbidden` if wrong role). BE `authenticate.js` (verifies Bearer, sets `req.user`), `authorizeRoles('Staff','Admin')` factory.
 
-**Staff onboarding before approval (Sprint 5.2):** new staff sign up Pending and onboard *before* they're approved (wizard: 2 Personal, 3 Address, 4 Identity/government ID, 5 Review; mandatory, no skip). Pending **Staff** and **Veterinarians** can log in (Sprint 6 extended it to vets; Pending Volunteer/Admin still can't) — the role list is `PENDING_LOGIN_ROLES` in `services/auth/pendingRoles.js`, shared by login and the middleware; login/refresh return `onboardingComplete`, `onboardingStep` (Adopter + Staff + Vet) and `accountStatus` (Staff + Vet). Plain `authenticate` still rejects Pending on every route — only routes wired with **`authenticate.allowPending`** admit a Pending staff member or vet: `GET/PUT /staff/me`, `GET/POST /staff/me/government-id`, `PATCH /staff/me/onboarding-step` + `/onboarding-complete`, the same set under `/vets/me` (`routes/vet/vets.routes.js` — vet self-service, mirroring `/staff/me`'s shapes and status codes), `POST /auth/logout`. Keep that list minimal. **Approval** (Manager `PATCH /staff/me/team/:id/status` and `PATCH /staff/me/vets/:id/status`; Admin `PATCH /staff/:id/status` for Manager sign-ups) requires onboarding complete **and** a Verified government ID — enforced in `services/staff/staffApproval.service.js` (409 otherwise; every export takes the `userType`, `Staff` or `Veterinarian`), which also adds `governmentIdStatus` to the approvers' staff and vet roster shapes. Declining is allowed at any stage. Existing staff, and every non-Pending vet, were backfilled as onboarded (migrations `…_staff_onboarding_backfill`, `…_vet_onboarding_backfill`).
+**Staff onboarding before approval (Sprint 5.2):** new staff sign up Pending and onboard *before* they're approved (wizard: 2 Personal, 3 Address, 4 Identity/government ID, 5 Review; mandatory, no skip). Pending **Staff**, **Veterinarians** and **Volunteers** can log in (Pending Admin still can't) — the role list is `PENDING_LOGIN_ROLES` in `services/auth/pendingRoles.js`, shared by login and the middleware; login/refresh return `onboardingComplete`, `onboardingStep` (every role but Admin) and `accountStatus` (Staff + Vet + Volunteer). Plain `authenticate` still rejects Pending on every route — only routes wired with **`authenticate.allowPending`** admit a Pending staff member, vet or volunteer: `GET/PUT /staff/me`, `GET/POST /staff/me/government-id`, `PATCH /staff/me/onboarding-step` + `/onboarding-complete`, the same set under `/vets/me` (`routes/vet/vets.routes.js` — vet self-service, mirroring `/staff/me`'s shapes and status codes) and under `/volunteers/me` (`routes/volunteer/volunteers.routes.js`, mounted in `app.js` **before** the staff volunteers router so `GET /volunteers/:id` can't catch `/volunteers/me`), `POST /auth/logout`. Keep that list minimal. **Approval** (Manager `PATCH /staff/me/team/:id/status` and `PATCH /staff/me/vets/:id/status`; Admin `PATCH /staff/:id/status` for Manager sign-ups; any staff member at the shelter `PATCH /volunteers/:id/status`) requires onboarding complete **and** a Verified government ID — enforced in `services/staff/staffApproval.service.js` (409 otherwise; every export takes the `userType`: `Staff`, `Veterinarian` or `Volunteer`), which also adds `governmentIdStatus` to the approvers' staff, vet and volunteer roster shapes. Declining is allowed at any stage. Existing staff, and every non-Pending vet and volunteer, were backfilled as onboarded (migrations `…_staff_onboarding_backfill`, `…_vet_onboarding_backfill`, `…_volunteer_onboarding_backfill`).
 
 **Post-login redirect (Sprint 3):** `/login?redirect=/adopt/apply/5` — a query param (survives a mid-login refresh), URL-encoded. Any guarded route can send one — `ProtectedRoute` builds it from `location.pathname + location.search` for every protected page, and the adopt-apply flow's own navigates (`PetDetailsModal`, `AdoptApply`) set it explicitly. Login is mostly role-agnostic about it: redirect present → go there, else → role-dashboard default (`resolveDestination` in `logic/route/`, which also owns the role → dashboard map — Veterinarian is `/vet`). One exception: a redirect into *another* role's dashboard (e.g. `/staff/...` after logging in as Admin) falls back to the user's own dashboard, since it could only end at `/forbidden`. Ending a session from the UI (Log out, closing your own account) must go through **`useEndSession`** (`logic/hooks/`), which navigates away and clears the session inside one `flushSync` — calling `navigate()` then `logout()` separately isn't enough, since the Zustand update can re-render before the router applies the navigation, and `ProtectedRoute` then captures the current page as a stale `redirect`. Where a session ends up is by role (`logoutDestinationFor` / `loginPathFor` in `resolveDestination.ts`): workers (Admin, Staff, Veterinarian) go to the worker login `/staff-portal/login` after Log out or a 401; everyone else goes home (`/`) on Log out and to `/login` on a 401. `ProtectedRoute` likewise sends a signed-out visitor on a worker dashboard (`/staff`, `/admin`, `/vet`) to the worker login, keeping `?redirect=` (`loginPathForPage`). The same branch handles post-login and an already-authed user hitting `/login` directly. Otherwise role correctness is the *destination's* job, not Login's — `RoleRoute` bounces a mismatched role to `/forbidden`, and `AdoptApply` (which bypasses `RoleRoute`) re-checks role itself → `/adopt` + toast.
 
@@ -53,7 +53,7 @@ Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every 
 ```
 client/src/
   logic/
-    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), selfGovernmentIdApi (per-role /me/government-id calls)
+    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), donorsApi (/donors/me/*, /donations/checkout), volunteersApi (/volunteers/me self-service) vs shelterVolunteersApi (staff's /volunteers), selfGovernmentIdApi (per-role /me/government-id calls)
     route/       ProtectedRoute, RoleRoute
     store/       useAuthStore (Zustand: { user, token, role })
     toast/       shared toast helpers
@@ -78,7 +78,7 @@ client/src/
                    (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
         overview/  *Widget.tsx
         shared/    ApplicationsList, VisitsList
-    protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending: Pending staff/vets wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/
+    protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending, /volunteer/pending: Pending staff/vets/volunteers wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi / volunteerGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/
     protected/staff/
       onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
       dashboard/   DashboardLayout routes + one file per tab
@@ -88,11 +88,20 @@ client/src/
         overview/  StatsWidget + *Widget.tsx (Today's Appointments — useTodaysAppointments merges the upcoming and past halves so earlier-today ones count; Overdue Vaccinations — rows open the pet's passport, View All → Health Records; Shelter Details). Tile and widget share each query
         sections/  appointments/ (AppointmentDetailPanel, EditAppointmentForm, RecordVaccineForm) · vaccinations/ (VaccineFormPanel — Add/Edit Vaccine slide-over)
         shared/    CloseAccountModal (DELETE /vets/me; the 409 upcoming-appointments block is its own panel, not a generic error; success → worker login)
-    (volunteer/ donor/ portals — planned)
+    protected/volunteer/
+      onboarding/  VolunteerOnboardingWizard + steps/   (same 2–5 wizard, /volunteer/onboarding/step/:step; OnboardingGate → wizard, then /volunteer/pending)
+      dashboard/   DashboardRoutes (shared DashboardLayout; ROLE_NAV.Volunteer) + one file per tab (Overview, Tasks, Events, Appointments, Availability, Profile)
+        overview/  StatsWidget + MyTasks/NextEvents/AppointmentsWidget; overviewQueries.ts (each query shared by its tile and widget)
+        shared/    DateBlock, CloseAccountModal
+    protected/donor/
+      onboarding/  DonorOnboardingWizard + steps/   (2 Personal, 3 Address, 4 Review — skippable)
+      dashboard/   DashboardRoutes (shared DashboardLayout; ROLE_NAV.Donor) + Overview, Donate, DonateConfirmation, History, Profile
+        overview/  donorQueries.ts, StatsWidget, RecentDonationsWidget
+        shared/    DonateForm, CloseAccountModal
   App.tsx        routes + session restore on mount
 
 server/src/
-  routes/ controllers/ services/   grouped auth/ public/ adopter/ staff/ admin/ vet/ webhooks/ — one <domain>.<layer>.js per file
+  routes/ controllers/ services/   grouped auth/ public/ adopter/ staff/ admin/ vet/ volunteer/ donor/ webhooks/ — one <domain>.<layer>.js per file
   middleware/   authenticate, authorizeRoles, errorHandler, upload
   services/geocoding/   index.js is the ONLY import; usPostalCodeGeocoder.js the only US-aware file
   services/storage/     index.js is the ONLY import (Supabase Storage)
@@ -100,7 +109,7 @@ server/src/
   utils/        errors.js, response.js
   config/prisma.js   singleton Prisma client (PrismaPg adapter)
   prisma/       schema.prisma, seed.js
-  tests/        unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys)
+  tests/        unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys)
   app.js / index.js
 ```
 
@@ -170,9 +179,43 @@ Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.ap
 | PUT | `/health-records/:id` | `recordDesc` only; only the vet who wrote it (403), incl. appointment-completion notes |
 | GET / POST | `/appointments/:id/vaccinations` | doses given at the appointment. POST: assigned vet only; body `vaccineID`, `administeredDate`, optional `dueDate` (null = no further dose planned — never overdue; passport status "No Further Dose"; client wording via `logic/utils/vaccination.ts`; nullable since migration `…_vaccination_due_date_optional`) — `petID`, `administeredBy`, `administeredAt` (appointment's shelter) and `appointmentID` set server-side; any status but Cancelled (409); future `administeredDate` or `dueDate` not after it → 422; unknown vaccineID → 404. GET: assigned vet, Staff at that shelter (403 otherwise), Admin. Another vet's appointment → 404 on both |
 
+### Volunteer portal (Sprint 7 ✅)
+
+All Volunteer-only. Volunteers sign up at a shelter (Pending) and onboard before staff approve them — see Staff onboarding above for `allowPending` and the approval gate.
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET / PUT | `/volunteers/me` | profile (incl. shelter contact, decoded `availability`); `allowPending`. PUT partial; shelterID/accountStatus → 400; phone → E.164 (422 if unparseable) |
+| PUT | `/volunteers/me/availability` | whole week `{ availability: { Mon: ["Morning","Afternoon"] } }`; `{}` clears; unknown day/slot → 400. Stored compactly in `volunteerSchedule` (`"Mon:MA;Wed:E"`, `utils/availability.js`); older free text decodes to `availability: null` (client shows the raw text) |
+| GET / POST | `/volunteers/me/government-id` | shared `selfGovernmentId.service.js`; `allowPending` |
+| PATCH | `/volunteers/me/onboarding-step` · `/onboarding-complete` | 2–5, same wizard as staff/vets; complete needs a submitted ID (409 naming what's missing) |
+| GET | `/volunteers/me/tasks` | tasks they're assigned to; `taskStatus`, `upcoming` (on `taskDue`), page/limit; staff Task shape incl. derived Overdue |
+| PATCH | `/volunteers/me/tasks/:id/status` | `{ taskStatus: "Completed" }` only (cancel is staff's); not theirs → 404; not In_progress → 409 |
+| GET | `/volunteers/me/events` | **read-only** — every event at their shelter + `assigned` (only their own assignment). `upcoming`, `assigned`, `dateTo` (inclusive), page/limit. No self sign-up: staff assign via POST/PUT `/events` `volunteerIDs`; `/volunteers/me/events/:id/signup` doesn't exist (404) |
+| GET | `/volunteers/me/appointments` | appointments they assist (`Appointment.volunteerID`); same item shape/labels/split as `/vets/me/appointments` |
+| DELETE | `/volunteers/me` | `{ mode: deactivate|delete }`. 409 (either mode) while assisting an upcoming Scheduled appointment or holding an In_progress task — `error.details.blockers` = `["appointments","tasks"]` (whichever apply). Either mode drops their future event assignments; delete also removes their task/event assignment rows, the ID + file, Volunteer + Users rows (`Appointment.volunteerID` → null) |
+
+Staff side: `GET /volunteers` roster rows carry `onboardingComplete` + `governmentIdStatus`; `GET /volunteers/:id` masks `idNumber` and returns decoded `availability`; `PATCH /volunteers/:id/status` (any staff at the shelter) is the approval.
+
+### Donor portal (Sprint 7 ✅)
+
+All Donor-only, plain `authenticate` (donors are Active from sign-up — no Pending state, no government ID). Never exposes the Stripe IDs (`stripeCustomerID`, `stripeCheckoutSessionID`, `stripePaymentIntentID`).
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET / PUT | `/donors/me` | profile; PUT partial; accountStatus/stripeCustomerID → 400 |
+| PATCH | `/donors/me/onboarding-step` · `/onboarding-complete` | 2–4 (Personal, Address, Review); skippable client-side |
+| POST | `/donations/checkout` | `{ shelterID, amount (whole USD 1–10000, config/fees.js), donationDesc? ≤300 }` → `{ checkoutUrl }`. Closed shelter → 409 (Open and Full accept); unknown → 404. No row here — the Stripe webhook (`metadata.kind = "donation"` → `finalizeDonation`) records it with Stripe's `amount_total`; a replay is ignored (unique session ID). success → `/donor/donate/confirmation?session_id=…`, cancel → `/donor/donate` |
+| GET | `/donors/me/donations` | history newest first — `shelterID`, `dateFrom` (incl.), `dateTo` (excl.), page/limit. With `?checkoutSessionId=` it's the confirmation poll instead: that donation, or `null` (200) until the webhook lands |
+| GET | `/donors/me/donations/stats` | `?yearStart=` (required — client's local start of year): totalAmount, donationCount, thisYearAmount, byShelter (largest first) |
+| GET | `/donors/me/donations/:id` | own only; another donor's → 404 |
+| DELETE | `/donors/me` | `{ mode: deactivate|delete }`; never blocked. Donations survive with `donorID` null (staff see "Former donor") |
+
+Public: `GET /shelters?acceptingDonations=true` lists Open + Full shelters (the Donate picker); without it, Open only.
+
 ### Domains not yet built
 
-Volunteer portal (volunteer self-service — staff-side `/volunteers` and `/tasks` exist) · Donor portal `/donors` (staff-side `/donations` exists) · AI compatibility matcher.
+AI compatibility matcher (Sprint 8).
 
 ---
 
@@ -217,12 +260,38 @@ Tabs under `/vet/*`: **Overview** · **Appointments** (queue + `AppointmentDetai
 
 **Health passport** (`protected/shared/HealthPassport.tsx`) is one component for Staff and Vet. Read-only for Staff; a vet also gets **Add Record** (`POST /pets/:id/health-records`). Doses are only recorded against an appointment (no standalone dose endpoint), so the passport has no Record Vaccination button. Summarize with AI is a disabled placeholder until the matcher sprint. Editing a vet's own notes isn't wired in the UI — the passport payload doesn't carry the author's `vetID` yet.
 
+
+---
+
+## Volunteer Portal (Sprint 7 ✅)
+
+Onboarding is the staff/vet wizard (`/volunteer/onboarding/step/:step`, mandatory), then the shared `AwaitingApproval` (`/volunteer/pending`) until any staff member at their shelter approves. Volunteers aren't workers: public `/login`, Log out / close account → `/`. Tabs under `/volunteer/*` (Profile is reached from the sidebar account menu, never `ROLE_NAV`):
+
+- **Overview** — tiles (Active Tasks, Upcoming Events, Upcoming Appointments, Events Served) + My Tasks, My Next Events, Assisting Appointments, Shelter Details (`protected/shared/ShelterDetailsWidget`, shared with the vet Overview). Each tile reads `pagination.total` from its widget's query (`overview/overviewQueries.ts`); keys under `["volunteer","tasks"|"events"|"appointments"]`.
+- **My Tasks** — Status + Due Date filters; **Mark Completed** through `DashboardActionList` (confirm modal), invalidating `["volunteer","tasks"]` so the Overview updates. Volunteer-facing labels in `logic/volunteer/taskStatus.ts` (In_progress reads "Open").
+- **Events** — read-only, vet-Appointments layout: Upcoming card (Status all/assigned + Event Date → `dateTo`) and Past card (events they were on). "Assigned to you" badge instead of a Sign up button.
+- **Appointments** — read-only Upcoming/Past cards.
+- **Availability** — `components/ui/AvailabilityGrid` (also read-only on staff's volunteer detail; slot hours `AVAILABILITY_SLOT_HOURS` in `logic/utils/availability.ts`), local draft until Save → `PUT /volunteers/me/availability`.
+- **Profile** — vet Profile layout with `GovernmentIdSection`; `shared/CloseAccountModal` turns the 409's `blockers` into its own panel with View tasks / View appointments.
+
+## Donor Portal (Sprint 7 ✅)
+
+Onboarding is skippable (`/donor/onboarding/step/:step`; `OnboardingGate`'s `SKIPPABLE_ROLE_PATHS` — Adopter keeps `/adopt/apply` gated, Donor gates nothing once skipped). Tabs under `/donor/*`:
+
+- **Overview** — tiles (Total Donated, This Year, Donations Made, Shelters Supported) from the stats query, the donate form, Recent Donations. Every donation query sits under `["donor","donations"]` (`overview/donorQueries.ts`).
+- **Donate** — `shared/DonateForm` (also on the Overview): shelter picker (`GET /shelters?acceptingDonations=true`), $25/$50/$100/$200/custom whole dollars, optional message → `POST /donations/checkout` → `window.location.href` to Stripe.
+- **DonateConfirmation** (`/donor/donate/confirmation`, Stripe's success_url) — polls `?checkoutSessionId=` every 2s (30s then "Still processing"), same approach as `AdoptApplyConfirmation`; once found, invalidates `["donor","donations"]`.
+- **Donation History** — Shelter (from the stats' `byShelter`) + Date range filters (client-computed `dateFrom`/`dateTo`), rows with `donationCode`, plus a By Shelter totals card.
+- **Profile** — vet/volunteer Profile layout minus the government ID; `shared/CloseAccountModal` (no 409 case).
+
 ---
 
 ## Database Notes
 
 - `Pet.petDOB` replaced static `petAge` (age computed at request time). `Pet.featuredFlag BOOLEAN DEFAULT FALSE` powers `/pets/featured` (set via SQL for now, staff toggle planned).
 - Partial and expression unique indexes (not expressible in `schema.prisma`) live only in migration SQL — see Known Issues. Case-insensitive name uniqueness (migration `20260927060418_species_breed_name_ci_unique`): `LOWER(speciesName)` table-wide, `(speciesID, LOWER(breedName))` per species; `staff/species.service.js` pre-checks for a clean 409 and maps the index's violation (a race) to the same 409. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`. One Accepted application per pet: `UNIQUE (petID) WHERE applicationStatus = 'Accepted'` (migration `…_one_accepted_application_per_pet`) — accepting an application also declines the pet's other Pending ones with an automatic `staffRemark`, and accepting for a pet that's no longer `available` is a 409; the index stops two simultaneous acceptances. Double-submit guard on Appointment: `UNIQUE (petID, vetID, appointmentDate) WHERE appointmentStatus = 'Scheduled'` — same pet+vet+timestamp can't have two Scheduled rows (a resubmitted create after a perceived failure).
+- Donation (migration `…_donation_stripe`): `stripeCheckoutSessionID` (UNIQUE — a replayed webhook can't record twice) and `stripePaymentIntentID`, both nullable for pre-Stripe rows; `donorID` nullable with `ON DELETE SET NULL` so a deleted donor's donations stay (same treatment as `Appointment.vetID`).
+- `Volunteer.volunteerSchedule` holds structured availability compactly (`"Mon:MA;Wed:E"`); older free text is left as-is. Volunteer onboarding backfill: every non-Pending volunteer marked onboarded (`…_volunteer_onboarding_backfill`).
 
 ---
 
@@ -256,8 +325,8 @@ Tabs under `/vet/*`: **Overview** · **Appointments** (queue + `AppointmentDetai
 | 5.1 | Shelter staff operations — pet management, adoption application review, staff profile | ✅ |
 | 5.2 | Shelter staff operations — appointments, visits, transfers, events, volunteers + tasks, donations, species/breeds, team + vet approval, government ID review, staff onboarding before approval | ✅ |
 | 6 | Veterinarian portal — onboarding before approval, appointment queue + completion, vaccinations + vaccine catalogue, health records, universal health passport, profile/close account | ✅ |
-| 7 | AI compatibility matcher (OpenAI API) | — |
-| 8 | Volunteer + donor portals | — |
+| 7 | Volunteer + donor portals — volunteer onboarding before approval, tasks, events (read-only, staff assign), assisted appointments, availability; donor skippable onboarding, Stripe donations, history + stats; both profiles/close account | ✅ |
+| 8 | AI compatibility matcher (OpenAI API) | — |
 | 9 | Testing to 70% + cleanup (remove TokenDenylist → RefreshTokens table) | — |
 | 10 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
 

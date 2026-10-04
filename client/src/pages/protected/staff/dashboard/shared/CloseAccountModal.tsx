@@ -7,6 +7,7 @@
 // staff member — surfaced via mutation.isError like any other API error.
 import { useState } from "react";
 import useEndSession from "../../../../../logic/hooks/useEndSession";
+import { logoutDestinationFor } from "../../../../../logic/route/resolveDestination";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -55,8 +56,9 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
       toast.success(
         mode === "delete" ? "Account deleted" : "Account deactivated",
       );
-      // Leave and clear the session in one render (see useEndSession).
-      endSession("/");
+      // Leave and clear the session in one render (see useEndSession) —
+      // staff land on the worker login, like after Log out.
+      endSession(logoutDestinationFor("Staff"));
     },
   });
 

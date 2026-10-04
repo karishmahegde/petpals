@@ -59,6 +59,13 @@ router.get("/shelters/nearby", sheltersController.getNearbyShelters);
  *         description: >
  *           When exactly "true", only shelters with a manager assigned — the
  *           ones a veterinarian can sign up at.
+ *       - in: query
+ *         name: acceptingDonations
+ *         schema: { type: boolean }
+ *         description: >
+ *           When exactly "true", Full shelters are listed too — every
+ *           shelter that can take a donation (only Closed ones can't). The
+ *           donor's Donate picker.
  *     responses:
  *       200:
  *         description: Open shelters ordered alphabetically by name
