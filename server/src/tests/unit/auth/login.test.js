@@ -4,8 +4,8 @@ const bcrypt = require("bcrypt");
 
 // Mocked so this suite never touches a real database. Covers what the staff
 // onboarding change added to login and session restore: a Pending Staff
-// member or Veterinarian CAN log in (to onboard before approval) while
-// Pending accounts of other roles still can't, and Staff/Vet sessions carry
+// member, Veterinarian or Volunteer CAN log in (to onboard before approval)
+// while a Pending Admin still can't, and Staff/Vet/Volunteer sessions carry
 // accountStatus plus onboarding progress. The happy-path login/refresh round trip against a
 // real DB is covered by the integration suite.
 jest.mock("../../../config/prisma", () => ({
@@ -15,6 +15,7 @@ jest.mock("../../../config/prisma", () => ({
   volunteer: { findUnique: jest.fn() },
   admin: { findUnique: jest.fn() },
   adopter: { findUnique: jest.fn() },
+  donor: { findUnique: jest.fn() },
 }));
 
 const prisma = require("../../../config/prisma");
@@ -29,6 +30,7 @@ const ROLE_MODEL = {
   Volunteer: { model: "volunteer", nameField: "volunteerName" },
   Admin: { model: "admin", nameField: "adminName" },
   Adopter: { model: "adopter", nameField: "adopterName" },
+  Donor: { model: "donor", nameField: "donorName" },
 };
 
 // Credentials row + the role table row login() reads.
@@ -130,20 +132,29 @@ describe("Login and session restore", () => {
       });
     });
 
-    test.each(["Volunteer", "Admin"])(
-      "Pending %s → 401, can't log in until approved",
-      async (role) => {
-        mockAccount(role, { accountStatus: "Pending" });
+    test("Pending Volunteer mid-onboarding → 200 with accountStatus and onboarding progress", async () => {
+      mockAccount("Volunteer", {
+        accountStatus: "Pending",
+        onboardingComplete: false,
+        onboardingStep: 3,
+      });
 
-        const res = await login();
+      const res = await login();
 
-        expect(res.status).toBe(401);
-        expect(res.body.message).toBe(
-          "This account is pending approval and can't log in yet.",
-        );
-        expect(prisma.users.update).not.toHaveBeenCalled(); // no lastLoginAt, no refresh token
-      },
-    );
+      expect(res.status).toBe(200);
+      expect(res.body.data.token).toEqual(expect.any(String));
+      expect(res.body.data.user).toMatchObject({
+        userID: 42,
+        role: "Volunteer",
+        accountStatus: "Pending",
+        onboardingComplete: false,
+        onboardingStep: 3,
+      });
+      expect(prisma.volunteer.findUnique.mock.calls[0][0].select).toMatchObject({
+        onboardingComplete: true,
+        onboardingStep: true,
+      });
+    });
 
     test("Deactivated Staff → still 401", async () => {
       mockAccount("Staff", {
@@ -199,32 +210,62 @@ describe("Login and session restore", () => {
       expect(res.status).toBe(401);
     });
 
-    // Only Staff and Veterinarian are in PENDING_LOGIN_ROLES — every other
-    // role's Pending account is still refused, and never gets a session.
-    test.each(["Volunteer", "Admin"])(
-      "Pending %s → still 401, no session issued",
-      async (role) => {
-        mockAccount(role, { accountStatus: "Pending" });
+    // Admin is the one role outside PENDING_LOGIN_ROLES that has a Pending
+    // state — its Pending account is still refused, and never gets a session.
+    test("Pending Admin → still 401, no session issued", async () => {
+      mockAccount("Admin", { accountStatus: "Pending" });
 
-        const res = await login();
+      const res = await login();
 
-        expect(res.status).toBe(401);
-        expect(res.body.error.code).toBe("UNAUTHORIZED");
-        expect(res.body.message).toBe(
-          "This account is pending approval and can't log in yet.",
-        );
-        expect(res.headers["set-cookie"]).toBeUndefined();
-        expect(prisma.users.update).not.toHaveBeenCalled();
-      },
-    );
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe("UNAUTHORIZED");
+      expect(res.body.message).toBe(
+        "This account is pending approval and can't log in yet.",
+      );
+      expect(res.headers["set-cookie"]).toBeUndefined();
+      expect(prisma.users.update).not.toHaveBeenCalled(); // no lastLoginAt, no refresh token
+    });
 
-    test("Volunteer (Active) → neither onboarding fields nor accountStatus", async () => {
-      mockAccount("Volunteer", { accountStatus: "Active" });
+    test("Active Volunteer → 200 with the same fields as Staff", async () => {
+      mockAccount("Volunteer", {
+        accountStatus: "Active",
+        onboardingComplete: true,
+        onboardingStep: 5,
+      });
 
       const res = await login();
 
       expect(res.status).toBe(200);
-      expect(res.body.data.user).not.toHaveProperty("onboardingComplete");
+      expect(res.body.data.user).toMatchObject({
+        accountStatus: "Active",
+        onboardingComplete: true,
+        onboardingStep: 5,
+      });
+    });
+
+    test("Deactivated Volunteer → still 401", async () => {
+      mockAccount("Volunteer", { accountStatus: "Deactivated" });
+
+      const res = await login();
+
+      expect(res.status).toBe(401);
+    });
+
+    test("Donor → onboarding progress but no accountStatus, like an Adopter", async () => {
+      mockAccount("Donor", {
+        accountStatus: "Active",
+        onboardingComplete: false,
+        onboardingStep: 2,
+      });
+
+      const res = await login();
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user).toMatchObject({
+        role: "Donor",
+        onboardingComplete: false,
+        onboardingStep: 2,
+      });
       expect(res.body.data.user).not.toHaveProperty("accountStatus");
     });
   });
@@ -293,6 +334,39 @@ describe("Login and session restore", () => {
         avatarSeed: "seed-42",
         onboardingComplete: false,
         onboardingStep: 3,
+        accountStatus: "Pending",
+      });
+    });
+
+    test("Pending Volunteer → 200, session carries accountStatus and onboarding progress", async () => {
+      const cookieToken = jwt.sign({ userID: 42 }, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+      });
+      prisma.users.findUnique.mockResolvedValueOnce({
+        userID: 42,
+        role: "Volunteer",
+        refreshToken: await bcrypt.hash(cookieToken, 4),
+      });
+      prisma.volunteer.findUnique.mockResolvedValueOnce({
+        volunteerName: "Sam Rivera",
+        avatarSeed: "seed-42",
+        accountStatus: "Pending",
+        onboardingComplete: true,
+        onboardingStep: 5,
+      });
+
+      const res = await request(app)
+        .post("/api/v1/auth/refresh-token")
+        .set("Cookie", `refreshToken=${cookieToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user).toEqual({
+        userID: 42,
+        role: "Volunteer",
+        name: "Sam Rivera",
+        avatarSeed: "seed-42",
+        onboardingComplete: true,
+        onboardingStep: 5,
         accountStatus: "Pending",
       });
     });

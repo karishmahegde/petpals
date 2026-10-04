@@ -8,7 +8,7 @@ import { getGreeting, getGreetingEmoji } from "../../../../logic/utils/datetime"
 import StatsWidget from "./overview/StatsWidget";
 import TodaysAppointmentsWidget from "./overview/TodaysAppointmentsWidget";
 import OverdueVaccinationsWidget from "./overview/OverdueVaccinationsWidget";
-import ShelterDetailsWidget from "./overview/ShelterDetailsWidget";
+import ShelterDetailsWidget from "../../shared/ShelterDetailsWidget";
 import AppointmentDetailPanel from "./sections/appointments/AppointmentDetailPanel";
 
 // Landing section of the vet dashboard (/vet): greeting ("Good afternoon,

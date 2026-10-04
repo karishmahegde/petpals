@@ -6,9 +6,14 @@ jest.mock("../../../services/adopter/adoptionApplications.service", () => ({
   ...jest.requireActual("../../../services/adopter/adoptionApplications.service"),
   finalizeApplication: jest.fn(),
 }));
+jest.mock("../../../services/donor/donations.service", () => ({
+  ...jest.requireActual("../../../services/donor/donations.service"),
+  finalizeDonation: jest.fn(),
+}));
 
 const stripe = require("../../../config/stripe");
 const adoptionApplicationsService = require("../../../services/adopter/adoptionApplications.service");
+const donationsService = require("../../../services/donor/donations.service");
 const app = require("../../../app");
 
 const TEST_WEBHOOK_SECRET = "whsec_unit_test_only";
@@ -74,6 +79,54 @@ describe("POST /api/v1/webhooks/stripe", () => {
     expect(res.body).toEqual({ received: true });
     expect(adoptionApplicationsService.finalizeApplication).toHaveBeenCalledTimes(1);
     expect(adoptionApplicationsService.finalizeApplication).toHaveBeenCalledWith(paidSession());
+  });
+
+  test("a donation session (metadata.kind = donation) → finalizeDonation, not the application flow", async () => {
+    donationsService.finalizeDonation.mockResolvedValueOnce(undefined);
+    const session = paidSession({
+      id: "cs_test_donation",
+      metadata: { kind: "donation", donorID: "42", shelterID: "9", donationDesc: "" },
+    });
+    const payload = JSON.stringify(buildEvent("checkout.session.completed", session));
+
+    const res = await post(payload);
+
+    expect(res.status).toBe(200);
+    expect(donationsService.finalizeDonation).toHaveBeenCalledWith(session);
+    expect(adoptionApplicationsService.finalizeApplication).not.toHaveBeenCalled();
+  });
+
+  test("a session with no kind is still the application flow (sessions created before donations existed)", async () => {
+    adoptionApplicationsService.finalizeApplication.mockResolvedValueOnce(undefined);
+    const payload = JSON.stringify(buildEvent("checkout.session.completed", paidSession()));
+
+    await post(payload);
+
+    expect(adoptionApplicationsService.finalizeApplication).toHaveBeenCalledTimes(1);
+    expect(donationsService.finalizeDonation).not.toHaveBeenCalled();
+  });
+
+  test("an unpaid donation session → nothing recorded, still 200", async () => {
+    const session = paidSession({
+      payment_status: "unpaid",
+      metadata: { kind: "donation", donorID: "42", shelterID: "9" },
+    });
+    const payload = JSON.stringify(buildEvent("checkout.session.completed", session));
+
+    const res = await post(payload);
+
+    expect(res.status).toBe(200);
+    expect(donationsService.finalizeDonation).not.toHaveBeenCalled();
+  });
+
+  test("finalizeDonation throws → 500 so Stripe retries the event", async () => {
+    donationsService.finalizeDonation.mockRejectedValueOnce(new Error("db down"));
+    const session = paidSession({ metadata: { kind: "donation", donorID: "42", shelterID: "9" } });
+    const payload = JSON.stringify(buildEvent("checkout.session.completed", session));
+
+    const res = await post(payload);
+
+    expect(res.status).toBe(500);
   });
 
   test("signature is checked against the raw bytes (unusual whitespace still verifies)", async () => {

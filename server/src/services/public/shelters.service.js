@@ -1,13 +1,16 @@
 const prisma = require("../../config/prisma");
 
 // ——————————————— GET SHELTERS ———————————————
-// hasManager narrows to shelters with a manager assigned — the only ones a
-// vet can sign up at (see auth.service.js's register). Only the filter is
-// public; who the manager is stays internal.
-const getShelters = async ({ hasManager = false } = {}) => {
+// Open shelters by default. hasManager narrows to shelters with a manager
+// assigned — the only ones a vet can sign up at (see auth.service.js's
+// register); only the filter is public, who the manager is stays internal.
+// acceptingDonations widens to Full shelters too — every shelter but a
+// Closed one takes donations (donor/donations.service.js), so this is the
+// donor's Donate picker.
+const getShelters = async ({ hasManager = false, acceptingDonations = false } = {}) => {
   const shelters = await prisma.shelter.findMany({
     where: {
-      shelterStatus: "Open",
+      shelterStatus: acceptingDonations ? { in: ["Open", "Full"] } : "Open",
       ...(hasManager ? { managerStaffID: { not: null } } : {}),
     },
     orderBy: { shelterName: "asc" },

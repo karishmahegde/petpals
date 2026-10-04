@@ -299,8 +299,15 @@ const updateTaskStatus = async (taskID, { taskStatus }, actor) => {
   return getTaskDetail(taskID, actor);
 };
 
+// TASK_SELECT, formatTask and deriveTaskStatus are also used by
+// volunteer/tasks.service.js (GET /volunteers/me/tasks), so a volunteer's
+// own task list has exactly the same item shape and status labels as the
+// Staff Tasks tab.
 module.exports = {
   TASK_NAMES,
+  TASK_SELECT,
+  formatTask,
+  deriveTaskStatus,
   listTasks,
   getTaskDetail,
   createTask,

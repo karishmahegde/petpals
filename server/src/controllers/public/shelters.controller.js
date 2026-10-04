@@ -9,6 +9,7 @@ const getShelters = async (req, res, next) => {
     // boolean query flags).
     const shelters = await sheltersService.getShelters({
       hasManager: req.query.hasManager === "true",
+      acceptingDonations: req.query.acceptingDonations === "true",
     });
     return successResponse(res, "Shelters retrieved successfully", shelters);
   } catch (err) {

@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import axios from "axios";
 import toast from "react-hot-toast";
 import { FaPlus } from "react-icons/fa";
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
@@ -23,7 +24,7 @@ import {
   updateVolunteerStatus,
   type VolunteerAccountStatus,
   type VolunteerListItem,
-} from "../../../../logic/api/volunteersApi";
+} from "../../../../logic/api/shelterVolunteersApi";
 import {
   getTasks,
   type Task,
@@ -42,6 +43,8 @@ import TaskFormPanel from "./sections/volunteers/tasks/TaskFormPanel";
 import TaskDetailPanel from "./sections/volunteers/tasks/TaskDetailPanel";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
+import ButtonElement from "../../../../components/ui/ButtonElement";
+import { approvalBlockers } from "../../../../logic/staff/approvalReadiness";
 
 const PAGE_SIZE = 20;
 
@@ -135,7 +138,14 @@ const Volunteers = () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "volunteers"] });
       toast.success("Volunteer approved");
     },
-    onError: () => toast.error("Couldn't approve this volunteer. Please try again."),
+    // A 409 means readiness changed since the list loaded (e.g. the ID was
+    // rejected meanwhile) — show the server's explanation, not a generic error.
+    onError: (err) =>
+      toast.error(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : "Couldn't approve this volunteer. Please try again.",
+      ),
   });
 
   const [page, setPage] = useState(1);
@@ -217,29 +227,56 @@ const Volunteers = () => {
           <DashboardActionList
             items={pendingVolunteers}
             getKey={(volunteer) => volunteer.userID}
-            renderRow={(volunteer, confirm) => (
-              <DashboardListRow
-                title={volunteer.volunteerName}
-                lines={contactLines(volunteer)}
-                actions={
-                  <>
-                    <RowActionButton
-                      variant="success"
-                      disabled={approve.isPending}
-                      onClick={() => approve.mutate(volunteer.userID)}
-                    >
-                      Approve
-                    </RowActionButton>
-                    <RowActionButton
-                      variant="danger"
-                      onClick={() => confirm(volunteer)}
-                    >
-                      Decline
-                    </RowActionButton>
-                  </>
-                }
-              />
-            )}
+            renderRow={(volunteer, confirm) => {
+              // Approval needs onboarding complete AND a Verified ID (the
+              // server 409s otherwise) — shown at a glance, Approve held back
+              // until both are in place. Declining is allowed at any stage.
+              const blockers = approvalBlockers(volunteer);
+              const ready = blockers.length === 0;
+              return (
+                <DashboardListRow
+                  title={volunteer.volunteerName}
+                  lines={[
+                    ...contactLines(volunteer),
+                    {
+                      text: ready
+                        ? "Ready to approve — onboarding done, ID verified"
+                        : `Can't approve yet: ${blockers.join(" · ")}`,
+                      strong: ready,
+                    },
+                  ]}
+                  actions={
+                    <>
+                      {volunteer.governmentIdStatus === "Pending" && (
+                        <ButtonElement
+                          to="/staff/id-verification"
+                          size="sm"
+                          className="bg-gold-md hover:brightness-95"
+                        >
+                          Verify ID
+                        </ButtonElement>
+                      )}
+                      <RowActionButton onClick={() => setOpenId(volunteer.userID)}>
+                        View Details
+                      </RowActionButton>
+                      <RowActionButton
+                        variant="success"
+                        disabled={!ready || approve.isPending}
+                        onClick={() => approve.mutate(volunteer.userID)}
+                      >
+                        Approve
+                      </RowActionButton>
+                      <RowActionButton
+                        variant="danger"
+                        onClick={() => confirm(volunteer)}
+                      >
+                        Decline
+                      </RowActionButton>
+                    </>
+                  }
+                />
+              );
+            }}
             confirmAction={{
               mutationFn: (volunteer) =>
                 updateVolunteerStatus(volunteer.userID, "Deactivated"),

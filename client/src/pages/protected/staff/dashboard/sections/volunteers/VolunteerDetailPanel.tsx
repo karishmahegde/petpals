@@ -1,9 +1,11 @@
 // VolunteerDetailPanel.tsx
-// Detail slide-over for one volunteer — opened from an All Volunteers row's
-// "View Details". Every Volunteer column (plus login email and government ID
-// type/number), same identity banner + InfoRow layout as the admin
-// StaffDetailPanel. Footer: Deactivate Account, only while Active, behind
-// ConfirmActionModal.
+// Detail slide-over for one volunteer — opened from a Volunteer Approvals or
+// All Volunteers row's "View Details". Every Volunteer column (plus login
+// email and government ID type/masked number), same identity banner +
+// InfoRow layout as the admin StaffDetailPanel; a Pending volunteer also
+// shows what approval is waiting on (onboarding, ID status), and the weekly
+// availability shows as a grid. Footer: Deactivate Account, only while
+// Active, behind ConfirmActionModal.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -17,10 +19,13 @@ import PhoneDisplay from "../../../../../../components/ui/PhoneDisplay";
 import {
   getVolunteerDetail,
   updateVolunteerStatus,
-} from "../../../../../../logic/api/volunteersApi";
+} from "../../../../../../logic/api/shelterVolunteersApi";
 import { VOLUNTEER_STATUS_TONE } from "../../../../../../logic/staff/volunteerStatus";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
 import { formatAddress } from "../../../../../../logic/utils/address";
+import { hasAnyAvailability } from "../../../../../../logic/utils/availability";
+import { approvalBlockers } from "../../../../../../logic/staff/approvalReadiness";
+import AvailabilityGrid from "../../../../../../components/ui/AvailabilityGrid";
 
 interface VolunteerDetailPanelProps {
   userID: number | null;
@@ -64,6 +69,9 @@ const VolunteerDetailPanel = ({ userID, onClose }: VolunteerDetailPanelProps) =>
     },
     onError: (err) => toast.error(extractError(err)),
   });
+
+  // What a Pending volunteer's approval is still waiting on (empty = ready).
+  const blockers = data ? approvalBlockers(data) : [];
 
   return (
     <>
@@ -136,14 +144,64 @@ const VolunteerDetailPanel = ({ userID, onClose }: VolunteerDetailPanelProps) =>
                 k="Volunteering Since"
                 v={formatFullDate(new Date(data.createdAt))}
               />
+              {data.accountStatus === "Pending" && (
+                <>
+                  <InfoRow
+                    k="Onboarding"
+                    v={
+                      data.onboardingComplete
+                        ? "Complete"
+                        : `Not finished (step ${data.onboardingStep} of 5)`
+                    }
+                  />
+                  <InfoRow
+                    k="ID Status"
+                    v={
+                      <span className="flex flex-wrap items-center gap-x-3">
+                        {data.governmentIdStatus ?? "Not submitted"}
+                        {data.governmentIdStatus === "Pending" && (
+                          <ButtonElement
+                            to="/staff/id-verification"
+                            size="bare"
+                            variant="outline"
+                            className="text-sm font-medium text-teal-dark underline"
+                          >
+                            Verify ID
+                          </ButtonElement>
+                        )}
+                      </span>
+                    }
+                  />
+                </>
+              )}
             </dl>
 
-            {/* Availability */}
+            {data.accountStatus === "Pending" &&
+              (blockers.length > 0 ? (
+                <div className="mt-5 rounded-lg bg-gold-lightest px-4 py-3 font-body text-sm text-neutral-charcoal">
+                  <p className="font-semibold">Can't approve yet</p>
+                  <p className="mt-1">{blockers.join(" · ")}</p>
+                </div>
+              ) : (
+                <p className="mt-5 font-body text-xs text-neutral-gray">
+                  Onboarding is done and their ID is verified — ready to
+                  approve from Volunteer Approvals.
+                </p>
+              ))}
+
+            {/* Availability — the decoded weekly grid; older free-text
+                schedules (availability null) still show as written. */}
             <div className={divider} />
-            <h3 className={sectionHeading}>Availability Schedule</h3>
-            <p className={`mt-1 ${value}`}>
-              {data.volunteerSchedule ?? "Not provided"}
-            </p>
+            <h3 className={sectionHeading}>Availability</h3>
+            <div className="mt-3">
+              {data.availability === null ? (
+                <p className={value}>{data.volunteerSchedule}</p>
+              ) : hasAnyAvailability(data.availability) ? (
+                <AvailabilityGrid value={data.availability} />
+              ) : (
+                <p className={value}>Not provided</p>
+              )}
+            </div>
           </div>
         )}
       </SlideOver>

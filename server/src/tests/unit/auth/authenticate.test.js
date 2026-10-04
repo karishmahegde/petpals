@@ -17,8 +17,8 @@ const buildApp = () => {
   app.get("/protected", authenticate, (req, res) => {
     res.status(200).json({ success: true, data: req.user }); //to send the user data to the client
   });
-  // The opt-in variant used by the few routes a Pending staff member or vet
-  // needs to onboard before approval (GET/PUT /staff/me, their government
+  // The opt-in variant used by the few routes a Pending staff member, vet or
+  // volunteer needs to onboard before approval (GET/PUT /staff/me, their government
   // ID, the onboarding endpoints, logout).
   app.get("/onboarding", authenticate.allowPending, (req, res) => {
     res.status(200).json({ success: true, data: req.user });
@@ -127,7 +127,7 @@ describe("authenticate middleware", () => {
     const tokenFor = (role) =>
       jwt.sign({ userID: 42, role }, JWT_SECRET, { expiresIn: "1h" });
 
-    test.each(["Staff", "Veterinarian"])(
+    test.each(["Staff", "Veterinarian", "Volunteer"])(
       "Pending %s → allowed through, req.user set",
       async (role) => {
         authService.getAccountStatus.mockResolvedValue("Pending");
@@ -149,24 +149,23 @@ describe("authenticate middleware", () => {
       expect(res.status).toBe(200);
     });
 
-    test.each(["Volunteer", "Admin"])(
-      "Pending %s → still 401 (only Staff and Vets onboard before approval)",
-      async (role) => {
-        authService.getAccountStatus.mockResolvedValue("Pending");
+    test("Pending Admin → still 401 (Admin doesn't onboard before approval)", async () => {
+      authService.getAccountStatus.mockResolvedValue("Pending");
 
-        const res = await request(app)
-          .get("/onboarding")
-          .set("Authorization", `Bearer ${tokenFor(role)}`);
+      const res = await request(app)
+        .get("/onboarding")
+        .set("Authorization", `Bearer ${tokenFor("Admin")}`);
 
-        expect(res.status).toBe(401);
-      },
-    );
+      expect(res.status).toBe(401);
+    });
 
     test.each([
       ["Deactivated", "Staff"],
       ["DELETED", "Staff"],
       ["Deactivated", "Veterinarian"],
       ["DELETED", "Veterinarian"],
+      ["Banned", "Volunteer"],
+      ["Deactivated", "Volunteer"],
     ])("%s %s → still 401 (only Pending is let through)", async (status, role) => {
       authService.getAccountStatus.mockResolvedValue(status);
 
@@ -177,7 +176,7 @@ describe("authenticate middleware", () => {
       expect(res.status).toBe(401);
     });
 
-    test.each(["Staff", "Veterinarian"])(
+    test.each(["Staff", "Veterinarian", "Volunteer"])(
       "the plain middleware still rejects the same Pending %s token",
       async (role) => {
         authService.getAccountStatus.mockResolvedValue("Pending");

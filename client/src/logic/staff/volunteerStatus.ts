@@ -2,7 +2,7 @@
 // Badge tone per volunteer account status — shared by the Volunteers tab's
 // list rows and VolunteerDetailPanel.
 import type { BadgeTone } from "../../components/ui/Badge";
-import type { VolunteerAccountStatus } from "../api/volunteersApi";
+import type { VolunteerAccountStatus } from "../api/shelterVolunteersApi";
 
 export const VOLUNTEER_STATUS_TONE: Record<VolunteerAccountStatus, BadgeTone> = {
   Pending: "gold",

@@ -28,8 +28,10 @@ import StaffOnboardingWizard from "./pages/protected/staff/onboarding/StaffOnboa
 import AwaitingApproval from "./pages/protected/shared/AwaitingApproval";
 import VetDashboardRoutes from "./pages/protected/vet/dashboard/DashboardRoutes";
 import VetOnboardingWizard from "./pages/protected/vet/onboarding/VetOnboardingWizard";
-import VolunteerDashboard from "./pages/protected/volunteer/VolunteerDashboard";
-import DonorDashboard from "./pages/protected/donor/DonorDashboard";
+import VolunteerOnboardingWizard from "./pages/protected/volunteer/onboarding/VolunteerOnboardingWizard";
+import VolunteerDashboardRoutes from "./pages/protected/volunteer/dashboard/DashboardRoutes";
+import DonorDashboardRoutes from "./pages/protected/donor/dashboard/DashboardRoutes";
+import DonorOnboardingWizard from "./pages/protected/donor/onboarding/DonorOnboardingWizard";
 import AdminDashboardRoutes from "./pages/protected/admin/dashboard/DashboardRoutes";
 import { refreshToken } from "./logic/api/authApi";
 import useAuthStore from "./logic/store/useAuthStore";
@@ -164,6 +166,30 @@ const App = () => {
           }
         />
 
+        {/* Volunteer onboarding wizard and pending page — same pattern again:
+            a new volunteer onboards, then waits for staff at their shelter
+            to approve them. */}
+        <Route
+          path="/volunteer/onboarding/step/:step"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Volunteer"]}>
+                <VolunteerOnboardingWizard />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/volunteer/pending"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Volunteer"]}>
+                <AwaitingApproval role="Volunteer" />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Role-based dashboards — guarded by ProtectedRoute (authenticated) + RoleRoute (correct role) */}
         <Route
           path="/adopter/*"
@@ -202,21 +228,37 @@ const App = () => {
           }
         />
         <Route
-          path="/volunteer"
+          path="/volunteer/*"
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Volunteer"]}>
-                <VolunteerDashboard />
+                <DashboardLayout>
+                  <VolunteerDashboardRoutes />
+                </DashboardLayout>
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        {/* Donor onboarding — skippable, like the adopter wizard (see
+            OnboardingGate). More specific than /donor/* so it matches first. */}
+        <Route
+          path="/donor/onboarding/step/:step"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={["Donor"]}>
+                <DonorOnboardingWizard />
               </RoleRoute>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/donor"
+          path="/donor/*"
           element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={["Donor"]}>
-                <DonorDashboard />
+                <DashboardLayout>
+                  <DonorDashboardRoutes />
+                </DashboardLayout>
               </RoleRoute>
             </ProtectedRoute>
           }

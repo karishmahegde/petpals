@@ -120,7 +120,10 @@ router.get(
  *     description: >
  *       Allowed transitions — Pending → Active (approve), Pending →
  *       Deactivated (decline), Active → Deactivated (deactivate). Anything
- *       else is 409. Staff may only act on volunteers at their own shelter.
+ *       else is 409. Approving also requires the volunteer to have finished
+ *       onboarding and their government ID to be Verified (409 naming what's
+ *       missing); declining is allowed at any stage. Staff may only act on
+ *       volunteers at their own shelter.
  *     tags: [Volunteers, Staff]
  *     security:
  *       - bearerAuth: []
@@ -162,7 +165,7 @@ router.get(
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: The transition isn't allowed from the volunteer's current status
+ *         description: The transition isn't allowed from the volunteer's current status, or (approve) onboarding is incomplete or the government ID isn't Verified
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
