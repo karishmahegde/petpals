@@ -217,6 +217,7 @@ model Pet {
   appointments           Appointment[]
   favorites              Favorite[]
   healthRecords          HealthRecord[]
+  matches                AdopterMatch[]
   breed                  Breed                 @relation(fields: [breedID], references: [breedID])
   shelter                Shelter               @relation(fields: [shelterID], references: [shelterID])
   staff                  Staff?                @relation(fields: [staffID], references: [userID])
@@ -277,6 +278,36 @@ model Adopter {
   applications       AdoptionApplication[]
   favorites          Favorite[]
   visits             Visit[]
+  quiz               AdopterQuiz?
+  matches            AdopterMatch[]
+}
+
+// The adopter's answers to the personality quiz (config/matchQuiz.js) —
+// { [questionId]: optionCode }. JSON rather than a column per question so the
+// quiz can change without a migration; the config validates every write.
+model AdopterQuiz {
+  adopterID Int      @id
+  answers   Json
+  updatedAt DateTime @updatedAt
+  adopter   Adopter  @relation(fields: [adopterID], references: [userID], onDelete: Cascade)
+}
+
+// Cached compatibility results, so page loads never call the AI. Disposable:
+// rows cascade away with their adopter or pet, and are rebuilt when stale.
+// aiScore is null when the result is rule-based only (AI off or unavailable).
+model AdopterMatch {
+  adopterID  Int
+  petID      Int
+  ruleScore  Int
+  aiScore    Int?
+  totalScore Int
+  reason     String?  @db.VarChar(300)
+  computedAt DateTime @default(now())
+  adopter    Adopter  @relation(fields: [adopterID], references: [userID], onDelete: Cascade)
+  pet        Pet      @relation(fields: [petID], references: [petID], onDelete: Cascade)
+
+  @@id([adopterID, petID])
+  @@index([adopterID, totalScore])
 }
 
 model Favorite {
