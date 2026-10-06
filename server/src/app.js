@@ -65,6 +65,8 @@ const visitsRouter = require("./routes/adopter/visits.routes");
 app.use("/api/v1/visits", visitsRouter);
 const favoritesRouter = require("./routes/adopter/favorites.routes");
 app.use("/api/v1", favoritesRouter);
+const matchQuizRouter = require("./routes/adopter/matchQuiz.routes");
+app.use("/api/v1", matchQuizRouter);
 // Staff self-service routes (/staff/me) must be mounted BEFORE the admin
 // staff router below — its GET /staff/:id would otherwise swallow
 // "/staff/me" first (:id="me").

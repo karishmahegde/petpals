@@ -1330,6 +1330,40 @@ const schemas = {
       },
     },
   },
+  MatchQuizQuestion: {
+    type: "object",
+    properties: {
+      id: { type: "string", example: "aloneTime" },
+      prompt: { type: "string" },
+      options: {
+        type: "array",
+        description: "Ordered from most to least on the trait the question measures",
+        items: {
+          type: "object",
+          properties: {
+            code: { type: "string", example: "rarely" },
+            emoji: { type: "string" },
+            label: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  QuizAnswers: {
+    type: "object",
+    description: "Question ID → chosen option code",
+    additionalProperties: { type: "string" },
+    example: { aloneTime: "workday", exercise: "oneToTwoH", noise: "moderate" },
+  },
+  AdopterQuiz: {
+    type: "object",
+    nullable: true,
+    properties: {
+      answers: { $ref: "#/components/schemas/QuizAnswers" },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  },
+
   Favorite: {
     type: "object",
     properties: {
