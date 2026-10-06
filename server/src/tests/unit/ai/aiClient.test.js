@@ -1,4 +1,8 @@
-const { isAiConfigured, generateStructured } = require("../../../services/ai");
+const {
+  AI_ERROR_REASONS,
+  isAiConfigured,
+  generateStructured,
+} = require("../../../services/ai");
 
 const SCHEMA = {
   type: "object",
@@ -37,6 +41,23 @@ afterEach(() => {
   delete global.fetch;
 });
 
+describe("AI_ERROR_REASONS", () => {
+  // The values are what callers see on err.reason — pinned so a rename is a
+  // deliberate, visible change.
+  test("lists every reason with its stable value, and can't be changed", () => {
+    expect(AI_ERROR_REASONS).toEqual({
+      NOT_CONFIGURED: "not_configured",
+      TIMEOUT: "timeout",
+      UNREACHABLE: "unreachable",
+      RATE_LIMITED: "rate_limited",
+      AUTH_FAILED: "auth_failed",
+      PROVIDER_ERROR: "provider_error",
+      INVALID_RESPONSE: "invalid_response",
+    });
+    expect(Object.isFrozen(AI_ERROR_REASONS)).toBe(true);
+  });
+});
+
 describe("isAiConfigured", () => {
   test("true only when base URL, key and model are all set", () => {
     expect(isAiConfigured()).toBe(true);
@@ -53,7 +74,7 @@ describe("generateStructured", () => {
   test("not configured → rejects without calling the provider", async () => {
     process.env.AI_API_KEY = "";
     await expect(generateStructured(request)).rejects.toMatchObject({
-      reason: "not_configured",
+      reason: AI_ERROR_REASONS.NOT_CONFIGURED,
     });
     expect(global.fetch).not.toHaveBeenCalled();
   });
@@ -94,10 +115,10 @@ describe("generateStructured", () => {
   });
 
   test.each([
-    [429, "rate_limited"],
-    [401, "auth_failed"],
-    [403, "auth_failed"],
-    [500, "provider_error"],
+    [429, AI_ERROR_REASONS.RATE_LIMITED],
+    [401, AI_ERROR_REASONS.AUTH_FAILED],
+    [403, AI_ERROR_REASONS.AUTH_FAILED],
+    [500, AI_ERROR_REASONS.PROVIDER_ERROR],
   ])("HTTP %i → reason %s, with the provider's message", async (status, reason) => {
     global.fetch.mockResolvedValue(
       jsonResponse(status, { error: { message: "nope" } }),
@@ -114,24 +135,24 @@ describe("generateStructured", () => {
     timeout.name = "TimeoutError";
     global.fetch.mockRejectedValueOnce(timeout);
     await expect(generateStructured(request)).rejects.toMatchObject({
-      reason: "timeout",
+      reason: AI_ERROR_REASONS.TIMEOUT,
     });
 
     global.fetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
     await expect(generateStructured(request)).rejects.toMatchObject({
-      reason: "unreachable",
+      reason: AI_ERROR_REASONS.UNREACHABLE,
     });
   });
 
   test("empty or non-JSON content → invalid_response", async () => {
     global.fetch.mockResolvedValueOnce(completion(""));
     await expect(generateStructured(request)).rejects.toMatchObject({
-      reason: "invalid_response",
+      reason: AI_ERROR_REASONS.INVALID_RESPONSE,
     });
 
     global.fetch.mockResolvedValueOnce(completion("not json"));
     await expect(generateStructured(request)).rejects.toMatchObject({
-      reason: "invalid_response",
+      reason: AI_ERROR_REASONS.INVALID_RESPONSE,
     });
   });
 });

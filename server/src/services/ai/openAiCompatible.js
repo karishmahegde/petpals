@@ -21,10 +21,21 @@ const isAiConfigured = () => {
   return Boolean(baseUrl && apiKey && model);
 };
 
-// `reason` lets callers tell the fall-back cases apart (not_configured,
-// timeout, unreachable, rate_limited, auth_failed, provider_error,
-// invalid_response); `code` keeps the standard envelope if one ever reaches
-// errorHandler.
+// Every value an AI error's `reason` can take — compare against these, never
+// a string literal, so a typo fails loudly (undefined) instead of silently
+// never matching.
+const AI_ERROR_REASONS = Object.freeze({
+  NOT_CONFIGURED: "not_configured", // AI_* env vars not all set
+  TIMEOUT: "timeout", // no reply within timeoutMs
+  UNREACHABLE: "unreachable", // network failure before any reply
+  RATE_LIMITED: "rate_limited", // HTTP 429
+  AUTH_FAILED: "auth_failed", // HTTP 401/403 — bad or revoked key
+  PROVIDER_ERROR: "provider_error", // any other non-OK status
+  INVALID_RESPONSE: "invalid_response", // empty reply, or not valid JSON
+});
+
+// `reason` (one of AI_ERROR_REASONS) lets callers tell the fall-back cases
+// apart; `code` keeps the standard envelope if one ever reaches errorHandler.
 const aiError = (message, reason) => {
   const err = new Error(message);
   err.code = "INTERNAL_SERVER_ERROR";
@@ -33,9 +44,9 @@ const aiError = (message, reason) => {
 };
 
 const reasonForStatus = (status) => {
-  if (status === 429) return "rate_limited";
-  if (status === 401 || status === 403) return "auth_failed";
-  return "provider_error";
+  if (status === 429) return AI_ERROR_REASONS.RATE_LIMITED;
+  if (status === 401 || status === 403) return AI_ERROR_REASONS.AUTH_FAILED;
+  return AI_ERROR_REASONS.PROVIDER_ERROR;
 };
 
 // Sends one system + user prompt and returns the reply parsed from JSON.
@@ -44,19 +55,31 @@ const reasonForStatus = (status) => {
 // needs `additionalProperties: false`. Groq enforces it at generation time;
 // not every provider does, so callers still check the shape they get back.
 const generateStructured = async ({
+  // Standing instructions — the model's role and rules, the same on every call
+  // for a feature. Kept apart from `user` so data can't override the rules.
   system,
+  // This call's data (e.g. quiz answers + shortlisted pets), usually
+  // JSON.stringify'd. Treated as input to judge, not instructions.
   user,
+  // Short label for the output shape (letters, digits, _ or -), e.g. "pet_fit".
+  // Only names the schema; doesn't change the reply.
   schemaName,
+  // JSON Schema the reply must match; the parsed object is what's returned.
   schema,
+  // Low = consistent answers (the same pet scores about the same each run).
   temperature = 0.2,
+  // "low" | "medium" | "high", or omitted for the provider's default — how
+  // long a reasoning model thinks before answering.
   reasoningEffort,
+  // Caps the reply length (sent as max_completion_tokens); omitted = no cap.
   maxTokens,
+  // Gives up after this, with AI_ERROR_REASONS.TIMEOUT.
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }) => {
   if (!isAiConfigured()) {
     throw aiError(
       "AI is not configured — set AI_BASE_URL, AI_API_KEY and AI_MODEL",
-      "not_configured",
+      AI_ERROR_REASONS.NOT_CONFIGURED,
     );
   }
   const { baseUrl, apiKey, model } = readConfig();
@@ -91,9 +114,9 @@ const generateStructured = async ({
     });
   } catch (fetchErr) {
     if (fetchErr.name === "TimeoutError") {
-      throw aiError(`AI request timed out after ${timeoutMs} ms`, "timeout");
+      throw aiError(`AI request timed out after ${timeoutMs} ms`, AI_ERROR_REASONS.TIMEOUT);
     }
-    throw aiError(`AI provider unreachable: ${fetchErr.message}`, "unreachable");
+    throw aiError(`AI provider unreachable: ${fetchErr.message}`, AI_ERROR_REASONS.UNREACHABLE);
   }
 
   if (!res.ok) {
@@ -113,13 +136,13 @@ const generateStructured = async ({
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
-    throw aiError("AI provider returned no content", "invalid_response");
+    throw aiError("AI provider returned no content", AI_ERROR_REASONS.INVALID_RESPONSE);
   }
   try {
     return JSON.parse(content);
   } catch {
-    throw aiError("AI provider returned invalid JSON", "invalid_response");
+    throw aiError("AI provider returned invalid JSON", AI_ERROR_REASONS.INVALID_RESPONSE);
   }
 };
 
-module.exports = { isAiConfigured, generateStructured };
+module.exports = { AI_ERROR_REASONS, isAiConfigured, generateStructured };
