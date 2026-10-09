@@ -213,6 +213,9 @@ model Pet {
   compatibleWithPets     Boolean               @default(false)
   specialNeeds           Boolean               @default(false)
   featuredFlag           Boolean               @default(false)
+  // Bumped by Prisma on every write — the matcher's cache treats a pet changed
+  // after an AdopterMatch row's computedAt as stale.
+  updatedAt              DateTime              @default(now()) @updatedAt
   adoptionApps           AdoptionApplication[]
   appointments           Appointment[]
   favorites              Favorite[]

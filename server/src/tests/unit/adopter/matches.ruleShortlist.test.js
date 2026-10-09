@@ -38,7 +38,7 @@ const petRow = (overrides = {}) => ({
   compatibleWithChildren: true,
   compatibleWithPets: true,
   specialNeeds: false,
-  breed: { speciesID: 1 },
+  breed: { speciesID: 1, species: { speciesName: "Dog" } },
   ...overrides,
 });
 
@@ -48,7 +48,7 @@ describe("getRuleShortlist", () => {
   test("loads available pets only and returns rule-only matches, best first", async () => {
     prisma.adopter.findUnique.mockResolvedValueOnce(adopterRow());
     prisma.pet.findMany.mockResolvedValueOnce([
-      petRow({ petID: 2, breedID: 30, petSize: "Large", breed: { speciesID: 2 } }),
+      petRow({ petID: 2, breedID: 30, petSize: "Large", breed: { speciesID: 2, species: { speciesName: "Cat" } } }),
       petRow({ petID: 1 }),
     ]);
 
@@ -71,8 +71,8 @@ describe("getRuleShortlist", () => {
     expect(top.ruleScore).toBe(99);
     expect(top.ruleScore).toBeGreaterThan(result[1].ruleScore);
     expect(top.breakdown.breed).toBe(1);
-    // The pet goes on to the AI step with its name and description, species flattened.
-    expect(top.pet).toEqual(expect.objectContaining({ petName: "Biscuit", petDesc: "Loves naps.", speciesID: 1 }));
+    // The pet goes on to the AI step with its description, species flattened.
+    expect(top.pet).toEqual(expect.objectContaining({ petName: "Biscuit", petDesc: "Loves naps.", speciesID: 1, speciesName: "Dog" }));
     expect(top.pet.breed).toBeUndefined();
   });
 

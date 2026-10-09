@@ -149,4 +149,4 @@ const shortlistPets = (adopter, answers, pets, { now = new Date(), limit = SHORT
     )
     .slice(0, limit);
 
-module.exports = { ageBand, passesHardFilters, scorePet, shortlistPets };
+module.exports = { ageInMonths, ageBand, passesHardFilters, scorePet, shortlistPets };

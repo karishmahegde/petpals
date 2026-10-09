@@ -47,6 +47,21 @@ const UNKNOWN_FIT = 0.5;
 // How many top-scoring pets go on to the AI step.
 const SHORTLIST_SIZE = 20;
 
+// totalScore = rule × rule weight + AI personality fit × AI weight (both
+// 0–100, weights add up to 1). A pet with no AI score keeps its rule score.
+const TOTAL_SCORE_WEIGHTS = { rule: 0.6, ai: 0.4 };
+
+// The one AI call per recompute — sized for Groq's free tier (~4K tokens:
+// ~3K prompt for 20 pets, the rest for low-effort reasoning + the reply).
+const AI_MATCH_CALL = {
+  reasoningEffort: "low",
+  maxTokens: 2000,
+  temperature: 0.2,
+};
+
+// AdopterMatch.reason is VARCHAR(300); longer AI reasons are cut to fit.
+const REASON_MAX_LENGTH = 300;
+
 module.exports = {
   MATCH_WEIGHTS,
   AGE_BAND_MONTHS,
@@ -58,4 +73,7 @@ module.exports = {
   AGE_BAND_ENERGY,
   UNKNOWN_FIT,
   SHORTLIST_SIZE,
+  TOTAL_SCORE_WEIGHTS,
+  AI_MATCH_CALL,
+  REASON_MAX_LENGTH,
 };
