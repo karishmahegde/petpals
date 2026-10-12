@@ -1364,6 +1364,37 @@ const schemas = {
     },
   },
 
+  AdopterMatches: {
+    type: "object",
+    properties: {
+      quizComplete: { type: "boolean", description: "false → the adopter hasn't taken the quiz; matches is empty" },
+      matches: {
+        type: "array",
+        items: {
+          type: "object",
+          description: "A pet catalog card (see AdoptedPet) plus the match fields.",
+          properties: {
+            petID: { type: "integer" },
+            petName: { type: "string" },
+            petAge: { type: "string", example: "~2 yrs" },
+            petSex: { type: "string" },
+            petPhoto: { type: "string", nullable: true },
+            breed: {
+              type: "object",
+              properties: {
+                breedName: { type: "string" },
+                speciesName: { type: "string" },
+              },
+            },
+            score: { type: "integer", minimum: 0, maximum: 100 },
+            reason: { type: "string", nullable: true, description: "AI-written, addressed to the adopter; null when aiExplained is false" },
+            aiExplained: { type: "boolean", description: "true when the AI scored this pet; false = rule-based score only" },
+          },
+        },
+      },
+    },
+  },
+
   Favorite: {
     type: "object",
     properties: {

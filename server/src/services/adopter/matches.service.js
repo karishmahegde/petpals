@@ -7,6 +7,8 @@ const {
   REASON_MAX_LENGTH,
 } = require("../../config/matchScoring");
 const { ageInMonths, ageBand, shortlistPets } = require("./matchScore");
+const { formatAgeFromDOBYears, formatSex } = require("../public/pets.service");
+const storage = require("../storage");
 
 const notFound = (userID) => {
   const err = new Error(`No adopter exists with ID ${userID}`);
@@ -316,11 +318,92 @@ const getMatches = async (adopterID, { now = new Date() } = {}) => {
   );
 };
 
+// ——————————————— TOP MATCHES (GET /adopters/me/matches) ———————————————
+const TOP_MATCHES_DEFAULT_LIMIT = 3;
+
+// An adopter's live application blocks a re-apply (AdoptApply), so a pet they
+// already have one for isn't worth suggesting.
+const ACTIVE_APPLICATION_STATUSES = ["Pending", "Accepted"];
+
+const PET_CARD_SELECT = {
+  petID: true,
+  petName: true,
+  petDOB: true, // for petAge only, not returned
+  petPhoto: true,
+  petSex: true,
+  breed: { select: { breedName: true, species: { select: { speciesName: true } } } },
+};
+
+// The adopter's best `limit` matches in the PetCard shape + score, reason and
+// aiExplained (true when the AI scored it — reason is null otherwise). No quiz
+// yet → quizComplete false and no matches, without computing anything.
+// Availability and the adopter's own applications are filtered here at read
+// time, not baked into the cache: applying doesn't touch the pet, so the
+// cache stays warm and the AI isn't called again.
+const getTopMatches = async (
+  adopterID,
+  { limit = TOP_MATCHES_DEFAULT_LIMIT, now = new Date() } = {},
+) => {
+  const adopter = await prisma.adopter.findUnique({
+    where: { userID: adopterID },
+    select: { quiz: { select: { adopterID: true } } },
+  });
+  if (!adopter) {
+    throw notFound(adopterID);
+  }
+  if (!adopter.quiz) {
+    return { quizComplete: false, matches: [] };
+  }
+
+  const ranked = await getMatches(adopterID, { now });
+  if (ranked.length === 0) {
+    return { quizComplete: true, matches: [] };
+  }
+
+  const pets = await prisma.pet.findMany({
+    where: {
+      petID: { in: ranked.map((row) => row.petID) },
+      adoptionStatus: "available",
+      adoptionApps: {
+        none: { adopterID, applicationStatus: { in: ACTIVE_APPLICATION_STATUSES } },
+      },
+    },
+    select: PET_CARD_SELECT,
+  });
+  const petsByID = new Map(pets.map((pet) => [pet.petID, pet]));
+
+  const matches = ranked
+    .filter((row) => petsByID.has(row.petID))
+    .slice(0, limit)
+    .map((row) => {
+      const pet = petsByID.get(row.petID);
+      const aiExplained = row.aiScore !== null;
+      return {
+        petID: pet.petID,
+        petName: pet.petName,
+        petAge: formatAgeFromDOBYears(pet.petDOB),
+        petSex: formatSex(pet.petSex),
+        petPhoto: storage.toPublicFileUrl(storage.PET_IMAGES_BUCKET, pet.petPhoto),
+        breed: {
+          breedName: pet.breed.breedName,
+          speciesName: pet.breed.species.speciesName,
+        },
+        score: row.totalScore,
+        reason: aiExplained ? row.reason : null,
+        aiExplained,
+      };
+    });
+
+  return { quizComplete: true, matches };
+};
+
 module.exports = {
   MATCH_PROFILE_FIELDS,
+  TOP_MATCHES_DEFAULT_LIMIT,
   getRuleShortlist,
   computeMatches,
   getMatches,
+  getTopMatches,
   // exported for unit tests
   buildAiUserPrompt,
   parseAiFit,
