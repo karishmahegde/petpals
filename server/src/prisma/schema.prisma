@@ -221,6 +221,7 @@ model Pet {
   favorites              Favorite[]
   healthRecords          HealthRecord[]
   matches                AdopterMatch[]
+  healthSummary          PetHealthSummary?
   breed                  Breed                 @relation(fields: [breedID], references: [breedID])
   shelter                Shelter               @relation(fields: [shelterID], references: [shelterID])
   staff                  Staff?                @relation(fields: [staffID], references: [userID])
@@ -414,6 +415,21 @@ model HealthRecord {
   appointment   Appointment?  @relation(fields: [appointmentID], references: [appointmentID], onDelete: SetNull)
 
   @@index([appointmentID])
+}
+
+// Cached AI summary of a pet's health passport, so opening it again never
+// calls the AI. Keyed by a hash of exactly what was sent (prompt + records,
+// doses, transfers): a record, dose or transfer added or changed gives a new
+// hash, and the next request regenerates. Disposable: cascades with the pet.
+// pointsToReview holds the AI's points only — overdue vaccines are worked out
+// fresh on every request (utils/vaccinations.js), never cached.
+model PetHealthSummary {
+  petID          Int      @id
+  inputHash      String   @db.VarChar(64)
+  summary        String   @db.VarChar(1500)
+  pointsToReview Json
+  generatedAt    DateTime @default(now())
+  pet            Pet      @relation(fields: [petID], references: [petID], onDelete: Cascade)
 }
 
 model Vaccine {

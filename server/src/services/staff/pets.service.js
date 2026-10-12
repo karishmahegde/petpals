@@ -811,6 +811,9 @@ module.exports = {
   listShelterPets,
   getShelterPetDetail,
   getHealthPassport,
+  // the passport's access rule, reused by healthPassportSummary.service.js
+  assertStaffOwnsShelter,
+  assertVetSeesPet,
   createPet,
   updatePet,
   deletePet,

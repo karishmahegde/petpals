@@ -684,6 +684,42 @@ const schemas = {
     },
   },
 
+  HealthPassportSummary: {
+    type: "object",
+    properties: {
+      aiAvailable: { type: "boolean", description: "false → AI isn't configured; everything else is empty" },
+      summary: { type: "string", nullable: true, maxLength: 1500 },
+      pointsToReview: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            text: { type: "string", maxLength: 200 },
+            source: {
+              type: "object",
+              description: "The passport row this point comes from",
+              properties: {
+                type: { type: "string", enum: ["healthRecord", "vaccination", "transfer"] },
+                recordID: { type: "integer" },
+              },
+            },
+            origin: {
+              type: "string",
+              enum: ["rules", "ai"],
+              description: "rules = overdue vaccine (latest-dose rule); ai = the model's",
+            },
+          },
+        },
+      },
+      generatedAt: {
+        type: "string",
+        format: "date-time",
+        nullable: true,
+        description: "When the AI summary was generated; null when no AI call was made",
+      },
+    },
+  },
+
   TransferQueueItem: {
     type: "object",
     properties: {
@@ -1363,7 +1399,6 @@ const schemas = {
       updatedAt: { type: "string", format: "date-time" },
     },
   },
-
   AdopterMatches: {
     type: "object",
     properties: {
