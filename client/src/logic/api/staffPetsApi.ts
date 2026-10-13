@@ -182,6 +182,9 @@ export interface PetTransferHistoryItem {
 // the (shelter-scoped) Transfers tab's own version of transfer history.
 export interface HealthPassportData {
   pet: StaffPetFullDetail;
+  // Whether "Summarize with AI" can work — from the server's AI config, no
+  // AI call. False keeps the button disabled.
+  aiSummaryAvailable: boolean;
   healthRecords: HealthRecordItem[];
   vaccinations: VaccinationItem[];
   transferHistory: PetTransferHistoryItem[];
@@ -191,6 +194,37 @@ export const getHealthPassport = async (
   petID: number,
 ): Promise<HealthPassportData> => {
   const response = await axiosInstance.get(`/staff/me/pets/${petID}/health-passport`);
+  return response.data.data;
+};
+
+// ———————————————— HEALTH PASSPORT AI SUMMARY ————————————————
+// GET /pets/:id/health-passport/summary — Staff (own shelter), Veterinarian
+// (own shelter) and Admin. Each point cites the passport row it came from;
+// "rules" points are overdue vaccines worked out by the server's rules,
+// "ai" points are the model's. Cached server-side until a record, dose or
+// transfer changes. 503 when the AI provider fails — worth retrying.
+export type PassportSummarySourceType =
+  "healthRecord" | "vaccination" | "transfer";
+
+export interface PassportSummaryPoint {
+  text: string;
+  source: { type: PassportSummarySourceType; recordID: number };
+  origin: "rules" | "ai";
+}
+
+export interface PassportSummary {
+  aiAvailable: boolean; // false → AI isn't configured; the rest is empty
+  summary: string | null;
+  pointsToReview: PassportSummaryPoint[];
+  generatedAt: string | null; // null when no AI call was made
+}
+
+export const getHealthPassportSummary = async (
+  petID: number,
+): Promise<PassportSummary> => {
+  const response = await axiosInstance.get(
+    `/pets/${petID}/health-passport/summary`,
+  );
   return response.data.data;
 };
 

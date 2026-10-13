@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
+const { isAiConfigured } = require("../ai");
 const {
   getPetDetails,
   formatPetDetail,
@@ -424,6 +425,10 @@ const getHealthPassport = async (petID, { role, userID }) => {
 
   return {
     pet,
+    // Whether "Summarize with AI" can work (GET /pets/:id/health-passport/
+    // summary) — from config alone, so the client can enable the button
+    // without calling the AI.
+    aiSummaryAvailable: isAiConfigured(),
     healthRecords: healthRecordRows.map((r) => ({
       recordID: r.recordID,
       createdAt: r.createdAt,

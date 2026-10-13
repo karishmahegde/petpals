@@ -631,6 +631,10 @@ const schemas = {
       "Read-only aggregate for the Health Passport page — pet is the same shape as GET /staff/me/pets/:id's data.",
     properties: {
       pet: { type: "object" },
+      aiSummaryAvailable: {
+        type: "boolean",
+        description: "Whether AI is configured, so GET /pets/{id}/health-passport/summary can generate a summary. Read from config only — no AI call.",
+      },
       healthRecords: {
         type: "array",
         items: {
