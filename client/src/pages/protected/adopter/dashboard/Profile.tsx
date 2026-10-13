@@ -15,6 +15,7 @@ import CloseAccountModal from "./shared/CloseAccountModal";
 import GovernmentIdSection from "../shared/GovernmentIdSection";
 import {
   getAdopterProfile,
+  getMyQuiz,
   updateAdopterProfile,
   type AdopterProfile as AdopterProfileData,
 } from "../../../../logic/api/adoptersApi";
@@ -26,6 +27,8 @@ import {
 import { formatShortDate } from "../../../../logic/utils/datetime";
 import useAuthStore from "../../../../logic/store/useAuthStore";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
+import { MY_QUIZ_QUERY_KEY } from "./shared/matchQuiz";
+import useMatchesPopupStore from "../../../../logic/store/useMatchesPopupStore";
 
 // ——————————————————————————————————————————————————————————————
 // Field model — drives both view and edit rendering generically.
@@ -696,6 +699,8 @@ const Profile = () => {
             )}
           </div>
 
+          <MatchQuizCard />
+
           {/* Danger zone */}
           <div className="mt-10 rounded-2xl border border-rose-md bg-rose-lightest p-5 md:p-6">
             <h2 className="font-display text-lg text-rose-dark">Danger zone</h2>
@@ -719,6 +724,37 @@ const Profile = () => {
         onClose={() => setIsCloseAccountOpen(false)}
       />
     </div>
+  );
+};
+
+// Second way into the personality quiz (the floating AI button is the
+// first) — opens the AI matches popup straight onto the quiz: "Take the quiz"
+// until it's been taken, then "Retake quiz" with the date.
+const MatchQuizCard = () => {
+  const quizQuery = useQuery({ queryKey: MY_QUIZ_QUERY_KEY, queryFn: getMyQuiz });
+  const quiz = quizQuery.data;
+  const openPopup = useMatchesPopupStore((state) => state.open);
+
+  return (
+    <section className="mt-10 rounded-2xl border border-rose-light bg-white p-5 md:p-6">
+      <h2 className="font-display text-lg text-neutral-dark">
+        Personality quiz
+      </h2>
+      <p className="mt-1 font-body text-sm text-neutral-charcoal">
+        {quiz
+          ? `Last taken on ${formatShortDate(new Date(quiz.updatedAt))}. Retake it any time and your matches update with your answers.`
+          : "Answer a few quick questions and we'll match you with pets that suit your lifestyle."}
+      </p>
+      {!quizQuery.isLoading && (
+        <ButtonElement
+          onClick={() => openPopup({ retake: true })}
+          size="bare"
+          className="mt-4 rounded-xl bg-teal-dark px-4 py-2 font-body text-sm font-medium hover:brightness-95"
+        >
+          {quiz ? "Retake quiz" : "Take the quiz"}
+        </ButtonElement>
+      )}
+    </section>
   );
 };
 

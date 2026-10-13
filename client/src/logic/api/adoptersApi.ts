@@ -354,3 +354,70 @@ export type CloseAccountMode = "deactivate" | "delete";
 export const closeAccount = async (mode: CloseAccountMode): Promise<void> => {
   await axiosInstance.delete("/adopters/me", { data: { mode } });
 };
+
+// ———————————————— MATCH QUIZ API ————————————————
+// The personality quiz behind the compatibility matcher. The server owns the
+// question set (server/src/config/matchQuiz.js); answers are saved by option
+// `code`, never by wording.
+export interface MatchQuizOption {
+  code: string;
+  emoji: string;
+  label: string;
+}
+
+export interface MatchQuizQuestion {
+  id: string;
+  prompt: string;
+  options: MatchQuizOption[]; // ordered most to least on the trait measured
+}
+
+// Question ID → chosen option code.
+export type QuizAnswers = Record<string, string>;
+
+export interface AdopterQuiz {
+  answers: QuizAnswers;
+  updatedAt: string;
+}
+
+export const getMatchQuizQuestions = async (): Promise<MatchQuizQuestion[]> => {
+  const response = await axiosInstance.get("/match-quiz/questions");
+  return response.data.data;
+};
+
+// null when the adopter hasn't taken the quiz yet.
+export const getMyQuiz = async (): Promise<AdopterQuiz | null> => {
+  const response = await axiosInstance.get("/adopters/me/quiz");
+  return response.data.data;
+};
+
+// The whole answer set — every question must be answered (400 otherwise).
+// Saving clears the adopter's cached matches server-side.
+export const saveMyQuiz = async (answers: QuizAnswers): Promise<AdopterQuiz> => {
+  const response = await axiosInstance.put("/adopters/me/quiz", { answers });
+  return response.data.data;
+};
+
+// ———————————————— MATCHES API ————————————————
+// A pet catalog card plus its compatibility score (0–100) and, when the AI
+// scored it, a one-line "why this match" addressed to the adopter.
+export interface AdopterMatch extends PetCard {
+  score: number;
+  reason: string | null; // null when aiExplained is false
+  aiExplained: boolean; // false = rule-based score only (AI off or unavailable)
+}
+
+export interface AdopterMatches {
+  quizComplete: boolean; // false → no quiz yet, matches is empty
+  matches: AdopterMatch[];
+}
+
+// Best first, at most `limit` (1–20). Pets no longer available, and pets the
+// adopter already has a live application for, are left out server-side. The
+// first call after a quiz/profile change can take a few seconds (one AI call);
+// after that it's served from the server's cache.
+export const getMyMatches = async (limit: number): Promise<AdopterMatches> => {
+  const response = await axiosInstance.get("/adopters/me/matches", {
+    params: { limit },
+  });
+  return response.data.data;
+};

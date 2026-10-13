@@ -22,6 +22,10 @@ interface OnboardingProgressProps {
   onSkip?: () => void;
   // Why skipping has a cost, shown under the Skip link.
   skipHint?: string;
+  // Always the single-row ring layout, at every screen width — for narrow
+  // containers on wide screens (the adopter AI matches popup), where the
+  // full stepper wouldn't fit.
+  compact?: boolean;
 }
 
 // Ring geometry for the mobile progress circle — radius chosen so a 48px
@@ -37,6 +41,7 @@ const OnboardingProgress = ({
   furthestStep,
   onSkip,
   skipHint,
+  compact = false,
 }: OnboardingProgressProps) => {
   const total = steps.length;
   const percent = Math.round((currentStep / total) * 100);
@@ -48,7 +53,9 @@ const OnboardingProgress = ({
       {/* Mobile — the full stepper doesn't fit a narrow screen, so it
           collapses to a single "current step of 7 · name … % complete" row
           instead of a squished/scrolling version of the desktop layout. */}
-      <div className="flex items-center justify-between gap-3 sm:hidden">
+      <div
+        className={`flex items-center justify-between gap-3 ${compact ? "" : "sm:hidden"}`}
+      >
         <div className="flex items-center gap-3">
           <div className="relative flex h-12 w-12 shrink-0 items-center justify-center">
             <svg
@@ -111,7 +118,7 @@ const OnboardingProgress = ({
       </div>
 
       {/* sm and up — full stepper */}
-      <div className="hidden sm:block">
+      <div className={compact ? "hidden" : "hidden sm:block"}>
         <div className="relative">
           <div className="absolute left-5 right-5 top-5 h-0.5 bg-gold" />
           <div className="relative flex justify-between">
