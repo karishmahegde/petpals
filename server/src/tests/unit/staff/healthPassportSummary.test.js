@@ -29,6 +29,7 @@ const app = require("../../../app");
 const {
   buildAiUserPrompt,
   parseAiSummary,
+  getPassportInputHash,
 } = require("../../../services/staff/healthPassportSummary.service");
 
 const signToken = (role, userID = 70) =>
@@ -262,6 +263,26 @@ describe("GET /api/v1/pets/:id/health-passport/summary — summary", () => {
     mockPassport({ records: [recordRow(11)] });
     ai.generateStructured.mockResolvedValueOnce({ summary: "  ", pointsToReview: [] });
     expect((await get()).status).toBe(503);
+  });
+});
+
+// The seed stores Rocky's summary under this hash, so it must be exactly
+// what the endpoint computes — or the seeded summary would never be served.
+describe("getPassportInputHash", () => {
+  test("matches the hash the endpoint stores for the same passport", async () => {
+    const passport = { records: [recordRow(11)], doses: [doseRow(21, 1, 30, -335)], transfers: [transferRow(31)] };
+    mockPassport(passport);
+    ai.generateStructured.mockResolvedValueOnce(AI_REPLY);
+    await get();
+    const stored = prisma.petHealthSummary.upsert.mock.calls[0][0].create.inputHash;
+
+    mockPassport(passport);
+    await expect(getPassportInputHash(5)).resolves.toBe(stored);
+  });
+
+  test("unknown pet → null", async () => {
+    prisma.pet.findUnique.mockResolvedValueOnce(null);
+    await expect(getPassportInputHash(99)).resolves.toBeNull();
   });
 });
 

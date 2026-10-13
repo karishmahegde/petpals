@@ -242,21 +242,32 @@ const getAiSummary = async (pet, records, doses, transfers) => {
   return row;
 };
 
+// What the summary reads from the pet: the access check's shelterID, the
+// overdue rule's adoptionStatus, and the prompt's species/breed/sex/DOB.
+const PET_SELECT = {
+  petID: true,
+  shelterID: true,
+  adoptionStatus: true,
+  petSex: true,
+  petDOB: true,
+  breed: { select: { breedName: true, species: { select: { speciesName: true } } } },
+};
+
+// The cache key the endpoint would compute for this pet right now — so the
+// seed can store a summary that's served from the cache, not regenerated.
+// null for a missing pet.
+const getPassportInputHash = async (petID) => {
+  const pet = await prisma.pet.findUnique({ where: { petID }, select: PET_SELECT });
+  if (!pet) return null;
+  const [records, doses, transfers] = await loadPassport(petID);
+  return hashInput(buildAiUserPrompt(pet, records, doses, transfers));
+};
+
 // Same access as the passport: Staff at the pet's shelter (403 elsewhere), a
 // Veterinarian at it (404 elsewhere), any Admin. AI not configured →
 // aiAvailable false, so the client keeps the button disabled.
 const getPassportSummary = async (petID, { role, userID }, { now = new Date() } = {}) => {
-  const pet = await prisma.pet.findUnique({
-    where: { petID },
-    select: {
-      petID: true,
-      shelterID: true,
-      adoptionStatus: true,
-      petSex: true,
-      petDOB: true,
-      breed: { select: { breedName: true, species: { select: { speciesName: true } } } },
-    },
-  });
+  const pet = await prisma.pet.findUnique({ where: { petID }, select: PET_SELECT });
   if (!pet) {
     throw notFound(petID);
   }
@@ -285,6 +296,7 @@ const getPassportSummary = async (petID, { role, userID }, { now = new Date() } 
 
 module.exports = {
   getPassportSummary,
+  getPassportInputHash,
   // exported for unit tests
   buildAiUserPrompt,
   parseAiSummary,

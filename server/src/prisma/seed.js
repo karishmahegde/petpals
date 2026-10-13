@@ -1924,6 +1924,119 @@ async function main() {
     ],
   });
 
+  // ── COMPATIBILITY MATCHER + PASSPORT SUMMARY (Sprint 8) ──────
+  // Last on purpose: cached matches and summaries are only served while
+  // nothing they were computed from changes afterwards, so they're built
+  // from the final data.
+  //   AdopterQuiz — Emelie and Noah have answers that fit their profiles;
+  //     the mid-onboarding, banned and deactivated adopters have none (the
+  //     "take the quiz" state).
+  //   AdopterMatch — cached for Emelie only, with real rule scores from the
+  //     matcher. Some rows carry a hand-written AI score + reason, the rest
+  //     are rule-only (aiScore null), so both kinds of row exist. Noah has a
+  //     quiz but nothing cached: his first open computes (and calls the AI).
+  //   PetHealthSummary — Rocky's, stored under the hash the endpoint
+  //     computes, so it's served from the cache with no AI call until one of
+  //     his records changes. Every other pet generates on first click.
+  // Nothing here calls the AI, so the seed runs without AI configured.
+  console.log("Creating quiz answers, cached matches and passport summary...");
+  const { getRuleShortlist, combineScores } = require("../services/adopter/matches.service");
+  const { getPassportInputHash } = require("../services/staff/healthPassportSummary.service");
+
+  await prisma.adopterQuiz.createMany({
+    data: [
+      {
+        // Busy weekdays, active weekends, happy to train — a city
+        // apartment's balanced companion.
+        adopterID: emelie.userID,
+        answers: {
+          aloneTime: "workday",
+          exercise: "oneToTwoH",
+          noise: "moderate",
+          companionship: "nearby",
+          training: "reinforce",
+          grooming: "weekly",
+          homeVibe: "between",
+          handling: "guided",
+        },
+      },
+      {
+        // Works from home with kids and a yard, very experienced — up for
+        // a big, demanding, always-with-you dog.
+        adopterID: noah.userID,
+        answers: {
+          aloneTime: "rarely",
+          exercise: "over2h",
+          noise: "loves",
+          companionship: "shadow",
+          training: "teach",
+          grooming: "daily",
+          homeVibe: "lively",
+          handling: "confident",
+        },
+      },
+    ],
+  });
+
+  // Hand-written stand-ins for the AI's personality fit, addressed to Emelie
+  // as the real thing is. Only pets on her rule shortlist get a row, and any
+  // shortlisted pet not listed here stays rule-only.
+  const EMELIE_AI_FIT = {
+    Mittens: { aiScore: 92, reason: "Mittens is happy to nap through your workday and greet you in the evening — an easygoing fit for apartment life." },
+    Teddy: { aiScore: 84, reason: "Teddy's curiosity suits your weekend walks, and he's young enough to learn the basics with you." },
+    Pebbles: { aiScore: 80, reason: "Pebbles is gentle and litter trained, and enjoys calm evenings with you after a busy day." },
+    Sky: { aiScore: 76, reason: "Sky is calm and trusting, a peaceful companion who won't mind your long weekdays." },
+  };
+  const petNameByID = Object.fromEntries(Object.entries(pet).map(([name, id]) => [id, name]));
+  const matchesComputedAt = new Date();
+  const emelieShortlist = await getRuleShortlist(emelie.userID, { now: matchesComputedAt });
+  await prisma.adopterMatch.createMany({
+    data: emelieShortlist.map(({ petID, ruleScore }) => {
+      const ai = EMELIE_AI_FIT[petNameByID[petID]];
+      return {
+        adopterID: emelie.userID,
+        petID,
+        ruleScore,
+        aiScore: ai?.aiScore ?? null,
+        totalScore: ai ? combineScores(ruleScore, ai.aiScore) : ruleScore,
+        reason: ai?.reason ?? null,
+        computedAt: matchesComputedAt,
+      };
+    }),
+  });
+
+  // Points cite Rocky's own rows, looked up rather than assumed by ID. No
+  // medication names (his latest note has one) — the real prompt forbids it.
+  const rockyLatestNote = await prisma.healthRecord.findFirst({
+    where: { petID: pet.Rocky },
+    orderBy: { createdAt: "desc" },
+    select: { recordID: true },
+  });
+  const rockyTransfer = await prisma.transferHistory.findFirst({
+    where: { petID: pet.Rocky, transferStatus: "In_Progress" },
+    select: { recordID: true },
+  });
+  await prisma.petHealthSummary.create({
+    data: {
+      petID: pet.Rocky,
+      inputHash: await getPassportInputHash(pet.Rocky),
+      summary:
+        "Rocky is a senior Bulldog with two vet notes on file: a routine checkup about six months ago found no issues, and a visit about a month ago recorded weight loss and slight breathing issues, with treatment prescribed. He has had Rabies, DHPP and Bordetella vaccinations, the most recent (Bordetella) at his cardiac check about a month ago. A transfer from PetPals Downtown to PetPals Brooklyn is in progress.",
+      pointsToReview: [
+        {
+          text: "The latest note records weight loss and breathing issues — a follow-up check would confirm how he responded.",
+          sourceType: "healthRecord",
+          sourceID: rockyLatestNote.recordID,
+        },
+        {
+          text: "He's moving to Brooklyn mid-treatment; make sure his monthly vet visits carry over.",
+          sourceType: "transfer",
+          sourceID: rockyTransfer.recordID,
+        },
+      ],
+    },
+  });
+
   console.log("✅ Seeding complete!");
   console.log("");
   console.log("Logins (role — email / password — case):");
@@ -1939,4 +2052,6 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    // The matcher/summary services used above run on the app's own client.
+    await require("../config/prisma").$disconnect();
   });
