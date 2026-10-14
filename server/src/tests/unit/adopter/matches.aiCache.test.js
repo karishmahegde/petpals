@@ -227,8 +227,12 @@ describe("computeMatches", () => {
   });
 
   test.each([
+    [ai.AI_ERROR_REASONS.TIMEOUT, "warn"],
+    [ai.AI_ERROR_REASONS.UNREACHABLE, "warn"],
     [ai.AI_ERROR_REASONS.RATE_LIMITED, "warn"],
+    [ai.AI_ERROR_REASONS.PROVIDER_ERROR, "warn"],
     [ai.AI_ERROR_REASONS.INVALID_RESPONSE, "warn"],
+    [ai.AI_ERROR_REASONS.NOT_CONFIGURED, "warn"],
     [ai.AI_ERROR_REASONS.AUTH_FAILED, "error"],
   ])("AI failure (%s) falls back to rule scores and logs", async (reason, level) => {
     mockLoad();
@@ -239,6 +243,25 @@ describe("computeMatches", () => {
     expect(results.every((r) => r.aiScore === null && r.totalScore === r.ruleScore)).toBe(true);
     expect(console[level]).toHaveBeenCalledWith(expect.stringContaining(reason));
     expect(prisma.adopterMatch.createMany).toHaveBeenCalled();
+  });
+
+  test("made-up pet IDs in the reply are ignored — never cached, sent pets keep rule scores", async () => {
+    mockLoad();
+    ai.generateStructured.mockResolvedValueOnce({
+      matches: [
+        { petID: 99, score: 100, reason: "Not a pet we sent." },
+        { petID: 2, score: 40, reason: "Quiet like you." },
+      ],
+    });
+
+    const results = await computeMatches(7, { now: NOW });
+
+    expect(results.map((r) => r.petID).sort()).toEqual([1, 2]);
+    const byId = Object.fromEntries(results.map((r) => [r.petID, r]));
+    expect(byId[1]).toEqual(expect.objectContaining({ aiScore: null, totalScore: byId[1].ruleScore }));
+    expect(byId[2]).toEqual(expect.objectContaining({ aiScore: 40, reason: "Quiet like you." }));
+    const cachedIDs = prisma.adopterMatch.createMany.mock.calls[0][0].data.map((row) => row.petID);
+    expect(cachedIDs.sort()).toEqual([1, 2]);
   });
 
   test("a non-AI error is rethrown, nothing cached", async () => {

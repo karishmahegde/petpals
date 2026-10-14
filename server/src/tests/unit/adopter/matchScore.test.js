@@ -1,6 +1,7 @@
 // The rule-based scorer is pure — no mocks needed. A fixed `now` keeps the
 // age bands deterministic.
 const {
+  ageInMonths,
   ageBand,
   passesHardFilters,
   scorePet,
@@ -40,6 +41,18 @@ const pet = (overrides = {}) => ({
   compatibleWithPets: true,
   specialNeeds: false,
   ...overrides,
+});
+
+describe("ageInMonths", () => {
+  test("counts whole months from petDOB, month-end births included", () => {
+    expect(ageInMonths(new Date(2026, 0, 31), new Date(2026, 1, 28))).toBe(0);
+    expect(ageInMonths(new Date(2026, 0, 31), new Date(2026, 2, 31))).toBe(2);
+    expect(ageInMonths(new Date(2025, 9, 5), NOW)).toBe(12);
+  });
+
+  test("a DOB in the future reads as 0, never negative", () => {
+    expect(ageInMonths(new Date(2027, 0, 1), NOW)).toBe(0);
+  });
 });
 
 describe("ageBand", () => {
@@ -114,6 +127,42 @@ describe("scorePet", () => {
     const { score, breakdown } = scorePet(adopter, null, pet(), NOW);
     expect(score).toBe(100);
     expect(Object.values(breakdown).every((fit) => fit === 1)).toBe(true);
+  });
+
+  // Each factor in turn at half fit, everything else perfect: the score drops
+  // by exactly half that factor's weight.
+  const PERFECT_ADOPTER = {
+    preferredSize: "Medium",
+    preferredAgeRange: "Adult",
+    preferredBreedID: 10,
+    preferredSpeciesID: 1,
+    housingType: "House",
+    yardAvailable: true,
+    petExperience: "Some",
+    activityLevel: "Medium",
+  };
+  test.each([
+    ["size", { preferredSize: "Small" }, {}],
+    ["age", { preferredAgeRange: "Young" }, {}],
+    ["breed", {}, { breedID: 11 }], // same species, other breed
+    ["home", { housingType: null }, {}],
+    ["experience", { petExperience: null }, { specialNeeds: true }],
+    ["activity", { activityLevel: null }, {}],
+  ])("%s carries its MATCH_WEIGHTS weight", (factor, adopterOverrides, petOverrides) => {
+    const adopter = blankAdopter({ ...PERFECT_ADOPTER, ...adopterOverrides });
+    const { score, breakdown } = scorePet(adopter, null, pet(petOverrides), NOW);
+
+    expect(breakdown[factor]).toBe(0.5);
+    Object.entries(breakdown)
+      .filter(([name]) => name !== factor)
+      .forEach(([, fit]) => expect(fit).toBe(1));
+    expect(score).toBe(Math.round(100 - MATCH_WEIGHTS[factor] / 2));
+  });
+
+  test("a blank profile, no quiz and a pet with no size still score cleanly", () => {
+    const { score, breakdown } = scorePet(blankAdopter(), null, pet({ petSize: null }), NOW);
+    expect(Object.values(breakdown).every(Number.isFinite)).toBe(true);
+    expect(Number.isInteger(score)).toBe(true);
   });
 
   test("score is always a whole number from 0 to 100", () => {
@@ -261,6 +310,20 @@ describe("shortlistPets", () => {
   test("respects a custom limit, and an empty list is fine", () => {
     expect(shortlistPets(adopter, null, [pet(), pet({ petID: 2 })], { now: NOW, limit: 1 })).toHaveLength(1);
     expect(shortlistPets(adopter, null, [], { now: NOW })).toEqual([]);
+  });
+
+  test("every pet filtered out (no available pets) → empty shortlist", () => {
+    const pets = [
+      pet({ petID: 1, adoptionStatus: "adopted" }),
+      pet({ petID: 2, compatibleWithChildren: false }),
+    ];
+    expect(shortlistPets(adopter, null, pets, { now: NOW })).toEqual([]);
+  });
+
+  test("a blank profile with no quiz still ranks every available pet", () => {
+    const pets = [pet({ petID: 1, petSize: "Large" }), pet({ petID: 2, petSize: null })];
+    const result = shortlistPets(blankAdopter(), null, pets, { now: NOW });
+    expect(result.map((r) => r.pet.petID).sort()).toEqual([1, 2]);
   });
 
   test("doesn't mutate the input", () => {

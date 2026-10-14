@@ -104,10 +104,11 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("GET /api/v1/pets/:id/health-passport/summary — access", () => {
-  test("Adopter → 403", async () => {
-    const res = await get(signToken("Adopter"));
+  test.each(["Adopter", "Volunteer", "Donor"])("%s → 403", async (role) => {
+    const res = await get(signToken(role));
     expect(res.status).toBe(403);
     expect(prisma.pet.findUnique).not.toHaveBeenCalled();
+    expect(ai.generateStructured).not.toHaveBeenCalled();
   });
 
   test("Staff at another shelter → 403", async () => {
@@ -133,6 +134,17 @@ describe("GET /api/v1/pets/:id/health-passport/summary — access", () => {
     prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
     ai.isAiConfigured.mockReturnValue(false);
     expect((await get(signToken("Staff"))).status).toBe(200);
+  });
+
+  test("Veterinarian at the pet's shelter is allowed", async () => {
+    prisma.veterinarian.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+    ai.isAiConfigured.mockReturnValue(false);
+    expect((await get(signToken("Veterinarian"))).status).toBe(200);
+  });
+
+  test("Veterinarian with no shelter → 404", async () => {
+    prisma.veterinarian.findUnique.mockResolvedValueOnce({ shelterID: null });
+    expect((await get(signToken("Veterinarian"))).status).toBe(404);
   });
 });
 
@@ -238,6 +250,49 @@ describe("GET /api/v1/pets/:id/health-passport/summary — summary", () => {
     );
   });
 
+  // Each change to what the model reads is a new hash, so a new summary.
+  test.each([
+    ["an edited note", { records: [recordRow(11, "Ear has cleared up.")] }],
+    ["a new dose", { records: [recordRow(11)], doses: [doseRow(21, 1, 30, -335)] }],
+    ["a new transfer", { records: [recordRow(11)], transfers: [transferRow(31)] }],
+  ])("%s changes the hash → regenerated", async (_label, changed) => {
+    mockPassport({ records: [recordRow(11)] });
+    ai.generateStructured.mockResolvedValueOnce(AI_REPLY);
+    await get();
+    const { create } = prisma.petHealthSummary.upsert.mock.calls[0][0];
+
+    prisma.petHealthSummary.findUnique.mockResolvedValueOnce(create);
+    mockPassport(changed);
+    ai.generateStructured.mockResolvedValueOnce(AI_REPLY);
+    await get();
+
+    expect(ai.generateStructured).toHaveBeenCalledTimes(2);
+    expect(prisma.petHealthSummary.upsert.mock.calls[1][0].create.inputHash).not.toBe(
+      create.inputHash,
+    );
+  });
+
+  // Overdue is never cached: the AI part comes from the cache, the rule
+  // points are worked out again on every request.
+  test("warm cache still adds the current overdue points", async () => {
+    const passport = { records: [recordRow(11)], doses: [doseRow(21, 1, 400, 12)] };
+    mockPassport(passport);
+    ai.generateStructured.mockResolvedValueOnce({ summary: AI_REPLY.summary, pointsToReview: [] });
+    await get();
+    const { create } = prisma.petHealthSummary.upsert.mock.calls[0][0];
+    expect(create.pointsToReview).toEqual([]);
+
+    ai.generateStructured.mockClear();
+    prisma.petHealthSummary.findUnique.mockResolvedValueOnce(create);
+    mockPassport(passport);
+    const res = await get();
+
+    expect(ai.generateStructured).not.toHaveBeenCalled();
+    expect(res.body.data.pointsToReview).toEqual([
+      expect.objectContaining({ source: { type: "vaccination", recordID: 21 }, origin: "rules" }),
+    ]);
+  });
+
   test("adopted pet → no overdue points", async () => {
     prisma.pet.findUnique.mockResolvedValueOnce(petRow({ adoptionStatus: "adopted" }));
     mockPassport({ doses: [doseRow(21, 1, 400, 12)] });
@@ -256,6 +311,24 @@ describe("GET /api/v1/pets/:id/health-passport/summary — summary", () => {
     const res = await get();
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe("SERVICE_UNAVAILABLE");
+    expect(prisma.petHealthSummary.upsert).not.toHaveBeenCalled();
+  });
+
+  test("AI error with an out-of-date cached summary → 503, the old row is left alone", async () => {
+    prisma.petHealthSummary.findUnique.mockResolvedValueOnce({
+      petID: 5,
+      inputHash: "stale",
+      summary: "Old summary.",
+      pointsToReview: [],
+      generatedAt: daysAgo(30),
+    });
+    mockPassport({ records: [recordRow(11)] });
+    ai.generateStructured.mockRejectedValueOnce(
+      Object.assign(new Error("429"), { reason: ai.AI_ERROR_REASONS.RATE_LIMITED }),
+    );
+
+    const res = await get();
+    expect(res.status).toBe(503);
     expect(prisma.petHealthSummary.upsert).not.toHaveBeenCalled();
   });
 

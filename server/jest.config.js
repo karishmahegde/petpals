@@ -7,4 +7,6 @@ module.exports = {
   // Unit tests are fully mocked and finish in milliseconds either way.
   // A suite needing more sets its own jest.setTimeout (sprint5_1Journeys).
   testTimeout: 30000,
+  // No test ever reaches the AI provider — see the file.
+  setupFiles: ["<rootDir>/src/tests/setup/noAiProvider.js"],
 };
