@@ -109,7 +109,7 @@ server/src/
   utils/        errors.js, response.js
   config/prisma.js   singleton Prisma client (PrismaPg adapter)
   prisma/       schema.prisma, seed.js
-  tests/        unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys)
+  tests/        setup/noAiProvider.js (jest setupFiles — blanks AI_* so no test can reach the AI provider; AI suites mock services/ai) · unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys, adopter/sprint8Journeys — fakes services/ai via jest.mock)
   app.js / index.js
 ```
 
