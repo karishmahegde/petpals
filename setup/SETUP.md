@@ -54,8 +54,9 @@ Open `.env` and fill in:
 | `JWT_SECRET` | any random string — generate one with `openssl rand -base64 32` |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | leave the placeholders if skipping payments |
 | `CLIENT_URL` | `http://localhost:3000` (default is fine) |
+| `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | *optional* — leave blank to run without AI; see [AI features (optional)](#ai-features-optional) |
 
-`PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. The client has its own env file, configured in step 5.
+`PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. The client has its own env file, configured in step 5. To switch on the AI features, follow [AI features (optional)](#ai-features-optional) once you're set up.
 
 ### Build the database, storage and sample data
 
@@ -131,6 +132,71 @@ Every other seeded account uses its role's password above. The ones worth knowin
 | `staff.onboarding@petpals.com` | Pending, stopped mid-onboarding (step 3) — logs in straight to the onboarding wizard |
 | `staff.manager.pending@petpals.com` | Pending Manager sign-up at Queens, onboarding done, ID awaiting verification — an Admin verifies and approves |
 | `*.deactivated@` / `*.banned@petpals.com` | Closed or banned accounts — login is refused |
+
+## AI features (optional)
+
+Two features use AI. Everything else in the app works the same with or without it.
+
+| Feature | What the AI adds |
+| --- | --- |
+| Adopter compatibility matcher | a personality-fit score for each shortlisted pet (blended with the rule-based score) and a one-line "why this match" reason on each card |
+| Health passport → **Summarize with AI** (Staff, Vet, Admin) | a short summary of the pet's records, doses and transfers, plus "Points to review" that each link to the record they came from |
+
+The server talks to any OpenAI-compatible provider through one file, `server/src/services/ai/openAiCompatible.js`. AI switches on only when **all three** of `AI_BASE_URL`, `AI_API_KEY` and `AI_MODEL` are set in `server/.env`. If any of them is blank, the app runs without AI.
+
+### Option A: Groq (free tier, recommended)
+
+1. Sign up at [console.groq.com](https://console.groq.com). Groq rejects Outlook email sign-ups, so use Google or another email provider.
+2. Create a key at [console.groq.com/keys](https://console.groq.com/keys).
+3. In `server/.env`:
+
+   ```bash
+   AI_BASE_URL=https://api.groq.com/openai/v1
+   AI_API_KEY=<your key>
+   AI_MODEL=openai/gpt-oss-20b
+   ```
+
+4. Restart the server (`npm run dev`). The config is read on every AI call, but `.env` itself is only loaded once at startup.
+
+**Free-tier limits.** Groq's free tier caps requests and tokens per minute and per day for each model. The exact numbers change, so check [Groq's rate-limits page](https://console.groq.com/docs/rate-limits) instead of relying on figures here. The app is built to stay well inside them:
+
+- **One AI call per recompute.** The matcher scores every available pet with rules first, then sends only the top 20 (the shortlist) to the AI in a single call, with low reasoning effort and a 2000-token reply cap (`AI_MATCH_CALL` in `server/src/config/matchScoring.js`). The passport summary is also one call per generation, with low effort and a 1500-token cap (`AI_SUMMARY_CALL` in `server/src/config/passportSummary.js`).
+- **Results are cached.** Matches are stored in `AdopterMatch` and summaries in `PetHealthSummary`, so ordinary page loads read the cache and don't call the AI again.
+- **Recomputes happen only when something changed.** Matches are recomputed after the adopter retakes the quiz or edits a profile field the matcher reads, or after a pet changes (a new or edited available pet, or a cached pet that was adopted or edited). A summary is regenerated only when the pet's passport changes (a new or edited record, dose or transfer).
+- **A 429 (rate limited) is a fallback, not a crash.** It's handled like any other provider failure. See [Without AI, or when the provider fails](#without-ai-or-when-the-provider-fails) below.
+
+### Option B: Ollama (local, no account)
+
+1. Install [Ollama](https://ollama.com) and pull the model:
+
+   ```bash
+   ollama pull gpt-oss:20b
+   ```
+
+2. In `server/.env`:
+
+   ```bash
+   AI_BASE_URL=http://localhost:11434/v1
+   AI_API_KEY=ollama
+   AI_MODEL=gpt-oss:20b
+   ```
+
+   Ollama ignores the key, but it still has to be non-empty, or the app treats AI as switched off.
+
+3. Restart the server.
+
+No account or rate limits, but it's much slower than Groq and needs a capable machine to run a 20B model.
+
+### Without AI, or when the provider fails
+
+| Situation | Matcher | Summarize with AI |
+| --- | --- | --- |
+| **No AI configured** (any of the three blank) | works on the rule-based scores only; cards show no AI reason | the button is disabled on the passport (`aiSummaryAvailable` is `false`) |
+| **AI configured, provider fails** (rate limited, timeout, bad key, invalid reply) | falls back to the rule-based scores for that recompute, and logs a warning | returns a retryable `503` ("try again shortly"); nothing is cached, so the next try calls the AI again |
+
+Nothing crashes in either case. A bad or revoked key is logged as an error in the server terminal (other failures as warnings), so check there if AI results stop appearing.
+
+**Tests never call the AI.** `server/src/tests/setup/noAiProvider.js` runs before every test file and blanks the `AI_*` variables, so a real key in `server/.env` is never used. Suites that test AI behaviour mock it instead.
 
 ## Troubleshooting
 
