@@ -56,7 +56,7 @@ const router = express.Router();
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: The shelter is Closed
+ *         description: The shelter is Closed, or the donor's email isn't verified yet (error.details.reason = "email_unverified")
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

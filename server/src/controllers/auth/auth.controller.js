@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const authService = require("../../services/auth/auth.service");
+const emailVerificationService = require("../../services/auth/emailVerification.service");
 const { successResponse } = require("../../utils/response");
 
 const VALID_ROLES = ["admin", "adopter", "staff", "vet", "volunteer", "donor"];
@@ -150,6 +151,7 @@ const refreshToken = async (req, res, next) => {
         onboardingComplete: user.onboardingComplete,
         onboardingStep: user.onboardingStep,
         accountStatus: user.accountStatus,
+        emailVerified: user.emailVerified,
       },
     });
   } catch (err) {
@@ -157,4 +159,31 @@ const refreshToken = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, logout, refreshToken };
+// ——————————————— EMAIL VERIFICATION ———————————————
+// POST: (re)send a link to the signed-in user. PATCH: { token } from the link.
+const requestEmailVerification = async (req, res, next) => {
+  try {
+    await emailVerificationService.requestVerification(req.user.userID);
+    return successResponse(res, "Verification email sent", null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const verifyEmail = async (req, res, next) => {
+  try {
+    const data = await emailVerificationService.verifyEmail(req.body?.token);
+    return successResponse(res, "Email address verified", data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  logout,
+  refreshToken,
+  requestEmailVerification,
+  verifyEmail,
+};

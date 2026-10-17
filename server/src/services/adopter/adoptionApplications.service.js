@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { assertEmailVerified } = require("../auth/emailVerification.service");
 const stripe = require("../../config/stripe");
 const storage = require("../storage");
 const { APPLICATION_FEE_CENTS, APPLICATION_FEE_USD } = require("../../config/fees");
@@ -137,6 +138,8 @@ const createCheckoutSession = async ({
   applicationType,
   shelterMessage,
 }) => {
+  // Soft gate — 409 email_unverified (emailVerification.service.js).
+  await assertEmailVerified(adopterID, "applying to adopt");
   await validateApplicationEligibility({ adopterID, petID, shelterID });
   const customerID = await ensureStripeCustomer(adopterID);
 

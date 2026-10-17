@@ -61,4 +61,21 @@ const renderEmail = ({ subject, heading, paragraphs = [], action, footnote }) =>
   return { subject, text: textParts.join("\n\n"), html };
 };
 
-module.exports = { clientLink, renderEmail };
+// "Hi Sam," — or just "Hi," when there's no name on the account yet.
+const greeting = (name) => (name ? `Hi ${name},` : "Hi,");
+
+// ——————————————— Account emails ———————————————
+
+const verifyEmail = ({ name, url }) =>
+  renderEmail({
+    subject: "Verify your PetPals email address",
+    heading: greeting(name),
+    paragraphs: [
+      "Please confirm this is your email address. You'll need a verified email to apply to adopt or to donate.",
+      "This link works once and expires in 24 hours.",
+    ],
+    action: { label: "Verify email", url },
+    footnote: "Didn't create a PetPals account? You can ignore this email.",
+  });
+
+module.exports = { clientLink, renderEmail, verifyEmail };

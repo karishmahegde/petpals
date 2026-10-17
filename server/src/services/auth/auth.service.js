@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const prisma = require("../../config/prisma");
 const { PENDING_LOGIN_ROLES } = require("./pendingRoles");
+const { sendVerificationEmail } = require("./emailVerification.service");
 
 // Maps the incoming role string to the Prisma enum value, model accessor, and name field
 const ROLE_CONFIG = {
@@ -146,7 +147,15 @@ const register = async ({ name, email, password, role, shelterID }) => {
     return user;
   });
 
-  const { userPassword, ...safeUser } = newUser;
+  // After the commit: the account exists whether or not this works, so a
+  // failure is logged, not thrown — the user can resend from their dashboard.
+  try {
+    await sendVerificationEmail({ userID: newUser.userID, email, name });
+  } catch (err) {
+    console.error(`[email] couldn't issue a verification link for user ${newUser.userID}: ${err.message}`);
+  }
+
+  const { userPassword, refreshToken, ...safeUser } = newUser;
   return safeUser;
 };
 
@@ -154,7 +163,7 @@ const register = async ({ name, email, password, role, shelterID }) => {
 const login = async ({ email, password }) => {
   const user = await prisma.users.findUnique({
     where: { userEmail: email },
-    select: { userID: true, userEmail: true, role: true, userPassword: true },
+    select: { userID: true, userEmail: true, role: true, userPassword: true, emailVerified: true },
   }); //Fetches the row from USERS - Email, password, role and refreshToken
   if (!user) {
     const err = new Error("No account found with this email");
@@ -339,7 +348,7 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
   const user = await prisma.users.findUnique({
     //Fetch the userID, role and current refreshToken value from DB
     where: { userID },
-    select: { userID: true, role: true, refreshToken: true },
+    select: { userID: true, role: true, refreshToken: true, emailVerified: true },
   });
   if (!user) {
     const err = new Error("User not found");

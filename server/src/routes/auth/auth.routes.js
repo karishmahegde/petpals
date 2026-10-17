@@ -115,10 +115,62 @@ router.post("/logout", authenticate.allowPending, authController.logout);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Token refreshed successfully — new access token in body, new refresh token cookie set. user has the same onboarding/accountStatus fields as login.
+ *         description: Token refreshed successfully — new access token in body, new refresh token cookie set. user has the same onboarding/accountStatus/emailVerified fields as login.
  *       401:
  *         description: Refresh token missing, invalid, or session expired
  */
 router.post("/refresh-token", authController.refreshToken);
+
+/**
+ * @swagger
+ * /auth/email-verification:
+ *   post:
+ *     summary: Email the signed-in user a new verification link
+ *     description: >
+ *       Registration already sends one; this is the resend. Each new link
+ *       replaces the previous unused one and expires in 24 hours. Only
+ *       applying to adopt and donating require a verified email.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Verification email sent (data is null)
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       409:
+ *         description: Already verified — error.details.reason = "already_verified"
+ *       429:
+ *         description: >
+ *           Asked again within 60 seconds of the last link —
+ *           error.details.retryAfterSeconds says how long to wait
+ *   patch:
+ *     summary: Verify an email address with the token from the emailed link
+ *     description: No session needed — the link may be opened on another device. Each link works once.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       200:
+ *         description: Verified — data is { emailVerified: true }
+ *       400:
+ *         description: >
+ *           Link invalid, expired or already used — error.details.reason is
+ *           token_invalid, token_expired or token_used
+ */
+// allowPending: a Pending staff member, vet or volunteer can verify while
+// they onboard, before approval.
+router.post(
+  "/email-verification",
+  authenticate.allowPending,
+  authController.requestEmailVerification,
+);
+router.patch("/email-verification", authController.verifyEmail);
 
 module.exports = router;

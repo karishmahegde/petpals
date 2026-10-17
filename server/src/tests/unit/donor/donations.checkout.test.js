@@ -4,6 +4,8 @@ const jwt = require("jsonwebtoken");
 // Mocked so this suite never touches a real database.
 jest.mock("../../../config/prisma", () => ({
   shelter: { findUnique: jest.fn() },
+  // The email-verification soft gate (emailVerification.service.js).
+  users: { findUnique: jest.fn() },
   donor: { findUnique: jest.fn(), update: jest.fn() },
   donation: { create: jest.fn() },
 }));
@@ -37,6 +39,7 @@ describe("Donations — Stripe Checkout", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     authService.getAccountStatus.mockResolvedValue("Active");
+    prisma.users.findUnique.mockResolvedValue({ emailVerified: true });
     stripe.checkout.sessions.create.mockResolvedValue({ url: "https://checkout.stripe.test/cs_1" });
   });
 
@@ -47,6 +50,18 @@ describe("Donations — Stripe Checkout", () => {
         .post("/api/v1/donations/checkout")
         .set("Authorization", `Bearer ${token}`)
         .send(body);
+
+    test("unverified email → 409 email_unverified, no shelter lookup or Stripe calls", async () => {
+      prisma.users.findUnique.mockResolvedValueOnce({ emailVerified: false });
+
+      const res = await checkout({ shelterID: 9, amount: 50 });
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe("Please verify your email address before donating");
+      expect(res.body.error).toEqual({ code: "CONFLICT", details: { reason: "email_unverified" } });
+      expect(prisma.shelter.findUnique).not.toHaveBeenCalled();
+      expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+    });
 
     test("returning donor → 201 Checkout URL; session tagged kind=donation with the amount in cents, nothing recorded yet", async () => {
       prisma.shelter.findUnique.mockResolvedValueOnce(openShelter);

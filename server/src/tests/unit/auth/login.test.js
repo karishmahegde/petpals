@@ -40,6 +40,7 @@ const mockAccount = (role, roleRow) => {
     userEmail: "someone@petpals.com",
     role,
     userPassword: passwordHash,
+    emailVerified: true,
   });
   const { model, nameField } = ROLE_MODEL[role];
   prisma[model].findUnique.mockResolvedValueOnce({
@@ -202,6 +203,16 @@ describe("Login and session restore", () => {
       });
     });
 
+    test("the session carries emailVerified (the dashboard banner and soft gate read it)", async () => {
+      mockAccount("Adopter", { accountStatus: "Active", onboardingComplete: true, onboardingStep: 5 });
+
+      const res = await login();
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.emailVerified).toBe(true);
+      expect(prisma.users.findUnique.mock.calls[0][0].select.emailVerified).toBe(true);
+    });
+
     // Closed = the owner closed it; the login page uses details.reason to
     // offer a reactivation link. Same for every role that can close itself.
     test.each(["Adopter", "Donor", "Staff", "Veterinarian", "Volunteer", "Admin"])(
@@ -323,6 +334,7 @@ describe("Login and session restore", () => {
         userID: 42,
         role: "Staff",
         refreshToken: await bcrypt.hash(cookieToken, 4),
+        emailVerified: false,
       });
       prisma.staff.findUnique.mockResolvedValueOnce({
         staffName: "Sam Taylor",
@@ -345,6 +357,7 @@ describe("Login and session restore", () => {
         onboardingComplete: true,
         onboardingStep: 5,
         accountStatus: "Pending",
+        emailVerified: false,
       });
     });
 
