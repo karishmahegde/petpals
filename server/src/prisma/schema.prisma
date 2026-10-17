@@ -21,6 +21,7 @@ model Users {
   staff         Staff?
   veterinarian  Veterinarian?
   volunteer     Volunteer?
+  accountTokens AccountToken[]
 }
 
 model Admin {
@@ -432,6 +433,26 @@ model PetHealthSummary {
   pet            Pet      @relation(fields: [petID], references: [petID], onDelete: Cascade)
 }
 
+// Single-use emailed links (verify email, reset password, reactivate a Closed
+// account, confirm an email change). Only the SHA-256 hex of the random token
+// is stored — the raw token exists only in the emailed link. Issuing a new one
+// deletes the user's earlier unused tokens of that purpose
+// (services/auth/accountTokens.service.js).
+model AccountToken {
+  tokenID   Int                 @id @default(autoincrement())
+  userID    Int
+  purpose   AccountTokenPurpose
+  tokenHash String              @unique @db.VarChar(64)
+  // EmailChange only: the address the link confirms.
+  newEmail  String?             @db.VarChar(45)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime            @default(now())
+  user      Users               @relation(fields: [userID], references: [userID], onDelete: Cascade)
+
+  @@index([userID, purpose])
+}
+
 model Vaccine {
   vaccineID    Int                 @id @default(autoincrement())
   vaccineName  String              @db.VarChar(45)
@@ -836,6 +857,13 @@ enum VolunteerAccountStatus {
   Deactivated
   Closed
   Declined
+}
+
+enum AccountTokenPurpose {
+  EmailVerification
+  PasswordReset
+  Reactivation
+  EmailChange
 }
 
 enum VisitStatus {
