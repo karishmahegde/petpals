@@ -78,4 +78,30 @@ const verifyEmail = ({ name, url }) =>
     footnote: "Didn't create a PetPals account? You can ignore this email.",
   });
 
-module.exports = { clientLink, renderEmail, verifyEmail };
+const passwordReset = ({ name, url }) =>
+  renderEmail({
+    subject: "Reset your PetPals password",
+    heading: greeting(name),
+    paragraphs: [
+      "We got a request to reset the password on your PetPals account. Use the button below to choose a new one.",
+      "This link works once and expires in 1 hour.",
+    ],
+    action: { label: "Reset password", url },
+    footnote: "Didn't ask for this? You can ignore this email — your password won't change.",
+  });
+
+const passwordChanged = ({ name }) =>
+  renderEmail({
+    subject: "Your PetPals password was changed",
+    heading: greeting(name),
+    paragraphs: [
+      "The password on your PetPals account was just changed, and any other signed-in sessions were signed out.",
+      "If this was you, there's nothing else to do.",
+    ],
+    action: {
+      label: "Wasn't you? Reset your password",
+      url: clientLink("/forgot-password"),
+    },
+  });
+
+module.exports = { clientLink, renderEmail, verifyEmail, passwordReset, passwordChanged };

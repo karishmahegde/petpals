@@ -27,7 +27,8 @@ const router = express.Router();
  *                 example: jane@example.com
  *               password:
  *                 type: string
- *                 example: secret123
+ *                 description: 8+ characters with an uppercase letter, a lowercase letter, a number and a special character
+ *                 example: Secret123!
  *               role:
  *                 type: string
  *                 enum: [admin, adopter, staff, vet, volunteer, donor]
@@ -42,6 +43,10 @@ const router = express.Router();
  *         description: Missing or invalid fields
  *       409:
  *         description: Email already registered
+ *       422:
+ *         description: >
+ *           A required field is missing, role is invalid, or the password is
+ *           too weak (error.details.unmet lists the missing rules)
  */
 router.post("/register", authController.register);
 
@@ -172,5 +177,101 @@ router.post(
   authController.requestEmailVerification,
 );
 router.patch("/email-verification", authController.verifyEmail);
+
+/**
+ * @swagger
+ * /auth/password-reset:
+ *   post:
+ *     summary: Email a password reset link (forgot password)
+ *     description: >
+ *       Always 200 with the same message, whether or not the email has an
+ *       account — so it can't be used to find out who's registered. A link is
+ *       only sent to an existing account that isn't Banned or Declined, at
+ *       most once a minute (a quicker repeat sends nothing). The link expires
+ *       in 1 hour and replaces any earlier unused one.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200:
+ *         description: Request accepted (data is null)
+ *       422:
+ *         description: email missing
+ *   patch:
+ *     summary: Set a new password with the token from the reset link
+ *     description: >
+ *       Signs out every session (stored refresh token cleared, cookie
+ *       cleared), marks the email verified (the link proves ownership) and
+ *       emails a "password changed" notice.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, password]
+ *             properties:
+ *               token: { type: string }
+ *               password:
+ *                 type: string
+ *                 description: 8+ characters with an uppercase letter, a lowercase letter, a number and a special character
+ *     responses:
+ *       200:
+ *         description: Password reset (data is null)
+ *       400:
+ *         description: >
+ *           Link invalid, expired or already used — error.details.reason is
+ *           token_invalid, token_expired or token_used
+ *       422:
+ *         description: Password too weak — error.details.unmet lists the missing rules
+ */
+router.post("/password-reset", authController.requestPasswordReset);
+router.patch("/password-reset", authController.resetPassword);
+
+/**
+ * @swagger
+ * /auth/password:
+ *   patch:
+ *     summary: Change your password (signed in)
+ *     description: >
+ *       Needs the current password. This session stays signed in (a new
+ *       refresh token cookie is set); any other session is signed out. Emails
+ *       a "password changed" notice.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword: { type: string }
+ *               newPassword:
+ *                 type: string
+ *                 description: Same rules as a reset; must differ from the current one
+ *     responses:
+ *       200:
+ *         description: Password changed (data is null)
+ *       401:
+ *         description: >
+ *           Not signed in, or the current password is wrong
+ *           (error.details.reason = "wrong_password")
+ *       422:
+ *         description: New password too weak (error.details.unmet), or the same as the current one
+ */
+// allowPending: a Pending staff member, vet or volunteer can change it while
+// they onboard.
+router.patch("/password", authenticate.allowPending, authController.changePassword);
 
 module.exports = router;

@@ -58,7 +58,9 @@ const linkToken = () => {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  // resetAllMocks (not clear) so a test's unconsumed *Once values can't leak
+  // into the next one.
+  jest.resetAllMocks();
   prisma.$transaction.mockImplementation((fn) => fn(prisma));
   authService.getAccountStatus.mockResolvedValue("Active");
   prisma.accountToken.findFirst.mockResolvedValue(null);
@@ -244,6 +246,20 @@ describe("POST /api/v1/auth/register", () => {
       subject: "Verify your PetPals email address",
     });
     expect(prisma.accountToken.create.mock.calls[0][0].data.tokenHash).toBe(hashToken(linkToken()));
+  });
+
+  test.each([
+    ["weakpass", ["one uppercase letter", "one number", "one special character"]],
+    ["Ab1!", ["at least 8 characters"]],
+  ])("weak password %s → 422 naming what's missing, no account created", async (password, unmet) => {
+    const res = await request(app)
+      .post("/api/v1/auth/register")
+      .send({ name: "Sam", email: "sam@example.test", password, role: "adopter" });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error).toEqual({ code: "VALIDATION_ERROR", details: { unmet } });
+    expect(prisma.users.create).not.toHaveBeenCalled();
+    expect(queueEmail).not.toHaveBeenCalled();
   });
 
   test("issuing the link fails → registration still succeeds, error logged", async () => {

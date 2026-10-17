@@ -2,9 +2,26 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const authService = require("../../services/auth/auth.service");
 const emailVerificationService = require("../../services/auth/emailVerification.service");
+const passwordsService = require("../../services/auth/passwords.service");
+const { unmetPasswordRules } = require("../../utils/password");
 const { successResponse } = require("../../utils/response");
 
 const VALID_ROLES = ["admin", "adopter", "staff", "vet", "volunteer", "donor"];
+
+// Signs a new 7-day refresh token, stores its hash (replacing any other
+// session's) and sets it as the httpOnly cookie. Used by login and by a
+// password change, which keeps the current session while signing out others.
+const startRefreshSession = async (res, userID) => {
+  const refreshToken = jwt.sign({ userID }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  const hashedRT = await bcrypt.hash(refreshToken, 10);
+  await authService.storeRefreshToken(userID, hashedRT); // Store the refreshToken against the user's record in the user table
+  res.cookie("refreshToken", refreshToken, {
+    //return the refreshToken in an httpOnly cookie
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production", // Cookie is sent securely only in HTTPS
+  });
+};
 
 // ——————————————— REGISTER ———————————————
 const register = async (req, res, next) => {
@@ -20,6 +37,16 @@ const register = async (req, res, next) => {
   if (!VALID_ROLES.includes(role)) {
     const err = new Error(`role must be one of: ${VALID_ROLES.join(", ")}`);
     err.code = "VALIDATION_ERROR";
+    return next(err);
+  }
+
+  // Same strength rules as a reset or change (utils/password.js) — the
+  // register forms check them too, so this only catches direct API calls.
+  const unmet = unmetPasswordRules(password);
+  if (unmet.length > 0) {
+    const err = new Error(`password needs ${unmet.join(", ")}`);
+    err.code = "VALIDATION_ERROR";
+    err.details = { unmet };
     return next(err);
   }
 
@@ -65,19 +92,7 @@ const login = async (req, res, next) => {
       process.env.JWT_SECRET,
       { expiresIn: "15m" },
     );
-    const refreshToken = jwt.sign(
-      { userID: user.userID },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" },
-    );
-    const hashedRT = await bcrypt.hash(refreshToken, 10);
-    await authService.storeRefreshToken(user.userID, hashedRT); // Store the refreshToken against the user's record in the user table
-    res.cookie("refreshToken", refreshToken, {
-      //return the refreshToken in an httpOnly cookie
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production", // Cookie is sent securely only in HTTPS
-    });
+    await startRefreshSession(res, user.userID);
     return successResponse(res, "Login successful", {
       token: accessToken,
       user,
@@ -179,6 +194,45 @@ const verifyEmail = async (req, res, next) => {
   }
 };
 
+// ——————————————— PASSWORD RESET + CHANGE ———————————————
+// POST: { email } — same 200 whether or not the account exists.
+const requestPasswordReset = async (req, res, next) => {
+  try {
+    await passwordsService.requestPasswordReset(req.body?.email);
+    return successResponse(
+      res,
+      "If an account exists for that email, a password reset link is on its way",
+      null,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// PATCH: { token, password } from the emailed link. Signs out every session.
+const resetPassword = async (req, res, next) => {
+  try {
+    await passwordsService.resetPassword(req.body?.token, req.body?.password);
+    res.clearCookie("refreshToken");
+    return successResponse(res, "Password reset — please log in with your new password", null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// PATCH /auth/password: { currentPassword, newPassword }. This session stays
+// signed in (fresh refresh token + cookie); any other is signed out.
+const changePassword = async (req, res, next) => {
+  const { currentPassword, newPassword } = req.body ?? {};
+  try {
+    await passwordsService.changePassword(req.user.userID, currentPassword, newPassword);
+    await startRefreshSession(res, req.user.userID);
+    return successResponse(res, "Password changed", null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -186,4 +240,7 @@ module.exports = {
   refreshToken,
   requestEmailVerification,
   verifyEmail,
+  requestPasswordReset,
+  resetPassword,
+  changePassword,
 };
