@@ -274,4 +274,115 @@ router.patch("/password-reset", authController.resetPassword);
 // they onboard.
 router.patch("/password", authenticate.allowPending, authController.changePassword);
 
+/**
+ * @swagger
+ * /auth/reactivation:
+ *   post:
+ *     summary: Email a link to reopen an account its owner closed
+ *     description: >
+ *       Always 200 with the same message. A link is only sent when the email
+ *       belongs to a Closed account (closed by its owner) — never to one an
+ *       admin/staff member deactivated, one declined at sign-up or a banned
+ *       one — at most once a minute. Expires in 24 hours.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200:
+ *         description: Request accepted (data is null)
+ *       422:
+ *         description: email missing
+ *   patch:
+ *     summary: Reopen a Closed account with the token from the emailed link
+ *     description: >
+ *       Adopter and Donor accounts go straight back to Active; Staff,
+ *       Veterinarian, Volunteer and Admin accounts go back to Pending and are
+ *       re-approved the usual way. Also marks the email verified.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       200:
+ *         description: Reactivated — data is { role, accountStatus } (Active or Pending)
+ *       400:
+ *         description: Link invalid, expired or already used (error.details.reason token_invalid / token_expired / token_used)
+ *       409:
+ *         description: The account is no longer Closed (error.details.reason = "not_closed"); the link stays unused
+ */
+router.post("/reactivation", authController.requestReactivation);
+router.patch("/reactivation", authController.reactivate);
+
+/**
+ * @swagger
+ * /auth/email-change:
+ *   post:
+ *     summary: Ask to change your login email
+ *     description: >
+ *       Needs the current password. Sends a confirmation link to the new
+ *       address (nothing changes until it's opened) and a heads-up to the
+ *       current one. Expires in 24 hours; a newer request replaces it.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newEmail, currentPassword]
+ *             properties:
+ *               newEmail: { type: string, format: email, maxLength: 45 }
+ *               currentPassword: { type: string }
+ *     responses:
+ *       200:
+ *         description: Confirmation link sent (data is null)
+ *       401:
+ *         description: Not signed in, or the current password is wrong (error.details.reason = "wrong_password")
+ *       409:
+ *         description: Another account already uses that address (error.details.reason = "email_taken")
+ *       422:
+ *         description: newEmail missing, invalid, longer than 45 characters, or the same as the current one
+ *       429:
+ *         description: Asked again within 60 seconds (error.details.retryAfterSeconds)
+ *   patch:
+ *     summary: Confirm an email change with the token from the link
+ *     description: >
+ *       No session needed. Re-checks the address is still free, sets it as
+ *       the login email (verified), and tells the old address it changed.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       200:
+ *         description: Changed — data is { userEmail }
+ *       400:
+ *         description: Link invalid, expired or already used (error.details.reason token_invalid / token_expired / token_used)
+ *       409:
+ *         description: Someone else took the address meanwhile (error.details.reason = "email_taken")
+ */
+router.post("/email-change", authenticate, authController.requestEmailChange);
+router.patch("/email-change", authController.confirmEmailChange);
+
 module.exports = router;

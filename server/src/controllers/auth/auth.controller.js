@@ -3,6 +3,8 @@ const bcrypt = require("bcrypt");
 const authService = require("../../services/auth/auth.service");
 const emailVerificationService = require("../../services/auth/emailVerification.service");
 const passwordsService = require("../../services/auth/passwords.service");
+const reactivationService = require("../../services/auth/reactivation.service");
+const emailChangeService = require("../../services/auth/emailChange.service");
 const { unmetPasswordRules } = require("../../utils/password");
 const { successResponse } = require("../../utils/response");
 
@@ -233,6 +235,53 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+// ——————————————— REACTIVATION ———————————————
+// POST: { email } — same 200 whether or not there's a Closed account.
+const requestReactivation = async (req, res, next) => {
+  try {
+    await reactivationService.requestReactivation(req.body?.email);
+    return successResponse(
+      res,
+      "If that email belongs to a closed account, a reactivation link is on its way",
+      null,
+    );
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// PATCH: { token } from the emailed link.
+const reactivate = async (req, res, next) => {
+  try {
+    const data = await reactivationService.reactivate(req.body?.token);
+    return successResponse(res, "Account reactivated", data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ——————————————— EMAIL CHANGE ———————————————
+// POST: { newEmail, currentPassword } — signed in. PATCH: { token } from the
+// link sent to the new address.
+const requestEmailChange = async (req, res, next) => {
+  const { newEmail, currentPassword } = req.body ?? {};
+  try {
+    await emailChangeService.requestEmailChange(req.user.userID, newEmail, currentPassword);
+    return successResponse(res, "Confirmation link sent to the new email address", null);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const confirmEmailChange = async (req, res, next) => {
+  try {
+    const data = await emailChangeService.confirmEmailChange(req.body?.token);
+    return successResponse(res, "Email address changed", data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -243,4 +292,8 @@ module.exports = {
   requestPasswordReset,
   resetPassword,
   changePassword,
+  requestReactivation,
+  reactivate,
+  requestEmailChange,
+  confirmEmailChange,
 };

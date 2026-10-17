@@ -104,4 +104,62 @@ const passwordChanged = ({ name }) =>
     },
   });
 
-module.exports = { clientLink, renderEmail, verifyEmail, passwordReset, passwordChanged };
+const reactivateAccount = ({ name, url }) =>
+  renderEmail({
+    subject: "Reactivate your PetPals account",
+    heading: greeting(name),
+    paragraphs: [
+      "You asked to reopen the PetPals account you closed. Use the button below to reactivate it.",
+      "This link works once and expires in 24 hours.",
+    ],
+    action: { label: "Reactivate account", url },
+    footnote: "Didn't ask for this? You can ignore this email — your account stays closed.",
+  });
+
+// To the NEW address — proves the person can receive mail there.
+const confirmEmailChange = ({ name, newEmail, url }) =>
+  renderEmail({
+    subject: "Confirm your new PetPals email address",
+    heading: greeting(name),
+    paragraphs: [
+      `Confirm that ${newEmail} should become the email address for your PetPals account. You'll use it to log in from then on.`,
+      "This link works once and expires in 24 hours.",
+    ],
+    action: { label: "Confirm new email", url },
+    footnote: "Didn't ask for this? You can ignore this email — nothing will change.",
+  });
+
+// To the OLD address, when the change is requested and again once it's done,
+// so a hijacked session can't quietly move the account.
+const emailChangeRequested = ({ name, newEmail }) =>
+  renderEmail({
+    subject: "A request to change your PetPals email address",
+    heading: greeting(name),
+    paragraphs: [
+      `Someone signed in to your PetPals account asked to change its email address to ${newEmail}. Nothing changes until the link sent to that address is opened.`,
+      "If this wasn't you, reset your password now.",
+    ],
+    action: { label: "Reset password", url: clientLink("/forgot-password") },
+  });
+
+const emailChanged = ({ name, newEmail }) =>
+  renderEmail({
+    subject: "Your PetPals email address was changed",
+    heading: greeting(name),
+    paragraphs: [
+      `The email address for your PetPals account is now ${newEmail}. This address won't receive PetPals emails any more.`,
+      "If this wasn't you, contact the PetPals team straight away.",
+    ],
+  });
+
+module.exports = {
+  clientLink,
+  renderEmail,
+  verifyEmail,
+  passwordReset,
+  passwordChanged,
+  reactivateAccount,
+  confirmEmailChange,
+  emailChangeRequested,
+  emailChanged,
+};
