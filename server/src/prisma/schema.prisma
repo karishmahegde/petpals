@@ -213,10 +213,15 @@ model Pet {
   compatibleWithPets     Boolean               @default(false)
   specialNeeds           Boolean               @default(false)
   featuredFlag           Boolean               @default(false)
+  // Bumped by Prisma on every write — the matcher's cache treats a pet changed
+  // after an AdopterMatch row's computedAt as stale.
+  updatedAt              DateTime              @default(now()) @updatedAt
   adoptionApps           AdoptionApplication[]
   appointments           Appointment[]
   favorites              Favorite[]
   healthRecords          HealthRecord[]
+  matches                AdopterMatch[]
+  healthSummary          PetHealthSummary?
   breed                  Breed                 @relation(fields: [breedID], references: [breedID])
   shelter                Shelter               @relation(fields: [shelterID], references: [shelterID])
   staff                  Staff?                @relation(fields: [staffID], references: [userID])
@@ -277,6 +282,36 @@ model Adopter {
   applications       AdoptionApplication[]
   favorites          Favorite[]
   visits             Visit[]
+  quiz               AdopterQuiz?
+  matches            AdopterMatch[]
+}
+
+// The adopter's answers to the personality quiz (config/matchQuiz.js) —
+// { [questionId]: optionCode }. JSON rather than a column per question so the
+// quiz can change without a migration; the config validates every write.
+model AdopterQuiz {
+  adopterID Int      @id
+  answers   Json
+  updatedAt DateTime @updatedAt
+  adopter   Adopter  @relation(fields: [adopterID], references: [userID], onDelete: Cascade)
+}
+
+// Cached compatibility results, so page loads never call the AI. Disposable:
+// rows cascade away with their adopter or pet, and are rebuilt when stale.
+// aiScore is null when the result is rule-based only (AI off or unavailable).
+model AdopterMatch {
+  adopterID  Int
+  petID      Int
+  ruleScore  Int
+  aiScore    Int?
+  totalScore Int
+  reason     String?  @db.VarChar(300)
+  computedAt DateTime @default(now())
+  adopter    Adopter  @relation(fields: [adopterID], references: [userID], onDelete: Cascade)
+  pet        Pet      @relation(fields: [petID], references: [petID], onDelete: Cascade)
+
+  @@id([adopterID, petID])
+  @@index([adopterID, totalScore])
 }
 
 model Favorite {
@@ -380,6 +415,21 @@ model HealthRecord {
   appointment   Appointment?  @relation(fields: [appointmentID], references: [appointmentID], onDelete: SetNull)
 
   @@index([appointmentID])
+}
+
+// Cached AI summary of a pet's health passport, so opening it again never
+// calls the AI. Keyed by a hash of exactly what was sent (prompt + records,
+// doses, transfers): a record, dose or transfer added or changed gives a new
+// hash, and the next request regenerates. Disposable: cascades with the pet.
+// pointsToReview holds the AI's points only — overdue vaccines are worked out
+// fresh on every request (utils/vaccinations.js), never cached.
+model PetHealthSummary {
+  petID          Int      @id
+  inputHash      String   @db.VarChar(64)
+  summary        String   @db.VarChar(1500)
+  pointsToReview Json
+  generatedAt    DateTime @default(now())
+  pet            Pet      @relation(fields: [petID], references: [petID], onDelete: Cascade)
 }
 
 model Vaccine {

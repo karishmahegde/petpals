@@ -10,8 +10,9 @@
 // (network-wide, not scoped to the viewer's own shelter — the passport is
 // universal). Read-only for Staff; a vet can also add a standalone health
 // note (AddHealthRecordModal). Doses are recorded from an appointment, not
-// here.
-import { useState } from "react";
+// here. "Summarize with AI" (both roles) opens PassportSummaryPanel when the
+// server says AI is configured; its points link back to the rows below.
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { FaArrowLeft, FaPaw, FaPlus } from "react-icons/fa";
@@ -24,6 +25,7 @@ import { formatShortDate } from "../../../logic/utils/datetime";
 import {
   getHealthPassport,
   type HealthPassportData,
+  type PassportSummarySourceType,
   type VaccinationStatus,
 } from "../../../logic/api/staffPetsApi";
 import { getMyVetPetHealthPassport } from "../../../logic/api/vetsApi";
@@ -31,6 +33,7 @@ import { PET_STATUS_META } from "../../../logic/staff/petStatus";
 import { formatVetName } from "../../../logic/utils/vetName";
 import { formatNextDue } from "../../../logic/utils/vaccination";
 import AddHealthRecordModal from "./AddHealthRecordModal";
+import PassportSummaryPanel from "./PassportSummaryPanel";
 
 const VACCINATION_TONE: Record<VaccinationStatus, BadgeTone> = {
   Overdue: "red",
@@ -52,6 +55,20 @@ const TRANSFER_STATUS_TONE: Record<string, BadgeTone> = {
   Rejected: "red",
   Cancelled: "gray",
 };
+
+// The id each passport row carries, so a summary point can scroll to it.
+const rowID = (type: PassportSummarySourceType, recordID: number) =>
+  `passport-${type}-${recordID}`;
+
+// How long a row stays highlighted after a summary point jumps to it.
+const HIGHLIGHT_MS = 2500;
+
+// Rows a summary point can jump to: focusable from script only (tabIndex -1)
+// so focus lands on them, and ringed while highlighted.
+const rowFocusClass = (isHighlighted: boolean) =>
+  `scroll-mt-28 transition-shadow focus:outline-none ${
+    isHighlighted ? "ring-2 ring-gold-md ring-offset-2" : ""
+  }`;
 
 const sectionHeading =
   "flex items-center gap-2 font-display text-2xl text-neutral-dark";
@@ -132,6 +149,34 @@ const HealthPassport = ({ role }: HealthPassportProps) => {
   const isValidPetID = Number.isInteger(petID) && petID > 0;
   const config = ROLE_CONFIG[role];
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  // The row a summary point last jumped to, ringed for HIGHLIGHT_MS.
+  const [highlightedRow, setHighlightedRow] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(highlightTimer.current), []);
+
+  const handleViewSource = (
+    type: PassportSummarySourceType,
+    recordID: number,
+  ) => {
+    const id = rowID(type, recordID);
+    const row = document.getElementById(id);
+    if (!row) return;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    row.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "center",
+    });
+    row.focus({ preventScroll: true });
+    setHighlightedRow(id);
+    clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(
+      () => setHighlightedRow(null),
+      HIGHLIGHT_MS,
+    );
+  };
 
   const passportQueryKey = [config.queryKeyRoot, "health-passport", petID];
   const { data, isLoading, isError } = useQuery({
@@ -231,14 +276,26 @@ const HealthPassport = ({ role }: HealthPassportProps) => {
               <span aria-hidden>📁</span> Health Records
             </h2>
             <div className="mb-5 mt-3 flex flex-wrap justify-end gap-2">
-              <ButtonElement
-                disabled
-                title="AI summaries aren't available yet"
-                size="sm"
-                className="flex cursor-not-allowed items-center gap-1.5 bg-rose-md"
-              >
-                <PiSparkleFill aria-hidden /> Summarize with AI
-              </ButtonElement>
+              {data.aiSummaryAvailable ? (
+                <ButtonElement
+                  onClick={() => setIsSummaryOpen(!isSummaryOpen)}
+                  aria-expanded={isSummaryOpen}
+                  size="sm"
+                  className="flex items-center gap-1.5 bg-rose-md hover:brightness-95"
+                >
+                  <PiSparkleFill aria-hidden />{" "}
+                  {isSummaryOpen ? "Hide AI summary" : "Summarize with AI"}
+                </ButtonElement>
+              ) : (
+                <ButtonElement
+                  disabled
+                  title="AI summaries aren't available yet"
+                  size="sm"
+                  className="flex cursor-not-allowed items-center gap-1.5 bg-rose-md"
+                >
+                  <PiSparkleFill aria-hidden /> Summarize with AI
+                </ButtonElement>
+              )}
               {role === "Veterinarian" && (
                 <ButtonElement
                   onClick={() => setIsAddRecordOpen(true)}
@@ -250,6 +307,15 @@ const HealthPassport = ({ role }: HealthPassportProps) => {
               )}
             </div>
 
+            {isSummaryOpen && data.aiSummaryAvailable && (
+              <PassportSummaryPanel
+                petID={petID}
+                passportQueryKey={passportQueryKey}
+                onViewSource={handleViewSource}
+                onClose={() => setIsSummaryOpen(false)}
+              />
+            )}
+
             {data.healthRecords.length === 0 ? (
               <DashboardEmptyMessage>
                 No health records on file.
@@ -259,7 +325,11 @@ const HealthPassport = ({ role }: HealthPassportProps) => {
                 {data.healthRecords.map((record) => (
                   <li
                     key={record.recordID}
-                    className="flex flex-col gap-3 rounded-xl bg-teal-light p-5 sm:flex-row sm:items-center sm:gap-6"
+                    id={rowID("healthRecord", record.recordID)}
+                    tabIndex={-1}
+                    className={`flex flex-col gap-3 rounded-xl bg-teal-light p-5 sm:flex-row sm:items-center sm:gap-6 ${rowFocusClass(
+                      highlightedRow === rowID("healthRecord", record.recordID),
+                    )}`}
                   >
                     <DateBlock iso={record.createdAt} />
                     <div className="min-w-0 flex-1">
@@ -298,7 +368,11 @@ const HealthPassport = ({ role }: HealthPassportProps) => {
                 {data.vaccinations.map((vax) => (
                   <li
                     key={vax.recordID}
-                    className="flex items-start justify-between gap-4 rounded-xl bg-rose-lightest p-5"
+                    id={rowID("vaccination", vax.recordID)}
+                    tabIndex={-1}
+                    className={`flex items-start justify-between gap-4 rounded-xl bg-rose-lightest p-5 ${rowFocusClass(
+                      highlightedRow === rowID("vaccination", vax.recordID),
+                    )}`}
                   >
                     <div className="min-w-0">
                       <p className="font-body text-sm font-bold text-neutral-charcoal">
@@ -339,7 +413,11 @@ const HealthPassport = ({ role }: HealthPassportProps) => {
                 {data.transferHistory.map((transfer) => (
                   <li
                     key={transfer.recordID}
-                    className="flex flex-col gap-3 rounded-xl bg-teal-light p-5 sm:flex-row sm:items-center sm:gap-6"
+                    id={rowID("transfer", transfer.recordID)}
+                    tabIndex={-1}
+                    className={`flex flex-col gap-3 rounded-xl bg-teal-light p-5 sm:flex-row sm:items-center sm:gap-6 ${rowFocusClass(
+                      highlightedRow === rowID("transfer", transfer.recordID),
+                    )}`}
                   >
                     <DateBlock iso={transfer.transferDate} />
                     <div className="min-w-0 flex-1">

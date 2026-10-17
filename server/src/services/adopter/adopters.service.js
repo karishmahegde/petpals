@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
+const { MATCH_PROFILE_FIELDS } = require("./matches.service");
 
 // The public shape of an adopter profile — shared by GET and PUT /adopters/me so
 // both responses stay identical. stripeCustomerID is intentionally omitted —
@@ -70,16 +71,24 @@ const getAdopterProfile = async (userID) => {
 };
 
 // ——————————————— UPDATE ADOPTER PROFILE (PUT /adopters/me) ———————————————
-// `data` is already validated and whitelisted by the controller.
+// `data` is already validated and whitelisted by the controller. Touching a
+// field the matcher scores on clears the adopter's cached matches in the same
+// transaction — they were scored against the old profile.
 const updateAdopterProfile = async (userID, data) => {
+  const update = prisma.adopter.update({
+    where: { userID },
+    data,
+    select: ADOPTER_PROFILE_SELECT,
+  });
   try {
-    return toAdopterProfile(
-      await prisma.adopter.update({
-        where: { userID },
-        data,
-        select: ADOPTER_PROFILE_SELECT,
-      }),
-    );
+    if (!MATCH_PROFILE_FIELDS.some((field) => field in data)) {
+      return toAdopterProfile(await update);
+    }
+    const [adopter] = await prisma.$transaction([
+      update,
+      prisma.adopterMatch.deleteMany({ where: { adopterID: userID } }),
+    ]);
+    return toAdopterProfile(adopter);
   } catch (err) {
     if (err.code === "P2025") {
       // error codes sent by prisma

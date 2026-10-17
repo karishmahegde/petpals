@@ -631,6 +631,10 @@ const schemas = {
       "Read-only aggregate for the Health Passport page — pet is the same shape as GET /staff/me/pets/:id's data.",
     properties: {
       pet: { type: "object" },
+      aiSummaryAvailable: {
+        type: "boolean",
+        description: "Whether AI is configured, so GET /pets/{id}/health-passport/summary can generate a summary. Read from config only — no AI call.",
+      },
       healthRecords: {
         type: "array",
         items: {
@@ -680,6 +684,42 @@ const schemas = {
             toStaffName: { type: "string", nullable: true },
           },
         },
+      },
+    },
+  },
+
+  HealthPassportSummary: {
+    type: "object",
+    properties: {
+      aiAvailable: { type: "boolean", description: "false → AI isn't configured; everything else is empty" },
+      summary: { type: "string", nullable: true, maxLength: 1500 },
+      pointsToReview: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            text: { type: "string", maxLength: 200 },
+            source: {
+              type: "object",
+              description: "The passport row this point comes from",
+              properties: {
+                type: { type: "string", enum: ["healthRecord", "vaccination", "transfer"] },
+                recordID: { type: "integer" },
+              },
+            },
+            origin: {
+              type: "string",
+              enum: ["rules", "ai"],
+              description: "rules = overdue vaccine (latest-dose rule); ai = the model's",
+            },
+          },
+        },
+      },
+      generatedAt: {
+        type: "string",
+        format: "date-time",
+        nullable: true,
+        description: "When the AI summary was generated; null when no AI call was made",
       },
     },
   },
@@ -1330,6 +1370,70 @@ const schemas = {
       },
     },
   },
+  MatchQuizQuestion: {
+    type: "object",
+    properties: {
+      id: { type: "string", example: "aloneTime" },
+      prompt: { type: "string" },
+      options: {
+        type: "array",
+        description: "Ordered from most to least on the trait the question measures",
+        items: {
+          type: "object",
+          properties: {
+            code: { type: "string", example: "rarely" },
+            emoji: { type: "string" },
+            label: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  QuizAnswers: {
+    type: "object",
+    description: "Question ID → chosen option code",
+    additionalProperties: { type: "string" },
+    example: { aloneTime: "workday", exercise: "oneToTwoH", noise: "moderate" },
+  },
+  AdopterQuiz: {
+    type: "object",
+    nullable: true,
+    properties: {
+      answers: { $ref: "#/components/schemas/QuizAnswers" },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  },
+  AdopterMatches: {
+    type: "object",
+    properties: {
+      quizComplete: { type: "boolean", description: "false → the adopter hasn't taken the quiz; matches is empty" },
+      matches: {
+        type: "array",
+        items: {
+          type: "object",
+          description: "A pet catalog card (see AdoptedPet) plus the match fields.",
+          properties: {
+            petID: { type: "integer" },
+            petName: { type: "string" },
+            petAge: { type: "string", example: "~2 yrs" },
+            petSex: { type: "string" },
+            petPhoto: { type: "string", nullable: true },
+            breed: {
+              type: "object",
+              properties: {
+                breedName: { type: "string" },
+                speciesName: { type: "string" },
+              },
+            },
+            score: { type: "integer", minimum: 0, maximum: 100 },
+            reason: { type: "string", nullable: true, description: "AI-written, addressed to the adopter; null when aiExplained is false" },
+            aiExplained: { type: "boolean", description: "true when the AI scored this pet; false = rule-based score only" },
+          },
+        },
+      },
+    },
+  },
+
   Favorite: {
     type: "object",
     properties: {

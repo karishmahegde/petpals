@@ -6,6 +6,7 @@
 // routes/staff/staff.routes.js.
 const express = require("express");
 const petsController = require("../../controllers/staff/pets.controller");
+const passportSummaryController = require("../../controllers/staff/healthPassportSummary.controller");
 const authenticate = require("../../middleware/authenticate");
 const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
 const { singleFile } = require("../../middleware/upload");
@@ -198,6 +199,60 @@ router.get(
   authenticate,
   authorizeRoles(ROLES.STAFF),
   petsController.getHealthPassport,
+);
+
+/**
+ * @swagger
+ * /pets/{id}/health-passport/summary:
+ *   get:
+ *     summary: AI summary of a pet's health passport, with points to review (Staff, Veterinarian, Admin)
+ *     description: >
+ *       Same access as the passport: Staff at the pet's shelter (403
+ *       elsewhere), a Veterinarian at it (404 elsewhere), any Admin. Built
+ *       from the pet's health records, vaccination doses and transfers, read
+ *       by petID across every shelter — no adopter, staff or vet names are
+ *       sent to the AI, and it's told not to diagnose or name medications or
+ *       dosages. Each point to review cites the record, dose or transfer it
+ *       came from; origin "rules" points are overdue vaccines from the
+ *       latest-dose rule (never the model's call), origin "ai" points are the
+ *       model's. Cached per pet until a record, dose or transfer changes.
+ *       AI not configured → aiAvailable false (200) so the client keeps the
+ *       button disabled. A pet with nothing on file gets a fixed summary
+ *       without an AI call.
+ *     tags: [Pets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: The summary (or aiAvailable false)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/HealthPassportSummary' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       503:
+ *         description: The AI provider failed or returned nothing usable — retry later
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.get(
+  "/pets/:id/health-passport/summary",
+  authenticate,
+  authorizeRoles(ROLES.STAFF, ROLES.VETERINARIAN, ROLES.ADMIN),
+  passportSummaryController.getPassportSummary,
 );
 
 /**

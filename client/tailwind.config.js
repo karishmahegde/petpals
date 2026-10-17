@@ -45,6 +45,17 @@ export default {
         display: ["Benne", "serif"],
         body: ["Montserrat", "sans-serif"],
       },
+      // Slides an oversized gradient (e.g. bg-[length:300%_300%]) corner to corner
+      // and back, so its colours drift around — the adopter AI button's hover.
+      keyframes: {
+        "gradient-drift": {
+          "0%, 100%": { backgroundPosition: "0% 0%" },
+          "50%": { backgroundPosition: "100% 100%" },
+        },
+      },
+      animation: {
+        "gradient-drift": "gradient-drift 3s ease-in-out infinite",
+      },
     },
   },
   plugins: [],

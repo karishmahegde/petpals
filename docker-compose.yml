@@ -35,7 +35,9 @@ services:
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_KEY: ${SUPABASE_KEY}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
     volumes:
       - ./server/src:/app/src # hot-reload in dev
 

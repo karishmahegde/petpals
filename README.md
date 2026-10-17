@@ -52,7 +52,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 ### AI
 
-![OpenAI](https://img.shields.io/badge/OpenAI_API-412991?style=flat-square&logo=openai&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-F55036?style=flat-square)
 
 ### Testing
 
@@ -81,7 +81,9 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 git clone https://github.com/karishmahegde/petpals.git
 cd petpals
 
-# 2. Configure the server — fill in your Supabase / JWT (/ optional Stripe) values
+# 2. Configure the server — fill in your Supabase / JWT (/ optional Stripe) values,
+#    plus the optional Groq AI values (AI_BASE_URL / AI_API_KEY / AI_MODEL; leave them
+#    blank to run without AI — see setup/SETUP.md "AI features (optional)")
 cd server
 npm install
 cp .env.example .env
