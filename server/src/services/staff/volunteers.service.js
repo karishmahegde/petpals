@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { ADDRESS_SELECT } = require("../../utils/address");
 const { decodeAvailability } = require("../../utils/availability");
 const { maskIdNumber } = require("../governmentIds/selfGovernmentId.service");
@@ -195,6 +196,8 @@ const updateVolunteerStatus = async (userID, { accountStatus }, actor) => {
   }
 
   await prisma.volunteer.update({ where: { userID }, data: { accountStatus } });
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(userID, volunteer.accountStatus, accountStatus);
 
   return getVolunteerDetail(userID, actor);
 };

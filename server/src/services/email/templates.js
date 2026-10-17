@@ -152,6 +152,77 @@ const emailChanged = ({ name, newEmail }) =>
     ],
   });
 
+// ——————————————— Account notices ———————————————
+// `loginUrl` is the role's own login page (workers use the staff portal).
+
+const accountClosed = ({ name, loginUrl }) =>
+  renderEmail({
+    subject: "Your PetPals account is closed",
+    heading: greeting(name),
+    paragraphs: [
+      "You closed your PetPals account, and you've been signed out everywhere. Your details are kept in case you come back.",
+      "Changed your mind? Log in with your usual email and password and choose to email yourself a reactivation link.",
+    ],
+    action: { label: "Go to login", url: loginUrl },
+    footnote: "Didn't close your account? Reset your password from the login page straight away.",
+  });
+
+const accountDeleted = ({ name }) =>
+  renderEmail({
+    subject: "Your PetPals account was deleted",
+    heading: greeting(name),
+    paragraphs: [
+      "You deleted your PetPals account. Your profile and personal details have been removed, and this email address can be used to sign up again.",
+      "Thank you for being part of PetPals.",
+    ],
+  });
+
+const accountApproved = ({ name, loginUrl }) =>
+  renderEmail({
+    subject: "Your PetPals account is approved",
+    heading: greeting(name),
+    paragraphs: ["Good news — your PetPals account has been approved. You can now log in and use your dashboard."],
+    action: { label: "Log in", url: loginUrl },
+  });
+
+const accountDeclined = ({ name }) =>
+  renderEmail({
+    subject: "Your PetPals sign-up",
+    heading: greeting(name),
+    paragraphs: [
+      "Thank you for your interest in PetPals. Your sign-up wasn't approved, so this account can't be used to log in.",
+      "If you think this is a mistake, please get in touch with the shelter you signed up with.",
+    ],
+  });
+
+const accountDeactivated = ({ name }) =>
+  renderEmail({
+    subject: "Your PetPals account was deactivated",
+    heading: greeting(name),
+    paragraphs: [
+      "Your PetPals account has been deactivated by the PetPals team, so you can no longer log in.",
+      "If you believe this is a mistake, please contact support.",
+    ],
+  });
+
+const accountBanned = ({ name }) =>
+  renderEmail({
+    subject: "Your PetPals account was suspended",
+    heading: greeting(name),
+    paragraphs: [
+      "Your PetPals account has been suspended by the PetPals team, so you can no longer log in.",
+      "If you believe this is a mistake, please contact support.",
+    ],
+  });
+
+const accountRestored = ({ name, loginUrl }) =>
+  renderEmail({
+    subject: "Your PetPals account is active again",
+    heading: greeting(name),
+    paragraphs: ["Your PetPals account has been reactivated by the PetPals team. You can log in again."],
+    action: { label: "Log in", url: loginUrl },
+  });
+
 module.exports = {
   clientLink,
   renderEmail,
@@ -162,4 +233,11 @@ module.exports = {
   confirmEmailChange,
   emailChangeRequested,
   emailChanged,
+  accountClosed,
+  accountDeleted,
+  accountApproved,
+  accountDeclined,
+  accountDeactivated,
+  accountBanned,
+  accountRestored,
 };

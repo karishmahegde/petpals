@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const storage = require("../storage");
 const { ADDRESS_SELECT } = require("../../utils/address");
@@ -121,6 +122,9 @@ const updateAdminStatus = async (userID, accountStatus, actorID) => {
     throw err;
   }
 
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(userID, current.accountStatus, accountStatus);
+
   return getAdminDetail(userID);
 };
 
@@ -152,6 +156,9 @@ const updateMyProfile = async (userID, data) => {
 // Admin has no other relations besides an optional GovernmentID row (no
 // favorites/visits/applications like Adopter).
 const closeMyAccount = async (userID, mode) => {
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     await prisma.$transaction([
       prisma.admin.update({
@@ -165,6 +172,7 @@ const closeMyAccount = async (userID, mode) => {
       }),
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -188,6 +196,8 @@ const closeMyAccount = async (userID, mode) => {
       governmentId.documentURL,
     );
   }
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

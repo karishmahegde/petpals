@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 // Adopter oversight — the list and detail reads are shared by Admin and
 // Staff (the Staff dashboard's People → Adopters tab, read-only); the status
 // change stays Admin-only.
@@ -154,6 +155,9 @@ const updateAdopterStatus = async (userID, accountStatus) => {
     }
     throw err;
   }
+
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(userID, current.accountStatus, accountStatus);
 
   return prisma.adopter.findUnique({
     where: { userID },

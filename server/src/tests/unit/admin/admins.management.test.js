@@ -37,7 +37,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
@@ -236,6 +241,7 @@ describe("Admin accounts", () => {
       expect(data.statusChangedByID).toBe(1);
       expect(data.statusChangedAt).toBeInstanceOf(Date);
       expect(res.body.data.accountStatus).toBe(accountStatus);
+      expect(accountNotices.statusChanged).toHaveBeenCalledWith(2, from, accountStatus);
     });
 
     test.each([
@@ -256,6 +262,7 @@ describe("Admin accounts", () => {
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe("CONFLICT");
       expect(prisma.admin.update).not.toHaveBeenCalled();
+      expect(accountNotices.statusChanged).not.toHaveBeenCalled();
     });
 
     test("deactivating yourself -> 400, nothing written", async () => {
@@ -437,6 +444,10 @@ describe("Admin accounts", () => {
         data: { refreshToken: null },
       });
       expect(prisma.admin.delete).not.toHaveBeenCalled();
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "deactivate");
     });
 
     test("mode=delete -> government ID, admin and users rows removed, stored file deleted after", async () => {
@@ -457,6 +468,13 @@ describe("Admin accounts", () => {
       expect(storage.deletePrivateFile).toHaveBeenCalledWith(
         "government-ids",
         "admin/1/id-123.jpg",
+      );
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "delete");
+      expect(accountNotices.lookupContact.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.admin.delete.mock.invocationCallOrder[0],
       );
     });
 

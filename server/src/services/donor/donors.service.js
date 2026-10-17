@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const { ADDRESS_SELECT } = require("../../utils/address");
 
@@ -155,6 +156,9 @@ const completeOnboarding = async (userID) => {
 // ON DELETE SET NULL, so every donation stays, just with no donor attached
 // (staff see "Former donor").
 const closeMyAccount = async (userID, mode) => {
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     await prisma.$transaction([
       prisma.donor.update({
@@ -163,6 +167,7 @@ const closeMyAccount = async (userID, mode) => {
       }),
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -170,6 +175,8 @@ const closeMyAccount = async (userID, mode) => {
     prisma.donor.delete({ where: { userID } }),
     prisma.users.delete({ where: { userID } }),
   ]);
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

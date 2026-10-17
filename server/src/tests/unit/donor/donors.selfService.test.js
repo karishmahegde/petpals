@@ -17,7 +17,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -278,6 +283,10 @@ describe("Donor self-service endpoints", () => {
         data: { refreshToken: null },
       });
       expect(prisma.donor.delete).not.toHaveBeenCalled();
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "deactivate");
     });
 
     test("mode=delete → 200, donor + users rows removed; donations are never deleted (donorID → NULL in the DB)", async () => {
@@ -291,6 +300,13 @@ describe("Donor self-service endpoints", () => {
       expect(prisma.donor.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
       expect(prisma.users.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
       expect(prisma.donation.deleteMany).not.toHaveBeenCalled();
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "delete");
+      expect(accountNotices.lookupContact.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.donor.delete.mock.invocationCallOrder[0],
+      );
     });
 
     test.each([undefined, "archive"])("mode %p → 422, nothing written", async (mode) => {

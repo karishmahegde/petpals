@@ -36,7 +36,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
@@ -536,6 +541,10 @@ describe("Veterinarian self-service endpoints", () => {
       });
       expect(prisma.veterinarian.delete).not.toHaveBeenCalled();
       expect(prisma.governmentID.deleteMany).not.toHaveBeenCalled();
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "deactivate");
     });
 
     test("mode=delete → 200, vet + users rows and government ID removed, then its stored file", async () => {
@@ -555,6 +564,13 @@ describe("Veterinarian self-service endpoints", () => {
       expect(prisma.veterinarian.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
       expect(prisma.users.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
       expect(storage.deletePrivateFile).toHaveBeenCalledWith("government-ids", "vet/42/id-1.jpg");
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "delete");
+      expect(accountNotices.lookupContact.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.veterinarian.delete.mock.invocationCallOrder[0],
+      );
     });
 
     test("mode=delete with no government ID → nothing to remove from storage", async () => {

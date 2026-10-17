@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const { ADDRESS_SELECT } = require("../../utils/address");
@@ -206,6 +207,9 @@ const closeMyAccount = async (userID, mode) => {
     throw upcomingAppointmentsConflict();
   }
 
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     await prisma.$transaction([
       prisma.veterinarian.update({
@@ -214,6 +218,7 @@ const closeMyAccount = async (userID, mode) => {
       }),
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -236,6 +241,8 @@ const closeMyAccount = async (userID, mode) => {
       governmentId.documentURL,
     );
   }
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

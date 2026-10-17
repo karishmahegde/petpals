@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { staffStatusDates } = require("../../utils/staffDates");
 const { withGovernmentIdStatus, assertReadyForApproval } = require("./staffApproval.service");
 const { ADDRESS_FIELDS, ADDRESS_SELECT } = require("../../utils/address");
@@ -220,6 +221,8 @@ const updateStatus = async (managerID, targetID, accountStatus, staffDesignation
     },
     select: SHELTER_STAFF_SELECT,
   });
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(targetID, member.accountStatus, accountStatus);
   return formatOne(updated);
 };
 

@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { resolveManagedShelterID } = require("./shelterStaff.service");
 const {
   withGovernmentIdStatus,
@@ -145,6 +146,8 @@ const updateVetStatus = async (managerID, vetID, accountStatus) => {
     data: { accountStatus },
     select: VET_SELECT,
   });
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(vetID, vet.accountStatus, accountStatus);
   return formatOne(updated);
 };
 

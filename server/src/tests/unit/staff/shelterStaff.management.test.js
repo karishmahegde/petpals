@@ -14,7 +14,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -349,6 +354,7 @@ describe("Shelter manager staff management", () => {
       expect(prisma.staff.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
+      expect(accountNotices.statusChanged).toHaveBeenCalledWith(50, "Pending", "Declined");
     });
 
     test("a Pending Manager sign-up is Admin's → 403", async () => {

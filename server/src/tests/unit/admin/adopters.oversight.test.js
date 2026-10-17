@@ -27,7 +27,12 @@ jest.mock("../../../config/prisma", () => ({
 // already-resolved entry inside the service's Promise.all-backed transaction.
 jest.mock("../../../services/auth/auth.service");
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
 
@@ -214,6 +219,7 @@ describe("Adopter oversight endpoints", () => {
         where: { userID: 12 },
         data: { accountStatus: "Banned" },
       });
+      expect(accountNotices.statusChanged).toHaveBeenCalledWith(12, "Active", "Banned");
     });
 
     test("an adopter who closed their own account → 409, nothing written", async () => {
@@ -227,6 +233,7 @@ describe("Adopter oversight endpoints", () => {
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe("CONFLICT");
       expect(prisma.adopter.update).not.toHaveBeenCalled();
+      expect(accountNotices.statusChanged).not.toHaveBeenCalled();
     });
 
     test("unknown adopter → 404, nothing written", async () => {

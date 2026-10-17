@@ -27,7 +27,12 @@ jest.mock("../../../config/prisma", () => ({
 // suite doesn't need a real accountStatus-bearing table for the token's role.
 jest.mock("../../../services/auth/auth.service");
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
 
@@ -341,6 +346,7 @@ describe("Admin staff management endpoints", () => {
         where: { userID: 42 },
         data: { accountStatus: "Active", staffDOS: null },
       });
+      expect(accountNotices.statusChanged).toHaveBeenCalledWith(42, "Deactivated", "Active");
     });
 
     test.each([

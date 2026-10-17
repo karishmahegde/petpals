@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { staffStatusDates } = require("../../utils/staffDates");
 const {
   withGovernmentIdStatus,
@@ -275,6 +276,9 @@ const updateStaffStatus = async (userID, accountStatus) => {
     }
     throw err;
   }
+
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(userID, current.accountStatus, accountStatus);
 
   return getStaffDetail(userID);
 };
