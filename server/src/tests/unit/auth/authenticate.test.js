@@ -100,7 +100,7 @@ describe("authenticate middleware", () => {
   });
 
   // —————————————————— BLOCKED ACCOUNT STATUS ——————————————————
-  test.each(["Deactivated", "Banned", "Pending", "DELETED"])(
+  test.each(["Deactivated", "Closed", "Declined", "Banned", "Pending", "DELETED"])(
     "valid JWT but %s account status returns 401 UNAUTHORIZED",
     async (status) => {
       authService.getAccountStatus.mockResolvedValue(status);
@@ -166,6 +166,9 @@ describe("authenticate middleware", () => {
       ["DELETED", "Veterinarian"],
       ["Banned", "Volunteer"],
       ["Deactivated", "Volunteer"],
+      ["Closed", "Staff"],
+      ["Declined", "Veterinarian"],
+      ["Closed", "Volunteer"],
     ])("%s %s → still 401 (only Pending is let through)", async (status, role) => {
       authService.getAccountStatus.mockResolvedValue(status);
 

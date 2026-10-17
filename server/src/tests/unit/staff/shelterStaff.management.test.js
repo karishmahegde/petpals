@@ -60,7 +60,7 @@ describe("Shelter manager staff management", () => {
       });
       expect(prisma.staff.findMany.mock.calls[0][0].where).toEqual({
         shelterID: 9,
-        accountStatus: { in: ["Active", "Deactivated"] },
+        accountStatus: { not: "Pending" },
         staffDesignation: "Associate",
         staffName: { contains: "ari", mode: "insensitive" },
       });
@@ -319,17 +319,17 @@ describe("Shelter manager staff management", () => {
         pendingMember({ onboardingComplete: false }),
       );
       prisma.staff.update.mockResolvedValueOnce(
-        memberRow({ accountStatus: "Deactivated" }),
+        memberRow({ accountStatus: "Declined" }),
       );
 
       const res = await request(app)
         .patch("/api/v1/staff/me/team/50/status")
         .set("Authorization", `Bearer ${managerToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.staff.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+        expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
     });
 
@@ -337,17 +337,17 @@ describe("Shelter manager staff management", () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.staff.findUnique.mockResolvedValueOnce(pendingMember());
       prisma.staff.update.mockResolvedValueOnce(
-        memberRow({ accountStatus: "Deactivated" }),
+        memberRow({ accountStatus: "Declined" }),
       );
 
       const res = await request(app)
         .patch("/api/v1/staff/me/team/50/status")
         .set("Authorization", `Bearer ${managerToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.staff.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+        expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
     });
 

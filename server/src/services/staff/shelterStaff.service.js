@@ -35,10 +35,11 @@ const badRequest = (message) => {
 // (it also moves Shelter.managerStaffID — see admin/staff.service.js).
 const ASSIGNABLE_DESIGNATIONS = ["Senior", "Associate"];
 
-// Pending → Active (approve), Pending → Deactivated (decline),
-// Active → Deactivated (deactivate).
+// Pending → Active (approve), Pending → Declined (decline),
+// Active → Deactivated (deactivate). Closed and Declined are final here — a
+// Closed account is reopened by its owner, by emailed link.
 const ALLOWED_TRANSITIONS = {
-  Pending: ["Active", "Deactivated"],
+  Pending: ["Active", "Declined"],
   Active: ["Deactivated"],
 };
 
@@ -119,8 +120,8 @@ const loadShelterStaffMember = async (managerID, targetID) => {
 };
 
 // ——————————————— LIST (GET /staff/me/team) ———————————————
-// section "pending" = awaiting approval; "all" = everyone already approved
-// (Active or Deactivated), the manager included.
+// section "pending" = awaiting approval; "all" = everyone past that stage
+// (Active, Deactivated, Closed or Declined), the manager included.
 const listShelterStaff = async (
   managerID,
   { section, staffDesignation, name, page = 1, limit = 20 },
@@ -138,7 +139,7 @@ const listShelterStaff = async (
             { staffDesignation: { not: "Manager" } },
           ],
         }
-      : { shelterID, accountStatus: { in: ["Active", "Deactivated"] } };
+      : { shelterID, accountStatus: { not: "Pending" } };
   if (staffDesignation) where.staffDesignation = staffDesignation;
   if (name) where.staffName = { contains: name, mode: "insensitive" };
 

@@ -517,7 +517,7 @@ describe("Veterinarian self-service endpoints", () => {
         .set("Authorization", `Bearer ${vetToken()}`)
         .send(body);
 
-    test("mode=deactivate → 200, status Deactivated, refresh token nulled, nothing deleted", async () => {
+    test("mode=deactivate → 200, status Closed, refresh token nulled, nothing deleted", async () => {
       prisma.appointment.findFirst.mockResolvedValueOnce(null);
       prisma.veterinarian.update.mockResolvedValueOnce({});
       prisma.users.update.mockResolvedValueOnce({});
@@ -525,10 +525,10 @@ describe("Veterinarian self-service endpoints", () => {
       const res = await close({ mode: "deactivate" });
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toBe("Account deactivated");
+      expect(res.body.message).toBe("Account closed");
       expect(prisma.veterinarian.update).toHaveBeenCalledWith({
         where: { userID: 42 },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       });
       expect(prisma.users.update).toHaveBeenCalledWith({
         where: { userID: 42 },

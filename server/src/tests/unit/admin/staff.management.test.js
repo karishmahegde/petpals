@@ -185,6 +185,7 @@ describe("Admin staff management endpoints", () => {
       // Current row's staffDOJ (read before the update), then the refreshed detail.
       prisma.staff.findUnique.mockResolvedValueOnce({
         staffDOJ: new Date("2020-01-10"),
+        accountStatus: "Active",
       });
       prisma.staff.update.mockResolvedValueOnce({});
       prisma.shelter.updateMany.mockResolvedValueOnce({ count: 1 });
@@ -300,22 +301,69 @@ describe("Admin staff management endpoints", () => {
       expect(prisma.shelter.update).not.toHaveBeenCalled();
     });
 
-    test("declining a Manager sign-up is allowed before onboarding or ID verification", async () => {
+    test("declining a Manager sign-up (→ Declined) is allowed before onboarding or ID verification", async () => {
       prisma.staff.findUnique
         .mockResolvedValueOnce(pendingManagerRow({ onboardingComplete: false }))
-        .mockResolvedValueOnce(buildStaffDetail({ accountStatus: "Deactivated" }));
+        .mockResolvedValueOnce(buildStaffDetail({ accountStatus: "Declined" }));
       prisma.staff.update.mockResolvedValueOnce({});
-      prisma.shelter.updateMany.mockResolvedValueOnce({ count: 0 });
 
       const res = await request(app)
         .patch("/api/v1/staff/42/status")
         .set("Authorization", `Bearer ${adminToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.staff.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+        expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
+      expect(prisma.shelter.updateMany).not.toHaveBeenCalled();
+    });
+
+    test("reactivating a Deactivated staff member → 200, staffDOS cleared, original staffDOJ kept", async () => {
+      prisma.staff.findUnique
+        .mockResolvedValueOnce({
+          staffDOJ: new Date("2020-01-10"),
+          accountStatus: "Deactivated",
+          staffDesignation: "Senior",
+          shelterID: 9,
+          shelter: { managerStaffID: 7 },
+        })
+        .mockResolvedValueOnce(buildStaffDetail({ accountStatus: "Active" }));
+      prisma.staff.update.mockResolvedValueOnce({});
+
+      const res = await request(app)
+        .patch("/api/v1/staff/42/status")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.update).toHaveBeenCalledWith({
+        where: { userID: 42 },
+        data: { accountStatus: "Active", staffDOS: null },
+      });
+    });
+
+    test.each([
+      ["Closed", "Active"],
+      ["Declined", "Active"],
+      ["Pending", "Deactivated"],
+      ["Active", "Declined"],
+      ["Active", "Active"],
+    ])("%s → %s: 409, nothing written", async (from, accountStatus) => {
+      prisma.staff.findUnique.mockResolvedValueOnce(
+        pendingManagerRow({ accountStatus: from }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/staff/42/status")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ accountStatus });
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe(
+        `A ${from} staff member can't be moved to ${accountStatus}`,
+      );
+      expect(prisma.staff.update).not.toHaveBeenCalled();
     });
 
     test("GET /staff/:id includes onboardingComplete and the ID's verification status", async () => {

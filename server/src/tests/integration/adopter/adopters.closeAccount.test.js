@@ -96,10 +96,10 @@ describe("DELETE /api/v1/adopters/me", () => {
       .send({ mode: "deactivate" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ success: true, message: "Account deactivated" });
+    expect(res.body).toMatchObject({ success: true, message: "Account closed" });
 
     const adopter = await prisma.adopter.findUnique({ where: { userID } });
-    expect(adopter.accountStatus).toBe("Deactivated");
+    expect(adopter.accountStatus).toBe("Closed");
 
     const user = await prisma.users.findUnique({ where: { userID } });
     expect(user.refreshToken).toBeNull();
@@ -216,7 +216,7 @@ describe("DELETE /api/v1/adopters/me", () => {
 
       const adopter = await prisma.adopter.findUnique({ where: { userID } });
       expect(adopter).not.toBeNull();
-      expect(adopter.accountStatus).not.toBe("Deactivated");
+      expect(adopter.accountStatus).not.toBe("Closed");
 
       await prisma.adoptionApplication.deleteMany({ where: { adopterID: userID } });
       await prisma.adopter.deleteMany({ where: { userID } });

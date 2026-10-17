@@ -17,7 +17,7 @@ const parseId = (value) => {
 
 const VALID_SECTIONS = ["all", "pending"];
 const VALID_DESIGNATION_FILTERS = ["Manager", "Senior", "Associate"];
-const VALID_TARGET_STATUSES = ["Active", "Deactivated"];
+const VALID_TARGET_STATUSES = ["Active", "Deactivated", "Declined"];
 
 // ——————————————— GET /staff/me/team ———————————————
 const listShelterStaff = async (req, res, next) => {

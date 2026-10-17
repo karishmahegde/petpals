@@ -39,11 +39,13 @@ const assertStaffOwnsShelter = async (role, userID, shelterID) => {
 };
 
 // Staff-driven account transitions: approve/decline a Pending registration,
-// or deactivate an Active volunteer. Banned is never set from here. Approving
+// or deactivate an Active volunteer. Banned is never set from here, and a
+// Closed (owner closed it) or Declined account can't be changed by staff —
+// only the owner can reopen a Closed one, via the emailed reactivation link. Approving
 // (Pending → Active) also needs onboarding complete and a Verified government
 // ID — the same rule as staff and vet approval (staffApproval.service.js).
 const ALLOWED_TRANSITIONS = {
-  Pending: ["Active", "Deactivated"],
+  Pending: ["Active", "Declined"],
   Active: ["Deactivated"],
 };
 

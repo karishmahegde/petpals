@@ -189,6 +189,16 @@ const updateStaff = async (userID, data) => {
 // same transaction. Every other Pending staff member is their shelter
 // manager's to approve (Staff tab). Deactivating/reactivating an existing
 // member stays Admin's either way.
+// Pending → Active (approve) / Declined (decline); Active → Deactivated;
+// Deactivated → Active (reactivate). Closed (the owner closed it) and Declined
+// are final for an admin — only the owner reopens a Closed account, by
+// emailed link.
+const ALLOWED_TRANSITIONS = {
+  Pending: ["Active", "Declined"],
+  Active: ["Deactivated"],
+  Deactivated: ["Active"],
+};
+
 const updateStaffStatus = async (userID, accountStatus) => {
   const current = await prisma.staff.findUnique({
     where: { userID },
@@ -203,6 +213,13 @@ const updateStaffStatus = async (userID, accountStatus) => {
   });
   if (!current) {
     throw notFound(userID);
+  }
+  if (!ALLOWED_TRANSITIONS[current.accountStatus]?.includes(accountStatus)) {
+    const err = new Error(
+      `A ${current.accountStatus} staff member can't be moved to ${accountStatus}`,
+    );
+    err.code = "CONFLICT";
+    throw err;
   }
 
   const approvingManager =

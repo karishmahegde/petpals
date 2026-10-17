@@ -149,7 +149,7 @@ const completeOnboarding = async (userID) => {
 
 // ——————————————— CLOSE MY ACCOUNT (DELETE /donors/me) ———————————————
 // Nothing blocks a donor from leaving — there's no open work to hand over.
-// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared). 'delete' removes the Donor and Users rows (the refresh token goes
 // with Users). The shelters' records survive either way: Donation.donorID is
 // ON DELETE SET NULL, so every donation stays, just with no donor attached
@@ -159,7 +159,7 @@ const closeMyAccount = async (userID, mode) => {
     await prisma.$transaction([
       prisma.donor.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       }),
       nullifyRefreshToken(prisma, userID),
     ]);

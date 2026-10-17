@@ -239,7 +239,8 @@ const closeAccount = async (userID, mode) => {
     await prisma.$transaction([
       prisma.adopter.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        // Closed, not Deactivated — the owner closed it, so they can reactivate it.
+        data: { accountStatus: "Closed" },
       }),
       nullifyRefreshToken(prisma, userID),
     ]);

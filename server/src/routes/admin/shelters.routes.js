@@ -200,7 +200,7 @@ router.patch(
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       409:
- *         description: The staff member is Deactivated and cannot be assigned as manager
+ *         description: The staff member is Deactivated, Closed or Declined and cannot be assigned as manager
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

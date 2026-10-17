@@ -187,7 +187,7 @@ const upcomingAppointmentsConflict = () => {
   return err;
 };
 
-// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared). 'delete' removes the Veterinarian and Users rows (the refresh
 // token goes with Users) plus their government ID and its stored file. The
 // pets' history survives: HealthRecord.vetID,
@@ -210,7 +210,7 @@ const closeMyAccount = async (userID, mode) => {
     await prisma.$transaction([
       prisma.veterinarian.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       }),
       nullifyRefreshToken(prisma, userID),
     ]);

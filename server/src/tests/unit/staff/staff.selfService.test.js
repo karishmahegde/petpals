@@ -323,7 +323,7 @@ describe("Staff self-service endpoints", () => {
 
   // ————————————————————————————— DELETE /staff/me —————————————————————————————
   describe("DELETE /api/v1/staff/me", () => {
-    test("mode=deactivate → 200, status set Deactivated, refresh token nulled, managed shelters cleared", async () => {
+    test("mode=deactivate → 200, status set Closed, refresh token nulled, managed shelters cleared", async () => {
       prisma.adoptionApplication.findFirst.mockResolvedValueOnce(null);
       prisma.staff.update.mockResolvedValueOnce({});
       prisma.shelter.updateMany.mockResolvedValueOnce({ count: 1 });
@@ -338,7 +338,7 @@ describe("Staff self-service endpoints", () => {
       expect(prisma.staff.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userID: 42 },
-          data: { accountStatus: "Deactivated" },
+          data: { accountStatus: "Closed" },
         }),
       );
       expect(prisma.shelter.updateMany).toHaveBeenCalledWith({

@@ -191,7 +191,7 @@ const hasAssignedPendingApplication = async (userID) => {
   return Boolean(application);
 };
 
-// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared); 'delete' permanently removes the Staff and Users rows. Both
 // modes clear managerStaffID on every shelter this staff member currently
 // manages — required for 'delete' (Shelter.managerStaffID FKs Staff.userID,
@@ -219,8 +219,8 @@ const closeMyAccount = async (userID, mode) => {
         where: { userID },
         // Stamps staffDOS — see utils/staffDates.js.
         data: {
-          accountStatus: "Deactivated",
-          ...staffStatusDates("Deactivated", current ?? {}),
+          accountStatus: "Closed",
+          ...staffStatusDates("Closed", current ?? {}),
         },
       }),
       clearManagedShelters,

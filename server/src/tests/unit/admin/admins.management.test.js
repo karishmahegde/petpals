@@ -209,26 +209,54 @@ describe("Admin accounts", () => {
 
   // ————————————————————————— PATCH /admins/:id/status —————————————————————————
   describe("PATCH /api/v1/admins/:id/status", () => {
-    test.each(["Active", "Deactivated"])(
-      "-> %s: written with the acting admin as statusChangedBy",
-      async (accountStatus) => {
-        prisma.admin.update.mockResolvedValueOnce({});
-        prisma.admin.findUnique.mockResolvedValueOnce(buildAdminRow({ accountStatus }));
+    // The service reads the current status first, then writes, then re-reads
+    // the detail shape.
+    const mockCurrent = (accountStatus) =>
+      prisma.admin.findUnique.mockResolvedValueOnce({ accountStatus });
 
-        const res = await request(app)
-          .patch("/api/v1/admins/2/status")
-          .set("Authorization", `Bearer ${adminToken(1)}`)
-          .send({ accountStatus });
+    test.each([
+      ["Pending", "Active"],
+      ["Pending", "Declined"],
+      ["Active", "Deactivated"],
+      ["Deactivated", "Active"],
+    ])("%s -> %s: written with the acting admin as statusChangedBy", async (from, accountStatus) => {
+      mockCurrent(from);
+      prisma.admin.update.mockResolvedValueOnce({});
+      prisma.admin.findUnique.mockResolvedValueOnce(buildAdminRow({ accountStatus }));
 
-        expect(res.status).toBe(200);
-        const { where, data } = prisma.admin.update.mock.calls[0][0];
-        expect(where).toEqual({ userID: 2 });
-        expect(data.accountStatus).toBe(accountStatus);
-        expect(data.statusChangedByID).toBe(1);
-        expect(data.statusChangedAt).toBeInstanceOf(Date);
-        expect(res.body.data.accountStatus).toBe(accountStatus);
-      },
-    );
+      const res = await request(app)
+        .patch("/api/v1/admins/2/status")
+        .set("Authorization", `Bearer ${adminToken(1)}`)
+        .send({ accountStatus });
+
+      expect(res.status).toBe(200);
+      const { where, data } = prisma.admin.update.mock.calls[0][0];
+      expect(where).toEqual({ userID: 2 });
+      expect(data.accountStatus).toBe(accountStatus);
+      expect(data.statusChangedByID).toBe(1);
+      expect(data.statusChangedAt).toBeInstanceOf(Date);
+      expect(res.body.data.accountStatus).toBe(accountStatus);
+    });
+
+    test.each([
+      ["Closed", "Active"],
+      ["Declined", "Active"],
+      ["Pending", "Deactivated"],
+      ["Active", "Declined"],
+      ["Active", "Active"],
+      ["Deactivated", "Declined"],
+    ])("%s -> %s: 409, nothing written", async (from, accountStatus) => {
+      mockCurrent(from);
+
+      const res = await request(app)
+        .patch("/api/v1/admins/2/status")
+        .set("Authorization", `Bearer ${adminToken(1)}`)
+        .send({ accountStatus });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
+      expect(prisma.admin.update).not.toHaveBeenCalled();
+    });
 
     test("deactivating yourself -> 400, nothing written", async () => {
       const res = await request(app)
@@ -241,20 +269,8 @@ describe("Admin accounts", () => {
       expect(prisma.admin.update).not.toHaveBeenCalled();
     });
 
-    test("setting yourself Active is allowed (only self-deactivation is blocked)", async () => {
-      prisma.admin.update.mockResolvedValueOnce({});
-      prisma.admin.findUnique.mockResolvedValueOnce(buildAdminRow({ userID: 1 }));
-
-      const res = await request(app)
-        .patch("/api/v1/admins/1/status")
-        .set("Authorization", `Bearer ${adminToken(1)}`)
-        .send({ accountStatus: "Active" });
-
-      expect(res.status).toBe(200);
-    });
-
-    test("unknown id (Prisma P2025) -> 404", async () => {
-      prisma.admin.update.mockRejectedValueOnce(Object.assign(new Error("nope"), { code: "P2025" }));
+    test("unknown id -> 404, nothing written", async () => {
+      prisma.admin.findUnique.mockResolvedValueOnce(null);
 
       const res = await request(app)
         .patch("/api/v1/admins/999/status")
@@ -262,9 +278,23 @@ describe("Admin accounts", () => {
         .send({ accountStatus: "Active" });
 
       expect(res.status).toBe(404);
+      expect(prisma.admin.update).not.toHaveBeenCalled();
+    });
+
+    test("row gone between the read and the write (Prisma P2025) -> 404", async () => {
+      mockCurrent("Pending");
+      prisma.admin.update.mockRejectedValueOnce(Object.assign(new Error("nope"), { code: "P2025" }));
+
+      const res = await request(app)
+        .patch("/api/v1/admins/2/status")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(404);
     });
 
     test("any other DB error -> 500", async () => {
+      mockCurrent("Pending");
       prisma.admin.update.mockRejectedValueOnce(new Error("connection lost"));
 
       const res = await request(app)
@@ -275,7 +305,7 @@ describe("Admin accounts", () => {
       expect(res.status).toBe(500);
     });
 
-    test.each([undefined, "Pending", "Banned"])("accountStatus %s -> 400", async (accountStatus) => {
+    test.each([undefined, "Pending", "Banned", "Closed"])("accountStatus %s -> 400", async (accountStatus) => {
       const res = await request(app)
         .patch("/api/v1/admins/2/status")
         .set("Authorization", `Bearer ${adminToken()}`)
@@ -391,17 +421,17 @@ describe("Admin accounts", () => {
         .set("Authorization", `Bearer ${adminToken(1)}`)
         .send({ mode });
 
-    test("mode=deactivate -> row kept, Deactivated by self, refresh token nulled", async () => {
+    test("mode=deactivate -> row kept, Closed by self, refresh token nulled", async () => {
       prisma.admin.update.mockResolvedValueOnce({});
       prisma.users.update.mockResolvedValueOnce({});
 
       const res = await close("deactivate");
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toBe("Account deactivated");
+      expect(res.body.message).toBe("Account closed");
       const { where, data } = prisma.admin.update.mock.calls[0][0];
       expect(where).toEqual({ userID: 1 });
-      expect(data).toMatchObject({ accountStatus: "Deactivated", statusChangedByID: 1 });
+      expect(data).toMatchObject({ accountStatus: "Closed", statusChangedByID: 1 });
       expect(prisma.users.update).toHaveBeenCalledWith({
         where: { userID: 1 },
         data: { refreshToken: null },

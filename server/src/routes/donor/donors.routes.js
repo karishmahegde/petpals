@@ -182,7 +182,7 @@ router.patch(
  *   delete:
  *     summary: Deactivate or permanently delete your own donor account (Donor only)
  *     description: >
- *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       'deactivate' keeps the row (accountStatus → Closed, refresh
  *       token cleared); 'delete' permanently removes the Donor and Users
  *       rows. The shelters' records survive either way — every donation
  *       stays, with the donor link set to null on delete (staff see

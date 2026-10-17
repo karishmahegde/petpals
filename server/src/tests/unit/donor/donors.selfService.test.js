@@ -261,17 +261,17 @@ describe("Donor self-service endpoints", () => {
         .set("Authorization", `Bearer ${donorToken()}`)
         .send(body);
 
-    test("mode=deactivate → 200, status Deactivated, refresh token nulled, nothing deleted", async () => {
+    test("mode=deactivate → 200, status Closed, refresh token nulled, nothing deleted", async () => {
       prisma.donor.update.mockResolvedValueOnce({});
       prisma.users.update.mockResolvedValueOnce({});
 
       const res = await close({ mode: "deactivate" });
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toBe("Account deactivated");
+      expect(res.body.message).toBe("Account closed");
       expect(prisma.donor.update).toHaveBeenCalledWith({
         where: { userID: 42 },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       });
       expect(prisma.users.update).toHaveBeenCalledWith({
         where: { userID: 42 },

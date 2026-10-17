@@ -223,7 +223,7 @@ const openWorkConflict = (reasons) => {
   return err;
 };
 
-// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared). 'delete' removes the Volunteer and Users rows (the refresh token
 // goes with Users) plus their government ID and its stored file.
 //
@@ -269,7 +269,7 @@ const closeMyAccount = async (userID, mode) => {
       }),
       prisma.volunteer.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       }),
       nullifyRefreshToken(prisma, userID),
     ]);

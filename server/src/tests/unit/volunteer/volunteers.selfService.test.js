@@ -624,7 +624,7 @@ describe("Volunteer self-service endpoints", () => {
       prisma.task.findFirst.mockResolvedValueOnce(null);
     };
 
-    test("mode=deactivate → 200, leaves future events, status Deactivated, refresh token nulled, nothing deleted", async () => {
+    test("mode=deactivate → 200, leaves future events, status Closed, refresh token nulled, nothing deleted", async () => {
       noOpenWork();
       prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });
       prisma.volunteer.update.mockResolvedValueOnce({});
@@ -633,14 +633,14 @@ describe("Volunteer self-service endpoints", () => {
       const res = await close({ mode: "deactivate" });
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toBe("Account deactivated");
+      expect(res.body.message).toBe("Account closed");
       // Only events that haven't happened yet — past assignments stay as history.
       expect(prisma.volunteerEvent.deleteMany).toHaveBeenCalledWith({
         where: { volunteerID: 42, event: { eventDate: { gt: expect.any(Date) } } },
       });
       expect(prisma.volunteer.update).toHaveBeenCalledWith({
         where: { userID: 42 },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       });
       expect(prisma.users.update).toHaveBeenCalledWith({
         where: { userID: 42 },

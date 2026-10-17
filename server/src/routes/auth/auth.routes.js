@@ -76,7 +76,12 @@ router.post("/register", authController.register);
  *           only reach their own onboarding endpoints until approved;
  *           Pending accounts of other roles get 401.
  *       401:
- *         description: Incorrect password, or a Deactivated/Banned account (or Pending, for roles other than Staff/Veterinarian)
+ *         description: >
+ *           Incorrect password, or a Deactivated/Closed/Declined/Banned
+ *           account (or Pending, for roles other than Staff/Veterinarian/
+ *           Volunteer). A Closed account (closed by its owner) carries
+ *           error.details.reason = "account_closed" so the login page can
+ *           offer a reactivation link; a Declined one "account_declined".
  *       404:
  *         description: No account found with this email
  */

@@ -73,7 +73,7 @@ describe("Shelter manager veterinarian management", () => {
       expect(res.status).toBe(200);
       expect(prisma.veterinarian.findMany.mock.calls[0][0].where).toEqual({
         shelterID: 9,
-        accountStatus: { in: ["Active", "Deactivated"] },
+        accountStatus: { not: "Pending" },
         vetName: { contains: "adr", mode: "insensitive" },
       });
       expect(res.body.data[0]).toMatchObject({
@@ -251,7 +251,7 @@ describe("Shelter manager veterinarian management", () => {
       expect(prisma.veterinarian.update).not.toHaveBeenCalled();
     });
 
-    test("decline: Pending → Deactivated is allowed mid-onboarding with no ID", async () => {
+    test("decline: Pending → Declined is allowed mid-onboarding with no ID", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.veterinarian.findUnique.mockResolvedValueOnce({
         shelterID: 9,
@@ -259,17 +259,17 @@ describe("Shelter manager veterinarian management", () => {
         onboardingComplete: false,
       });
       prisma.veterinarian.update.mockResolvedValueOnce(
-        vetRow({ accountStatus: "Deactivated", onboardingComplete: false }),
+        vetRow({ accountStatus: "Declined", onboardingComplete: false }),
       );
 
       const res = await request(app)
         .patch("/api/v1/staff/me/vets/60/status")
         .set("Authorization", `Bearer ${managerToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.veterinarian.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+        expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
     });
 

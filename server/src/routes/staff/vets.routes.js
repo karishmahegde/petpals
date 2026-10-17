@@ -17,7 +17,8 @@ const router = express.Router();
  *     summary: List the veterinarians at the caller's shelter (shelter manager)
  *     description: >
  *       section=pending lists vets awaiting approval; section=all lists
- *       approved vets (Active or Deactivated), optionally narrowed by
+ *       everyone past that stage (Active, Deactivated, Closed or Declined),
+ *       optionally narrowed by
  *       accountStatus. name is a case-insensitive contains match. Each vet
  *       carries onboardingComplete and governmentIdStatus (Pending,
  *       Verified, Rejected, or null if none submitted) — what the manager
@@ -32,7 +33,7 @@ const router = express.Router();
  *         schema: { type: string, enum: [all, pending] }
  *       - in: query
  *         name: accountStatus
- *         schema: { type: string, enum: [Active, Deactivated] }
+ *         schema: { type: string, enum: [Active, Deactivated, Closed, Declined] }
  *         description: section=all only
  *       - in: query
  *         name: name
@@ -81,8 +82,9 @@ router.get(
  *   patch:
  *     summary: Approve, decline, or deactivate a veterinarian (shelter manager)
  *     description: >
- *       Pending → Active (approve), Pending → Deactivated (decline),
- *       Active → Deactivated (deactivate); anything else is 409. The vet
+ *       Pending → Active (approve), Pending → Declined (decline),
+ *       Active → Deactivated (deactivate); anything else is 409 (a Closed
+ *       account is reopened only by its owner, by emailed link). The vet
  *       must be at the caller's shelter. Approving also needs the vet's
  *       onboarding complete and their government ID Verified — 409 naming
  *       what's missing otherwise. Declining is allowed at any onboarding
@@ -103,7 +105,7 @@ router.get(
  *             type: object
  *             required: [accountStatus]
  *             properties:
- *               accountStatus: { type: string, enum: [Active, Deactivated] }
+ *               accountStatus: { type: string, enum: [Active, Deactivated, Declined] }
  *     responses:
  *       200:
  *         description: The updated veterinarian
