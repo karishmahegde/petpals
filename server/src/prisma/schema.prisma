@@ -785,34 +785,45 @@ enum PaymentStatus {
   Paid
 }
 
+// Closed = the owner closed it (the only state they can reactivate themselves,
+// by emailed link); Deactivated = done by an admin/staff member; Declined =
+// turned down at approval. Same meanings in every role's enum below.
 enum AdopterAccountStatus {
   Active
   Banned
   Deactivated
+  Closed
 }
 
 enum DonorAccountStatus {
   Active
   Banned
   Deactivated
+  Closed
 }
 
 enum StaffAccountStatus {
   Pending
   Active
   Deactivated
+  Closed
+  Declined
 }
 
 enum VetAccountStatus {
   Pending
   Active
   Deactivated
+  Closed
+  Declined
 }
 
 enum AdminAccountStatus {
   Pending
   Active
   Deactivated
+  Closed
+  Declined
 }
 
 // Volunteer applications go through staff approval — new volunteers start
@@ -823,6 +834,8 @@ enum VolunteerAccountStatus {
   Active
   Banned
   Deactivated
+  Closed
+  Declined
 }
 
 enum VisitStatus {
