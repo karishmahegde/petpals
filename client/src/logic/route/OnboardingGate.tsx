@@ -49,6 +49,7 @@ const LINK_PAGES = [
   "/forgot-password",
   "/reset-password",
   "/reactivate",
+  "/confirm-email-change",
 ];
 
 interface OnboardingGateProps {

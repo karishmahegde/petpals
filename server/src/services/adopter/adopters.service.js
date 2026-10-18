@@ -42,11 +42,12 @@ const ADOPTER_PROFILE_SELECT = {
   onboardingStep: true,
   // Account-level, on Users — flattened back onto the profile by
   // toAdopterProfile so the response shape is unchanged.
-  user: { select: { emailVerified: true, lastLoginAt: true } },
+  user: { select: { userEmail: true, emailVerified: true, lastLoginAt: true } },
 };
 
 const toAdopterProfile = ({ user, ...rest }) => ({
   ...rest,
+  userEmail: user.userEmail,
   emailVerified: user.emailVerified,
   lastLoginAt: user.lastLoginAt,
 });
