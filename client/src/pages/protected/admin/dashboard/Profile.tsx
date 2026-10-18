@@ -25,6 +25,7 @@ import {
 import type { Address } from "../../../../logic/utils/address";
 import ProfileAddressSection from "../../../../components/ui/profile/ProfileAddressSection";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
+import useResendVerification from "../../../../logic/hooks/useResendVerification";
 import useAuthStore from "../../../../logic/store/useAuthStore";
 
 const STATUS_TONE: Record<AdminAccountStatus, BadgeTone> = {
@@ -86,6 +87,7 @@ const inputClass =
 const Profile = () => {
   const queryClient = useQueryClient();
   const updateUser = useAuthStore((state) => state.updateUser);
+  const verification = useResendVerification();
 
   const profileQuery = useQuery({
     queryKey: ["admin", "me"],
@@ -212,7 +214,11 @@ const Profile = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <EmailVerificationStatus verified={profile.emailVerified} />
+              <EmailVerificationStatus
+                verified={profile.emailVerified}
+                onVerify={verification.resend}
+                pending={verification.pending}
+              />
               {profile.accountStatus && (
                 <Badge tone={STATUS_TONE[profile.accountStatus]}>
                   {profile.accountStatus}

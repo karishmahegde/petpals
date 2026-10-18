@@ -4,7 +4,8 @@
 // Responsibilities:
 //   - Renders name, email, password, role, and consent fields with client-side validation
 //   - Calls authApi.register() on submit and handles loading/error states
-//   - On success: redirects to /login and shows a success toast
+//   - On success: redirects to /login and shows a toast saying to check
+//     their inbox for the verification link (sent by the server on register)
 //   - On failure: displays server error message inline
 // Route: /register
 import { useState } from "react";
@@ -152,7 +153,10 @@ const Register = () => {
         role,
         shelterID: isVolunteer ? Number(shelterID) : undefined,
       });
-      toast.success("Registered successfully");
+      toast.success(
+        "Registered! We've emailed you a link to verify your address.",
+        { duration: 6000 },
+      );
       navigate("/login", { replace: true });
     } catch (err: unknown) {
       const message =

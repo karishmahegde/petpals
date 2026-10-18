@@ -27,6 +27,7 @@ import {
 import { formatShortDate } from "../../../../logic/utils/datetime";
 import useAuthStore from "../../../../logic/store/useAuthStore";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
+import useResendVerification from "../../../../logic/hooks/useResendVerification";
 import { MY_QUIZ_QUERY_KEY } from "./shared/matchQuiz";
 import useMatchesPopupStore from "../../../../logic/store/useMatchesPopupStore";
 
@@ -270,6 +271,7 @@ const inputClass =
 const Profile = () => {
   const queryClient = useQueryClient();
   const updateUser = useAuthStore((state) => state.updateUser);
+  const verification = useResendVerification();
 
   const profileQuery = useQuery({
     queryKey: ["adopter", "me"],
@@ -627,7 +629,11 @@ const Profile = () => {
                   Pre-qualified
                 </span>
               )}
-              <EmailVerificationStatus verified={profile.emailVerified} />
+              <EmailVerificationStatus
+                verified={profile.emailVerified}
+                onVerify={verification.resend}
+                pending={verification.pending}
+              />
             </div>
           </div>
 

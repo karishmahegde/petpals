@@ -21,6 +21,7 @@ import PersonalFields, {
 import AddressFields from "../../../../components/ui/onboarding/AddressFields";
 import ProfileAddressSection from "../../../../components/ui/profile/ProfileAddressSection";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
+import useResendVerification from "../../../../logic/hooks/useResendVerification";
 import CloseAccountModal from "./shared/CloseAccountModal";
 import {
   getMyDonorProfile,
@@ -122,6 +123,7 @@ const inputClass =
 const Profile = () => {
   const queryClient = useQueryClient();
   const updateUser = useAuthStore((state) => state.updateUser);
+  const verification = useResendVerification();
 
   const profileQuery = useQuery({
     queryKey: ["donor", "me"],
@@ -225,7 +227,11 @@ const Profile = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <EmailVerificationStatus verified={profile.emailVerified} />
+              <EmailVerificationStatus
+                verified={profile.emailVerified}
+                onVerify={verification.resend}
+                pending={verification.pending}
+              />
               {profile.accountStatus && (
                 <Badge tone={STATUS_TONE[profile.accountStatus]}>
                   {profile.accountStatus}

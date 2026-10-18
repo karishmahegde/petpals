@@ -172,12 +172,16 @@ const WorkerRegister = () => {
         // it, then on /staff/pending until they're approved).
         const { token: newToken, user } = await loginApi({ email, password });
         storeLogin(user, newToken, user.role);
-        toast.success("Account created! Let's set up your profile.");
+        toast.success(
+          "Account created! We've emailed you a link to verify your address — now let's set up your profile.",
+          { duration: 6000 },
+        );
         navigate("/staff/onboarding/step/2", { replace: true });
         return;
       }
       toast.success(
-        "Registered! Your account needs approval before you can sign in.",
+        "Registered! We've emailed you a link to verify your address. Your account needs approval before you can sign in.",
+        { duration: 6000 },
       );
       navigate("/staff-portal/login", { replace: true });
     } catch (err: unknown) {

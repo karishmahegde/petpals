@@ -9,6 +9,10 @@
 //       4. Active application exists -> /adopter/applications + toast
 //   - Once all guards pass, renders the application form (pet summary +
 //     Adopter Type / message-to-shelter, per the Part 4 spec).
+//   - Soft gate: with an unverified email the form still shows, but
+//     EmailUnverifiedNotice replaces "Continue to Payment" (the server 409s
+//     "email_unverified" otherwise; that 409 also flips the session, in case
+//     it was stale).
 // Route: /adopt/apply/:petID
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -27,9 +31,11 @@ import {
   createCheckoutSession,
   type CreateApplicationPayload,
 } from "../../../../logic/api/adoptionApplicationsApi";
+import { isEmailUnverifiedError } from "../../../../logic/api/authApi";
 import { showAdopterAccountToast } from "../../../../logic/toast/adopterAccountToast";
 import { saveApplyDraft, loadApplyDraft } from "../../../../logic/adoptApplyDraft";
 import useAuthStore from "../../../../logic/store/useAuthStore";
+import EmailUnverifiedNotice from "../../shared/EmailUnverifiedNotice";
 
 const ACTIVE_STATUSES = ["Pending", "Accepted"];
 
@@ -48,6 +54,10 @@ const AdoptApply = () => {
   const petID = Number(petIDParam);
   const navigate = useNavigate();
   const { token, role } = useAuthStore();
+  const emailUnverified = useAuthStore(
+    (state) => state.user?.emailVerified === false,
+  );
+  const updateUser = useAuthStore((state) => state.updateUser);
 
   const isAdopter = !!token && role === "Adopter";
 
@@ -153,6 +163,10 @@ const AdoptApply = () => {
       window.location.href = checkoutUrl;
     },
     onError: (err) => {
+      if (isEmailUnverifiedError(err)) {
+        updateUser({ emailVerified: false });
+        return;
+      }
       toast(extractError(err));
     },
   });
@@ -291,16 +305,20 @@ const AdoptApply = () => {
             </p>
           </div>
 
-          <ButtonElement
-            onClick={handleSubmit}
-            disabled={applicationType === null || mutation.isPending}
-            size="panel"
-            className="w-full bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
-          >
-            {mutation.isPending
-              ? "Redirecting to payment…"
-              : "Continue to Payment"}
-          </ButtonElement>
+          {emailUnverified ? (
+            <EmailUnverifiedNotice action="apply to adopt" />
+          ) : (
+            <ButtonElement
+              onClick={handleSubmit}
+              disabled={applicationType === null || mutation.isPending}
+              size="panel"
+              className="w-full bg-teal-dark hover:brightness-95 disabled:cursor-not-allowed"
+            >
+              {mutation.isPending
+                ? "Redirecting to payment…"
+                : "Continue to Payment"}
+            </ButtonElement>
+          )}
           <ButtonElement
             onClick={handleCancelClick}
             size="panel"
