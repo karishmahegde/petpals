@@ -164,6 +164,26 @@ describe("applicationsDecided", () => {
     expect(queueEmail).not.toHaveBeenCalled();
   });
 
+  test("one failed email is logged and skipped — the rest still go, nothing thrown", () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    queueEmail.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+
+    expect(() =>
+      decided([
+        { email: "sam@example.test", name: "Sam", status: "Accepted" },
+        { email: "ali@example.test", name: "Ali", status: "Rejected" },
+      ]),
+    ).not.toThrow();
+
+    expect(queueEmail).toHaveBeenCalledTimes(2);
+    expect(queueEmail.mock.calls[1][0].to).toBe("ali@example.test");
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0]).toContain("sam@example.test");
+    error.mockRestore();
+  });
+
   test("the remark is escaped in the HTML part", () => {
     decided([{ email: "sam@example.test", name: "Sam", status: "Rejected", staffRemark: "<b>no</b>" }]);
 

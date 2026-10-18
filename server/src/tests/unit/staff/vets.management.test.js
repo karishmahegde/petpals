@@ -295,6 +295,29 @@ describe("Shelter manager veterinarian management", () => {
       expect(prisma.veterinarian.update).not.toHaveBeenCalled();
     });
 
+    // Closed is reopened only by its owner (emailed link); Declined is final;
+    // Declined is only a decline of a Pending sign-up.
+    test.each([
+      ["Closed", "Active"],
+      ["Closed", "Deactivated"],
+      ["Declined", "Active"],
+      ["Active", "Declined"],
+    ])("%s → %s isn't allowed → 409, nothing written", async (from, to) => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.veterinarian.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        accountStatus: from,
+      });
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/vets/60/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: to });
+
+      expect(res.status).toBe(409);
+      expect(prisma.veterinarian.update).not.toHaveBeenCalled();
+    });
+
     test("vet at another shelter → 403, nothing written", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.veterinarian.findUnique.mockResolvedValueOnce({

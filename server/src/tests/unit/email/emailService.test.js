@@ -120,6 +120,18 @@ describe("sendEmail", () => {
     );
   });
 
+  test("provider error with a non-JSON body → still a clear error, just the status", async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError("Unexpected token <");
+      },
+    });
+
+    await expect(sendEmail(message)).rejects.toThrow(/^Email provider returned 502$/);
+  });
+
   test("timeout and network failure → throw", async () => {
     const timeout = new Error("timed out");
     timeout.name = "TimeoutError";

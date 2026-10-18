@@ -101,6 +101,15 @@ describe("POST /api/v1/auth/email-verification", () => {
     });
   });
 
+  test("the account no longer exists (deleted mid-session) → 404, nothing sent", async () => {
+    prisma.users.findUnique.mockResolvedValueOnce(null);
+
+    const res = await send();
+
+    expect(res.status).toBe(404);
+    expect(queueEmail).not.toHaveBeenCalled();
+  });
+
   test("already verified → 409 already_verified, nothing sent", async () => {
     prisma.users.findUnique.mockResolvedValueOnce({ ...unverifiedAdopter, emailVerified: true });
 

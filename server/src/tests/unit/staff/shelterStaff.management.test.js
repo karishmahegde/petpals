@@ -388,5 +388,29 @@ describe("Shelter manager staff management", () => {
       expect(res.status).toBe(409);
       expect(prisma.staff.update).not.toHaveBeenCalled();
     });
+
+    // Closed is reopened only by its owner (emailed link); Declined is final;
+    // Declined is only a decline of a Pending sign-up.
+    test.each([
+      ["Closed", "Active"],
+      ["Closed", "Deactivated"],
+      ["Declined", "Active"],
+      ["Active", "Declined"],
+    ])("%s -> %s isn't allowed -> 409, nothing written", async (from, to) => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        staffDesignation: "Associate",
+        accountStatus: from,
+      });
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: to });
+
+      expect(res.status).toBe(409);
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
   });
 });

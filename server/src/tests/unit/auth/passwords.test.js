@@ -154,6 +154,18 @@ describe("POST /api/v1/auth/password-reset", () => {
     expect(queueEmail).not.toHaveBeenCalled();
   });
 
+  test("a real failure issuing the link → 500, not swallowed into the 200 (only the cooldown is)", async () => {
+    prisma.users.findUnique
+      .mockResolvedValueOnce({ userID: 7 })
+      .mockResolvedValueOnce(contactRow());
+    prisma.accountToken.findFirst.mockRejectedValueOnce(new Error("connection lost"));
+
+    const res = await forgot({ email: "sam@example.test" });
+
+    expect(res.status).toBe(500);
+    expect(queueEmail).not.toHaveBeenCalled();
+  });
+
   test("no email → 422", async () => {
     const res = await forgot({});
     expect(res.status).toBe(422);

@@ -159,6 +159,18 @@ describe("POST /api/v1/auth/reactivation", () => {
     expect(queueEmail).not.toHaveBeenCalled();
   });
 
+  test("a real failure issuing the link → 500, not swallowed into the 200 (only the cooldown is)", async () => {
+    prisma.users.findUnique
+      .mockResolvedValueOnce({ userID: 7 })
+      .mockResolvedValueOnce(contactRow("Adopter", "Closed"));
+    prisma.accountToken.findFirst.mockRejectedValueOnce(new Error("connection lost"));
+
+    const res = await ask({ email: "sam@example.test" });
+
+    expect(res.status).toBe(500);
+    expect(queueEmail).not.toHaveBeenCalled();
+  });
+
   test("no email → 422", async () => {
     const res = await ask({});
     expect(res.status).toBe(422);
@@ -290,6 +302,15 @@ describe("POST /api/v1/auth/email-change", () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error.details).toEqual({ reason: "email_taken" });
+    expect(queueEmail).not.toHaveBeenCalled();
+  });
+
+  test("the account no longer exists (deleted mid-session) → 404, nothing sent", async () => {
+    prisma.users.findUnique.mockResolvedValueOnce(null);
+
+    const res = await ask(valid);
+
+    expect(res.status).toBe(404);
     expect(queueEmail).not.toHaveBeenCalled();
   });
 
