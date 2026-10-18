@@ -2136,14 +2136,55 @@ async function main() {
     ],
   });
 
-  // ── NOTIFICATIONS: every type / status / recipient type ──────
-  // Not yet sent or read by any app code — seeded so the table isn't empty.
+  // ── NOTIFICATIONS: every NotificationType ───────────────────
+  // Built with the app's own message builders, so the rows read exactly like
+  // real ones. Spread over the main logins (and a few others) so every
+  // dashboard's bell has something; read and unread mixed, newest first.
+  const notices = require("../services/notifications/messages");
+  const note = (user, built, daysAgo, read = false) => ({
+    userID: user.userID,
+    ...built,
+    createdAt: daysFromNow(-daysAgo),
+    readAt: read ? daysFromNow(-daysAgo + 0.1) : null,
+  });
   await prisma.notification.createMany({
     data: [
-      { recipientID: emelie.userID, recipientType: "adopter", notificationType: "vaccination", notificationStatus: "Sent", sendTime: daysFromNow(-2), textBody: "Buddy's Rabies vaccination is due within the year — book a visit with PetPals Downtown." },
-      { recipientID: vet.userID, recipientType: "veterinarian", notificationType: "appointment", notificationStatus: "Pending", sendTime: daysFromNow(6), textBody: "Reminder: Rocky's monthly cardiac check is tomorrow." },
-      { recipientID: bryan.userID, recipientType: "volunteer", notificationType: "task", notificationStatus: "Failed", sendTime: daysFromNow(-1), textBody: "New task assigned: Morning feed for the kennel block." },
-      { recipientID: sasha.userID, recipientType: "staff", notificationType: "task", notificationStatus: "Sent", sendTime: daysFromNow(-2), textBody: "Task overdue: Deep-clean the cat room." },
+      // Adopters
+      note(emelie, notices.appointmentScheduled({ petName: "Buddy" }), 0.2),
+      note(emelie, notices.visitConfirmed({ shelterName: "PetPals Downtown", petName: "Bella" }), 1),
+      note(emelie, notices.appointmentChanged({ petName: "Buddy", role: "Adopter" }), 3),
+      note(emelie, notices.applicationApproved({ petName: "Buddy", shelterName: "PetPals Downtown" }), 40, true),
+      note(emelie, notices.applicationSubmitted({ petName: "Buddy", shelterName: "PetPals Downtown" }), 45, true),
+      note(emelie, notices.governmentIdVerified({ role: "Adopter" }), 50, true),
+      note(noah, notices.applicationDeclined({ petName: "Apollo", shelterName: "PetPals Downtown" }), 2),
+      note(noah, notices.visitCancelled({ shelterName: "PetPals Brooklyn", petName: "Hazel" }), 4),
+      note(noah, notices.governmentIdRejected({ role: "Adopter" }), 6, true),
+      // Shelter staff (Downtown's manager, a Downtown senior, Brooklyn's manager)
+      note(sasha, notices.newApplication({ adopterName: "Noah Bennett", petName: "Apollo" }), 0.1),
+      note(sasha, notices.signupReadyForApproval({ name: "Priya Desai", kind: "Veterinarian" }), 0.5),
+      note(sasha, notices.newVisitRequest({ adopterName: "Emelie A. Archer", petName: "Bella" }), 1.5),
+      note(sasha, notices.capacityAlert({ shelterName: "PetPals Downtown" }), 2),
+      note(sasha, notices.transferCompleted({ petName: "Luna", toShelterName: "PetPals Brooklyn" }), 5, true),
+      note(sasha, notices.applicationWithdrawn({ adopterName: "Noah Bennett", petName: "Daisy" }), 8, true),
+      note(sasha, notices.visitCancelledByAdopter({ adopterName: "Noah Bennett", petName: "Hazel" }), 9, true),
+      note(daniel, notices.signupReadyForApproval({ name: "Priya Nair", kind: "Volunteer" }), 0.3),
+      note(daniel, notices.transferRejected({ petName: "Milo", toShelterName: "PetPals Queens" }), 7, true),
+      note(marcus, notices.transferIncoming({ petName: "Rocky", fromShelterName: "PetPals Downtown" }), 1),
+      note(marcus, notices.transferCancelled({ petName: "Coco", fromShelterName: "PetPals Downtown" }), 12, true),
+      // Veterinarian
+      note(vet, notices.appointmentAssigned({ petName: "Rocky" }), 0.4),
+      note(vet, notices.appointmentCancelled({ petName: "Max", role: "Veterinarian" }), 3, true),
+      // Volunteer
+      note(bryan, notices.eventAssigned({ eventName: "Monthly Meet & Greet" }), 0.6),
+      note(bryan, notices.taskAssigned({ taskName: "Feeding" }), 1),
+      note(bryan, notices.appointmentAssistAssigned({ petName: "Rocky" }), 2),
+      note(bryan, notices.appointmentAssistCancelled({ petName: "Max" }), 10, true),
+      note(bryan, notices.eventCancelled({ eventName: "Spring Adoption Fair" }), 14, true),
+      // Donor
+      note(charlotte, notices.donationReceived({ amount: 50, shelterName: "PetPals Downtown" }), 3),
+      // Admin
+      note(adminUser, notices.signupReadyForApproval({ name: "Grace Liu", kind: "Manager" }), 0.8),
+      note(adminUser, notices.adminSignupPending({ name: "Henry Walsh" }), 4, true),
     ],
   });
 
