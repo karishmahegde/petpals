@@ -16,6 +16,10 @@ const registerAndLoginAdopter = async (name) => {
     .post("/api/v1/auth/register")
     .send(payload);
   const userID = registerRes.body.data.userID;
+  // New sign-ups start unverified, and applying needs a verified email
+  // (the soft gate — covered in auth/sprint9Journeys.test.js). Verified
+  // directly here, since these tests are about applying, not verifying.
+  await prisma.users.update({ where: { userID }, data: { emailVerified: true } });
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });
