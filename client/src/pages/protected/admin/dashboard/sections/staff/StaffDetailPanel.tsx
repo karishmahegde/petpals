@@ -48,6 +48,8 @@ const STATUS_TONE: Record<StaffAccountStatus, BadgeTone> = {
   Pending: "gold",
   Active: "green",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };
 
 const StaffDetailPanel = ({ userID, onClose }: StaffDetailPanelProps) => {
@@ -127,6 +129,8 @@ const StaffDetailPanel = ({ userID, onClose }: StaffDetailPanelProps) => {
   const canSave =
     hasChanges && designation !== "" && shelterID !== "" && !mutation.isPending;
 
+  // Closed (only its owner can reopen it, by emailed link) and Declined
+  // accounts can't be changed by anyone (409), so no toggle for them.
   const canToggleStatus =
     data?.accountStatus === "Active" || data?.accountStatus === "Deactivated";
 
@@ -221,7 +225,8 @@ const StaffDetailPanel = ({ userID, onClose }: StaffDetailPanelProps) => {
                 k="Joined"
                 v={data.staffDOJ ? formatFullDate(new Date(data.staffDOJ)) : "—"}
               />
-              {data.accountStatus === "Deactivated" && (
+              {(data.accountStatus === "Deactivated" ||
+                data.accountStatus === "Closed") && (
                 <InfoRow
                   k="Separated"
                   v={

@@ -33,6 +33,8 @@ const STATUS_TONE: Record<StaffAccountStatus, BadgeTone> = {
   Pending: "gold",
   Active: "green",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };
 
 // Mirrors admin Profile.tsx's SEX_LABELS/adminSex handling.

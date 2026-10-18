@@ -12,15 +12,15 @@ import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Avatar from "../../../../../../components/ui/Avatar";
-import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
+import Badge from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import PhoneDisplay from "../../../../../../components/ui/PhoneDisplay";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
 import {
   updateShelterVetStatus,
   type ShelterVet,
-  type VetAccountStatus,
 } from "../../../../../../logic/api/shelterVetsApi";
+import { VET_STATUS_TONE } from "../../../../../../logic/staff/vetStatus";
 import { formatVetName } from "../../../../../../logic/utils/vetName";
 import { formatAddress } from "../../../../../../logic/utils/address";
 
@@ -28,12 +28,6 @@ interface VetDetailPanelProps {
   vet: ShelterVet | null;
   onClose: () => void;
 }
-
-const STATUS_TONE: Record<VetAccountStatus, BadgeTone> = {
-  Pending: "gold",
-  Active: "green",
-  Deactivated: "gray",
-};
 
 const SEX_LABEL: Record<"M" | "F", string> = { M: "Male", F: "Female" };
 
@@ -106,7 +100,7 @@ const VetDetailPanel = ({ vet, onClose }: VetDetailPanelProps) => {
                   Veterinarian
                 </p>
               </div>
-              <Badge tone={STATUS_TONE[vet.accountStatus]}>
+              <Badge tone={VET_STATUS_TONE[vet.accountStatus]}>
                 {vet.accountStatus}
               </Badge>
             </div>

@@ -40,6 +40,8 @@ import useAuthStore from "../../../../logic/store/useAuthStore";
 const STATUS_TONE: Record<DonorAccountStatus, BadgeTone> = {
   Active: "green",
   Deactivated: "gray",
+  Banned: "red",
+  Closed: "neutral",
 };
 
 const SEX_LABELS: Record<string, string> = {

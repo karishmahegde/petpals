@@ -8,4 +8,5 @@ export const ADOPTER_STATUS_TONE: Record<AdopterAccountStatus, BadgeTone> = {
   Active: "green",
   Banned: "red",
   Deactivated: "gray",
+  Closed: "neutral",
 };

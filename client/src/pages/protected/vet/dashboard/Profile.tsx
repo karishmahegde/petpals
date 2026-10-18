@@ -42,6 +42,8 @@ const STATUS_TONE: Record<VetAccountStatus, BadgeTone> = {
   Pending: "gold",
   Active: "green",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };
 
 const SEX_LABELS: Record<string, string> = {

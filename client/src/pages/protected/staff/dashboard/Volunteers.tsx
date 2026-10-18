@@ -56,6 +56,8 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "Active", label: "Active" },
   { value: "Banned", label: "Banned" },
   { value: "Deactivated", label: "Deactivated" },
+  { value: "Closed", label: "Closed" },
+  { value: "Declined", label: "Declined" },
 ];
 
 // Matches SelectField's own label + trigger sizing, same as Transfers.tsx.
@@ -279,7 +281,7 @@ const Volunteers = () => {
             }}
             confirmAction={{
               mutationFn: (volunteer) =>
-                updateVolunteerStatus(volunteer.userID, "Deactivated"),
+                updateVolunteerStatus(volunteer.userID, "Declined"),
               invalidateKeys: [["staff", "volunteers"]],
               successToast: "Volunteer declined",
               errorToast: "Couldn't decline this volunteer. Please try again.",
@@ -287,8 +289,9 @@ const Volunteers = () => {
               confirmLabel: "Decline",
               renderBody: (volunteer) => (
                 <>
-                  This declines {volunteer.volunteerName}'s registration and
-                  deactivates their account.
+                  This declines {volunteer.volunteerName}'s registration — they
+                  won't be able to log in, and we'll email them to let them
+                  know.
                 </>
               ),
             }}

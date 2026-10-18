@@ -45,6 +45,8 @@ const STATUS_TONE: Record<AdminAccountStatus, BadgeTone> = {
   Pending: "gold",
   Active: "green",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };
 
 const AdminDetailPanel = ({ userID, onClose }: AdminDetailPanelProps) => {
@@ -87,7 +89,8 @@ const AdminDetailPanel = ({ userID, onClose }: AdminDetailPanelProps) => {
   // The backend rejects self-deactivation (there'd be no one left to reverse
   // it), and self-activation is moot — you can't be viewing this panel while
   // Deactivated. Hiding the toggle for your own row avoids a button that
-  // would always fail.
+  // would always fail. Closed (only its owner can reopen it, by emailed
+  // link) and Declined accounts can't be changed by anyone (409).
   const canToggleStatus =
     !isSelf &&
     (data?.accountStatus === "Active" || data?.accountStatus === "Deactivated");

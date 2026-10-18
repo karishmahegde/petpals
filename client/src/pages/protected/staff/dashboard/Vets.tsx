@@ -17,20 +17,25 @@ import { getMyStaffProfile } from "../../../../logic/api/staffApi";
 import {
   getShelterVets,
   type ShelterVet,
+  type VetAccountStatus,
 } from "../../../../logic/api/shelterVetsApi";
 import VetDetailPanel from "./sections/vets/VetDetailPanel";
 import VetApprovalPanel from "./sections/vets/VetApprovalPanel";
 import { formatVetName } from "../../../../logic/utils/vetName";
 import { approvalBlockers } from "../../../../logic/staff/approvalReadiness";
+import { VET_STATUS_TONE } from "../../../../logic/staff/vetStatus";
 
 const PAGE_SIZE = 20;
 
-type StatusFilter = "Active" | "Deactivated" | "all";
+// The All Vets list is everyone past approval, so no Pending.
+type StatusFilter = Exclude<VetAccountStatus, "Pending"> | "all";
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All Statuses" },
   { value: "Active", label: "Active" },
   { value: "Deactivated", label: "Deactivated" },
+  { value: "Closed", label: "Closed" },
+  { value: "Declined", label: "Declined" },
 ];
 
 // Matches SelectField's own label + trigger sizing, same as Staff.tsx.
@@ -233,8 +238,11 @@ const Vets = () => {
                 <DashboardListRow
                   {...vetRowProps(vet)}
                   badge={
-                    vet.accountStatus === "Deactivated"
-                      ? { label: "Deactivated", tone: "gray" }
+                    vet.accountStatus !== "Active"
+                      ? {
+                          label: vet.accountStatus,
+                          tone: VET_STATUS_TONE[vet.accountStatus],
+                        }
                       : undefined
                   }
                   actions={

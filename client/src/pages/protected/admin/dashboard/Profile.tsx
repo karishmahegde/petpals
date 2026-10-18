@@ -31,6 +31,8 @@ const STATUS_TONE: Record<AdminAccountStatus, BadgeTone> = {
   Pending: "gold",
   Active: "green",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };
 
 // Mirrors adopter Profile.tsx's SEX_LABELS/adopterSex handling.

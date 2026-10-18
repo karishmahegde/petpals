@@ -18,7 +18,8 @@ import type {
   PetAdoptionStatus,
 } from "./staffPetsApi";
 
-export type VetAccountStatus = "Pending" | "Active" | "Deactivated";
+export type VetAccountStatus =
+  "Pending" | "Active" | "Deactivated" | "Closed" | "Declined";
 
 export interface VetSelfProfile extends Address {
   userID: number;
