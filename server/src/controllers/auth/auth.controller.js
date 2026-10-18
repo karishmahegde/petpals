@@ -214,9 +214,9 @@ const requestPasswordReset = async (req, res, next) => {
 // PATCH: { token, password } from the emailed link. Signs out every session.
 const resetPassword = async (req, res, next) => {
   try {
-    await passwordsService.resetPassword(req.body?.token, req.body?.password);
+    const data = await passwordsService.resetPassword(req.body?.token, req.body?.password);
     res.clearCookie("refreshToken");
-    return successResponse(res, "Password reset — please log in with your new password", null);
+    return successResponse(res, "Password reset — please log in with your new password", data);
   } catch (err) {
     return next(err);
   }

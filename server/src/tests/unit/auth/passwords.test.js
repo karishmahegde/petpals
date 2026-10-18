@@ -170,6 +170,7 @@ describe("PATCH /api/v1/auth/password-reset", () => {
     const res = await reset({ token: "raw", password: STRONG });
 
     expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ role: "Adopter" });
     const { where, data } = prisma.users.update.mock.calls[0][0];
     expect(where).toEqual({ userID: 7 });
     expect(data.refreshToken).toBeNull();

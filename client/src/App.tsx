@@ -12,6 +12,9 @@ import Register from "./pages/public/auth/Register";
 import WorkerLogin from "./pages/public/auth/WorkerLogin";
 import WorkerRegister from "./pages/public/auth/WorkerRegister";
 import VerifyEmail from "./pages/public/auth/VerifyEmail";
+import ForgotPassword from "./pages/public/auth/ForgotPassword";
+import ResetPassword from "./pages/public/auth/ResetPassword";
+import Reactivate from "./pages/public/auth/Reactivate";
 import Adopt from "./pages/public/adopt/Adopt";
 import Events from "./pages/public/events/Events";
 import Faqs from "./pages/public/faqs/Faqs";
@@ -73,6 +76,9 @@ const App = () => {
           <Route path="/staff-portal/login" element={<WorkerLogin />} />
           <Route path="/staff-portal/register" element={<WorkerRegister />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/reactivate" element={<Reactivate />} />
           <Route path="/adopt" element={<Adopt />} />
           <Route path="/events" element={<Events />} />
           <Route path="/faqs" element={<Faqs />} />

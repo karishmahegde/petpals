@@ -12,8 +12,9 @@ import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import axios from "axios";
-import { login as loginApi } from "../../../logic/api/authApi";
+import { errorReason, login as loginApi } from "../../../logic/api/authApi";
 import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
+import ReactivationOffer from "./shared/ReactivationOffer";
 import { resolveDestination } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
@@ -33,6 +34,9 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Set when the password was right but the owner had closed the account —
+  // the address the reactivation link would go to.
+  const [closedEmail, setClosedEmail] = useState<string | null>(null);
 
   // Captured once, on mount — true only if a session already existed when
   // this page was first reached (e.g. visiting /login directly while
@@ -74,6 +78,7 @@ const Login = () => {
       return;
     }
     setError("");
+    setClosedEmail(null);
     setLoading(true);
     try {
       // sending the credentials to the login API
@@ -100,6 +105,7 @@ const Login = () => {
           ? String(err.response.data.message)
           : "Unable to connect to the server. Please try again later.";
       setError(message);
+      if (errorReason(err) === "account_closed") setClosedEmail(email.trim());
     } finally {
       setLoading(false);
     }
@@ -152,7 +158,10 @@ const Login = () => {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setClosedEmail(null);
+              }}
               placeholder="jane.doe@email.com"
               className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark placeholder:text-neutral-gray focus:outline-none focus:border-teal-dark"
             />
@@ -174,6 +183,14 @@ const Login = () => {
               placeholder="••••••••••••"
               className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark placeholder:text-neutral-gray focus:outline-none focus:border-teal-dark"
             />
+            <ButtonElement
+              onClick={() => navigate("/forgot-password")}
+              size="bare"
+              variant="outline"
+              className="self-end font-body text-xs font-semibold text-teal-dark hover:underline"
+            >
+              Forgot password?
+            </ButtonElement>
           </div>
 
           {/* Error message */}
@@ -185,6 +202,8 @@ const Login = () => {
             </p>
           </div>
 
+          {closedEmail && <ReactivationOffer email={closedEmail} />}
+
           {/* Submit button */}
           <ButtonElement
             type="submit"
@@ -195,6 +214,18 @@ const Login = () => {
             {loading ? "Signing in..." : "sign in"}
           </ButtonElement>
         </form>
+
+        <p className="mt-6 text-center font-body text-xs text-neutral-gray">
+          Don't have an account?{" "}
+          <ButtonElement
+            onClick={() => navigate("/register")}
+            size="bare"
+            variant="outline"
+            className="font-semibold text-teal-dark underline"
+          >
+            Register here
+          </ButtonElement>
+        </p>
       </Card>
     </div>
   );

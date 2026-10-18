@@ -72,6 +72,9 @@ const resetPassword = async (rawToken, password) => {
   });
 
   if (contact) notifyPasswordChanged(contact);
+  // The role lets the page send them to the right login (public or staff
+  // portal); holding a valid link already proves the account is theirs.
+  return { role: contact?.role ?? null };
 };
 
 // Throws 401 if `password` isn't the user's current one. 401 is safe on

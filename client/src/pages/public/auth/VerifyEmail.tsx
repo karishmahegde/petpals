@@ -11,17 +11,13 @@
 import { useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { errorReason, verifyEmail } from "../../../logic/api/authApi";
 import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import useResendVerification from "../../../logic/hooks/useResendVerification";
 import { queryClient } from "../../../logic/queryClient";
-import backgroundImg from "../../../static/assets/images/background.png";
-
-const primaryButton =
-  "w-full rounded-xl bg-rose-dark py-3 font-body text-sm font-semibold hover:brightness-95 disabled:opacity-60";
+import AuthCard, { authPrimaryButtonClass as primaryButton } from "./shared/AuthCard";
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
@@ -170,19 +166,7 @@ const VerifyEmail = () => {
     );
   }
 
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center bg-cover bg-fixed bg-center px-4 py-2"
-      style={{ backgroundImage: `url(${backgroundImg})` }}
-    >
-      <Card className="w-full max-w-md p-12">
-        <h1 className="mb-6 text-center font-display text-3xl text-neutral-dark">
-          {title}
-        </h1>
-        <div className="flex flex-col gap-5">{body}</div>
-      </Card>
-    </div>
-  );
+  return <AuthCard title={title}>{body}</AuthCard>;
 };
 
 export default VerifyEmail;

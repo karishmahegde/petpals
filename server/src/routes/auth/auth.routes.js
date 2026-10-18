@@ -225,7 +225,7 @@ router.patch("/email-verification", authController.verifyEmail);
  *                 description: 8+ characters with an uppercase letter, a lowercase letter, a number and a special character
  *     responses:
  *       200:
- *         description: Password reset (data is null)
+ *         description: Password reset — data is { role }, so the page can link the right login
  *       400:
  *         description: >
  *           Link invalid, expired or already used — error.details.reason is

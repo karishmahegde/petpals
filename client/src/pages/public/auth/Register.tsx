@@ -15,6 +15,8 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
+import PasswordRequirements from "../../../components/ui/PasswordRequirements";
+import { meetsPasswordRequirements } from "../../../logic/utils/password";
 import { register as registerApi } from "../../../logic/api/authApi";
 import { getShelters } from "../../../logic/api/petsApi";
 import { dashboardPathFor } from "../../../logic/route/resolveDestination";
@@ -23,23 +25,6 @@ import backgroundImg from "../../../static/assets/images/background.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const nameRegex = /^[A-Za-z][A-Za-z'-]*(?: [A-Za-z'-]+)*$/;
-
-interface PasswordRequirement {
-  label: string;
-  test: (password: string) => boolean;
-}
-
-// Checked off live as the user types - matches the backend's expected password strength
-const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
-  { label: "At least 8 characters", test: (pw) => pw.length >= 8 },
-  { label: "One uppercase letter", test: (pw) => /[A-Z]/.test(pw) },
-  { label: "One lowercase letter", test: (pw) => /[a-z]/.test(pw) },
-  { label: "One number", test: (pw) => /[0-9]/.test(pw) },
-  {
-    label: "One special character (!@#$%^&*)",
-    test: (pw) => /[!@#$%^&*(),.?":{}|<>_\-+=]/.test(pw),
-  },
-];
 
 interface RoleOption {
   value: string;
@@ -123,7 +108,7 @@ const Register = () => {
     if (!emailRegex.test(email)) return "Please enter a valid email address";
 
     if (!password) return "Please enter a password";
-    if (!PASSWORD_REQUIREMENTS.every((req) => req.test(password)))
+    if (!meetsPasswordRequirements(password))
       return "Password does not meet all requirements";
 
     if (!role) return "Please select how you'd like to get involved";
@@ -274,22 +259,7 @@ const Register = () => {
               placeholder="••••••••••••"
               className="border border-neutral-gray rounded-lg px-4 py-2.5 font-body text-sm text-neutral-dark placeholder:text-neutral-gray focus:outline-none focus:border-teal-dark"
             />
-            <ul className="mt-1 flex flex-col gap-1">
-              {PASSWORD_REQUIREMENTS.map((req) => {
-                const met = req.test(password);
-                return (
-                  <li
-                    key={req.label}
-                    className={`font-body text-xs flex items-center gap-1.5 transition-colors ${
-                      met ? "text-teal-dark" : "text-neutral-gray"
-                    }`}
-                  >
-                    <span>{met ? "✓" : "○"}</span>
-                    {req.label}
-                  </li>
-                );
-              })}
-            </ul>
+            <PasswordRequirements password={password} />
           </div>
 
           {/* Role selection */}
@@ -396,6 +366,18 @@ const Register = () => {
             {loading ? "Signing up..." : "sign up"}
           </ButtonElement>
         </form>
+
+        <p className="mt-6 text-center font-body text-xs text-neutral-gray">
+          Already have an account?{" "}
+          <ButtonElement
+            onClick={() => navigate("/login")}
+            size="bare"
+            variant="outline"
+            className="font-semibold text-teal-dark underline"
+          >
+            Log in here
+          </ButtonElement>
+        </p>
       </Card>
     </div>
   );

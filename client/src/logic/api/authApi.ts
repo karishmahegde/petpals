@@ -92,11 +92,17 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
   await axiosInstance.post("/auth/password-reset", { email });
 };
 
+// Signs out every session. Returns the account's role so the page can send
+// them to the right login.
 export const resetPassword = async (
   token: string,
   password: string,
-): Promise<void> => {
-  await axiosInstance.patch("/auth/password-reset", { token, password });
+): Promise<{ role: string | null }> => {
+  const response = await axiosInstance.patch("/auth/password-reset", {
+    token,
+    password,
+  });
+  return response.data.data;
 };
 
 // Signed in. 401 with reason "wrong_password" if currentPassword is wrong.

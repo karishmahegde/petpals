@@ -27,8 +27,8 @@ const EmailVerificationBanner = ({
       />
       <p className="font-body text-sm text-neutral-charcoal">
         <span className="font-bold">Please verify your email address.</span>{" "}
-        Open the link we emailed you — you'll need a verified email to apply
-        to adopt or to donate.
+        Open the link we emailed you — you'll need a verified email to apply to
+        adopt or to donate.
       </p>
     </div>
     <ButtonElement

@@ -44,7 +44,12 @@ const APPROVAL_ROLE_PATHS: Record<string, { onboarding: string; pending: string 
 // Where emailed links land. Always reachable: a new sign-up opens their
 // verification link while still onboarding (or Pending), and a redirect
 // would drop the token before it's redeemed.
-const LINK_PAGES = ["/verify-email"];
+const LINK_PAGES = [
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
+  "/reactivate",
+];
 
 interface OnboardingGateProps {
   children: ReactNode;
