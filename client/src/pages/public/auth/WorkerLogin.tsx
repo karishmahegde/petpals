@@ -193,6 +193,18 @@ const WorkerLogin = () => {
         </form>
 
         <p className="mt-6 text-center font-body text-xs text-neutral-gray">
+          Don't have a staff portal account?{" "}
+          <ButtonElement
+            onClick={() => navigate("/staff-portal/register")}
+            size="bare"
+            variant="outline"
+            className="font-semibold text-teal-dark underline"
+          >
+            Register here
+          </ButtonElement>
+        </p>
+
+        <p className="mt-2 text-center font-body text-xs text-neutral-gray">
           Looking to adopt, volunteer, or donate?{" "}
           <ButtonElement
             onClick={() => navigate("/login")}
