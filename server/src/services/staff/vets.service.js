@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { resolveManagedShelterID } = require("./shelterStaff.service");
 const {
   withGovernmentIdStatus,
@@ -31,10 +32,11 @@ const conflict = (message) => {
   return err;
 };
 
-// Pending → Active (approve) / Deactivated (decline); Active → Deactivated.
-// Reactivation stays Admin-side, same as for staff.
+// Pending → Active (approve) / Declined (decline); Active → Deactivated.
+// Reactivation stays Admin-side, same as for staff. Closed and Declined are
+// final here — a Closed account is reopened by its owner, by emailed link.
 const ALLOWED_TRANSITIONS = {
-  Pending: ["Active", "Deactivated"],
+  Pending: ["Active", "Declined"],
   Active: ["Deactivated"],
 };
 
@@ -79,8 +81,9 @@ const formatOne = async (row) =>
   formatVet((await withGovernmentIdStatus("Veterinarian", [row]))[0]);
 
 // ——————————————— LIST (GET /staff/me/vets) ———————————————
-// section "pending" = awaiting approval; "all" = already approved (Active or
-// Deactivated), optionally narrowed by accountStatus.
+// section "pending" = awaiting approval; "all" = everyone past that stage
+// (Active, Deactivated, Closed or Declined), optionally narrowed by
+// accountStatus.
 const listVets = async (
   managerID,
   { section, accountStatus, name, page = 1, limit = 20 },
@@ -92,7 +95,7 @@ const listVets = async (
     accountStatus:
       section === "pending"
         ? "Pending"
-        : (accountStatus ?? { in: ["Active", "Deactivated"] }),
+        : (accountStatus ?? { not: "Pending" }),
   };
   if (name) where.vetName = { contains: name, mode: "insensitive" };
 
@@ -132,7 +135,7 @@ const updateVetStatus = async (managerID, vetID, accountStatus) => {
       `A ${vet.accountStatus} veterinarian can't be moved to ${accountStatus}`,
     );
   }
-  // Only approving is gated — declining (Pending → Deactivated) is allowed
+  // Only approving is gated — declining (Pending → Declined) is allowed
   // at any onboarding stage.
   if (vet.accountStatus === "Pending" && accountStatus === "Active") {
     await assertReadyForApproval("Veterinarian", vetID, vet.onboardingComplete);
@@ -143,6 +146,8 @@ const updateVetStatus = async (managerID, vetID, accountStatus) => {
     data: { accountStatus },
     select: VET_SELECT,
   });
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(vetID, vet.accountStatus, accountStatus);
   return formatOne(updated);
 };
 

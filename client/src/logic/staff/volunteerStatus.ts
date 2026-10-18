@@ -9,4 +9,6 @@ export const VOLUNTEER_STATUS_TONE: Record<VolunteerAccountStatus, BadgeTone> = 
   Active: "green",
   Banned: "red",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };

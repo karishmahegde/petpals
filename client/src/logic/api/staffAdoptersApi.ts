@@ -6,7 +6,7 @@
 import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
 
-export type AdopterAccountStatus = "Active" | "Banned" | "Deactivated";
+export type AdopterAccountStatus = "Active" | "Banned" | "Deactivated" | "Closed";
 
 export interface AdopterListItem {
   userID: number;

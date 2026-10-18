@@ -20,7 +20,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -73,7 +78,7 @@ describe("Shelter manager veterinarian management", () => {
       expect(res.status).toBe(200);
       expect(prisma.veterinarian.findMany.mock.calls[0][0].where).toEqual({
         shelterID: 9,
-        accountStatus: { in: ["Active", "Deactivated"] },
+        accountStatus: { not: "Pending" },
         vetName: { contains: "adr", mode: "insensitive" },
       });
       expect(res.body.data[0]).toMatchObject({
@@ -251,7 +256,7 @@ describe("Shelter manager veterinarian management", () => {
       expect(prisma.veterinarian.update).not.toHaveBeenCalled();
     });
 
-    test("decline: Pending → Deactivated is allowed mid-onboarding with no ID", async () => {
+    test("decline: Pending → Declined is allowed mid-onboarding with no ID", async () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.veterinarian.findUnique.mockResolvedValueOnce({
         shelterID: 9,
@@ -259,18 +264,19 @@ describe("Shelter manager veterinarian management", () => {
         onboardingComplete: false,
       });
       prisma.veterinarian.update.mockResolvedValueOnce(
-        vetRow({ accountStatus: "Deactivated", onboardingComplete: false }),
+        vetRow({ accountStatus: "Declined", onboardingComplete: false }),
       );
 
       const res = await request(app)
         .patch("/api/v1/staff/me/vets/60/status")
         .set("Authorization", `Bearer ${managerToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.veterinarian.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+        expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
+      expect(accountNotices.statusChanged).toHaveBeenCalledWith(60, "Pending", "Declined");
     });
 
     test("Deactivated → Active isn't allowed → 409, nothing written", async () => {
@@ -284,6 +290,29 @@ describe("Shelter manager veterinarian management", () => {
         .patch("/api/v1/staff/me/vets/60/status")
         .set("Authorization", `Bearer ${managerToken()}`)
         .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(409);
+      expect(prisma.veterinarian.update).not.toHaveBeenCalled();
+    });
+
+    // Closed is reopened only by its owner (emailed link); Declined is final;
+    // Declined is only a decline of a Pending sign-up.
+    test.each([
+      ["Closed", "Active"],
+      ["Closed", "Deactivated"],
+      ["Declined", "Active"],
+      ["Active", "Declined"],
+    ])("%s → %s isn't allowed → 409, nothing written", async (from, to) => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.veterinarian.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        accountStatus: from,
+      });
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/vets/60/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: to });
 
       expect(res.status).toBe(409);
       expect(prisma.veterinarian.update).not.toHaveBeenCalled();

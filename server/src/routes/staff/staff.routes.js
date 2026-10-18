@@ -214,7 +214,7 @@ router.post(
  *   delete:
  *     summary: Deactivate or permanently delete your own staff account (Staff only)
  *     description: >
- *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       'deactivate' keeps the row (accountStatus → Closed, refresh
  *       token cleared); 'delete' permanently removes the Staff and Users
  *       rows. Either mode clears managerStaffID on every shelter this staff
  *       member currently manages, and is blocked with 409 CONFLICT while

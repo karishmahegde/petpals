@@ -7,12 +7,15 @@ import type { Pagination } from "./petsApi";
 import type { Address } from "../utils/address";
 
 // Pending = self-registered, awaiting approval by an existing admin.
-// Filter-only — never a target an admin sets directly (see
-// AdminAccountStatusTarget below).
-export type AdminAccountStatus = "Pending" | "Active" | "Deactivated";
+// Closed = the admin closed it themselves (only they can reopen it, by
+// emailed link); Declined = turned down at approval. Pending and Closed are
+// filter-only — never a target an admin sets (see AdminAccountStatusTarget).
+export type AdminAccountStatus =
+  "Pending" | "Active" | "Deactivated" | "Closed" | "Declined";
 // What PATCH /admins/:id/status actually accepts: Active approves a Pending
-// account (or reactivates), Deactivated declines/deactivates.
-export type AdminAccountStatusTarget = "Active" | "Deactivated";
+// account (or reactivates a Deactivated one), Declined declines a Pending
+// one, Deactivated deactivates an Active one.
+export type AdminAccountStatusTarget = "Active" | "Deactivated" | "Declined";
 
 export interface AdminListItem extends Address {
   userID: number;

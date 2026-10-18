@@ -11,13 +11,17 @@ import {
 } from "./selfGovernmentIdApi";
 
 export type StaffDesignation = "Manager" | "Senior" | "Associate";
-// Pending = self-registered, awaiting admin approval. Filter-only — never a
-// target an admin sets directly (see StaffAccountStatusTarget below).
-export type StaffAccountStatus = "Pending" | "Active" | "Deactivated";
+// Pending = self-registered, awaiting approval. Closed = the staff member
+// closed it themselves (only they can reopen it, by emailed link); Declined =
+// turned down at approval. Pending and Closed are filter-only — never a
+// target an admin sets (see StaffAccountStatusTarget below).
+export type StaffAccountStatus =
+  "Pending" | "Active" | "Deactivated" | "Closed" | "Declined";
 // What PATCH /staff/:id/status actually accepts: Active approves a Pending
-// account (or reactivates), Deactivated declines/deactivates. There's no
-// endpoint to manually revert someone back to Pending.
-export type StaffAccountStatusTarget = "Active" | "Deactivated";
+// account (or reactivates a Deactivated one), Declined declines a Pending
+// one, Deactivated deactivates an Active one. There's no endpoint to revert
+// someone back to Pending.
+export type StaffAccountStatusTarget = "Active" | "Deactivated" | "Declined";
 
 export interface StaffListItem {
   userID: number;

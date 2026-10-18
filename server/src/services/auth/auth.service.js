@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const prisma = require("../../config/prisma");
 const { PENDING_LOGIN_ROLES } = require("./pendingRoles");
+const { sendVerificationEmail } = require("./emailVerification.service");
 
 // Maps the incoming role string to the Prisma enum value, model accessor, and name field
 const ROLE_CONFIG = {
@@ -146,7 +147,15 @@ const register = async ({ name, email, password, role, shelterID }) => {
     return user;
   });
 
-  const { userPassword, ...safeUser } = newUser;
+  // After the commit: the account exists whether or not this works, so a
+  // failure is logged, not thrown — the user can resend from their dashboard.
+  try {
+    await sendVerificationEmail({ userID: newUser.userID, email, name });
+  } catch (err) {
+    console.error(`[email] couldn't issue a verification link for user ${newUser.userID}: ${err.message}`);
+  }
+
+  const { userPassword, refreshToken, ...safeUser } = newUser;
   return safeUser;
 };
 
@@ -154,7 +163,7 @@ const register = async ({ name, email, password, role, shelterID }) => {
 const login = async ({ email, password }) => {
   const user = await prisma.users.findUnique({
     where: { userEmail: email },
-    select: { userID: true, userEmail: true, role: true, userPassword: true },
+    select: { userID: true, userEmail: true, role: true, userPassword: true, emailVerified: true },
   }); //Fetches the row from USERS - Email, password, role and refreshToken
   if (!user) {
     const err = new Error("No account found with this email");
@@ -178,10 +187,10 @@ const login = async ({ email, password }) => {
   let onboardingStep;
   let accountStatus;
   if (config) {
-    // Every role table now carries its own accountStatus field (Active/
-    // Deactivated for Admin/Staff/Vet; Active/Banned/Deactivated for Adopter/
-    // Donor; Pending/Active/Banned/Deactivated for Volunteer, which also
-    // gates on staff approval). Fetching it unconditionally lets the block
+    // Every role table now carries its own accountStatus field (Pending/
+    // Active/Deactivated/Closed/Declined for Admin/Staff/Vet;
+    // Active/Banned/Deactivated/Closed for Adopter/Donor; all six for
+    // Volunteer, which also gates on staff approval). Fetching it unconditionally lets the block
     // below stay role-agnostic — "Banned" or "Pending" simply never occurs
     // for a role whose enum doesn't define it.
     const roleRecord = await prisma[config.model].findUnique({
@@ -207,14 +216,28 @@ const login = async ({ email, password }) => {
     // 401, not 403: the frontend's axios interceptor hard-redirects to
     // /forbidden on any 403 with no exemption for auth calls, which would hide
     // this message from the user on the login page.
+    // Closed = the owner closed it themselves. Only reached after a correct
+    // password, so saying so leaks nothing; details.reason lets the login page
+    // offer "Email me a reactivation link" (POST /auth/reactivation).
+    if (roleRecord?.accountStatus === "Closed") {
+      const err = new Error(
+        "You closed this account. You can reactivate it with a link sent to your email.",
+      );
+      err.code = "UNAUTHORIZED";
+      err.details = { reason: "account_closed" };
+      throw err;
+    }
+    if (roleRecord?.accountStatus === "Declined") {
+      const err = new Error("This sign-up was declined.");
+      err.code = "UNAUTHORIZED";
+      err.details = { reason: "account_declined" };
+      throw err;
+    }
+    // Deactivated = done by an admin or staff member, not the owner.
     if (roleRecord?.accountStatus === "Deactivated") {
-      // Only Adopter has a self-service closure flow today — the message says
-      // so where it's true, and stays neutral for roles an admin deactivates.
-      const message =
-        user.role === "Adopter"
-          ? "This account was deactivated by its owner. Contact support to reactivate it."
-          : "This account has been deactivated. Contact support if you believe this is an error.";
-      const err = new Error(message);
+      const err = new Error(
+        "This account has been deactivated. Contact support if you believe this is an error.",
+      );
       err.code = "UNAUTHORIZED";
       throw err;
     }
@@ -239,7 +262,7 @@ const login = async ({ email, password }) => {
   }
 
   // Runs after every blocking check above, so a rejected login (wrong
-  // password, Banned/Deactivated/Pending account) never counts as one.
+  // password, Banned/Deactivated/Closed/Declined/Pending account) never counts as one.
   // lastLoginAt lives on Users, so it's tracked for every role.
   await prisma.users.update({
     where: { userID: user.userID },
@@ -318,14 +341,14 @@ const nullifyRefreshToken = (client, userID) =>
   client.users.update({ where: { userID }, data: { refreshToken: null } });
 
 const closeAccountMessage = (mode) =>
-  mode === "delete" ? "Account deleted" : "Account deactivated";
+  mode === "delete" ? "Account deleted" : "Account closed";
 
 // ——————————————— REFRESH TOKEN ———————————————
 const refreshToken = async (userID, rawOldRT, rawNewRT) => {
   const user = await prisma.users.findUnique({
     //Fetch the userID, role and current refreshToken value from DB
     where: { userID },
-    select: { userID: true, role: true, refreshToken: true },
+    select: { userID: true, role: true, refreshToken: true, emailVerified: true },
   });
   if (!user) {
     const err = new Error("User not found");

@@ -22,7 +22,7 @@ const router = express.Router();
  *     parameters:
  *       - in: query
  *         name: accountStatus
- *         schema: { type: string, enum: [Pending, Active, Banned, Deactivated] }
+ *         schema: { type: string, enum: [Pending, Active, Banned, Deactivated, Closed, Declined] }
  *       - in: query
  *         name: name
  *         schema: { type: string }
@@ -119,8 +119,9 @@ router.get(
  *     summary: Approve, decline, or deactivate a volunteer (Staff, Admin)
  *     description: >
  *       Allowed transitions — Pending → Active (approve), Pending →
- *       Deactivated (decline), Active → Deactivated (deactivate). Anything
- *       else is 409. Approving also requires the volunteer to have finished
+ *       Declined (decline), Active → Deactivated (deactivate). Anything
+ *       else is 409 (a Closed account is reopened only by its owner, by
+ *       emailed link). Approving also requires the volunteer to have finished
  *       onboarding and their government ID to be Verified (409 naming what's
  *       missing); declining is allowed at any stage. Staff may only act on
  *       volunteers at their own shelter.
@@ -140,7 +141,7 @@ router.get(
  *             type: object
  *             required: [accountStatus]
  *             properties:
- *               accountStatus: { type: string, enum: [Active, Deactivated] }
+ *               accountStatus: { type: string, enum: [Active, Deactivated, Declined] }
  *     responses:
  *       200:
  *         description: The updated volunteer

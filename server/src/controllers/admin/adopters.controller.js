@@ -7,7 +7,10 @@ const badRequest = (message) => {
   return err;
 };
 
-const ADOPTER_ACCOUNT_STATUS_VALUES = ["Active", "Banned", "Deactivated"];
+// Filtering recognizes every state; an admin can only set the first three —
+// Closed is the owner's own action (reopened only by them, by emailed link).
+const ADOPTER_ACCOUNT_STATUS_FILTER_VALUES = ["Active", "Banned", "Deactivated", "Closed"];
+const ADOPTER_ACCOUNT_STATUS_TARGET_VALUES = ["Active", "Banned", "Deactivated"];
 
 // ——————————————— GET /adopters ———————————————
 const listAdopters = async (req, res, next) => {
@@ -37,11 +40,11 @@ const listAdopters = async (req, res, next) => {
 
   if (
     accountStatus !== undefined &&
-    !ADOPTER_ACCOUNT_STATUS_VALUES.includes(accountStatus)
+    !ADOPTER_ACCOUNT_STATUS_FILTER_VALUES.includes(accountStatus)
   ) {
     return next(
       badRequest(
-        `accountStatus must be one of: ${ADOPTER_ACCOUNT_STATUS_VALUES.join(", ")}`,
+        `accountStatus must be one of: ${ADOPTER_ACCOUNT_STATUS_FILTER_VALUES.join(", ")}`,
       ),
     );
   }
@@ -95,10 +98,10 @@ const updateAdopterStatus = async (req, res, next) => {
   }
 
   const { accountStatus } = req.body ?? {};
-  if (!ADOPTER_ACCOUNT_STATUS_VALUES.includes(accountStatus)) {
+  if (!ADOPTER_ACCOUNT_STATUS_TARGET_VALUES.includes(accountStatus)) {
     return next(
       badRequest(
-        `accountStatus must be one of: ${ADOPTER_ACCOUNT_STATUS_VALUES.join(", ")}`,
+        `accountStatus must be one of: ${ADOPTER_ACCOUNT_STATUS_TARGET_VALUES.join(", ")}`,
       ),
     );
   }

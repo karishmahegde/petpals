@@ -203,11 +203,9 @@ describe("Admin shelter management endpoints", () => {
       expect(prisma.shelter.update).not.toHaveBeenCalled();
     });
 
-    test("staff member at this shelter but Deactivated → 409 CONFLICT, nothing written", async () => {
+    test.each(["Deactivated", "Closed", "Declined"])("staff member at this shelter but %s → 409 CONFLICT, nothing written", async (accountStatus) => {
       prisma.shelter.findUnique.mockResolvedValueOnce({ shelterID: 3 });
-      prisma.staff.findFirst.mockResolvedValueOnce({
-        accountStatus: "Deactivated",
-      });
+      prisma.staff.findFirst.mockResolvedValueOnce({ accountStatus });
 
       const res = await request(app)
         .patch("/api/v1/shelters/3/manager")
@@ -219,6 +217,7 @@ describe("Admin shelter management endpoints", () => {
         success: false,
         error: { code: "CONFLICT" },
       });
+      expect(res.body.message).toMatch(new RegExp(`is ${accountStatus.toLowerCase()} and cannot`));
       expect(prisma.shelter.update).not.toHaveBeenCalled();
     });
   });

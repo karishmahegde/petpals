@@ -370,6 +370,42 @@ async function main() {
   });
   login("Admin", "admin.deactivated@petpals.com", "Admin@123", "Deactivated by Isabella");
 
+  // Closed: the admin closed their own account (statusChangedByID is
+  // themselves) — the only status the owner can reopen, by emailed link.
+  const adminClosedUser = await createUser("admin.closed@petpals.com", "Admin@123", "Admin", {
+    lastLoginAt: daysFromNow(-40),
+  });
+  await prisma.admin.create({
+    data: {
+      userID: adminClosedUser.userID,
+      adminName: "Felix Romero",
+      avatarSeed: avatar(),
+      adminPhone: "+12125550144",
+      ...address("88 Greenwich Street", "New York", "NY", "10006"),
+      ...ONBOARDED,
+      accountStatus: "Closed",
+      statusChangedByID: adminClosedUser.userID,
+      statusChangedAt: daysFromNow(-35),
+    },
+  });
+  login("Admin", "admin.closed@petpals.com", "Admin@123", "Closed own account — login offers a reactivation link");
+
+  // Declined: a self-registration Isabella turned down.
+  const adminDeclinedUser = await createUser("admin.declined@petpals.com", "Admin@123", "Admin", {
+    emailVerified: false,
+  });
+  await prisma.admin.create({
+    data: {
+      userID: adminDeclinedUser.userID,
+      adminName: "Paul Mercer",
+      avatarSeed: avatar(),
+      accountStatus: "Declined",
+      statusChangedByID: adminUser.userID,
+      statusChangedAt: daysFromNow(-12),
+    },
+  });
+  login("Admin", "admin.declined@petpals.com", "Admin@123", "Declined by Isabella — login refused");
+
   // ── STAFF: every designation + status, both shelters, no shelter ──
   const createStaff = async (email, data, userOpts) => {
     const user = await createUser(email, "Staff@123", "Staff", userOpts);
@@ -485,6 +521,44 @@ async function main() {
     { lastLoginAt: daysFromNow(-65) },
   );
   login("Staff", "staff.deactivated@petpals.com", "Staff@123", "Deactivated");
+
+  // Closed their own account after joining: DOS stamped, like a deactivation.
+  await createStaff(
+    "staff.closed@petpals.com",
+    {
+      staffName: "Rachel Moreno",
+      staffPhone: "+12125550145",
+      shelterID: shelter1.shelterID,
+      staffDOB: new Date("1990-04-23"),
+      staffSex: "F",
+      staffDOJ: new Date("2023-06-12"),
+      staffDOS: daysFromNow(-20),
+      staffDesignation: "Associate",
+      accountStatus: "Closed",
+      ...address("31 Beaver Street", "New York", "NY", "10004"),
+      ...STAFF_ONBOARDED,
+    },
+    { lastLoginAt: daysFromNow(-21) },
+  );
+  login("Staff", "staff.closed@petpals.com", "Staff@123", "Closed own account — login offers a reactivation link");
+
+  // Declined at approval: never joined, so neither DOJ nor DOS.
+  await createStaff(
+    "staff.declined@petpals.com",
+    {
+      staffName: "Kevin Doyle",
+      staffPhone: "+12125550146",
+      shelterID: shelter1.shelterID,
+      staffDOB: new Date("1993-08-15"),
+      staffSex: "M",
+      staffDesignation: "Associate",
+      accountStatus: "Declined",
+      ...address("12 Stone Street", "New York", "NY", "10004"),
+      ...STAFF_ONBOARDED,
+    },
+    { emailVerified: false },
+  );
+  login("Staff", "staff.declined@petpals.com", "Staff@123", "Declined by Downtown's manager — login refused");
 
   // Brooklyn's manager — the "other shelter" for isolation checks.
   const marcus = await createStaff(
@@ -621,6 +695,38 @@ async function main() {
   );
   login("Veterinarian", "vet.deactivated@petpals.com", "Vet@123", "Deactivated");
 
+  await createVet(
+    "vet.closed@petpals.com",
+    {
+      vetName: "Martin Alvarez",
+      vetPhone: "+17185550147",
+      vetDOB: new Date("1981-01-30"),
+      vetSex: "M",
+      shelterID: shelter2.shelterID,
+      accountStatus: "Closed",
+      ...address("200 Atlantic Avenue", "Brooklyn", "NY", "11201"),
+      ...STAFF_ONBOARDED,
+    },
+    { lastLoginAt: daysFromNow(-50) },
+  );
+  login("Veterinarian", "vet.closed@petpals.com", "Vet@123", "Closed own account — login offers a reactivation link");
+
+  await createVet(
+    "vet.declined@petpals.com",
+    {
+      vetName: "Irene Walsh",
+      vetPhone: "+12125550148",
+      vetDOB: new Date("1992-06-18"),
+      vetSex: "F",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Declined",
+      ...address("45 John Street", "New York", "NY", "10038"),
+      ...STAFF_ONBOARDED,
+    },
+    { emailVerified: false },
+  );
+  login("Veterinarian", "vet.declined@petpals.com", "Vet@123", "Declined by Downtown's manager — login refused");
+
   // ── ADOPTERS: every AdopterAccountStatus + mid-onboarding ────
   const createAdopter = async (email, data, userOpts) => {
     const user = await createUser(email, "Adopter@123", "Adopter", userOpts);
@@ -698,8 +804,9 @@ async function main() {
   );
   login("Adopter", "adopter.banned@petpals.com", "Adopter@123", "Banned — risk-flagged, ID rejected");
 
-  await createAdopter(
-    "adopter.deactivated@petpals.com",
+  // Closed their own account — the reactivation-link case.
+  const jordan = await createAdopter(
+    "adopter.closed@petpals.com",
     {
       adopterName: "Jordan Price",
       adopterPhone: "+12125550125",
@@ -714,13 +821,64 @@ async function main() {
       petExperience: "Some",
       preferredAgeRange: "Old",
       preferredSize: "Medium",
-      accountStatus: "Deactivated",
+      accountStatus: "Closed",
       ...address("500 W 110th Street", "New York", "NY", "10025"),
       ...ONBOARDED,
     },
     { lastLoginAt: daysFromNow(-150) },
   );
-  login("Adopter", "adopter.deactivated@petpals.com", "Adopter@123", "Deactivated (closed own account)");
+  login("Adopter", "adopter.closed@petpals.com", "Adopter@123", "Closed own account — login offers a reactivation link (an earlier one expired unused)");
+
+  // Deactivated by an admin (Admin → Adopters) — only an admin can restore it.
+  await createAdopter(
+    "adopter.deactivated@petpals.com",
+    {
+      adopterName: "Sofia Reyes",
+      adopterPhone: "+17185550149",
+      adopterDOB: new Date("1991-09-25"),
+      adopterSex: "F",
+      housingType: "Apartment",
+      ownsOrRents: "Rents",
+      landlordContact: "+17185550150",
+      householdSize: 2,
+      numChildren: 0,
+      employmentStatus: "Employed",
+      activityLevel: "Active",
+      petExperience: "Some",
+      accountStatus: "Deactivated",
+      ...address("320 Bedford Avenue", "Brooklyn", "NY", "11249"),
+      ...ONBOARDED,
+    },
+    { lastLoginAt: daysFromNow(-90) },
+  );
+  login("Adopter", "adopter.deactivated@petpals.com", "Adopter@123", "Deactivated by an admin — login refused, no reactivation link");
+
+  // Onboarded but never verified their email: sees the verify banner, and
+  // applying to adopt is blocked (409 email_unverified) until they do.
+  await createAdopter(
+    "adopter.unverified@petpals.com",
+    {
+      adopterName: "Liam Foster",
+      adopterPhone: "+12125550151",
+      adopterDOB: new Date("1997-02-11"),
+      adopterSex: "M",
+      housingType: "House",
+      ownsOrRents: "Owns",
+      householdSize: 2,
+      numChildren: 0,
+      employmentStatus: "Employed",
+      activityLevel: "Medium",
+      yardAvailable: true,
+      petExperience: "Some",
+      preferredAgeRange: "Young",
+      preferredSize: "Medium",
+      accountStatus: "Active",
+      ...address("85 Avenue A", "New York", "NY", "10009"),
+      ...ONBOARDED,
+    },
+    { emailVerified: false, lastLoginAt: daysFromNow(-1) },
+  );
+  login("Adopter", "adopter.unverified@petpals.com", "Adopter@123", "Active, onboarded, email NOT verified — banner shown, applying blocked");
 
   // ── VOLUNTEERS: every VolunteerAccountStatus + onboarding stage ──
   // Approved volunteers are onboarded with structured availability. Pending
@@ -841,6 +999,39 @@ async function main() {
   );
   login("Volunteer", "volunteer.deactivated@petpals.com", "Volunteer@123", "Deactivated");
 
+  await createVolunteer(
+    "volunteer.closed@petpals.com",
+    {
+      volunteerName: "Grace Okoro",
+      volunteerPhone: "+17185550152",
+      volunteerDOB: new Date("2000-07-07"),
+      volunteerSex: "F",
+      volunteerSchedule: "Tue:E;Thu:E",
+      shelterID: shelter2.shelterID,
+      accountStatus: "Closed",
+      ...address("90 Hoyt Street", "Brooklyn", "NY", "11217"),
+      ...STAFF_ONBOARDED,
+    },
+    { lastLoginAt: daysFromNow(-25) },
+  );
+  login("Volunteer", "volunteer.closed@petpals.com", "Volunteer@123", "Closed own account — login offers a reactivation link");
+
+  await createVolunteer(
+    "volunteer.declined@petpals.com",
+    {
+      volunteerName: "Daniel Ortiz",
+      volunteerPhone: "+12125550153",
+      volunteerDOB: new Date("2004-01-26"),
+      volunteerSex: "M",
+      shelterID: shelter1.shelterID,
+      accountStatus: "Declined",
+      ...address("7 Orchard Street", "New York", "NY", "10002"),
+      ...STAFF_ONBOARDED,
+    },
+    { emailVerified: false },
+  );
+  login("Volunteer", "volunteer.declined@petpals.com", "Volunteer@123", "Declined by Downtown staff — login refused");
+
   const zoe = await createVolunteer(
     "volunteer.brooklyn@petpals.com",
     {
@@ -903,6 +1094,38 @@ async function main() {
     { lastLoginAt: daysFromNow(-300) },
   );
   login("Donor", "donor.deactivated@petpals.com", "Donor@123", "Deactivated");
+
+  await createDonor(
+    "donor.closed@petpals.com",
+    {
+      donorName: "Henry Liu",
+      donorPhone: "+12125550154",
+      donorDOB: new Date("1965-03-14"),
+      donorSex: "M",
+      accountStatus: "Closed",
+      ...address("101 Lafayette Street", "New York", "NY", "10013"),
+      ...DONOR_ONBOARDED,
+    },
+    { lastLoginAt: daysFromNow(-60) },
+  );
+  login("Donor", "donor.closed@petpals.com", "Donor@123", "Closed own account — login offers a reactivation link");
+
+  // Never verified their email: sees the verify banner, and donating is
+  // blocked (409 email_unverified) until they do.
+  await createDonor(
+    "donor.unverified@petpals.com",
+    {
+      donorName: "Mia Novak",
+      donorPhone: "+17185550155",
+      donorDOB: new Date("1988-11-02"),
+      donorSex: "F",
+      accountStatus: "Active",
+      ...address("14 Joralemon Street", "Brooklyn", "NY", "11201"),
+      ...DONOR_ONBOARDED,
+    },
+    { emailVerified: false, lastLoginAt: daysFromNow(-1) },
+  );
+  login("Donor", "donor.unverified@petpals.com", "Donor@123", "Active, email NOT verified — banner shown, donating blocked");
 
   // ── SPECIES & BREEDS ─────────────────────────────────────────
   // Reptile / Leopard Gecko has no pets: a filter option that matches nothing.
@@ -2035,6 +2258,51 @@ async function main() {
         },
       ],
     },
+  });
+
+  // ── ACCOUNT TOKENS: one per AccountTokenPurpose ──────────────
+  // Spent links only — every row is used or expired, so none of them can be
+  // redeemed (the raw tokens never existed outside this file anyway). Stored
+  // as the SHA-256 hex, like services/auth/accountTokens.service.js does.
+  const seedTokenHash = (label) => crypto.createHash("sha256").update(`seed-${label}`).digest("hex");
+  await prisma.accountToken.createMany({
+    data: [
+      // Emelie verified her email from the sign-up link.
+      {
+        userID: adopterUser.userID,
+        purpose: "EmailVerification",
+        tokenHash: seedTokenHash("email-verification"),
+        createdAt: daysFromNow(-200),
+        expiresAt: new Date(daysFromNow(-200).getTime() + DAY),
+        usedAt: new Date(daysFromNow(-200).getTime() + 10 * 60 * 1000),
+      },
+      // Noah asked for a reset link and never opened it.
+      {
+        userID: noah.userID,
+        purpose: "PasswordReset",
+        tokenHash: seedTokenHash("password-reset"),
+        createdAt: daysFromNow(-3),
+        expiresAt: new Date(daysFromNow(-3).getTime() + 60 * 60 * 1000),
+      },
+      // Jordan (Closed) requested a reactivation link and let it expire.
+      {
+        userID: jordan.userID,
+        purpose: "Reactivation",
+        tokenHash: seedTokenHash("reactivation"),
+        createdAt: daysFromNow(-10),
+        expiresAt: daysFromNow(-9),
+      },
+      // Daniel moved his login to his current address.
+      {
+        userID: daniel.userID,
+        purpose: "EmailChange",
+        tokenHash: seedTokenHash("email-change"),
+        newEmail: "staff.senior@petpals.com",
+        createdAt: daysFromNow(-30),
+        expiresAt: daysFromNow(-29),
+        usedAt: new Date(daysFromNow(-30).getTime() + 5 * 60 * 1000),
+      },
+    ],
   });
 
   console.log("✅ Seeding complete!");

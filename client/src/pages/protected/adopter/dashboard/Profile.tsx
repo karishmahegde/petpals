@@ -27,6 +27,8 @@ import {
 import { formatShortDate } from "../../../../logic/utils/datetime";
 import useAuthStore from "../../../../logic/store/useAuthStore";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
+import useResendVerification from "../../../../logic/hooks/useResendVerification";
+import AccountSecuritySection from "../../shared/AccountSecuritySection";
 import { MY_QUIZ_QUERY_KEY } from "./shared/matchQuiz";
 import useMatchesPopupStore from "../../../../logic/store/useMatchesPopupStore";
 
@@ -270,6 +272,7 @@ const inputClass =
 const Profile = () => {
   const queryClient = useQueryClient();
   const updateUser = useAuthStore((state) => state.updateUser);
+  const verification = useResendVerification();
 
   const profileQuery = useQuery({
     queryKey: ["adopter", "me"],
@@ -627,7 +630,11 @@ const Profile = () => {
                   Pre-qualified
                 </span>
               )}
-              <EmailVerificationStatus verified={profile.emailVerified} />
+              <EmailVerificationStatus
+                verified={profile.emailVerified}
+                onVerify={verification.resend}
+                pending={verification.pending}
+              />
             </div>
           </div>
 
@@ -701,12 +708,15 @@ const Profile = () => {
 
           <MatchQuizCard />
 
+          <AccountSecuritySection currentEmail={profile.userEmail} />
+
           {/* Danger zone */}
           <div className="mt-10 rounded-2xl border border-rose-md bg-rose-lightest p-5 md:p-6">
             <h2 className="font-display text-lg text-rose-dark">Danger zone</h2>
             <p className="mt-1 font-body text-sm text-neutral-charcoal">
-              Closing your account removes your profile, applications and saved
-              pets. This can't be undone.
+              Deactivate your account (you can reopen it later from the login
+              page) or delete it — deleting removes your profile, applications
+              and saved pets for good.
             </p>
             <ButtonElement
               onClick={() => setIsCloseAccountOpen(true)}

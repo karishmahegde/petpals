@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { assertEmailVerified } = require("../auth/emailVerification.service");
 const stripe = require("../../config/stripe");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
 
@@ -61,6 +62,8 @@ const ensureStripeCustomer = async (donorID) => {
 // A Closed shelter can't take donations (409); Open and Full ones can — a
 // Full shelter has no room for animals, which says nothing about money.
 const createCheckoutSession = async ({ donorID, shelterID, amount, donationDesc }) => {
+  // Soft gate — 409 email_unverified (emailVerification.service.js).
+  await assertEmailVerified(donorID, "donating");
   const shelter = await prisma.shelter.findUnique({
     where: { shelterID },
     select: { shelterName: true, shelterStatus: true },

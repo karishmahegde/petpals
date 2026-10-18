@@ -15,7 +15,7 @@ const { PENDING_LOGIN_ROLES } = require("../services/auth/pendingRoles");
 // away, on every protected route across every role, not just at the next
 // login/refresh. Same statuses login() itself rejects, plus "DELETED" — the
 // sentinel getAccountStatus returns when the role row is gone entirely.
-const BLOCKED_STATUSES = ["Deactivated", "Banned", "Pending", "DELETED"];
+const BLOCKED_STATUSES = ["Deactivated", "Closed", "Declined", "Banned", "Pending", "DELETED"];
 
 // A Pending Staff member or Veterinarian can log in before approval, but
 // only to finish onboarding (profile, address, government ID) — see
@@ -47,7 +47,7 @@ const buildAuthenticate = ({ allowPending }) => async (req, res, next) => {
         message: "This account is no longer active",
         error: {
           code: "UNAUTHORIZED",
-          details: "Account deactivated, banned, or deleted",
+          details: "Account deactivated, closed, declined, banned, or deleted",
         },
       });
     }

@@ -28,7 +28,7 @@ const router = express.Router();
  *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
  *       - in: query
  *         name: accountStatus
- *         schema: { type: string, enum: [Active, Banned, Deactivated] }
+ *         schema: { type: string, enum: [Active, Banned, Deactivated, Closed] }
  *       - in: query
  *         name: adopterRiskFlag
  *         schema: { type: boolean }
@@ -103,7 +103,9 @@ router.get(
  *       Banned/Deactivated adopters are rejected on their next login attempt
  *       (POST /auth/login). Transitioning to Banned or Deactivated also nulls
  *       the adopter's stored refresh token, so an already-issued one can't
- *       keep minting fresh access tokens until it expires.
+ *       keep minting fresh access tokens until it expires. An adopter who
+ *       closed their own account (Closed) can't be changed here (409) — only
+ *       they can reactivate it, by emailed link.
  *     tags: [Adopters, Admin]
  *     security:
  *       - bearerAuth: []
@@ -142,6 +144,11 @@ router.get(
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The adopter closed their own account (Closed)
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.patch(
   "/:id/status",

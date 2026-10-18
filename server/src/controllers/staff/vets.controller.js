@@ -16,8 +16,8 @@ const parseId = (value) => {
 };
 
 const VALID_SECTIONS = ["all", "pending"];
-const VALID_STATUS_FILTERS = ["Active", "Deactivated"];
-const VALID_TARGET_STATUSES = ["Active", "Deactivated"];
+const VALID_STATUS_FILTERS = ["Active", "Deactivated", "Closed", "Declined"];
+const VALID_TARGET_STATUSES = ["Active", "Deactivated", "Declined"];
 
 // ——————————————— GET /staff/me/vets ———————————————
 const listVets = async (req, res, next) => {

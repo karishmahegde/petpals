@@ -148,8 +148,8 @@ router.patch(
  *       Adopter-initiated account closure — distinct from an admin setting
  *       Banned. Blocked with 409 if the adopter has an Accepted
  *       adoption application on record, for either mode. 'deactivate' sets
- *       accountStatus to Deactivated (data retained, no self-service
- *       reactivation). 'delete' permanently removes the adopter's favorites,
+ *       accountStatus to Closed (data retained; the owner can reactivate it
+ *       later from an emailed link). 'delete' permanently removes the adopter's favorites,
  *       visits, adoption applications, government ID, and the Adopter/Users
  *       rows themselves. Both modes clear the refresh token, forcing logout.
  *     tags: [Adopters]

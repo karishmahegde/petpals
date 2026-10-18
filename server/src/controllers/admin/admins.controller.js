@@ -14,13 +14,13 @@ const badRequest = (message) => {
   return err;
 };
 
-// Filtering (GET /admins?accountStatus=) recognizes all three states,
-// including Pending — self-registered admins awaiting approval by an
-// existing admin.
-const ADMIN_ACCOUNT_STATUS_FILTER_VALUES = ["Pending", "Active", "Deactivated"];
-// PATCH /admins/:id/status only ever moves someone TO Active (approve) or
-// Deactivated (decline/deactivate) — same convention as Staff.
-const ADMIN_ACCOUNT_STATUS_TARGET_VALUES = ["Active", "Deactivated"];
+// Filtering (GET /admins?accountStatus=) recognizes every state, including
+// Pending — self-registered admins awaiting approval by an existing admin.
+const ADMIN_ACCOUNT_STATUS_FILTER_VALUES = ["Pending", "Active", "Deactivated", "Closed", "Declined"];
+// PATCH /admins/:id/status only ever moves someone TO Active (approve or
+// reactivate), Declined (decline) or Deactivated (deactivate) — same
+// convention as Staff; the service decides which moves are allowed (409).
+const ADMIN_ACCOUNT_STATUS_TARGET_VALUES = ["Active", "Deactivated", "Declined"];
 
 // ——————————————— GET /admins/me ———————————————
 const getMyProfile = async (req, res, next) => {

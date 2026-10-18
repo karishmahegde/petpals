@@ -20,6 +20,8 @@ import PersonalFields, {
 import AddressFields from "../../../../components/ui/onboarding/AddressFields";
 import ProfileAddressSection from "../../../../components/ui/profile/ProfileAddressSection";
 import EmailVerificationStatus from "../../../../components/ui/profile/EmailVerificationStatus";
+import useResendVerification from "../../../../logic/hooks/useResendVerification";
+import AccountSecuritySection from "../../shared/AccountSecuritySection";
 import CloseAccountModal from "./shared/CloseAccountModal";
 import GovernmentIdSection from "../../shared/GovernmentIdSection";
 import {
@@ -42,6 +44,8 @@ const STATUS_TONE: Record<VetAccountStatus, BadgeTone> = {
   Pending: "gold",
   Active: "green",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };
 
 const SEX_LABELS: Record<string, string> = {
@@ -122,6 +126,7 @@ const inputClass =
 const Profile = () => {
   const queryClient = useQueryClient();
   const updateUser = useAuthStore((state) => state.updateUser);
+  const verification = useResendVerification();
 
   const profileQuery = useQuery({
     queryKey: ["vet", "me"],
@@ -228,7 +233,11 @@ const Profile = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <EmailVerificationStatus verified={profile.emailVerified} />
+              <EmailVerificationStatus
+                verified={profile.emailVerified}
+                onVerify={verification.resend}
+                pending={verification.pending}
+              />
               {profile.accountStatus && (
                 <Badge tone={STATUS_TONE[profile.accountStatus]}>
                   {profile.accountStatus}
@@ -399,12 +408,14 @@ const Profile = () => {
             )}
           </div>
 
+          <AccountSecuritySection currentEmail={profile.user.userEmail} />
+
           {/* Danger zone */}
           <div className="mt-10 rounded-2xl border border-rose-md bg-rose-lightest p-5 md:p-6">
             <h2 className="font-display text-lg text-rose-dark">Danger zone</h2>
             <p className="mt-1 font-body text-sm text-neutral-charcoal">
-              Closing your account deactivates or permanently deletes it. This
-              can't be undone.
+              Deactivate your account (you can reopen it later from the login
+              page) or delete it permanently.
             </p>
             <ButtonElement
               onClick={() => setIsCloseAccountOpen(true)}

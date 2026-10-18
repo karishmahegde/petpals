@@ -24,7 +24,7 @@ const router = express.Router();
  *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
  *       - in: query
  *         name: accountStatus
- *         schema: { type: string, enum: [Pending, Active, Deactivated] }
+ *         schema: { type: string, enum: [Pending, Active, Deactivated, Closed, Declined] }
  *         description: >
  *           Optional filter by account status. Pending is a self-registered
  *           account awaiting approval by an existing admin.
@@ -82,7 +82,7 @@ router.get(
  *   delete:
  *     summary: Deactivate or permanently delete your own admin account
  *     description: >
- *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       'deactivate' keeps the row (accountStatus → Closed, refresh
  *       token cleared); 'delete' permanently removes the Admin and Users
  *       rows. No "last active Admin" guard — this is self-service on your
  *       own account, unlike PATCH /admins/:id/status which blocks
@@ -226,13 +226,14 @@ router.get(
  * @swagger
  * /admins/{id}/status:
  *   patch:
- *     summary: Activate or deactivate an admin account (Admin only)
+ *     summary: Approve, decline, deactivate or reactivate an admin account (Admin only)
  *     description: >
- *       This is also how a self-registered (Pending) admin account is
- *       approved or declined — setting accountStatus to 'Active' approves it,
- *       'Deactivated' declines it. There is no distinct approve/decline
- *       endpoint. An admin cannot deactivate their own account. A
- *       Deactivated (or still-Pending) admin account is rejected on its next
+ *       Allowed moves — Pending → Active (approve) or Declined (decline);
+ *       Active → Deactivated; Deactivated → Active (reactivate). Anything
+ *       else is 409, including any change to a Closed account (the owner
+ *       closed it; only they can reactivate it, by emailed link) or a
+ *       Declined one. An admin cannot deactivate their own account. A
+ *       Deactivated, Closed, Declined (or still-Pending) admin account is rejected on its next
  *       login attempt (POST /auth/login) — existing already-issued access
  *       tokens are unaffected until they expire.
  *     tags: [Admins, Admin]
@@ -253,7 +254,7 @@ router.get(
  *             properties:
  *               accountStatus:
  *                 type: string
- *                 enum: [Active, Deactivated]
+ *                 enum: [Active, Deactivated, Declined]
  *     responses:
  *       200:
  *         description: The updated admin detail
@@ -262,6 +263,8 @@ router.get(
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: Move not allowed from the current status (e.g. a Closed or Declined account)
  */
 router.patch(
   "/admins/:id/status",

@@ -5,7 +5,7 @@
 // shelter's manager, server-side.
 // Read-only profile plus Approve/Decline in the footer, both going through
 // the existing PATCH /staff/:id/status endpoint (Active = approve,
-// Deactivated = decline — there's no dedicated approve/decline endpoint).
+// Declined = decline — there's no dedicated approve/decline endpoint).
 // Approving needs their onboarding complete AND their government ID
 // Verified (the server refuses otherwise), so Approve stays disabled, with
 // what's missing shown, until both are true.
@@ -83,7 +83,7 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
               {mutation.isPending ? "Working…" : "Approve"}
             </ButtonElement>
             <ButtonElement
-              onClick={() => mutation.mutate("Deactivated")}
+              onClick={() => mutation.mutate("Declined")}
               disabled={mutation.isPending}
               size="panel"
               className="flex-1 bg-red hover:brightness-95 disabled:cursor-not-allowed"
@@ -164,8 +164,8 @@ const StaffApprovalPanel = ({ userID, onClose }: StaffApprovalPanelProps) => {
           <p className="mt-5 font-body text-xs text-neutral-gray">
             Approving activates this account and lets them log in. Shelter and
             designation can be assigned afterward from the staff list.
-            Declining deactivates the account the same way a manual
-            deactivation would.
+            Declining marks the sign-up Declined, so they can't log in.
+            Either way they get an email.
           </p>
         </div>
       )}

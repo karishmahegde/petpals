@@ -135,13 +135,15 @@ const staffNotFoundAtShelter = (managerStaffID, shelterID) => {
   return err;
 };
 
-const deactivatedManager = (managerStaffID) => {
+const inactiveManager = (managerStaffID, accountStatus) => {
   const err = new Error(
-    `Staff member ${managerStaffID} is deactivated and cannot be assigned as manager`,
+    `Staff member ${managerStaffID} is ${accountStatus.toLowerCase()} and cannot be assigned as manager`,
   );
   err.code = "CONFLICT";
   return err;
 };
+
+const INACTIVE_STAFF_STATUSES = ["Deactivated", "Closed", "Declined"];
 
 // ——————————————— UPDATE MANAGER (PATCH /shelters/:id/manager) ———————————————
 // Scoped to this shelter — a staff member who exists but works at a
@@ -163,8 +165,10 @@ const updateShelterManager = async (shelterID, managerStaffID) => {
   if (!staff) {
     throw staffNotFoundAtShelter(managerStaffID, shelterID);
   }
-  if (staff.accountStatus === "Deactivated") {
-    throw deactivatedManager(managerStaffID);
+  // Deactivated, closed by its owner, or declined at sign-up — none of them
+  // can log in, so none can manage a shelter.
+  if (INACTIVE_STAFF_STATUSES.includes(staff.accountStatus)) {
+    throw inactiveManager(managerStaffID, staff.accountStatus);
   }
 
   await prisma.shelter.update({

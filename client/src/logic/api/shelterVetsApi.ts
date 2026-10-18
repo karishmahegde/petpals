@@ -8,7 +8,8 @@ import type { Pagination } from "./petsApi";
 import type { Address } from "../utils/address";
 import type { GovernmentIdStatus } from "./staffApi";
 
-export type VetAccountStatus = "Pending" | "Active" | "Deactivated";
+export type VetAccountStatus =
+  "Pending" | "Active" | "Deactivated" | "Closed" | "Declined";
 
 export interface ShelterVet extends Address {
   userID: number;
@@ -27,7 +28,7 @@ export interface ShelterVet extends Address {
 
 interface ShelterVetsParams {
   section: "all" | "pending"; // pending = awaiting approval
-  accountStatus?: "Active" | "Deactivated"; // section=all only
+  accountStatus?: Exclude<VetAccountStatus, "Pending">; // section=all only
   name?: string;
   page?: number;
   limit?: number;
@@ -40,12 +41,12 @@ export const getShelterVets = async (
   return { data: response.data.data, pagination: response.data.pagination };
 };
 
-// Pending → Active (approve) / Deactivated (decline); Active → Deactivated.
+// Pending → Active (approve) / Declined (decline); Active → Deactivated.
 // Approving needs onboarding complete and a Verified government ID — 409
 // with the reason otherwise.
 export const updateShelterVetStatus = async (
   userID: number,
-  accountStatus: "Active" | "Deactivated",
+  accountStatus: "Active" | "Deactivated" | "Declined",
 ): Promise<ShelterVet> => {
   const response = await axiosInstance.patch(
     `/staff/me/vets/${userID}/status`,

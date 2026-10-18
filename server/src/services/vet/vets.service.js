@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const { ADDRESS_SELECT } = require("../../utils/address");
@@ -187,7 +188,7 @@ const upcomingAppointmentsConflict = () => {
   return err;
 };
 
-// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared). 'delete' removes the Veterinarian and Users rows (the refresh
 // token goes with Users) plus their government ID and its stored file. The
 // pets' history survives: HealthRecord.vetID,
@@ -206,14 +207,18 @@ const closeMyAccount = async (userID, mode) => {
     throw upcomingAppointmentsConflict();
   }
 
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     await prisma.$transaction([
       prisma.veterinarian.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       }),
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -236,6 +241,8 @@ const closeMyAccount = async (userID, mode) => {
       governmentId.documentURL,
     );
   }
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

@@ -78,9 +78,8 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
               Deactivate
             </p>
             <p className="mt-1 font-body text-xs text-neutral-charcoal">
-              Your data is kept and your account is hidden. There is{" "}
-              <strong>no self-service reactivation</strong> - you'll need to
-              contact support to reactivate it.
+              Your data is kept and your account is hidden. You can reopen it
+              any time from the login page with an emailed link.
             </p>
           </ButtonElement>
           <ButtonElement
@@ -106,9 +105,8 @@ const CloseAccountModal = ({ isOpen, onClose }: CloseAccountModalProps) => {
           <p className="font-body text-sm text-neutral-charcoal">
             {mode === "deactivate" ? (
               <>
-                This deactivates your account. Data is kept, but there's no
-                self-service reactivation - you'll need to contact support to
-                reactivate.
+                This deactivates your account. Data is kept, and you can reopen
+                it any time from the login page with an emailed link.
               </>
             ) : (
               <>

@@ -59,12 +59,12 @@ export const updateShelterStaffDesignation = async (
   return response.data.data;
 };
 
-// Pending → Active (approve) / Deactivated (decline); Active → Deactivated.
+// Pending → Active (approve) / Declined (decline); Active → Deactivated.
 // Staff sign up with no designation — approving sets it, so it's required
 // then (Senior/Associate).
 export const updateShelterStaffStatus = async (
   userID: number,
-  accountStatus: "Active" | "Deactivated",
+  accountStatus: "Active" | "Deactivated" | "Declined",
   staffDesignation?: AssignableDesignation,
 ): Promise<ShelterStaffMember> => {
   const response = await axiosInstance.patch(

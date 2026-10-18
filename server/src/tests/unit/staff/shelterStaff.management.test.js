@@ -14,7 +14,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -60,7 +65,7 @@ describe("Shelter manager staff management", () => {
       });
       expect(prisma.staff.findMany.mock.calls[0][0].where).toEqual({
         shelterID: 9,
-        accountStatus: { in: ["Active", "Deactivated"] },
+        accountStatus: { not: "Pending" },
         staffDesignation: "Associate",
         staffName: { contains: "ari", mode: "insensitive" },
       });
@@ -319,17 +324,17 @@ describe("Shelter manager staff management", () => {
         pendingMember({ onboardingComplete: false }),
       );
       prisma.staff.update.mockResolvedValueOnce(
-        memberRow({ accountStatus: "Deactivated" }),
+        memberRow({ accountStatus: "Declined" }),
       );
 
       const res = await request(app)
         .patch("/api/v1/staff/me/team/50/status")
         .set("Authorization", `Bearer ${managerToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.staff.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+        expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
     });
 
@@ -337,18 +342,19 @@ describe("Shelter manager staff management", () => {
       prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
       prisma.staff.findUnique.mockResolvedValueOnce(pendingMember());
       prisma.staff.update.mockResolvedValueOnce(
-        memberRow({ accountStatus: "Deactivated" }),
+        memberRow({ accountStatus: "Declined" }),
       );
 
       const res = await request(app)
         .patch("/api/v1/staff/me/team/50/status")
         .set("Authorization", `Bearer ${managerToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.staff.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { accountStatus: "Deactivated" } }),
+        expect.objectContaining({ data: { accountStatus: "Declined" } }),
       );
+      expect(accountNotices.statusChanged).toHaveBeenCalledWith(50, "Pending", "Declined");
     });
 
     test("a Pending Manager sign-up is Admin's → 403", async () => {
@@ -378,6 +384,30 @@ describe("Shelter manager staff management", () => {
         .patch("/api/v1/staff/me/team/50/status")
         .set("Authorization", `Bearer ${managerToken()}`)
         .send({ accountStatus: "Active" });
+
+      expect(res.status).toBe(409);
+      expect(prisma.staff.update).not.toHaveBeenCalled();
+    });
+
+    // Closed is reopened only by its owner (emailed link); Declined is final;
+    // Declined is only a decline of a Pending sign-up.
+    test.each([
+      ["Closed", "Active"],
+      ["Closed", "Deactivated"],
+      ["Declined", "Active"],
+      ["Active", "Declined"],
+    ])("%s -> %s isn't allowed -> 409, nothing written", async (from, to) => {
+      prisma.shelter.findFirst.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.staff.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        staffDesignation: "Associate",
+        accountStatus: from,
+      });
+
+      const res = await request(app)
+        .patch("/api/v1/staff/me/team/50/status")
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ accountStatus: to });
 
       expect(res.status).toBe(409);
       expect(prisma.staff.update).not.toHaveBeenCalled();
