@@ -1,6 +1,6 @@
 # Setup Guide
 
-Gets you from `git clone` to a running PetPals instance with sample data covering every case the app handles — 32 test logins (every account status for every role), 4 shelters, and 21 pets. ~15 minutes, most of it waiting on installs.
+Gets you from `git clone` to a running PetPals instance with sample data covering every case the app handles — 50 test logins (every account status for every role), 4 shelters, and 21 pets. ~15 minutes, most of it waiting on installs.
 
 For architecture, folder structure, and API reference, see [`CLAUDE.md`](../CLAUDE.md). This file only covers first-time setup. Everything setup-related lives in this `setup/` folder:
 
@@ -79,7 +79,7 @@ One command, four steps:
 
 > ⚠️ **Use `migrate deploy`, never `migrate dev`.** (`npm run prisma:migrate` runs `migrate deploy`, so it's safe.) Prisma can't model the PostGIS/generated columns, so `migrate dev` sees them as drift and offers to reset your database. `migrate deploy` just applies the tracked migrations and never prompts. Full explanation in `CLAUDE.md` → Permanent Known Issues.
 
-The seed creates 4 shelters (one per status), 21 pets (one per adoption status), and 32 logins covering every account status for every role, plus applications, visits, appointments, transfers, tasks, events, donations and ID verifications in every status. The command prints every login and what case it represents when it finishes — the main ones are in the [Test accounts](#test-accounts) table below.
+The seed creates 4 shelters (one per status), 21 pets (one per adoption status), and 50 logins covering every account status for every role, plus applications, visits, appointments, transfers, tasks, events, donations and ID verifications in every status. The command prints every login and what case it represents when it finishes — the main ones are in the [Test accounts](#test-accounts) table below.
 
 ## 4. Start the server
 
@@ -131,7 +131,9 @@ Every other seeded account uses its role's password above. The ones worth knowin
 | `staff.pending@petpals.com` | Pending, onboarding done, ID awaiting verification — logs in to the "awaiting approval" screen; Downtown's manager verifies the ID, then approves |
 | `staff.onboarding@petpals.com` | Pending, stopped mid-onboarding (step 3) — logs in straight to the onboarding wizard |
 | `staff.manager.pending@petpals.com` | Pending Manager sign-up at Queens, onboarding done, ID awaiting verification — an Admin verifies and approves |
-| `*.deactivated@` / `*.banned@petpals.com` | Closed or banned accounts — login is refused |
+| `*.closed@petpals.com` (every role) | Closed by its owner — login is refused; the owner can reopen it with an emailed reactivation link |
+| `*.deactivated@` / `*.declined@` / `*.banned@petpals.com` | Deactivated by an admin/staff member, declined at approval, or banned — login is refused |
+| `adopter.unverified@` / `donor.unverified@petpals.com` | Email not verified — verify banner shown; applying to adopt / donating is blocked until verified |
 
 ## AI features (optional)
 

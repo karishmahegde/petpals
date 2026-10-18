@@ -74,12 +74,12 @@ router.post("/register", authController.register);
  *       200:
  *         description: >
  *           Login successful — returns access token in body, refresh token
- *           as httpOnly cookie. user carries onboardingComplete and
- *           onboardingStep for Adopter, Staff and Veterinarian, plus
- *           accountStatus for Staff and Veterinarian. A Pending Staff member
- *           or Veterinarian CAN log in (to onboard before approval) but can
- *           only reach their own onboarding endpoints until approved;
- *           Pending accounts of other roles get 401.
+ *           as httpOnly cookie. user carries emailVerified for every role,
+ *           onboardingComplete and onboardingStep for every role but Admin,
+ *           plus accountStatus for Staff, Veterinarian and Volunteer. A
+ *           Pending Staff member, Veterinarian or Volunteer CAN log in (to
+ *           onboard before approval) but can only reach their own onboarding
+ *           endpoints until approved; a Pending Admin gets 401.
  *       401:
  *         description: >
  *           Incorrect password, or a Deactivated/Closed/Declined/Banned
@@ -163,7 +163,7 @@ router.post("/refresh-token", authController.refreshToken);
  *               token: { type: string }
  *     responses:
  *       200:
- *         description: Verified — data is { emailVerified: true }
+ *         description: 'Verified — data is { emailVerified: true }'
  *       400:
  *         description: >
  *           Link invalid, expired or already used — error.details.reason is
