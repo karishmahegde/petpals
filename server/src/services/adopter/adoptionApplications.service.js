@@ -4,6 +4,8 @@ const stripe = require("../../config/stripe");
 const storage = require("../storage");
 const { APPLICATION_FEE_CENTS, APPLICATION_FEE_USD } = require("../../config/fees");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
+const { getUserContact } = require("../auth/userContact");
+const reviewNotices = require("../staff/reviewNotices");
 const {
   formatAgeFromDOBYears,
   formatSex,
@@ -698,18 +700,27 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
   // Accepting also declines the pet's other Pending applications, with a
   // remark the applicant sees — rather than leaving them "Under
   // Consideration" for a pet that's gone.
+  // The findMany reads, in the same transaction and just before the
+  // updateMany, who is about to be declined — so each of them gets an email.
   if (status === "Accepted") {
+    const otherPending = {
+      petID: application.petID,
+      applicationStatus: "Pending",
+      applicationID: { not: applicationID },
+    };
     operations.push(
       prisma.pet.update({
         where: { petID: application.petID },
         data: { adoptionStatus: "adopted" },
       }),
-      prisma.adoptionApplication.updateMany({
-        where: {
-          petID: application.petID,
-          applicationStatus: "Pending",
-          applicationID: { not: applicationID },
+      prisma.adoptionApplication.findMany({
+        where: otherPending,
+        select: {
+          adopter: { select: { adopterName: true, user: { select: { userEmail: true } } } },
         },
+      }),
+      prisma.adoptionApplication.updateMany({
+        where: otherPending,
         data: { applicationStatus: "Rejected", staffRemark: AUTO_DECLINE_REMARK },
       }),
     );
@@ -722,9 +733,12 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
     );
   }
 
+  let updated;
+  let autoDeclined = [];
   try {
-    const [updated] = await prisma.$transaction(operations);
-    return toClientShape(updated);
+    const results = await prisma.$transaction(operations);
+    updated = results[0];
+    if (status === "Accepted") autoDeclined = results[2] ?? [];
   } catch (err) {
     // Another application for this pet was accepted at the same moment —
     // the one-Accepted-per-pet partial unique index fired (migration
@@ -733,6 +747,39 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
       throw petNoLongerAvailable(application.pet.petName);
     }
     throw err;
+  }
+
+  // Staff/admin decisions email the applicant(s); an adopter's own Withdraw
+  // sends nothing.
+  if (actor.role !== "Adopter") {
+    await notifyApplicationDecision(application, updated, staffRemark, autoDeclined);
+  }
+  return toClientShape(updated);
+};
+
+// Never throws — the decision has already committed.
+const notifyApplicationDecision = async (application, updated, staffRemark, autoDeclined) => {
+  try {
+    const applicant = await getUserContact(application.adopterID);
+    reviewNotices.applicationsDecided({
+      petName: updated.pet.petName,
+      shelterName: updated.shelter.shelterName,
+      applications: [
+        ...(applicant
+          ? [{ email: applicant.email, name: applicant.name, status: updated.applicationStatus, staffRemark }]
+          : []),
+        ...autoDeclined.map(({ adopter }) => ({
+          email: adopter?.user?.userEmail,
+          name: adopter?.adopterName,
+          status: "Rejected",
+          staffRemark: AUTO_DECLINE_REMARK,
+        })),
+      ],
+    });
+  } catch (err) {
+    console.error(
+      `[email] couldn't send the decision notice for application ${application.applicationID}: ${err.message}`,
+    );
   }
 };
 

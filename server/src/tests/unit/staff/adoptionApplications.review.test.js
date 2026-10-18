@@ -28,7 +28,16 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The decision emails are covered in staff/reviewNotices.test.js — mocked
+// here, with the applicant lookup, so the suite only checks who gets told.
+jest.mock("../../../services/staff/reviewNotices");
+jest.mock("../../../services/auth/userContact", () => ({
+  getUserContact: jest.fn(),
+}));
+
 const prisma = require("../../../config/prisma");
+const reviewNotices = require("../../../services/staff/reviewNotices");
+const { getUserContact } = require("../../../services/auth/userContact");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
 
@@ -84,6 +93,7 @@ describe("Application review workflow (Staff/Admin)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     authService.getAccountStatus.mockResolvedValue("Active");
+    getUserContact.mockResolvedValue({ userID: 7, email: "emilie@example.com", name: "Emilie" });
   });
 
   // ————————————————————— GET /api/v1/adoption-applications —————————————————————
@@ -224,11 +234,14 @@ describe("Application review workflow (Staff/Admin)", () => {
         buildUpdatedApplication({ applicationStatus: "Accepted", staffID: 42 }),
       );
       prisma.pet.update.mockResolvedValueOnce({});
+      prisma.adoptionApplication.findMany.mockResolvedValueOnce([
+        { adopter: { adopterName: "Ali", user: { userEmail: "ali@example.com" } } },
+      ]);
 
       const res = await request(app)
         .patch("/api/v1/adoption-applications/1/status")
         .set("Authorization", `Bearer ${staffToken(42)}`)
-        .send({ status: "Accepted" });
+        .send({ status: "Accepted", staffRemark: "See you Saturday" });
 
       expect(res.status).toBe(200);
       expect(prisma.adoptionApplication.update).toHaveBeenCalledWith(
@@ -256,6 +269,28 @@ describe("Application review workflow (Staff/Admin)", () => {
           applicationStatus: "Rejected",
           staffRemark: expect.stringContaining("Another applicant was approved for this pet"),
         },
+      });
+      // Who's about to be declined is read with the same where, inside the
+      // same transaction (before the updateMany).
+      expect(prisma.adoptionApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { petID: 5, applicationStatus: "Pending", applicationID: { not: 1 } },
+        }),
+      );
+      // The approved applicant and every auto-declined one get an email.
+      expect(getUserContact).toHaveBeenCalledWith(7);
+      expect(reviewNotices.applicationsDecided).toHaveBeenCalledWith({
+        petName: "Rex",
+        shelterName: "Athens Shelter",
+        applications: [
+          { email: "emilie@example.com", name: "Emilie", status: "Accepted", staffRemark: "See you Saturday" },
+          {
+            email: "ali@example.com",
+            name: "Ali",
+            status: "Rejected",
+            staffRemark: expect.stringContaining("Another applicant was approved for this pet"),
+          },
+        ],
       });
     });
 
@@ -310,6 +345,7 @@ describe("Application review workflow (Staff/Admin)", () => {
       expect(res.body.message).toBe(
         "Rex is no longer available — another application has already been accepted",
       );
+      expect(reviewNotices.applicationsDecided).not.toHaveBeenCalled();
     });
 
     test("Accept on a non-Pending application → 409 CONFLICT, nothing written", async () => {
@@ -363,6 +399,13 @@ describe("Application review workflow (Staff/Admin)", () => {
       expect(prisma.pet.update).not.toHaveBeenCalled();
       // Rejecting one application leaves the pet's others as they are.
       expect(prisma.adoptionApplication.updateMany).not.toHaveBeenCalled();
+      expect(reviewNotices.applicationsDecided).toHaveBeenCalledWith(
+        expect.objectContaining({
+          applications: [
+            { email: "emilie@example.com", name: "Emilie", status: "Rejected", staffRemark: "Not a good fit" },
+          ],
+        }),
+      );
     });
 
     test("Staff acting on another shelter's application → 403 FORBIDDEN, nothing written", async () => {
@@ -450,6 +493,8 @@ describe("Application review workflow (Staff/Admin)", () => {
       expect(res.status).toBe(200);
       expect(prisma.pet.update).not.toHaveBeenCalled();
       expect(prisma.pet.updateMany).not.toHaveBeenCalled();
+      // An adopter's own Withdraw sends nothing.
+      expect(reviewNotices.applicationsDecided).not.toHaveBeenCalled();
     });
 
     test("Adopter withdrawing their own Accepted application → 200, pet back to 'available' in the same transaction", async () => {

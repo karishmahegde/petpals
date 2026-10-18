@@ -223,6 +223,67 @@ const accountRestored = ({ name, loginUrl }) =>
     action: { label: "Log in", url: loginUrl },
   });
 
+// ——————————————— Review outcomes ———————————————
+
+// `awaitingApproval` — the person's account is still Pending (a worker or
+// volunteer onboarding before approval), so there's an approval step left.
+const governmentIdVerified = ({ name, awaitingApproval }) =>
+  renderEmail({
+    subject: "Your government ID is verified",
+    heading: greeting(name),
+    paragraphs: [
+      "The government ID you uploaded to PetPals has been reviewed and verified.",
+      ...(awaitingApproval
+        ? ["Your account is still waiting for approval — we'll email you as soon as it's approved."]
+        : []),
+    ],
+  });
+
+// Pending accounts re-upload from the page they see while awaiting approval;
+// everyone else from their Profile.
+const governmentIdRejected = ({ name, awaitingApproval, loginUrl }) =>
+  renderEmail({
+    subject: "Your government ID needs another look",
+    heading: greeting(name),
+    paragraphs: [
+      "The government ID you uploaded to PetPals couldn't be verified — the image may have been unclear, or the details didn't match your account.",
+      awaitingApproval
+        ? "Please log in and upload a new one from the approval page. Your account can be approved once a verified ID is on file."
+        : "Please log in and upload a new one from your Profile.",
+    ],
+    action: { label: "Log in", url: loginUrl },
+  });
+
+// Adopter-facing wording matches the dashboard (client
+// logic/adopter/applicationStatus.ts): Accepted → "Approved", Rejected →
+// "Declined". `staffRemark` is the shelter's note, shown when there is one.
+const applicationNote = (staffRemark) =>
+  staffRemark ? [`A note from the shelter: "${staffRemark}"`] : [];
+
+const applicationApproved = ({ name, petName, shelterName, staffRemark }) =>
+  renderEmail({
+    subject: `Your application for ${petName} was approved`,
+    heading: greeting(name),
+    paragraphs: [
+      `Great news — ${shelterName} has approved your adoption application for ${petName}.`,
+      ...applicationNote(staffRemark),
+      "The shelter will be in touch about next steps. You can follow along from your dashboard.",
+    ],
+    action: { label: "View my applications", url: clientLink("/adopter/applications") },
+  });
+
+const applicationDeclined = ({ name, petName, shelterName, staffRemark }) =>
+  renderEmail({
+    subject: `An update on your application for ${petName}`,
+    heading: greeting(name),
+    paragraphs: [
+      `Thank you for applying to adopt ${petName}. ${shelterName} has reviewed your application and decided not to go ahead with it.`,
+      ...applicationNote(staffRemark),
+      "There are plenty more pets looking for a home — we hope you'll find your match.",
+    ],
+    action: { label: "Browse pets", url: clientLink("/adopt") },
+  });
+
 module.exports = {
   clientLink,
   renderEmail,
@@ -240,4 +301,8 @@ module.exports = {
   accountDeactivated,
   accountBanned,
   accountRestored,
+  governmentIdVerified,
+  governmentIdRejected,
+  applicationApproved,
+  applicationDeclined,
 };

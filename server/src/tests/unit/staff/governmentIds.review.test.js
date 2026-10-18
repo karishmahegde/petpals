@@ -29,7 +29,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The review emails are covered in staff/reviewNotices.test.js — mocked
+// here so they never touch the mocked Prisma client.
+jest.mock("../../../services/staff/reviewNotices");
+
 const prisma = require("../../../config/prisma");
+const reviewNotices = require("../../../services/staff/reviewNotices");
 const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
@@ -174,6 +179,7 @@ describe("Government ID review — who may review which person types", () => {
 
       expect(res.status).toBe(403);
       expect(prisma.governmentID.update).not.toHaveBeenCalled();
+      expect(reviewNotices.governmentIdReviewed).not.toHaveBeenCalled();
     });
 
     test("manager reviewing a vet's ID at their shelter → 200", async () => {
@@ -209,6 +215,7 @@ describe("Government ID review — who may review which person types", () => {
         where: { governmentIDID: 5 },
         data: { verificationStatus: "Verified" },
       });
+      expect(reviewNotices.governmentIdReviewed).toHaveBeenCalledWith(80, "Verified");
       expect(res.body.data.personName).toBe("Adrian Nicholes");
     });
 
