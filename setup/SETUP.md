@@ -200,6 +200,60 @@ Nothing crashes in either case. A bad or revoked key is logged as an error in th
 
 **Tests never call the AI.** `server/src/tests/setup/noAiProvider.js` runs before every test file and blanks the `AI_*` variables, so a real key in `server/.env` is never used. Suites that test AI behaviour mock it instead.
 
+
+## Email (optional)
+
+The app sends email for these:
+
+| Email | When |
+| --- | --- |
+| Verify your email address | at sign-up, and from **Resend** (dashboard banner, Profile, the apply/donate notice) |
+| Reset your password | **Forgot password?** on either login page |
+| Reactivate your account | logging in to an account you closed → **Email me a reactivation link** |
+| Confirm your new email address | Profile → **Account & security** → Change email (plus a heads-up to the old address) |
+| Account notices | your account closed or deleted; approved, declined, deactivated, banned or restored by someone else; your password or email changed |
+| Review outcomes | your government ID verified or rejected; your adoption application approved or declined |
+
+Applying to adopt and donating need a verified email address. Everything else works unverified.
+
+### Without email (default)
+
+Leave `EMAIL_API_KEY` and `EMAIL_FROM` blank in `server/.env`. Nothing is sent. Every email is printed to the server terminal instead, with its link, so you can copy the link into the browser and use any flow locally:
+
+```text
+[email] not configured — would send to jane@example.com
+Subject: Verify your PetPals email address
+...
+```
+
+### With Brevo (real email)
+
+Email goes through [Brevo](https://www.brevo.com)'s HTTPS API, not SMTP. Railway, where the server is deployed, blocks outbound SMTP below its Pro plan. The free plan allows 300 emails a day.
+
+1. Sign up at [brevo.com](https://www.brevo.com) and complete the account profile it asks for.
+2. **Verify a sender.** Go to **Senders, Domains & Dedicated IPs → Senders → Add a sender**, enter `PetPals` as the name and an address you can receive mail at, then confirm the code Brevo emails to it. Recipients see this address, so use a dedicated one rather than a personal address once other people use the app.
+3. **Create an API key.** Go to **SMTP & API → API Keys → Generate a new API key**. Copy it straight away, because Brevo shows it only once. It starts with `xkeysib-`. The SMTP key (`xsmtpsib-…`) won't work.
+4. **Authorised IPs.** Newer accounts block API calls from IP addresses Brevo doesn't recognise. Under **Security → Authorised IPs**, add your IP, or turn the blocking off. Turn it off for Railway, whose outgoing IPs change.
+5. In `server/.env`:
+
+   ```bash
+   EMAIL_API_KEY=<your key>
+   EMAIL_FROM=<the sender address you verified>
+   EMAIL_FROM_NAME=PetPals
+   ```
+
+   Email switches on only when **both** `EMAIL_API_KEY` and `EMAIL_FROM` are set.
+6. Restart the server (`npm run dev`).
+7. Register an account with your own email address and check that the verification email arrives.
+
+**Check your spam folder.** Mail sent "from" a Gmail or Outlook address through Brevo often lands there, because those providers don't recognise Brevo as an allowed sender for their addresses. For a deployment, verify your own domain under Brevo's **Domains** tab and send from an address on it.
+
+**Don't use the seeded logins with real email on.** Their `@petpals.com` addresses don't exist, so approving, declining or resetting them sends mail that bounces, which counts against your Brevo sender reputation.
+
+**If an email doesn't arrive,** the server terminal logs a line starting with `[email] failed to send` with Brevo's reason, and Brevo's **Transactional → Logs** page shows what it received. A failed email never fails the request that triggered it.
+
+**Tests never send email.** `server/src/tests/setup/noEmailProvider.js` runs before every test file and blanks the `EMAIL_*` variables, so a real key in `server/.env` is never used. Suites that test email mock it instead.
+
 ## Troubleshooting
 
 - **Prisma asks to reset the database / mentions drift** — you (or a script) ran `migrate dev` instead of `migrate deploy`. Don't confirm the reset; re-read the callout in step 3.

@@ -29,6 +29,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 | **Role-based access control**  | Six distinct roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor |
 | **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                     |
 | **Two-token JWT auth**         | Short-lived access token + httpOnly refresh cookie, with post-login redirect-back |
+| **Email & account security**   | Email verification, password reset, self-service reactivation and email change by emailed link, plus account and review notices (Brevo, optional) |
 | **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                         |
 | **Donation management**        | Stripe-integrated donor flow with impact tracking                                 |
 
@@ -40,7 +41,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 ### Backend
 
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) ![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=flat-square&logo=stripe&logoColor=white) ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white) ![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=flat-square&logo=stripe&logoColor=white) ![Brevo](https://img.shields.io/badge/Brevo-0B996E?style=flat-square&logo=brevo&logoColor=white) ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black)
 
 ### Database
 
@@ -83,7 +84,9 @@ cd petpals
 
 # 2. Configure the server — fill in your Supabase / JWT (/ optional Stripe) values,
 #    plus the optional Groq AI values (AI_BASE_URL / AI_API_KEY / AI_MODEL; leave them
-#    blank to run without AI — see setup/SETUP.md "AI features (optional)")
+#    blank to run without AI — see setup/SETUP.md "AI features (optional)"), and the
+#    optional Brevo email values (EMAIL_API_KEY / EMAIL_FROM; leave them blank and
+#    every email prints to the server terminal — see setup/SETUP.md "Email (optional)")
 cd server
 npm install
 cp .env.example .env
