@@ -394,6 +394,35 @@ describe("Staff pet management endpoints", () => {
       ]);
     });
 
+    // The client enables "Summarize with AI" from this flag, so it must come
+    // from config alone — set the AI_* vars and it flips, no AI call made.
+    test("aiSummaryAvailable follows the AI config", async () => {
+      const AI_VARS = ["AI_BASE_URL", "AI_API_KEY", "AI_MODEL"];
+      const saved = Object.fromEntries(AI_VARS.map((key) => [key, process.env[key]]));
+      const mockEmptyHistory = () => {
+        prisma.healthRecord.findMany.mockResolvedValueOnce([]);
+        prisma.vaccinationRecord.findMany.mockResolvedValueOnce([]);
+        prisma.transferHistory.findMany.mockResolvedValueOnce([]);
+      };
+      try {
+        AI_VARS.forEach((key) => delete process.env[key]);
+        mockOwnPet();
+        mockEmptyHistory();
+        expect((await getPassport()).body.data.aiSummaryAvailable).toBe(false);
+
+        process.env.AI_BASE_URL = "https://ai.example.test/v1";
+        process.env.AI_API_KEY = "test-key";
+        process.env.AI_MODEL = "test-model";
+        mockOwnPet();
+        mockEmptyHistory();
+        expect((await getPassport()).body.data.aiSummaryAvailable).toBe(true);
+      } finally {
+        AI_VARS.forEach((key) =>
+          saved[key] === undefined ? delete process.env[key] : (process.env[key] = saved[key]),
+        );
+      }
+    });
+
     // A passport travels with the pet, so its history isn't limited to the
     // viewer's shelter the way the Transfers tab is.
     test("every history read is scoped by pet only, not by the caller's shelter", async () => {

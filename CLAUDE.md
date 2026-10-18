@@ -1,6 +1,6 @@
 # PetPals — Animal Adoption Management System
 
-Multi-shelter pet adoption platform (solo full-stack learning project). Unifies animal listings, adoption workflows, and medical records across every branch of a shelter organisation. Differentiators: (1) network-wide search & workflows, (2) universal health passport that travels with an animal across inter-shelter transfers, (3) AI pet–adopter compatibility matcher (OpenAI, planned — Sprint 8).
+Multi-shelter pet adoption platform (solo full-stack learning project). Unifies animal listings, adoption workflows, and medical records across every branch of a shelter organisation. Differentiators: (1) network-wide search & workflows, (2) universal health passport that travels with an animal across inter-shelter transfers, (3) AI pet–adopter compatibility matcher + health-passport summary (Groq, or any OpenAI-compatible provider, via `services/ai/` — Sprint 8).
 
 **Roles:** Admin (org oversight, shelters, analytics) · Shelter Staff (pets, applications, volunteers, events, donations) · Adopter (browse, apply, schedule visits, track status) · Veterinarian (appointments, vaccinations, health passport) · Volunteer (assigned tasks) · Donor (donations + history).
 
@@ -10,7 +10,7 @@ Multi-shelter pet adoption platform (solo full-stack learning project). Unifies 
 
 **Frontend (`client/`):** React 18 + Vite + TS · React Router v6 · Zustand (auth `{ user, token, role }`, access token in memory) · TanStack Query (all server state) · Axios (`logic/api/axiosInstance.ts`) · Tailwind (tokens in `tailwind.config.js`: rose/gold/teal + neutrals; Benne display, Montserrat body) · react-icons (Fa/Hi/Pi/Tb) · react-hot-toast (`<Toaster/>` mounted once near root, styled there — not per call) · embla-carousel (Home carousel autoplay, Featured Pets slider drag-only).
 
-**Backend (`server/`):** Node 18 + Express · Prisma (`server/src/prisma/schema.prisma`) · PostgreSQL 15 + PostGIS (`ST_MakePoint/SetSRID/Distance/DWithin`) · Supabase (managed Postgres + storage; buckets `pet-images`, `government-ids` private) · `zipcodes` npm (offline US zip→coords, behind `services/geocoding/`) · JWT two-token · bcrypt (10 rounds) · cookie-parser · node-cron (nightly TokenDenylist cleanup) · Stripe (application-fee Checkout).
+**Backend (`server/`):** Node 18 + Express · Prisma (`server/src/prisma/schema.prisma`) · PostgreSQL 15 + PostGIS (`ST_MakePoint/SetSRID/Distance/DWithin`) · Supabase (managed Postgres + storage; buckets `pet-images`, `government-ids` private) · `zipcodes` npm (offline US zip→coords, behind `services/geocoding/`) · JWT two-token · bcrypt (10 rounds) · cookie-parser · node-cron (nightly TokenDenylist cleanup) · Stripe (application-fee Checkout) · `services/ai/` (optional AI — `index.js` is the ONLY import, same rule as geocoding/ and storage/; `openAiCompatible.js` speaks OpenAI chat-completions over plain `fetch`, no SDK, so Groq/Ollama/OpenRouter are an `.env` change; `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` all set → `isAiConfigured()`, else features fall back; `generateStructured` sends a strict `json_schema` response format and returns parsed JSON; failures throw with `err.reason` ∈ `AI_ERROR_REASONS` — not_configured, timeout, unreachable, rate_limited, auth_failed, provider_error, invalid_response).
 
 **Infra:** Docker Compose (local) · Vercel (FE) / Railway (BE) · branches `main` → `dev` → `feature/*`.
 **Testing:** Jest + Supertest (unit + integration, target 70%) · Cypress (critical adoption flows only — `client/cypress/e2e/`; needs both dev servers running locally, `npm run cypress:open` / `cypress:run` from `client/`). Specs seed their own data via `cy.request()` straight to the API (e.g. `cy.registerTestAdopter()`), never pre-existing fixtures.
@@ -55,7 +55,7 @@ client/src/
   logic/
     api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), donorsApi (/donors/me/*, /donations/checkout), volunteersApi (/volunteers/me self-service) vs shelterVolunteersApi (staff's /volunteers), selfGovernmentIdApi (per-role /me/government-id calls)
     route/       ProtectedRoute, RoleRoute
-    store/       useAuthStore (Zustand: { user, token, role })
+    store/       useAuthStore (Zustand: { user, token, role }) · useMatchesPopupStore (AI matches popup open/retake)
     toast/       shared toast helpers
     adopter/     adopter-domain view helpers (applicationStatus.ts)
     geocoding/   (empty — server-side only)
@@ -77,7 +77,8 @@ client/src/
       dashboard/   DashboardLayout + DashboardRoutes + one file per tab
                    (Overview, Pets, Appointments, Favorites, Applications, Visits, Profile) + CloseAccountModal
         overview/  *Widget.tsx
-        shared/    ApplicationsList, VisitsList
+        sections/matches/  MatchesLauncher, MatchesPopup, QuizFlow + QuizQuestion, MatchesList   (AI matcher)
+        shared/    ApplicationsList, VisitsList, matchQuiz.ts (matcher query keys + topMatchesQuery)
     protected/shared/   used by 2+ roles: AwaitingApproval (role prop — /staff/pending, /vet/pending, /volunteer/pending: Pending staff/vets/volunteers wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi / volunteerGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/
     protected/staff/
       onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
@@ -105,11 +106,13 @@ server/src/
   middleware/   authenticate, authorizeRoles, errorHandler, upload
   services/geocoding/   index.js is the ONLY import; usPostalCodeGeocoder.js the only US-aware file
   services/storage/     index.js is the ONLY import (Supabase Storage)
+  services/ai/          index.js is the ONLY import; openAiCompatible.js the only file that talks to the provider
+  config/matchScoring.js · matchQuiz.js · passportSummary.js   every matcher/summary knob (weights, quiz, AI call sizes)
   services/governmentIds/selfGovernmentId.service.js   every role's GET/POST /<role>/me/government-id (keyed by userType) — add new roles to its OWNERS map, don't copy it
   utils/        errors.js, response.js
   config/prisma.js   singleton Prisma client (PrismaPg adapter)
   prisma/       schema.prisma, seed.js
-  tests/        unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys)
+  tests/        setup/noAiProvider.js (jest setupFiles — blanks AI_* so no test can reach the AI provider; AI suites mock services/ai) · unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys, adopter/sprint8Journeys — fakes services/ai via jest.mock)
   app.js / index.js
 ```
 
@@ -140,7 +143,7 @@ Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.ap
 ```
 `GET /pets/featured` returns a bare array (no envelope pagination).
 
-**Error codes:** `BAD_REQUEST` 400 · `UNAUTHORIZED` 401 · `FORBIDDEN` 403 · `NOT_FOUND` 404 · `CONFLICT` 409 · `VALIDATION_ERROR` 422 · `INTERNAL_SERVER_ERROR` 500.
+**Error codes:** `BAD_REQUEST` 400 · `UNAUTHORIZED` 401 · `FORBIDDEN` 403 · `NOT_FOUND` 404 · `CONFLICT` 409 · `VALIDATION_ERROR` 422 · `INTERNAL_SERVER_ERROR` 500 · `SERVICE_UNAVAILABLE` 503 (an upstream — the AI provider — failed; retryable).
 
 ### Public pet catalog (Sprint 2 ✅ — all no-auth)
 
@@ -213,9 +216,18 @@ All Donor-only, plain `authenticate` (donors are Active from sign-up — no Pend
 
 Public: `GET /shelters?acceptingDonations=true` lists Open + Full shelters (the Donate picker); without it, Open only.
 
-### Domains not yet built
+### AI matcher + passport summary (Sprint 8 ✅)
 
-AI compatibility matcher (Sprint 8).
+Matcher endpoints are Adopter-only. AI is optional throughout — see AI Matcher below for the fallbacks.
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET | `/match-quiz/questions` | served as-is from `config/matchQuiz.js`; options ordered most → least on the trait; answers saved by option `code` |
+| GET / PUT | `/adopters/me/quiz` | GET → `{ answers, updatedAt }` or `null` (answers no longer in the config dropped). PUT `{ answers }` — the **whole** set; unknown question/option, missing question or non-object → 400. Saving clears the adopter's `AdopterMatch` rows in the same `$transaction` |
+| GET | `/adopters/me/matches` | `limit` 1–20 (default 3; 400 otherwise). No quiz → `{ quizComplete: false, matches: [] }` (200, computes nothing). Else PetCard shape + `score` (totalScore), `reason` (null unless AI-scored), `aiExplained`. Excluded at read time, not in the cache: pets no longer `available` and pets the adopter has a Pending/Accepted application for |
+| GET | `/pets/:id/health-passport/summary` | Staff/Veterinarian/Admin, same access as the passport (Staff elsewhere → 403, vet elsewhere → 404). AI not configured → `{ aiAvailable: false, summary: null, pointsToReview: [] }`. Empty passport → fixed summary, no AI call. AI failure → 503 `SERVICE_UNAVAILABLE` ("try again shortly"), not cached. Points: `{ text, source: { type: healthRecord\|vaccination\|transfer, recordID }, origin: rules\|ai }` |
+
+The passport payloads (`/staff/me/pets/:id/health-passport`, `/vets/me/pets/:id/health-passport`) carry `aiSummaryAvailable` (= `isAiConfigured()`, no AI call) so the client can enable the button.
 
 ---
 
@@ -258,7 +270,7 @@ Adopter-facing status labels are renames in `logic/adopter/applicationStatus.ts`
 
 Tabs under `/vet/*`: **Overview** · **Appointments** (queue + `AppointmentDetailPanel`: edit date/reason, record doses, complete with notes) · **Health Records** (pets at the vet's shelter via `GET /vets/me/pets` — pet-name search + the shared `PetsFilterBar`; every filter and the search are in the `queryKey`; rows → View Health Passport) · **Vaccinations** (the network-wide vaccine catalogue — search, Add/Edit via `VaccineFormPanel`; saving invalidates every `["vaccines"]` query so the appointment dose picker updates) · **Profile** (same layout as the Staff profile; edit mode uses the onboarding `PersonalFields` + `AddressFields` and the same required-field/ZIP validation as the wizard; government ID via the shared `GovernmentIdSection`; Close account → `vet/dashboard/shared/CloseAccountModal`).
 
-**Health passport** (`protected/shared/HealthPassport.tsx`) is one component for Staff and Vet. Read-only for Staff; a vet also gets **Add Record** (`POST /pets/:id/health-records`). Doses are only recorded against an appointment (no standalone dose endpoint), so the passport has no Record Vaccination button. Summarize with AI is a disabled placeholder until the matcher sprint. Editing a vet's own notes isn't wired in the UI — the passport payload doesn't carry the author's `vetID` yet.
+**Health passport** (`protected/shared/HealthPassport.tsx`) is one component for Staff and Vet. Read-only for Staff; a vet also gets **Add Record** (`POST /pets/:id/health-records`). Doses are only recorded against an appointment (no standalone dose endpoint), so the passport has no Record Vaccination button. **Summarize with AI** (both roles; disabled with a tooltip when `aiSummaryAvailable` is false) opens `protected/shared/PassportSummaryPanel.tsx`: the summary plus Points to review, each linking to the record, dose or transfer it cites (scrolls the passport to that row and highlights it). Mounted only while open, so the first click fetches; its query sits under the passport's key, so Add Record invalidates both. Editing a vet's own notes isn't wired in the UI — the passport payload doesn't carry the author's `vetID` yet.
 
 
 ---
@@ -284,6 +296,18 @@ Onboarding is skippable (`/donor/onboarding/step/:step`; `OnboardingGate`'s `SKI
 - **Donation History** — Shelter (from the stats' `byShelter`) + Date range filters (client-computed `dateFrom`/`dateTo`), rows with `donationCode`, plus a By Shelter totals card.
 - **Profile** — vet/volunteer Profile layout minus the government ID; `shared/CloseAccountModal` (no 409 case).
 
+## AI Matcher (Sprint 8 ✅)
+
+**Rule scorer** (`services/adopter/matchScore.js`, pure, no Prisma/AI; knobs in `config/matchScoring.js`). Hard filters drop a pet outright: not `available`; adopter has children/pets and it isn't compatible; special needs the adopter isn't open to (only facts the adopter gave count). Six factors, each 0–1, weighted to 0–100: size 20, age 15, breed 15, home 20, experience 15, activity 15 (profile `activityLevel` averaged with the quiz's exercise answer); a blank adopter field scores neutral 0.5. Top 20 (`SHORTLIST_SIZE`) go on; ties → earliest `intakeDate`, then lower `petID`.
+
+**AI step** (`services/adopter/matches.service.js`). Only with AI configured, a saved quiz and a non-empty shortlist: **one** `generateStructured` call for the whole shortlist (`AI_MATCH_CALL`: low reasoning effort, 2000-token cap) with the quiz answers' wording + each pet's species/age/size/`petDesc` — no adopter personal data; `petDesc` is treated as data, never instructions. The reply is re-checked (unknown/repeated pet IDs dropped, scores clamped 0–100, reasons cut to 300). `totalScore = round(0.6 × rule + 0.4 × AI)`; a pet the AI didn't score keeps its rule score. Any AI error (`err.reason`) → rule scores for every pet, logged (auth_failed as an error, the rest as warnings); non-AI errors rethrow.
+
+**AdopterMatch cache.** A recompute replaces the adopter's rows in one `$transaction` (`computedAt` = compute start). `getMatches` reads the cache and recomputes only when stale: no rows, or any `available` pet or cached pet has `Pet.updatedAt` > oldest `computedAt`. Quiz saves (`matchQuiz.service.js`) and profile PUTs touching `MATCH_PROFILE_FIELDS` (`adopters.service.js`) delete the rows, so they arrive as "nothing cached". Applying for a pet doesn't touch it, so the cache stays warm.
+
+**PetHealthSummary cache** (`services/staff/healthPassportSummary.service.js`, knobs in `config/passportSummary.js`). One AI call per regeneration (`AI_SUMMARY_CALL`: low effort, 1500 tokens) over the newest 20 records, every dose and the newest 10 transfers — no people's names. Cached by `inputHash` = SHA-256 of the system prompt + the prompt data, so any record/dose/transfer change (or a reworded prompt) regenerates. Overdue-vaccine points always come from the rules (`utils/vaccinations.js`, worked out per request, `origin: "rules"`, skipped for adopted/deceased) — the AI is told not to judge due dates; its own points must cite a sent source. Seed caches a summary for Rocky via `getPassportInputHash`.
+
+**Client** (`adopter/dashboard/sections/matches/`) — not an Overview widget. `MatchesLauncher` is a floating AI button bottom-right on every adopter dashboard page (mounted in `DashboardRoutes`, tooltip from the saved quiz) that toggles `MatchesPopup`, a non-modal panel: no quiz → `QuizFlow` (one `QuizQuestion` at a time, compact progress ring, retake prefilled; saving removes `["adopter","matches"]`), else `MatchesList` (top 3 — best match gold + "Best match" tag, "why this match", Know More → `PetDetailsModal` owned by the launcher; one note when every score is rule-only) with Take the quiz again. Open/retake state is `useMatchesPopupStore`, so Profile's `MatchQuizCard` (Take the quiz / Retake quiz) opens the same popup; the popup mounts on first open (the matches query, which can run the AI, never fires until wanted) and is then only hidden, keeping a half-done quiz; the launcher resets the store on unmount (logout). Query keys in `dashboard/shared/matchQuiz.ts`.
+
 ---
 
 ## Database Notes
@@ -292,6 +316,7 @@ Onboarding is skippable (`/donor/onboarding/step/:step`; `OnboardingGate`'s `SKI
 - Partial and expression unique indexes (not expressible in `schema.prisma`) live only in migration SQL — see Known Issues. Case-insensitive name uniqueness (migration `20260927060418_species_breed_name_ci_unique`): `LOWER(speciesName)` table-wide, `(speciesID, LOWER(breedName))` per species; `staff/species.service.js` pre-checks for a clean 409 and maps the index's violation (a race) to the same 409. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`. One Accepted application per pet: `UNIQUE (petID) WHERE applicationStatus = 'Accepted'` (migration `…_one_accepted_application_per_pet`) — accepting an application also declines the pet's other Pending ones with an automatic `staffRemark`, and accepting for a pet that's no longer `available` is a 409; the index stops two simultaneous acceptances. Double-submit guard on Appointment: `UNIQUE (petID, vetID, appointmentDate) WHERE appointmentStatus = 'Scheduled'` — same pet+vet+timestamp can't have two Scheduled rows (a resubmitted create after a perceived failure).
 - Donation (migration `…_donation_stripe`): `stripeCheckoutSessionID` (UNIQUE — a replayed webhook can't record twice) and `stripePaymentIntentID`, both nullable for pre-Stripe rows; `donorID` nullable with `ON DELETE SET NULL` so a deleted donor's donations stay (same treatment as `Appointment.vetID`).
 - `Volunteer.volunteerSchedule` holds structured availability compactly (`"Mon:MA;Wed:E"`); older free text is left as-is. Volunteer onboarding backfill: every non-Pending volunteer marked onboarded (`…_volunteer_onboarding_backfill`).
+- Sprint 8 AI tables, all `ON DELETE CASCADE` (disposable caches + quiz): `AdopterQuiz` (PK `adopterID`, `answers` JSON of option codes; `…_adopter_match_quiz`), `AdopterMatch` (PK `(adopterID, petID)`, `ruleScore`, `aiScore` null = rule-only, `totalScore`, `reason VARCHAR(300)`, `computedAt`; same migration; cascades from adopter and pet), `PetHealthSummary` (PK `petID`, `inputHash VARCHAR(64)`, `summary VARCHAR(1500)`, `pointsToReview` JSON, `generatedAt`; `…_pet_health_summary`). `Pet.updatedAt` (`@updatedAt`, `…_pet_updated_at`) exists for match-cache staleness.
 
 ---
 
@@ -326,7 +351,7 @@ Onboarding is skippable (`/donor/onboarding/step/:step`; `OnboardingGate`'s `SKI
 | 5.2 | Shelter staff operations — appointments, visits, transfers, events, volunteers + tasks, donations, species/breeds, team + vet approval, government ID review, staff onboarding before approval | ✅ |
 | 6 | Veterinarian portal — onboarding before approval, appointment queue + completion, vaccinations + vaccine catalogue, health records, universal health passport, profile/close account | ✅ |
 | 7 | Volunteer + donor portals — volunteer onboarding before approval, tasks, events (read-only, staff assign), assisted appointments, availability; donor skippable onboarding, Stripe donations, history + stats; both profiles/close account | ✅ |
-| 8 | AI compatibility matcher (OpenAI API) | — |
+| 8 | AI compatibility matcher + health-passport summary (Groq / any OpenAI-compatible provider via `services/ai/`) — personality quiz, rule scorer + one AI call per recompute, cached matches and summaries, rule-only fallback | ✅ |
 | 9 | Testing to 70% + cleanup (remove TokenDenylist → RefreshTokens table) | — |
 | 10 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
 
