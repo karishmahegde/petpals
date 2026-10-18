@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { staffStatusDates } = require("../../utils/staffDates");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
@@ -191,7 +192,7 @@ const hasAssignedPendingApplication = async (userID) => {
   return Boolean(application);
 };
 
-// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared); 'delete' permanently removes the Staff and Users rows. Both
 // modes clear managerStaffID on every shelter this staff member currently
 // manages — required for 'delete' (Shelter.managerStaffID FKs Staff.userID,
@@ -209,6 +210,9 @@ const closeMyAccount = async (userID, mode) => {
     data: { managerStaffID: null },
   });
 
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     const current = await prisma.staff.findUnique({
       where: { userID },
@@ -219,13 +223,14 @@ const closeMyAccount = async (userID, mode) => {
         where: { userID },
         // Stamps staffDOS — see utils/staffDates.js.
         data: {
-          accountStatus: "Deactivated",
-          ...staffStatusDates("Deactivated", current ?? {}),
+          accountStatus: "Closed",
+          ...staffStatusDates("Closed", current ?? {}),
         },
       }),
       clearManagedShelters,
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -250,6 +255,8 @@ const closeMyAccount = async (userID, mode) => {
       governmentId.documentURL,
     );
   }
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

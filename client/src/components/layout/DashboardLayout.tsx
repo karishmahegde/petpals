@@ -2,6 +2,9 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import DashboardNavbar from "./DashboardNavbar";
 import DashboardSidebar from "./DashboardSidebar";
+import EmailVerificationBanner from "../ui/dashboard/EmailVerificationBanner";
+import useAuthStore from "../../logic/store/useAuthStore";
+import useResendVerification from "../../logic/hooks/useResendVerification";
 
 interface DashboardLayoutProps {
   /** The role's own <DashboardRoutes /> — everything else here is identical
@@ -20,6 +23,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   // Dummy - replace with real unread state once the notification system exists.
   const hasNotifications = false;
 
+  // Strictly false — a session without the field yet shouldn't flash it.
+  const emailUnverified = useAuthStore(
+    (state) => state.user?.emailVerified === false,
+  );
+  const verification = useResendVerification();
+
   return (
     <div className="flex min-h-screen flex-col bg-neutral-offwhite">
       <DashboardNavbar
@@ -31,7 +40,15 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <div className="flex flex-1">
         <DashboardSidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-        <main className="min-w-0 flex-1 p-6 md:p-8">{children}</main>
+        <main className="min-w-0 flex-1 p-6 md:p-8">
+          {emailUnverified && (
+            <EmailVerificationBanner
+              onResend={verification.resend}
+              pending={verification.pending}
+            />
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );

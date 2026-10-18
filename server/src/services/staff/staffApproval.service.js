@@ -8,7 +8,7 @@ const prisma = require("../../config/prisma");
 // /staff/me/team/:id/status and PATCH /staff/me/vets/:id/status, Admin's
 // PATCH /staff/:id/status for Manager sign-ups, and staff's PATCH
 // /volunteers/:id/status) so the rule can't drift between them. Declining
-// (Pending → Deactivated) never needs it.
+// (Pending → Declined) never needs it.
 //
 // Every export takes the GovernmentID userType of the people involved.
 

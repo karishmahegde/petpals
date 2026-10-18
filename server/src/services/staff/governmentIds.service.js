@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
+const reviewNotices = require("./reviewNotices");
 
 // The ID-verification queue (Staff dashboard → ID Verification, and the
 // same endpoints for Admin). Who reviews whose ID:
@@ -396,6 +397,7 @@ const updateGovernmentIdStatus = async (governmentIDID, verificationStatus, acto
     where: { governmentIDID },
     data: { verificationStatus },
   });
+  await reviewNotices.governmentIdReviewed(record.userID, verificationStatus);
 
   return getGovernmentIdDetail(governmentIDID, actor);
 };

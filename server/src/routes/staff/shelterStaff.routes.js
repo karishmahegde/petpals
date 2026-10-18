@@ -17,7 +17,8 @@ const router = express.Router();
  *     summary: List staff at the shelter the caller manages (shelter manager)
  *     description: >
  *       section=pending lists registrations awaiting approval; section=all
- *       lists approved staff (Active or Deactivated), the manager included.
+ *       lists everyone past that stage (Active, Deactivated, Closed or
+ *       Declined), the manager included.
  *       403 if the caller isn't a shelter's manager.
  *     tags: [Staff]
  *     security:
@@ -141,8 +142,9 @@ router.patch(
  *   patch:
  *     summary: Approve, decline, or deactivate a staff member (shelter manager)
  *     description: >
- *       Pending → Active (approve), Pending → Deactivated (decline),
- *       Active → Deactivated (deactivate); anything else is 409. The target
+ *       Pending → Active (approve), Pending → Declined (decline),
+ *       Active → Deactivated (deactivate); anything else is 409 (a Closed
+ *       account is reopened only by its owner, by emailed link). The target
  *       must be at the caller's shelter and not the caller. Approving also
  *       sets the new member's designation — staffDesignation (Senior or
  *       Associate) is required then (400 otherwise). A Pending Manager
@@ -163,7 +165,7 @@ router.patch(
  *             type: object
  *             required: [accountStatus]
  *             properties:
- *               accountStatus: { type: string, enum: [Active, Deactivated] }
+ *               accountStatus: { type: string, enum: [Active, Deactivated, Declined] }
  *               staffDesignation:
  *                 type: string
  *                 enum: [Senior, Associate]

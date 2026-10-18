@@ -2,7 +2,8 @@
 // Cross-cutting guard: an Adopter, Donor, Staff member, Veterinarian or
 // Volunteer whose onboarding isn't complete is redirected to their current
 // onboarding step for every route they try to access — catalog, dashboard,
-// adoption application, everything — except the wizard itself and /login.
+// adoption application, everything — except the wizard itself, /login and
+// the pages an emailed link lands on (LINK_PAGES).
 // Wraps the entire route tree in App.tsx, so it's the single onboarding-aware code path; no other
 // route/guard needs to know about onboarding state.
 //
@@ -40,6 +41,17 @@ const APPROVAL_ROLE_PATHS: Record<string, { onboarding: string; pending: string 
   Volunteer: { onboarding: "/volunteer/onboarding", pending: "/volunteer/pending" },
 };
 
+// Where emailed links land. Always reachable: a new sign-up opens their
+// verification link while still onboarding (or Pending), and a redirect
+// would drop the token before it's redeemed.
+const LINK_PAGES = [
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
+  "/reactivate",
+  "/confirm-email-change",
+];
+
 interface OnboardingGateProps {
   children: ReactNode;
 }
@@ -50,6 +62,8 @@ const OnboardingGate = ({ children }: OnboardingGateProps) => {
   const path = location.pathname;
   const startsWithAny = (prefixes: string[]) =>
     prefixes.some((prefix) => path.startsWith(prefix));
+
+  if (startsWithAny(LINK_PAGES)) return <>{children}</>;
 
   const approvalPaths = role ? APPROVAL_ROLE_PATHS[role] : undefined;
   if (approvalPaths && user) {

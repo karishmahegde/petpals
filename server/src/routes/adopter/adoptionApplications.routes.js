@@ -65,7 +65,7 @@ const router = express.Router();
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409:
- *         description: Pet is not available, or the adopter already has an active application for it
+ *         description: Pet is not available, the adopter already has an active application for it, or their email isn't verified yet (error.details.reason = "email_unverified")
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

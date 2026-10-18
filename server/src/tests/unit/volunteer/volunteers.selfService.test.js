@@ -39,7 +39,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
@@ -624,7 +629,7 @@ describe("Volunteer self-service endpoints", () => {
       prisma.task.findFirst.mockResolvedValueOnce(null);
     };
 
-    test("mode=deactivate → 200, leaves future events, status Deactivated, refresh token nulled, nothing deleted", async () => {
+    test("mode=deactivate → 200, leaves future events, status Closed, refresh token nulled, nothing deleted", async () => {
       noOpenWork();
       prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });
       prisma.volunteer.update.mockResolvedValueOnce({});
@@ -633,14 +638,14 @@ describe("Volunteer self-service endpoints", () => {
       const res = await close({ mode: "deactivate" });
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toBe("Account deactivated");
+      expect(res.body.message).toBe("Account closed");
       // Only events that haven't happened yet — past assignments stay as history.
       expect(prisma.volunteerEvent.deleteMany).toHaveBeenCalledWith({
         where: { volunteerID: 42, event: { eventDate: { gt: expect.any(Date) } } },
       });
       expect(prisma.volunteer.update).toHaveBeenCalledWith({
         where: { userID: 42 },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       });
       expect(prisma.users.update).toHaveBeenCalledWith({
         where: { userID: 42 },
@@ -649,6 +654,10 @@ describe("Volunteer self-service endpoints", () => {
       expect(prisma.volunteerTask.deleteMany).not.toHaveBeenCalled();
       expect(prisma.volunteer.delete).not.toHaveBeenCalled();
       expect(prisma.governmentID.deleteMany).not.toHaveBeenCalled();
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "deactivate");
     });
 
     test("mode=delete → 200, every task/event assignment, ID, volunteer + users rows removed, then the stored file", async () => {
@@ -673,6 +682,13 @@ describe("Volunteer self-service endpoints", () => {
       expect(prisma.volunteer.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
       expect(prisma.users.delete).toHaveBeenCalledWith({ where: { userID: 42 } });
       expect(storage.deletePrivateFile).toHaveBeenCalledWith("government-ids", "volunteer/42/id-1.jpg");
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "delete");
+      expect(accountNotices.lookupContact.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.volunteer.delete.mock.invocationCallOrder[0],
+      );
     });
 
     test("mode=delete with no government ID → nothing to remove from storage", async () => {

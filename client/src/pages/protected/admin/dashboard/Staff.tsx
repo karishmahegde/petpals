@@ -42,12 +42,16 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "Pending", label: "Pending" },
   { value: "Active", label: "Active" },
   { value: "Deactivated", label: "Deactivated" },
+  { value: "Closed", label: "Closed" },
+  { value: "Declined", label: "Declined" },
 ];
 
 const STATUS_TONE: Record<StaffAccountStatus, BadgeTone> = {
   Pending: "gold",
   Active: "green",
   Deactivated: "gray",
+  Closed: "neutral",
+  Declined: "rose",
 };
 
 // Matches SelectField's own label + trigger sizing, same as the Staff

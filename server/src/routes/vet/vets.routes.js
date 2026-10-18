@@ -221,7 +221,7 @@ router.post(
  *   delete:
  *     summary: Deactivate or permanently delete your own veterinarian account (Veterinarian only)
  *     description: >
- *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       'deactivate' keeps the row (accountStatus → Closed, refresh
  *       token cleared); 'delete' permanently removes the Veterinarian and
  *       Users rows and the government ID with its stored file. The pets'
  *       history survives a delete — health records, vaccinations and

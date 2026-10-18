@@ -8,7 +8,7 @@ import axiosInstance from "./axiosInstance";
 import type { Pagination } from "./petsApi";
 import type { Address } from "../utils/address";
 
-export type DonorAccountStatus = "Active" | "Deactivated";
+export type DonorAccountStatus = "Active" | "Banned" | "Deactivated" | "Closed";
 
 export interface DonorSelfProfile extends Address {
   userID: number;

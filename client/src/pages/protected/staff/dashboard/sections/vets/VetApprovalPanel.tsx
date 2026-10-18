@@ -75,7 +75,7 @@ const VetApprovalPanel = ({ vet, onClose }: VetApprovalPanelProps) => {
   });
 
   const decline = useMutation({
-    mutationFn: () => updateShelterVetStatus(vet!.userID, "Deactivated"),
+    mutationFn: () => updateShelterVetStatus(vet!.userID, "Declined"),
     onSuccess: () => {
       refreshVets();
       toast.success("Veterinarian declined");
@@ -203,8 +203,8 @@ const VetApprovalPanel = ({ vet, onClose }: VetApprovalPanelProps) => {
           onCancel={() => setConfirmingDecline(false)}
           onConfirm={() => decline.mutate()}
         >
-          This declines {formatVetName(vet.vetName)}'s registration and
-          deactivates their account.
+          This declines {formatVetName(vet.vetName)}'s registration — they
+          won't be able to log in, and we'll email them to let them know.
         </ConfirmActionModal>
       )}
     </>

@@ -31,6 +31,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "Active", label: "Active" },
   { value: "Banned", label: "Banned" },
   { value: "Deactivated", label: "Deactivated" },
+  { value: "Closed", label: "Closed" },
 ];
 
 // Matches SelectField's own label + trigger sizing, same as Staff.tsx.

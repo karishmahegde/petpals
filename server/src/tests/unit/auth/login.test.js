@@ -40,6 +40,7 @@ const mockAccount = (role, roleRow) => {
     userEmail: "someone@petpals.com",
     role,
     userPassword: passwordHash,
+    emailVerified: true,
   });
   const { model, nameField } = ROLE_MODEL[role];
   prisma[model].findUnique.mockResolvedValueOnce({
@@ -202,6 +203,59 @@ describe("Login and session restore", () => {
       });
     });
 
+    test("the session carries emailVerified (the dashboard banner and soft gate read it)", async () => {
+      mockAccount("Adopter", { accountStatus: "Active", onboardingComplete: true, onboardingStep: 5 });
+
+      const res = await login();
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.emailVerified).toBe(true);
+      expect(prisma.users.findUnique.mock.calls[0][0].select.emailVerified).toBe(true);
+    });
+
+    // Closed = the owner closed it; the login page uses details.reason to
+    // offer a reactivation link. Same for every role that can close itself.
+    test.each(["Adopter", "Donor", "Staff", "Veterinarian", "Volunteer", "Admin"])(
+      "Closed %s → 401 with reason account_closed, no session",
+      async (role) => {
+        mockAccount(role, { accountStatus: "Closed" });
+
+        const res = await login();
+
+        expect(res.status).toBe(401);
+        expect(res.body.message).toMatch(/You closed this account/);
+        expect(res.body.error).toEqual({
+          code: "UNAUTHORIZED",
+          details: { reason: "account_closed" },
+        });
+        expect(res.headers["set-cookie"]).toBeUndefined();
+        expect(prisma.users.update).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each(["Staff", "Veterinarian", "Volunteer", "Admin"])(
+      "Declined %s → 401 with reason account_declined",
+      async (role) => {
+        mockAccount(role, { accountStatus: "Declined" });
+
+        const res = await login();
+
+        expect(res.status).toBe(401);
+        expect(res.body.message).toBe("This sign-up was declined.");
+        expect(res.body.error.details).toEqual({ reason: "account_declined" });
+      },
+    );
+
+    test("Deactivated (by an admin/staff member) → 401 with no reactivation reason", async () => {
+      mockAccount("Adopter", { accountStatus: "Deactivated" });
+
+      const res = await login();
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toMatch(/has been deactivated/);
+      expect(res.body.error.details).toBeNull();
+    });
+
     test("Deactivated Veterinarian → still 401", async () => {
       mockAccount("Veterinarian", { accountStatus: "Deactivated" });
 
@@ -280,6 +334,7 @@ describe("Login and session restore", () => {
         userID: 42,
         role: "Staff",
         refreshToken: await bcrypt.hash(cookieToken, 4),
+        emailVerified: false,
       });
       prisma.staff.findUnique.mockResolvedValueOnce({
         staffName: "Sam Taylor",
@@ -302,6 +357,7 @@ describe("Login and session restore", () => {
         onboardingComplete: true,
         onboardingStep: 5,
         accountStatus: "Pending",
+        emailVerified: false,
       });
     });
 

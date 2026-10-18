@@ -28,6 +28,7 @@ export interface AdopterProfile {
   preferredAgeRange: string | null;
   preferredSize: string | null;
   openToSpecialNeeds: boolean;
+  userEmail: string; // login email (from Users)
   emailVerified: boolean;
   lastLoginAt: string | null;
   accountStatus: string;

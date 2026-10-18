@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 // Adopter oversight — the list and detail reads are shared by Admin and
 // Staff (the Staff dashboard's People → Adopters tab, read-only); the status
 // change stays Admin-only.
@@ -115,13 +116,30 @@ const getAdopterDetail = async (userID) => {
 };
 
 // ——————————————— UPDATE STATUS (PATCH /adopters/:id/status) ———————————————
-// Login already rejects Banned/Deactivated adopters (auth.service.js's
+// Login already rejects Banned/Deactivated/Closed adopters (auth.service.js's
 // role-agnostic accountStatus check), but that only stops a *new* login — an
 // already-issued refresh token would otherwise keep minting fresh access
 // tokens for up to 7 days. Nulling it here — same helper closeAccount's own
 // 'deactivate' mode uses — closes that gap immediately instead of waiting on
 // token expiry.
+// An adopter who closed their own account (Closed) can't be moved by an
+// admin — only the owner reopens it, by emailed link — so it's a 409.
 const updateAdopterStatus = async (userID, accountStatus) => {
+  const current = await prisma.adopter.findUnique({
+    where: { userID },
+    select: { accountStatus: true },
+  });
+  if (!current) {
+    throw notFound(userID);
+  }
+  if (current.accountStatus === "Closed") {
+    const err = new Error(
+      "This adopter closed their own account — only they can reactivate it",
+    );
+    err.code = "CONFLICT";
+    throw err;
+  }
+
   const operations = [
     prisma.adopter.update({ where: { userID }, data: { accountStatus } }),
   ];
@@ -137,6 +155,9 @@ const updateAdopterStatus = async (userID, accountStatus) => {
     }
     throw err;
   }
+
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(userID, current.accountStatus, accountStatus);
 
   return prisma.adopter.findUnique({
     where: { userID },

@@ -3,7 +3,7 @@
 // admin account — opened from the Admin Approvals section's "View Details".
 // Read-only profile plus Approve/Decline in the footer, both going through
 // the existing PATCH /admins/:id/status endpoint (Active = approve,
-// Deactivated = decline — there's no dedicated approve/decline endpoint).
+// Declined = decline — there's no dedicated approve/decline endpoint).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
@@ -74,7 +74,7 @@ const AdminApprovalPanel = ({ userID, onClose }: AdminApprovalPanelProps) => {
               {mutation.isPending ? "Working…" : "Approve"}
             </ButtonElement>
             <ButtonElement
-              onClick={() => mutation.mutate("Deactivated")}
+              onClick={() => mutation.mutate("Declined")}
               disabled={mutation.isPending}
               size="panel"
               className="flex-1 bg-red hover:brightness-95 disabled:cursor-not-allowed"
@@ -134,7 +134,8 @@ const AdminApprovalPanel = ({ userID, onClose }: AdminApprovalPanelProps) => {
 
           <p className="mt-5 font-body text-xs text-neutral-gray">
             Approving activates this account and lets them log in. Declining
-            deactivates the account the same way a manual deactivation would.
+            marks the sign-up Declined, so they can't log in. Either way they
+            get an email.
           </p>
         </div>
       )}

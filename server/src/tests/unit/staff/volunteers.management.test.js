@@ -19,7 +19,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -317,7 +322,7 @@ describe("Volunteers (Staff)", () => {
   describe("PATCH /api/v1/volunteers/:id/status", () => {
     test.each([
       ["Pending", "Active"],
-      ["Pending", "Deactivated"],
+      ["Pending", "Declined"],
       ["Active", "Deactivated"],
     ])("%s -> %s allowed (onboarded, ID Verified)", async (from, to) => {
       prisma.volunteer.findUnique
@@ -340,6 +345,7 @@ describe("Volunteers (Staff)", () => {
         data: { accountStatus: to },
       });
       expect(res.body.data.accountStatus).toBe(to);
+      expect(accountNotices.statusChanged).toHaveBeenCalledWith(30, from, to);
     });
 
     test.each([
@@ -348,6 +354,10 @@ describe("Volunteers (Staff)", () => {
       ["Deactivated", "Deactivated"],
       ["Banned", "Active"],
       ["Banned", "Deactivated"],
+      ["Pending", "Deactivated"],
+      ["Active", "Declined"],
+      ["Closed", "Active"],
+      ["Declined", "Active"],
     ])("%s -> %s rejected with 409", async (from, to) => {
       prisma.volunteer.findUnique.mockResolvedValueOnce({ shelterID: 9, accountStatus: from });
       prisma.staff.findUnique.mockResolvedValue({ shelterID: 9 });
@@ -359,6 +369,7 @@ describe("Volunteers (Staff)", () => {
 
       expect(res.status).toBe(409);
       expect(prisma.volunteer.update).not.toHaveBeenCalled();
+      expect(accountNotices.statusChanged).not.toHaveBeenCalled();
     });
 
     // Same rule as staff and vet approval (staffApproval.service.js) — 409
@@ -408,23 +419,23 @@ describe("Volunteers (Staff)", () => {
       expect(prisma.volunteer.update).not.toHaveBeenCalled();
     });
 
-    test("decline: Pending -> Deactivated is allowed mid-onboarding with no ID", async () => {
+    test("decline: Pending -> Declined is allowed mid-onboarding with no ID", async () => {
       prisma.volunteer.findUnique
         .mockResolvedValueOnce({ shelterID: 9, accountStatus: "Pending", onboardingComplete: false })
-        .mockResolvedValueOnce(detailRow({ accountStatus: "Deactivated", onboardingComplete: false }));
+        .mockResolvedValueOnce(detailRow({ accountStatus: "Declined", onboardingComplete: false }));
       prisma.staff.findUnique.mockResolvedValue({ shelterID: 9 });
       prisma.governmentID.findUnique.mockResolvedValueOnce(null);
 
       const res = await request(app)
         .patch("/api/v1/volunteers/30/status")
         .set("Authorization", `Bearer ${staffToken()}`)
-        .send({ accountStatus: "Deactivated" });
+        .send({ accountStatus: "Declined" });
 
       expect(res.status).toBe(200);
       expect(prisma.governmentID.findMany).not.toHaveBeenCalled();
       expect(prisma.volunteer.update).toHaveBeenCalledWith({
         where: { userID: 30 },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Declined" },
       });
     });
 

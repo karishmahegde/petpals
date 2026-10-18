@@ -10,7 +10,7 @@ import type { Availability } from "../utils/availability";
 import type { GovernmentIdStatus } from "./staffApi";
 
 export type VolunteerAccountStatus =
-  "Pending" | "Active" | "Banned" | "Deactivated";
+  "Pending" | "Active" | "Banned" | "Deactivated" | "Closed" | "Declined";
 
 // Row shape for GET /volunteers.
 export interface VolunteerListItem {
@@ -72,8 +72,8 @@ export const getVolunteerDetail = async (
   return response.data.data;
 };
 
-// Pending → Active (approve) / Deactivated (decline); Active → Deactivated.
-export type VolunteerStatusTarget = "Active" | "Deactivated";
+// Pending → Active (approve) / Declined (decline); Active → Deactivated.
+export type VolunteerStatusTarget = "Active" | "Deactivated" | "Declined";
 
 export const updateVolunteerStatus = async (
   userID: number,

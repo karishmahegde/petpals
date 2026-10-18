@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { ADDRESS_SELECT } = require("../../utils/address");
 const { decodeAvailability } = require("../../utils/availability");
 const { maskIdNumber } = require("../governmentIds/selfGovernmentId.service");
@@ -39,11 +40,13 @@ const assertStaffOwnsShelter = async (role, userID, shelterID) => {
 };
 
 // Staff-driven account transitions: approve/decline a Pending registration,
-// or deactivate an Active volunteer. Banned is never set from here. Approving
+// or deactivate an Active volunteer. Banned is never set from here, and a
+// Closed (owner closed it) or Declined account can't be changed by staff —
+// only the owner can reopen a Closed one, via the emailed reactivation link. Approving
 // (Pending → Active) also needs onboarding complete and a Verified government
 // ID — the same rule as staff and vet approval (staffApproval.service.js).
 const ALLOWED_TRANSITIONS = {
-  Pending: ["Active", "Deactivated"],
+  Pending: ["Active", "Declined"],
   Active: ["Deactivated"],
 };
 
@@ -193,6 +196,8 @@ const updateVolunteerStatus = async (userID, { accountStatus }, actor) => {
   }
 
   await prisma.volunteer.update({ where: { userID }, data: { accountStatus } });
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(userID, volunteer.accountStatus, accountStatus);
 
   return getVolunteerDetail(userID, actor);
 };

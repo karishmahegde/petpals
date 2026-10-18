@@ -22,6 +22,7 @@ import {
   type ShelterStaffMember,
 } from "../../../../logic/api/shelterStaffApi";
 import { approvalBlockers } from "../../../../logic/staff/approvalReadiness";
+import { STAFF_STATUS_TONE } from "../../../../logic/staff/staffStatus";
 import StaffDetailPanel from "./sections/staff/StaffDetailPanel";
 import StaffApprovalPanel from "./sections/staff/StaffApprovalPanel";
 
@@ -240,8 +241,11 @@ const Staff = () => {
                 <DashboardListRow
                   {...memberRowProps(member)}
                   badge={
-                    member.accountStatus === "Deactivated"
-                      ? { label: "Deactivated", tone: "gray" }
+                    member.accountStatus !== "Active"
+                      ? {
+                          label: member.accountStatus,
+                          tone: STAFF_STATUS_TONE[member.accountStatus],
+                        }
                       : undefined
                   }
                   actions={

@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const { MATCH_PROFILE_FIELDS } = require("./matches.service");
@@ -41,11 +42,12 @@ const ADOPTER_PROFILE_SELECT = {
   onboardingStep: true,
   // Account-level, on Users — flattened back onto the profile by
   // toAdopterProfile so the response shape is unchanged.
-  user: { select: { emailVerified: true, lastLoginAt: true } },
+  user: { select: { userEmail: true, emailVerified: true, lastLoginAt: true } },
 };
 
 const toAdopterProfile = ({ user, ...rest }) => ({
   ...rest,
+  userEmail: user.userEmail,
   emailVerified: user.emailVerified,
   lastLoginAt: user.lastLoginAt,
 });
@@ -235,14 +237,19 @@ const assertNoActiveAdoption = async (userID) => {
 const closeAccount = async (userID, mode) => {
   await assertNoActiveAdoption(userID);
 
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     await prisma.$transaction([
       prisma.adopter.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        // Closed, not Deactivated — the owner closed it, so they can reactivate it.
+        data: { accountStatus: "Closed" },
       }),
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -269,6 +276,8 @@ const closeAccount = async (userID, mode) => {
       governmentId.documentURL,
     );
   }
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

@@ -5,8 +5,14 @@ const prisma = require("../../../config/prisma");
 // Runs against the DATABASE_URL configured in server/.env, same convention as
 // auth.login.test.js — seeds via API calls where an endpoint exists, cleans up
 // via Prisma in afterAll.
-const uniqueEmail = () =>
-  `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
+// Every account a test creates is remembered, so afterAll can sweep up any a
+// failing test didn't reach its own cleanup for.
+const createdEmails = [];
+const uniqueEmail = () => {
+  const email = `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
+  createdEmails.push(email);
+  return email;
+};
 
 const registerAndLoginAdopter = async () => {
   const payload = {
@@ -79,6 +85,20 @@ describe("DELETE /api/v1/adopters/me", () => {
   });
 
   afterAll(async () => {
+    // Accounts a failed test left behind (the tests clean up their own
+    // otherwise, so this usually finds nothing). Children before parents.
+    const leftovers = await prisma.users.findMany({
+      where: { userEmail: { in: createdEmails } },
+      select: { userID: true },
+    });
+    const userIDs = leftovers.map((u) => u.userID);
+    await prisma.adoptionApplication.deleteMany({ where: { adopterID: { in: userIDs } } });
+    await prisma.favorite.deleteMany({ where: { adopterID: { in: userIDs } } });
+    await prisma.visit.deleteMany({ where: { adopterID: { in: userIDs } } });
+    await prisma.governmentID.deleteMany({ where: { userID: { in: userIDs } } });
+    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
+    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
+
     await prisma.pet.deleteMany({ where: { petID } });
     await prisma.breed.deleteMany({ where: { breedID } });
     await prisma.species.deleteMany({ where: { speciesID } });
@@ -96,10 +116,10 @@ describe("DELETE /api/v1/adopters/me", () => {
       .send({ mode: "deactivate" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ success: true, message: "Account deactivated" });
+    expect(res.body).toMatchObject({ success: true, message: "Account closed" });
 
     const adopter = await prisma.adopter.findUnique({ where: { userID } });
-    expect(adopter.accountStatus).toBe("Deactivated");
+    expect(adopter.accountStatus).toBe("Closed");
 
     const user = await prisma.users.findUnique({ where: { userID } });
     expect(user.refreshToken).toBeNull();
@@ -107,8 +127,9 @@ describe("DELETE /api/v1/adopters/me", () => {
     const loginRes = await request(app)
       .post("/api/v1/auth/login")
       .send({ email, password });
+    // Closed, not Deactivated: the login says so and offers a reactivation link.
     expect(loginRes.status).toBe(401);
-    expect(loginRes.body.message).toMatch(/deactivated/i);
+    expect(loginRes.body.error.details).toEqual({ reason: "account_closed" });
 
     await prisma.adopter.deleteMany({ where: { userID } });
     await prisma.users.deleteMany({ where: { userID } });
@@ -216,7 +237,7 @@ describe("DELETE /api/v1/adopters/me", () => {
 
       const adopter = await prisma.adopter.findUnique({ where: { userID } });
       expect(adopter).not.toBeNull();
-      expect(adopter.accountStatus).not.toBe("Deactivated");
+      expect(adopter.accountStatus).not.toBe("Closed");
 
       await prisma.adoptionApplication.deleteMany({ where: { adopterID: userID } });
       await prisma.adopter.deleteMany({ where: { userID } });

@@ -320,7 +320,7 @@ router.post(
  *   delete:
  *     summary: Deactivate or permanently delete your own volunteer account (Volunteer only)
  *     description: >
- *       'deactivate' keeps the row (accountStatus → Deactivated, refresh
+ *       'deactivate' keeps the row (accountStatus → Closed, refresh
  *       token cleared); 'delete' permanently removes the Volunteer and Users
  *       rows and the government ID with its stored file. Either way the
  *       volunteer comes off events that haven't happened yet. A delete also

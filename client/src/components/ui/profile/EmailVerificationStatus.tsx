@@ -1,12 +1,24 @@
 // components/ui/profile/EmailVerificationStatus.tsx
 // The identity strip's "Email verified" mark, or a "Verify email" button
-// when not verified yet — shared by every role's Profile page. There's no
-// verification flow yet, so the button only says so.
-import toast from "react-hot-toast";
+// when not verified yet — shared by every role's Profile page. The button
+// only reports the click (`onVerify`); the page owns the call
+// (logic/hooks/useResendVerification), keeping API calls out of components/.
 import { PiSealCheck } from "react-icons/pi";
 import ButtonElement from "../ButtonElement";
 
-const EmailVerificationStatus = ({ verified }: { verified: boolean }) =>
+interface EmailVerificationStatusProps {
+  verified: boolean;
+  /** Sends a new verification link. */
+  onVerify: () => void;
+  /** True while that request is in flight. */
+  pending: boolean;
+}
+
+const EmailVerificationStatus = ({
+  verified,
+  onVerify,
+  pending,
+}: EmailVerificationStatusProps) =>
   verified ? (
     <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-green">
       <PiSealCheck className="h-4 w-4" aria-hidden />
@@ -14,11 +26,12 @@ const EmailVerificationStatus = ({ verified }: { verified: boolean }) =>
     </span>
   ) : (
     <ButtonElement
-      onClick={() => toast("Email verification is coming soon.")}
+      onClick={onVerify}
+      disabled={pending}
       size="bare"
-      className="rounded-xl bg-teal-dark px-4 py-1.5 font-body text-sm font-medium hover:brightness-95"
+      className="rounded-xl bg-teal-dark px-4 py-1.5 font-body text-sm font-medium hover:brightness-95 disabled:opacity-60"
     >
-      Verify email
+      {pending ? "Sending…" : "Verify email"}
     </ButtonElement>
   );
 

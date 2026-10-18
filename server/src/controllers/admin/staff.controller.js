@@ -8,14 +8,14 @@ const badRequest = (message) => {
 };
 
 const STAFF_DESIGNATION_VALUES = ["Manager", "Senior", "Associate"];
-// Filtering (GET /staff?accountStatus=) recognizes all three states, including
+// Filtering (GET /staff?accountStatus=) recognizes every state, including
 // Pending — self-registered staff awaiting admin approval.
-const STAFF_ACCOUNT_STATUS_FILTER_VALUES = ["Pending", "Active", "Deactivated"];
-// PATCH /staff/:id/status only ever moves someone TO Active (approve) or
-// Deactivated (decline/deactivate) — there's no real workflow for an admin to
-// manually revert someone back to Pending, so it's deliberately not an
-// accepted target here even though it's a valid stored value.
-const STAFF_ACCOUNT_STATUS_TARGET_VALUES = ["Active", "Deactivated"];
+const STAFF_ACCOUNT_STATUS_FILTER_VALUES = ["Pending", "Active", "Deactivated", "Closed", "Declined"];
+// PATCH /staff/:id/status only ever moves someone TO Active (approve or
+// reactivate), Declined (decline) or Deactivated (deactivate) — there's no
+// workflow for reverting someone to Pending, and Closed is the owner's own
+// action. Which moves are allowed from where is the service's job (409).
+const STAFF_ACCOUNT_STATUS_TARGET_VALUES = ["Active", "Deactivated", "Declined"];
 
 // ——————————————— GET /staff ———————————————
 const listStaff = async (req, res, next) => {

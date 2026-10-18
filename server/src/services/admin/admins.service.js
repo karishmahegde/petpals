@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const storage = require("../storage");
 const { ADDRESS_SELECT } = require("../../utils/address");
@@ -74,13 +75,37 @@ const getAdminDetail = async (userID) => {
 };
 
 // ——————————————— UPDATE STATUS (PATCH /admins/:id/status) ———————————————
-// Same shape as Staff's: Active approves a Pending account (or reactivates
-// one), Deactivated declines/deactivates. Login itself already rejects a
-// Deactivated or Pending admin account (auth.service.js's role-agnostic
-// accountStatus check). `actorID` is the acting admin's own userID — recorded
-// as statusChangedByID/At, the last-change audit trail shown in
+// Same rules as Staff's (admin/staff.service.js): Pending → Active (approve)
+// / Declined (decline); Active → Deactivated; Deactivated → Active
+// (reactivate). Closed (the owner closed it) and Declined are final for
+// another admin — only the owner reopens a Closed account, by emailed link.
+// Login itself already rejects a Deactivated, Closed, Declined or Pending
+// admin account (auth.service.js's role-agnostic accountStatus check).
+// `actorID` is the acting admin's own userID — recorded as
+// statusChangedByID/At, the last-change audit trail shown in
 // AdminDetailPanel.
+const ALLOWED_TRANSITIONS = {
+  Pending: ["Active", "Declined"],
+  Active: ["Deactivated"],
+  Deactivated: ["Active"],
+};
+
 const updateAdminStatus = async (userID, accountStatus, actorID) => {
+  const current = await prisma.admin.findUnique({
+    where: { userID },
+    select: { accountStatus: true },
+  });
+  if (!current) {
+    throw notFound(userID);
+  }
+  if (!ALLOWED_TRANSITIONS[current.accountStatus]?.includes(accountStatus)) {
+    const err = new Error(
+      `A ${current.accountStatus} admin can't be moved to ${accountStatus}`,
+    );
+    err.code = "CONFLICT";
+    throw err;
+  }
+
   try {
     await prisma.admin.update({
       where: { userID },
@@ -96,6 +121,9 @@ const updateAdminStatus = async (userID, accountStatus, actorID) => {
     }
     throw err;
   }
+
+  // Tell the person (approved / declined / deactivated / …) — never throws.
+  await accountNotices.statusChanged(userID, current.accountStatus, accountStatus);
 
   return getAdminDetail(userID);
 };
@@ -128,12 +156,15 @@ const updateMyProfile = async (userID, data) => {
 // Admin has no other relations besides an optional GovernmentID row (no
 // favorites/visits/applications like Adopter).
 const closeMyAccount = async (userID, mode) => {
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     await prisma.$transaction([
       prisma.admin.update({
         where: { userID },
         data: {
-          accountStatus: "Deactivated",
+          accountStatus: "Closed",
           // Self-service — the actor and the target are the same admin.
           statusChangedByID: userID,
           statusChangedAt: new Date(),
@@ -141,6 +172,7 @@ const closeMyAccount = async (userID, mode) => {
       }),
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -164,6 +196,8 @@ const closeMyAccount = async (userID, mode) => {
       governmentId.documentURL,
     );
   }
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

@@ -31,7 +31,7 @@ const router = express.Router();
  *         description: Optional filter by designation
  *       - in: query
  *         name: accountStatus
- *         schema: { type: string, enum: [Pending, Active, Deactivated] }
+ *         schema: { type: string, enum: [Pending, Active, Deactivated, Closed, Declined] }
  *         description: >
  *           Optional filter by account status. Pending is a self-registered
  *           account awaiting approval (a Manager sign-up by an Admin, anyone
@@ -165,16 +165,17 @@ router.patch(
  * @swagger
  * /staff/{id}/status:
  *   patch:
- *     summary: Activate or deactivate a staff account (Admin only)
+ *     summary: Approve, decline, deactivate or reactivate a staff account (Admin only)
  *     description: >
- *       This is also how a self-registered (Pending) staff account is
- *       approved or declined — setting accountStatus to 'Active' approves it,
- *       'Deactivated' declines it. There is no distinct approve/decline
- *       endpoint. Admin may only approve/decline a Pending *Manager*
+ *       Allowed moves — Pending → Active (approve) or Declined (decline);
+ *       Active → Deactivated; Deactivated → Active (reactivate). Anything
+ *       else is 409, including any change to a Closed account (the owner
+ *       closed it; only they can reactivate it, by emailed link) or a
+ *       Declined one. There is no distinct approve/decline endpoint. Admin may only approve/decline a Pending *Manager*
  *       sign-up (403 otherwise — the shelter's manager approves everyone
  *       else from the Staff tab); approving one also makes them their
  *       shelter's manager (409 if it already has one). Deactivating clears managerStaffID on every shelter this
- *       staff member currently manages. A Deactivated (or still-Pending)
+ *       staff member currently manages. A Deactivated, Declined (or still-Pending)
  *       staff account is rejected on its next login attempt
  *       (POST /auth/login) — existing already-issued access tokens are
  *       unaffected until they expire. Pending itself is never an accepted
@@ -198,7 +199,7 @@ router.patch(
  *             properties:
  *               accountStatus:
  *                 type: string
- *                 enum: [Active, Deactivated]
+ *                 enum: [Active, Deactivated, Declined]
  *     responses:
  *       200:
  *         description: The updated staff detail
@@ -211,7 +212,7 @@ router.patch(
  *                   properties:
  *                     data: { $ref: '#/components/schemas/StaffDetail' }
  *       400:
- *         description: accountStatus missing or not one of Active/Deactivated
+ *         description: accountStatus missing or not one of Active/Deactivated/Declined
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
@@ -222,6 +223,14 @@ router.patch(
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: >
+ *           Move not allowed from the current status (e.g. a Closed or
+ *           Declined account), the shelter already has a manager, or the
+ *           Manager sign-up isn't ready for approval
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.patch(
   "/staff/:id/status",

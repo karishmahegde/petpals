@@ -8,6 +8,9 @@
 // /donor/donate if they cancel.
 // Shelters: GET /shelters?acceptingDonations=true — Open and Full ones
 // (a Closed shelter can't take donations).
+// Soft gate: with an unverified email, EmailUnverifiedNotice replaces the
+// Donate button (the server 409s "email_unverified" otherwise; that 409 also
+// flips the session, in case it was stale).
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -21,6 +24,9 @@ import {
   DONATION_MIN_USD,
 } from "../../../../../logic/api/donorsApi";
 import { formatUSD } from "../../../../../logic/utils/currency";
+import { isEmailUnverifiedError } from "../../../../../logic/api/authApi";
+import useAuthStore from "../../../../../logic/store/useAuthStore";
+import EmailUnverifiedNotice from "../../../shared/EmailUnverifiedNotice";
 
 const PRESET_AMOUNTS = [25, 50, 100, 200];
 const MAX_MESSAGE_LEN = 300;
@@ -53,6 +59,10 @@ const DonateForm = ({ idPrefix }: DonateFormProps) => {
   const [customAmount, setCustomAmount] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const emailUnverified = useAuthStore(
+    (state) => state.user?.emailVerified === false,
+  );
+  const updateUser = useAuthStore((state) => state.updateUser);
 
   const sheltersQuery = useQuery({
     queryKey: ["shelters", { acceptingDonations: true }],
@@ -74,7 +84,13 @@ const DonateForm = ({ idPrefix }: DonateFormProps) => {
     onSuccess: ({ checkoutUrl }) => {
       window.location.href = checkoutUrl;
     },
-    onError: (err) => setError(extractError(err)),
+    onError: (err) => {
+      if (isEmailUnverifiedError(err)) {
+        updateUser({ emailVerified: false });
+        return;
+      }
+      setError(extractError(err));
+    },
   });
 
   const handleDonate = () => {
@@ -201,18 +217,22 @@ const DonateForm = ({ idPrefix }: DonateFormProps) => {
         </p>
       )}
 
-      <ButtonElement
-        onClick={handleDonate}
-        disabled={busy}
-        size="panel"
-        className="w-full bg-rose-dark hover:brightness-95 disabled:opacity-60"
-      >
-        {busy
-          ? "Taking you to checkout…"
-          : amount && Number.isInteger(amount) && amount >= DONATION_MIN_USD
-            ? `Donate ${formatUSD(amount)}`
-            : "Donate"}
-      </ButtonElement>
+      {emailUnverified ? (
+        <EmailUnverifiedNotice action="donate" />
+      ) : (
+        <ButtonElement
+          onClick={handleDonate}
+          disabled={busy}
+          size="panel"
+          className="w-full bg-rose-dark hover:brightness-95 disabled:opacity-60"
+        >
+          {busy
+            ? "Taking you to checkout…"
+            : amount && Number.isInteger(amount) && amount >= DONATION_MIN_USD
+              ? `Donate ${formatUSD(amount)}`
+              : "Donate"}
+        </ButtonElement>
+      )}
     </div>
   );
 };

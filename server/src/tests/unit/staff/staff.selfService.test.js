@@ -48,7 +48,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// The account notice emails are covered in auth/accountNotices.test.js —
+// mocked here so they never touch the mocked Prisma client.
+jest.mock("../../../services/auth/accountNotices");
+
 const prisma = require("../../../config/prisma");
+const accountNotices = require("../../../services/auth/accountNotices");
 const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
@@ -323,7 +328,7 @@ describe("Staff self-service endpoints", () => {
 
   // ————————————————————————————— DELETE /staff/me —————————————————————————————
   describe("DELETE /api/v1/staff/me", () => {
-    test("mode=deactivate → 200, status set Deactivated, refresh token nulled, managed shelters cleared", async () => {
+    test("mode=deactivate → 200, status set Closed, refresh token nulled, managed shelters cleared", async () => {
       prisma.adoptionApplication.findFirst.mockResolvedValueOnce(null);
       prisma.staff.update.mockResolvedValueOnce({});
       prisma.shelter.updateMany.mockResolvedValueOnce({ count: 1 });
@@ -338,7 +343,7 @@ describe("Staff self-service endpoints", () => {
       expect(prisma.staff.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userID: 42 },
-          data: { accountStatus: "Deactivated" },
+          data: { accountStatus: "Closed" },
         }),
       );
       expect(prisma.shelter.updateMany).toHaveBeenCalledWith({
@@ -352,6 +357,10 @@ describe("Staff self-service endpoints", () => {
         }),
       );
       expect(prisma.staff.delete).not.toHaveBeenCalled();
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "deactivate");
     });
 
     test("mode=delete → 200, staff and users rows removed, government ID cleaned up", async () => {
@@ -378,6 +387,13 @@ describe("Staff self-service endpoints", () => {
       expect(storage.deletePrivateFile).toHaveBeenCalledWith(
         "government-ids",
         "staff/42/id-123.jpg",
+      );
+      // The contact is read before the write and the notice sent after it
+      // (accountNotices.js).
+      expect(accountNotices.lookupContact).toHaveBeenCalledTimes(1);
+      expect(accountNotices.accountClosed).toHaveBeenCalledWith(undefined, "delete");
+      expect(accountNotices.lookupContact.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.staff.delete.mock.invocationCallOrder[0],
       );
     });
 

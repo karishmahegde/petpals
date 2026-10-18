@@ -15,11 +15,11 @@ import toast from "react-hot-toast";
 import SlideOver from "../../../../../../components/ui/SlideOver";
 import ButtonElement from "../../../../../../components/ui/ButtonElement";
 import Avatar from "../../../../../../components/ui/Avatar";
-import Badge, { type BadgeTone } from "../../../../../../components/ui/Badge";
+import Badge from "../../../../../../components/ui/Badge";
 import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionModal";
 import PhoneDisplay from "../../../../../../components/ui/PhoneDisplay";
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
-import type { StaffAccountStatus } from "../../../../../../logic/api/staffApi";
+import { STAFF_STATUS_TONE } from "../../../../../../logic/staff/staffStatus";
 import {
   updateShelterStaffDesignation,
   updateShelterStaffStatus,
@@ -35,12 +35,6 @@ interface StaffDetailPanelProps {
 }
 
 const DESIGNATIONS: AssignableDesignation[] = ["Senior", "Associate"];
-
-const STATUS_TONE: Record<StaffAccountStatus, BadgeTone> = {
-  Pending: "gold",
-  Active: "green",
-  Deactivated: "gray",
-};
 
 const SEX_LABEL: Record<"M" | "F", string> = { M: "Male", F: "Female" };
 
@@ -152,7 +146,7 @@ const StaffDetailPanel = ({
                   {member.staffDesignation ?? "No designation"}
                 </p>
               </div>
-              <Badge tone={STATUS_TONE[member.accountStatus]}>
+              <Badge tone={STAFF_STATUS_TONE[member.accountStatus]}>
                 {member.accountStatus}
               </Badge>
             </div>
@@ -203,7 +197,8 @@ const StaffDetailPanel = ({
                 v={member.staffSex ? SEX_LABEL[member.staffSex] : "—"}
               />
               <InfoRow k="Date of Joining" v={formatDate(member.staffDOJ)} />
-              {member.accountStatus === "Deactivated" && (
+              {(member.accountStatus === "Deactivated" ||
+                member.accountStatus === "Closed") && (
                 <InfoRow
                   k="Date of Separation"
                   v={formatDate(member.staffDOS)}

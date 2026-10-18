@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const accountNotices = require("../auth/accountNotices");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const { ADDRESS_SELECT } = require("../../utils/address");
 
@@ -149,20 +150,24 @@ const completeOnboarding = async (userID) => {
 
 // ——————————————— CLOSE MY ACCOUNT (DELETE /donors/me) ———————————————
 // Nothing blocks a donor from leaving — there's no open work to hand over.
-// 'deactivate' keeps the row (accountStatus → Deactivated, refresh token
+// 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared). 'delete' removes the Donor and Users rows (the refresh token goes
 // with Users). The shelters' records survive either way: Donation.donorID is
 // ON DELETE SET NULL, so every donation stays, just with no donor attached
 // (staff see "Former donor").
 const closeMyAccount = async (userID, mode) => {
+  // Read before a delete removes the rows; the notice goes out after.
+  const contact = await accountNotices.lookupContact(userID);
+
   if (mode === "deactivate") {
     await prisma.$transaction([
       prisma.donor.update({
         where: { userID },
-        data: { accountStatus: "Deactivated" },
+        data: { accountStatus: "Closed" },
       }),
       nullifyRefreshToken(prisma, userID),
     ]);
+    accountNotices.accountClosed(contact, mode);
     return;
   }
 
@@ -170,6 +175,8 @@ const closeMyAccount = async (userID, mode) => {
     prisma.donor.delete({ where: { userID } }),
     prisma.users.delete({ where: { userID } }),
   ]);
+
+  accountNotices.accountClosed(contact, mode);
 };
 
 module.exports = {

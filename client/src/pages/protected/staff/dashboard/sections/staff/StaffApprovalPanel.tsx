@@ -78,7 +78,7 @@ const StaffApprovalPanel = ({ member, onClose }: StaffApprovalPanelProps) => {
   });
 
   const decline = useMutation({
-    mutationFn: () => updateShelterStaffStatus(member!.userID, "Deactivated"),
+    mutationFn: () => updateShelterStaffStatus(member!.userID, "Declined"),
     onSuccess: () => {
       refreshStaff();
       toast.success("Staff member declined");
@@ -239,8 +239,8 @@ const StaffApprovalPanel = ({ member, onClose }: StaffApprovalPanelProps) => {
           onCancel={() => setConfirmingDecline(false)}
           onConfirm={() => decline.mutate()}
         >
-          This declines {member.staffName}'s registration and deactivates their
-          account.
+          This declines {member.staffName}'s registration — they won't be able
+          to log in, and we'll email them to let them know.
         </ConfirmActionModal>
       )}
     </>

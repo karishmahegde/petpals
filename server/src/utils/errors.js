@@ -10,6 +10,8 @@ const ERROR_CODES = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   VALIDATION_ERROR: 422,
+  // Asked again too soon (e.g. resending an email inside its cooldown).
+  TOO_MANY_REQUESTS: 429,
   INTERNAL_SERVER_ERROR: 500,
   // An upstream we depend on (the AI provider) failed — worth retrying.
   SERVICE_UNAVAILABLE: 503,
