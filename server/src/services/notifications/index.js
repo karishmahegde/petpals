@@ -11,16 +11,14 @@
 const prisma = require("../../config/prisma");
 const messages = require("./messages");
 const hub = require("./hub");
+const inbox = require("./inbox");
+const { toItem } = inbox;
 
 // Column limits on Notification (schema.prisma). Text is built from names the
 // app already caps, but a long pet + shelter name could still run over.
 const LIMITS = { title: 120, body: 300, link: 200 };
 const clip = (value, max) =>
   value && value.length > max ? `${value.slice(0, max - 1)}…` : value;
-
-// What the client gets for one notification, on the stream and the REST
-// list alike — the row minus its owner.
-const toItem = ({ userID, ...item }) => item;
 
 // Stores one notification per recipient. `userIDs` may contain nulls and
 // repeats (e.g. an unassigned vet, a manager who is also on the shelter's
@@ -101,6 +99,10 @@ module.exports = {
   toItem,
   subscribe: hub.subscribe,
   frame: hub.frame,
+  listNotifications: inbox.listNotifications,
+  getUnreadCount: inbox.getUnreadCount,
+  markNotification: inbox.markNotification,
+  markAllRead: inbox.markAllRead,
   shelterStaffIDs,
   shelterManagerID,
   activeAdminIDs,

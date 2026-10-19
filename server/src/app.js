@@ -127,6 +127,9 @@ const vetPetsRouter = require("./routes/vet/pets.routes");
 app.use("/api/v1", vetPetsRouter);
 const vetOverviewRouter = require("./routes/vet/overview.routes");
 app.use("/api/v1", vetOverviewRouter);
+// Every role's own in-app notifications (/notifications…).
+const notificationsRouter = require("./routes/notifications/notifications.routes");
+app.use("/api/v1", notificationsRouter);
 // app.use('/api/v1/donors',               require('./routes/donors'));
 
 // ── 404 handler ───────────────────────────────────────────────
