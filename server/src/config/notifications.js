@@ -11,4 +11,13 @@ const READ_RETENTION_MS = 90 * DAY_MS;
 const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 50;
 
-module.exports = { READ_RETENTION_MS, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT };
+// GET /notifications/stream sends a comment line this often so proxies and
+// load balancers don't close a connection that's quiet between events.
+const STREAM_HEARTBEAT_MS = 25 * 1000;
+
+module.exports = {
+  READ_RETENTION_MS,
+  DEFAULT_PAGE_LIMIT,
+  MAX_PAGE_LIMIT,
+  STREAM_HEARTBEAT_MS,
+};

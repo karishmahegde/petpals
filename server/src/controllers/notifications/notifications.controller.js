@@ -106,4 +106,17 @@ const markAllRead = async (req, res, next) => {
   }
 };
 
-module.exports = { listNotifications, getUnreadCount, markNotification, markAllRead };
+// ——————————————— GET /notifications/stream ———————————————
+// Held open as Server-Sent Events until the client leaves or the access
+// token expires. Once the headers are out an error can't become a JSON
+// envelope, so openStream handles its own.
+const streamNotifications = (req, res) =>
+  notifications.openStream(req.user.userID, req.tokenExpiresAt, req, res);
+
+module.exports = {
+  listNotifications,
+  getUnreadCount,
+  markNotification,
+  markAllRead,
+  streamNotifications,
+};

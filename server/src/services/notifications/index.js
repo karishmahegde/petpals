@@ -12,6 +12,7 @@ const prisma = require("../../config/prisma");
 const messages = require("./messages");
 const hub = require("./hub");
 const inbox = require("./inbox");
+const { openStream } = require("./stream");
 const { toItem } = inbox;
 
 // Column limits on Notification (schema.prisma). Text is built from names the
@@ -97,8 +98,7 @@ module.exports = {
   notify,
   messages,
   toItem,
-  subscribe: hub.subscribe,
-  frame: hub.frame,
+  openStream,
   listNotifications: inbox.listNotifications,
   getUnreadCount: inbox.getUnreadCount,
   markNotification: inbox.markNotification,

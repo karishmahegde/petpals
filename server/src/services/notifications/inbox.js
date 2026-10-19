@@ -92,6 +92,7 @@ const markAllRead = async (userID) => {
 
 module.exports = {
   toItem,
+  countUnread,
   listNotifications,
   getUnreadCount,
   markNotification,

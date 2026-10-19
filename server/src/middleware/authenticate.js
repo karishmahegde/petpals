@@ -53,6 +53,9 @@ const buildAuthenticate = ({ allowPending }) => async (req, res, next) => {
     }
 
     req.user = { userID: decoded.userID, role: decoded.role };
+    // When this access token stops working (ms) — the live notification
+    // stream ends here so the client reconnects with a fresh one.
+    req.tokenExpiresAt = decoded.exp * 1000;
     next(); // This moves it to the next function in line at the parent level, which would be the controller
   } catch (error) {
     const details =

@@ -1,7 +1,7 @@
 // What it does: Defines the logged-in user's own in-app notifications — the
 // list, the unread count and marking them read. Mounted at /api/v1 in app.js.
 // Every role, plain authenticate: a Pending user has no dashboard (and so no
-// bell) yet. The live stream (GET /notifications/stream) is card 4's.
+// bell) yet.
 const express = require("express");
 const notificationsController = require("../../controllers/notifications/notifications.controller");
 const authenticate = require("../../middleware/authenticate");
@@ -116,6 +116,38 @@ router.get(
   authenticate,
   notificationsController.getUnreadCount,
 );
+
+/**
+ * @swagger
+ * /notifications/stream:
+ *   get:
+ *     summary: Live stream of the logged-in user's notifications (every role)
+ *     description: >
+ *       Server-Sent Events, held open. Auth is the normal Authorization
+ *       Bearer header, so read it with fetch streaming rather than
+ *       EventSource (which can't send headers). Events — each an `event:`
+ *       line plus one JSON `data:` line: `unread-count` { unreadCount } on
+ *       connect and after a mark-read in any tab; `notification` (a
+ *       Notification) when one arrives; `token-expired` {} just before the
+ *       stream ends at the access token's expiry — refresh the token and
+ *       reconnect. A `: heartbeat` comment comes every 25 seconds. The stream
+ *       is a nudge, not the record: refetch GET /notifications on every
+ *       reconnect to pick up anything sent while disconnected. Swagger UI
+ *       can't display a stream that doesn't end; use curl -N to try it.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The event stream
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *               example: "event: unread-count\ndata: {\"unreadCount\":3}\n\n"
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
+router.get("/notifications/stream", authenticate, notificationsController.streamNotifications);
 
 /**
  * @swagger
