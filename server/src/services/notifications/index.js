@@ -53,6 +53,20 @@ const notify = async (userIDs, { type, title, body, link = null }) => {
   return rows;
 };
 
+// For a hook whose recipients or text need a lookup first: `prepare`
+// resolves to [userIDs, message]. A failed lookup is logged like a failed
+// insert — the action it reports already happened, so it never throws.
+// `context` names the event in the log.
+const notifyAfterLookup = async (context, prepare) => {
+  try {
+    const [userIDs, message] = await prepare();
+    return await notify(userIDs, message);
+  } catch (err) {
+    console.error(`[notifications] couldn't prepare ${context}: ${err.message}`);
+    return [];
+  }
+};
+
 // ——————————————— Recipients ———————————————
 // Each returns user IDs to pass straight to notify(). Only Active accounts —
 // a Pending, Deactivated or Closed one has no dashboard to see them on.
@@ -83,6 +97,17 @@ const activeAdminIDs = async () => {
   return admins.map((a) => a.userID);
 };
 
+// Who approves a sign-up (staffApproval.service.js): a volunteer — any
+// staff member at their shelter; a staff member or vet — the shelter's
+// manager; a Manager sign-up — the admins. `kind` is a SIGNUP_KIND key in
+// messages.js.
+const signupApproverIDs = async (kind, shelterID) => {
+  if (kind === "Manager") return activeAdminIDs();
+  if (shelterID === null) return [];
+  if (kind === "Volunteer") return shelterStaffIDs(shelterID);
+  return [await shelterManagerID(shelterID)];
+};
+
 // The adopter holding the pet's Accepted application (at most one — a partial
 // unique index), or null. The same rule that lets an adopter see a pet's vet
 // appointments (adopter/appointments.service.js).
@@ -96,6 +121,7 @@ const acceptedAdopterForPet = async (petID) => {
 
 module.exports = {
   notify,
+  notifyAfterLookup,
   messages,
   toItem,
   openStream,
@@ -107,4 +133,5 @@ module.exports = {
   shelterManagerID,
   activeAdminIDs,
   acceptedAdopterForPet,
+  signupApproverIDs,
 };

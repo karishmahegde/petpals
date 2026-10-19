@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const { formatSex, formatAgeFromDOBYears } = require("../public/pets.service");
+const { notifyAfterLookup, messages, shelterStaffIDs } = require("../notifications");
 
 const notFound = (recordID) => {
   const err = new Error(`No transfer exists with ID ${recordID}`);
@@ -108,6 +109,27 @@ const TRANSFER_LIST_SELECT = {
   fromShelter: { select: { shelterName: true } },
   toShelter: { select: { shelterName: true } },
 };
+
+// Each side of a transfer has one assigned staff member; with none (an
+// Admin-initiated transfer, or a destination with no manager yet) the
+// shelter's whole team hears instead, so the transfer isn't missed.
+const sideRecipients = async (assignedStaffID, shelterID) =>
+  assignedStaffID !== null ? [assignedStaffID] : shelterStaffIDs(shelterID);
+
+// After the write — never throws, so the message is built in there too.
+// `record` is a TRANSFER_DETAIL_SELECT row; `build` gets its pet and
+// shelter names.
+const notifyTransfer = (record, toDestination, build) =>
+  notifyAfterLookup(`the transfer ${record.recordID} notice`, async () => [
+    toDestination
+      ? await sideRecipients(record.toShelterStaff, record.toShelterID)
+      : await sideRecipients(record.fromShelterStaff, record.fromShelterID),
+    build({
+      petName: record.pet.petName,
+      fromShelterName: record.fromShelter.shelterName,
+      toShelterName: record.toShelter.shelterName,
+    }),
+  ]);
 
 const TRANSFER_DETAIL_SELECT = {
   ...TRANSFER_LIST_SELECT,
@@ -237,6 +259,7 @@ const initiateTransfer = async ({ petID, data, actor, requestedShelterID }) => {
     prisma.pet.update({ where: { petID }, data: { adoptionStatus: "transferred" } }),
   ]);
 
+  await notifyTransfer(record, true, messages.transferIncoming);
   return formatTransferDetail(record, actor);
 };
 
@@ -425,6 +448,14 @@ const updateTransferStatus = async (recordID, { status }, actor) => {
     prisma.pet.update({ where: { petID: transfer.petID }, data: petData }),
   ]);
 
+  // The destination's answer goes back to the origin; the origin's
+  // retraction goes to the destination.
+  const build = {
+    Completed: messages.transferCompleted,
+    Rejected: messages.transferRejected,
+    Cancelled: messages.transferCancelled,
+  }[status];
+  await notifyTransfer(updated, status === "Cancelled", build);
   return formatTransferDetail(updated, actor);
 };
 
@@ -436,6 +467,7 @@ const reassignToShelterStaff = async (recordID, { toShelterStaff }, actor) => {
     where: { recordID },
     select: {
       toShelterID: true,
+      toShelterStaff: true,
       transferStatus: true,
       toShelter: { select: { managerStaffID: true } },
     },
@@ -470,6 +502,11 @@ const reassignToShelterStaff = async (recordID, { toShelterStaff }, actor) => {
     select: TRANSFER_DETAIL_SELECT,
   });
 
+  // The new assignee picks it up — unless they reassigned it to themselves,
+  // or it was already theirs.
+  if (toShelterStaff !== transfer.toShelterStaff && toShelterStaff !== actor.userID) {
+    await notifyTransfer(updated, true, messages.transferIncoming);
+  }
   return formatTransferDetail(updated, actor);
 };
 

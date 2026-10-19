@@ -1,5 +1,14 @@
 const prisma = require("../../config/prisma");
-const { notify, messages } = require("../notifications");
+const { notify, notifyAfterLookup, messages, shelterStaffIDs } = require("../notifications");
+
+// The name staff see on a visit notification.
+const adopterNameOf = async (adopterID) =>
+  (
+    await prisma.adopter.findUnique({
+      where: { userID: adopterID },
+      select: { adopterName: true },
+    })
+  ).adopterName;
 const storage = require("../storage");
 
 // Scalar shape returned to the client for a created visit.
@@ -44,17 +53,18 @@ const createVisit = async ({
 
   // petID is optional (a plain shelter visit has no pet). Validate it only when
   // supplied, so a bad reference is a clean 404 rather than an FK error.
+  let pet = null;
   if (petID != null) {
-    const pet = await prisma.pet.findUnique({
+    pet = await prisma.pet.findUnique({
       where: { petID },
-      select: { petID: true },
+      select: { petID: true, petName: true },
     });
     if (!pet) {
       throw notFound(`No pet exists with ID ${petID}`);
     }
   }
 
-  return prisma.visit.create({
+  const visit = await prisma.visit.create({
     data: {
       adopterID,
       shelterID,
@@ -64,6 +74,12 @@ const createVisit = async ({
     },
     select: VISIT_SELECT,
   });
+
+  await notifyAfterLookup(`the new visit request ${visit.visitID}`, async () => [
+    await shelterStaffIDs(shelterID),
+    messages.newVisitRequest({ adopterName: await adopterNameOf(adopterID), petName: pet?.petName }),
+  ]);
+  return visit;
 };
 
 // ——————————————— LIST VISITS FOR AN ADOPTER (GET /adopters/me/visits) ———————————————
@@ -340,8 +356,16 @@ const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
   });
 
   // The adopter hears when the shelter confirms or cancels; Completed
-  // happens with them there, and their own Cancel needs no telling.
-  if (actor.role !== "Adopter" && visitStatus !== "Completed") {
+  // happens with them there. Their own Cancel tells the shelter's staff.
+  if (actor.role === "Adopter") {
+    await notifyAfterLookup(`the cancellation of visit ${visitID}`, async () => [
+      await shelterStaffIDs(visit.shelterID),
+      messages.visitCancelledByAdopter({
+        adopterName: await adopterNameOf(visit.adopterID),
+        petName: updated.pet?.petName,
+      }),
+    ]);
+  } else if (visitStatus !== "Completed") {
     const names = { shelterName: updated.shelter.shelterName, petName: updated.pet?.petName };
     await notify(
       [visit.adopterID],

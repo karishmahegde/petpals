@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { notifyAfterLookup, messages, signupApproverIDs } = require("../notifications");
 const accountNotices = require("../auth/accountNotices");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
@@ -165,9 +166,16 @@ const REQUIRED_FOR_COMPLETION = {
 const completeOnboarding = async (userID) => {
   const volunteer = await prisma.volunteer.findUnique({
     where: { userID },
-    select: Object.fromEntries(
-      Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
-    ),
+    select: {
+      ...Object.fromEntries(
+        Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
+      ),
+      // For the approvers' notification below.
+      volunteerName: true,
+      shelterID: true,
+      accountStatus: true,
+      onboardingComplete: true,
+    },
   });
   if (!volunteer) {
     throw notFound();
@@ -198,13 +206,24 @@ const completeOnboarding = async (userID) => {
     throw err;
   }
 
-  return toSelfProfile(
-    await prisma.volunteer.update({
-      where: { userID },
-      data: { onboardingComplete: true, onboardingStep: LAST_ONBOARDING_STEP },
-      select: VOLUNTEER_SELF_SELECT,
-    }),
-  );
+  const updated = await prisma.volunteer.update({
+    where: { userID },
+    data: { onboardingComplete: true, onboardingStep: LAST_ONBOARDING_STEP },
+    select: VOLUNTEER_SELF_SELECT,
+  });
+
+  // Finishing onboarding is what makes a Pending sign-up approvable
+  // (staffApproval.service.js), so whoever approves it hears now — once, not
+  // on a repeat call.
+  if (volunteer.accountStatus === "Pending" && !volunteer.onboardingComplete) {
+    const kind = "Volunteer";
+    await notifyAfterLookup(`the sign-up of user ${userID}`, async () => [
+      await signupApproverIDs(kind, volunteer.shelterID),
+      messages.signupReadyForApproval({ name: volunteer.volunteerName, kind }),
+    ]);
+  }
+
+  return toSelfProfile(updated);
 };
 
 // ——————————————— CLOSE MY ACCOUNT (DELETE /volunteers/me) ———————————————

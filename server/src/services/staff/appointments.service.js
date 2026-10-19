@@ -1,7 +1,7 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
-const { notify, messages, acceptedAdopterForPet } = require("../notifications");
+const { notifyAfterLookup, messages, acceptedAdopterForPet } = require("../notifications");
 
 const notFound = (appointmentID) => {
   const err = new Error(`No appointment exists with ID ${appointmentID}`);
@@ -386,15 +386,12 @@ const assertNoDuplicateSlot = async ({
 // The adopter holding the pet's Accepted application follows its vet
 // appointments (GET /adopters/me/appointments), so they hear about each
 // change. Called after the write — never throws, so the message is built
-// in here (from `buildMessage`) too.
-const notifyAdopter = async (petID, buildMessage) => {
-  try {
-    const adopterID = await acceptedAdopterForPet(petID);
-    if (adopterID !== null) await notify([adopterID], buildMessage());
-  } catch (err) {
-    console.error(`[notifications] couldn't notify the adopter of pet ${petID}: ${err.message}`);
-  }
-};
+// in there (from `buildMessage`) too.
+const notifyAdopter = (petID, buildMessage) =>
+  notifyAfterLookup(`the appointment notice for pet ${petID}'s adopter`, async () => [
+    [await acceptedAdopterForPet(petID)],
+    buildMessage(),
+  ]);
 
 // What the adopter's appointment list shows: an edit touching none of these
 // (a volunteer or staff reassignment) isn't news to them.

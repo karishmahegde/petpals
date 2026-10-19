@@ -6,7 +6,7 @@ const { APPLICATION_FEE_CENTS, APPLICATION_FEE_USD } = require("../../config/fee
 const { isUniqueViolation } = require("../../utils/prismaErrors");
 const { getUserContact } = require("../auth/userContact");
 const reviewNotices = require("../staff/reviewNotices");
-const { notify, messages } = require("../notifications");
+const { notify, notifyAfterLookup, messages, shelterStaffIDs } = require("../notifications");
 const {
   formatAgeFromDOBYears,
   formatSex,
@@ -198,6 +198,7 @@ const finalizeApplication = async (session) => {
       select: {
         pet: { select: { petName: true } },
         shelter: { select: { shelterName: true } },
+        adopter: { select: { adopterName: true } },
       },
     });
   } catch (err) {
@@ -221,6 +222,13 @@ const finalizeApplication = async (session) => {
       shelterName: application.shelter.shelterName,
     }),
   );
+  await notifyAfterLookup(`the new application for pet ${petID}`, async () => [
+    await shelterStaffIDs(Number(shelterID)),
+    messages.newApplication({
+      adopterName: application.adopter.adopterName,
+      petName: application.pet.petName,
+    }),
+  ]);
 };
 
 // ——————————————— GET APPLICATION BY CHECKOUT SESSION (confirmation-page polling) ———————————————
@@ -623,6 +631,7 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
       petID: true,
       applicationStatus: true,
       pet: { select: { petName: true, adoptionStatus: true } },
+      adopter: { select: { adopterName: true } },
     },
   });
 
@@ -765,9 +774,17 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
   }
 
   // Staff/admin decisions email and notify the applicant(s); an adopter's
-  // own Withdraw sends them nothing.
+  // own Withdraw tells the shelter's staff instead.
   if (actor.role !== "Adopter") {
     await notifyApplicationDecision(application, updated, staffRemark, autoDeclined);
+  } else {
+    await notifyAfterLookup(`the withdrawal of application ${applicationID}`, async () => [
+      await shelterStaffIDs(application.shelterID),
+      messages.applicationWithdrawn({
+        adopterName: application.adopter.adopterName,
+        petName: application.pet.petName,
+      }),
+    ]);
   }
   return toClientShape(updated);
 };
