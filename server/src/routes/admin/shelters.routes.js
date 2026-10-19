@@ -212,4 +212,53 @@ router.patch(
   sheltersController.updateShelterManager,
 );
 
+/**
+ * @swagger
+ * /shelters/{id}/capacity-alerts:
+ *   post:
+ *     summary: Alert a shelter's manager that it's near capacity (Admin only)
+ *     description: >
+ *       The admin Overview's Notify Manager. Sends the shelter's manager an
+ *       in-app CapacityAlert notification suggesting transfers. No body, and
+ *       no utilisation check — the admin decides. Each call sends a new alert.
+ *     tags: [Shelters, Admin, Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       201:
+ *         description: Who was alerted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiEnvelope'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         managerID: { type: integer }
+ *                         managerName: { type: string }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409:
+ *         description: The shelter has no manager, or its manager's account isn't Active
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+router.post(
+  "/shelters/:id/capacity-alerts",
+  authenticate,
+  authorizeRoles(ROLES.ADMIN),
+  sheltersController.sendCapacityAlert,
+);
+
 module.exports = router;

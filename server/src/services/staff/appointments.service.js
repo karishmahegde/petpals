@@ -1,7 +1,7 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
-const { notifyAfterLookup, messages, acceptedAdopterForPet } = require("../notifications");
+const { notify, messages, acceptedAdopterForPet } = require("../notifications");
 
 const notFound = (appointmentID) => {
   const err = new Error(`No appointment exists with ID ${appointmentID}`);
@@ -383,23 +383,70 @@ const assertNoDuplicateSlot = async ({
   }
 };
 
-// The adopter holding the pet's Accepted application follows its vet
-// appointments (GET /adopters/me/appointments), so they hear about each
-// change. Called after the write — never throws, so the message is built
-// in there (from `buildMessage`) too.
-const notifyAdopter = (petID, buildMessage) =>
-  notifyAfterLookup(`the appointment notice for pet ${petID}'s adopter`, async () => [
-    [await acceptedAdopterForPet(petID)],
-    buildMessage(),
-  ]);
+// Everyone an appointment concerns hears about it: the assigned vet, the
+// assisting volunteer, and the adopter holding the pet's Accepted
+// application (they follow its appointments — GET /adopters/me/appointments).
+// `before` is the row before the write (null for a new appointment), `after`
+// the row after it (null once cancelled) — each { vetID, volunteerID,
+// appointmentDate, appointmentReason }. Swapping a vet or volunteer cancels
+// it for the old one and assigns it to the new; a new date or reason is a
+// change for whoever stays. Nobody is told about their own edit. Called after
+// the write — never throws.
+const notifyAppointment = async ({ appointmentID, pet, before, after, actorID }) => {
+  try {
+    const { petName } = pet;
+    const sends = [];
+    const send = (userID, message) => {
+      if (userID != null && userID !== actorID) sends.push([userID, message]);
+    };
 
-// What the adopter's appointment list shows: an edit touching none of these
-// (a volunteer or staff reassignment) isn't news to them.
-const adopterVisibleChange = (existing, data) =>
-  (data.appointmentDate !== undefined &&
-    new Date(data.appointmentDate).getTime() !== existing.appointmentDate.getTime()) ||
-  (data.appointmentReason !== undefined && data.appointmentReason !== existing.appointmentReason) ||
-  (data.vetID !== undefined && data.vetID !== existing.vetID);
+    const rescheduled =
+      before &&
+      after &&
+      (new Date(after.appointmentDate).getTime() !== before.appointmentDate.getTime() ||
+        after.appointmentReason !== before.appointmentReason);
+
+    // The vet and the volunteer: one assignee each, possibly swapped.
+    const assignee = (field, assigned, cancelled, changedRole) => {
+      const was = before?.[field] ?? null;
+      const now = after?.[field] ?? null;
+      if (was !== now) {
+        send(was, cancelled);
+        send(now, assigned);
+      } else if (rescheduled) {
+        send(now, messages.appointmentChanged({ petName, role: changedRole }));
+      }
+    };
+    assignee(
+      "vetID",
+      messages.appointmentAssigned({ petName }),
+      messages.appointmentCancelled({ petName, role: "Veterinarian" }),
+      "Veterinarian",
+    );
+    assignee(
+      "volunteerID",
+      messages.appointmentAssistAssigned({ petName }),
+      messages.appointmentAssistCancelled({ petName }),
+      "Volunteer",
+    );
+
+    // The adopter sees the date, reason and vet — a volunteer swap isn't news.
+    const adopterMessage = !before
+      ? messages.appointmentScheduled({ petName })
+      : !after
+        ? messages.appointmentCancelled({ petName, role: "Adopter" })
+        : rescheduled || before.vetID !== after.vetID
+          ? messages.appointmentChanged({ petName, role: "Adopter" })
+          : null;
+    if (adopterMessage) send(await acceptedAdopterForPet(pet.petID), adopterMessage);
+
+    for (const [userID, message] of sends) await notify([userID], message);
+  } catch (err) {
+    console.error(
+      `[notifications] couldn't prepare the notices for appointment ${appointmentID}: ${err.message}`,
+    );
+  }
+};
 
 // ——————————————— CREATE APPOINTMENT (POST /appointments) ———————————————
 const createAppointment = async ({ data, actor, requestedShelterID }) => {
@@ -447,7 +494,13 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
     throw err;
   }
 
-  await notifyAdopter(pet.petID, () => messages.appointmentScheduled({ petName: pet.petName }));
+  await notifyAppointment({
+    appointmentID: appointment.appointmentID,
+    pet,
+    before: null,
+    after: { vetID: data.vetID, volunteerID: data.volunteerID ?? null },
+    actorID: actor.userID,
+  });
   return getShelterAppointmentDetail(appointment.appointmentID, actor);
 };
 
@@ -468,11 +521,12 @@ const updateAppointment = async (appointmentID, data, actor) => {
     select: {
       petID: true,
       vetID: true,
+      volunteerID: true,
       shelterID: true,
       appointmentDate: true,
       appointmentReason: true,
       appointmentStatus: true,
-      pet: { select: { petName: true } },
+      pet: { select: { petID: true, petName: true } },
     },
   });
   if (!existing) {
@@ -505,11 +559,19 @@ const updateAppointment = async (appointmentID, data, actor) => {
     throw err;
   }
 
-  if (adopterVisibleChange(existing, data)) {
-    await notifyAdopter(existing.petID, () =>
-      messages.appointmentChanged({ petName: existing.pet.petName, role: "Adopter" }),
-    );
-  }
+  // Fields absent from `data` keep their old value; volunteerID: null unassigns.
+  await notifyAppointment({
+    appointmentID,
+    pet: existing.pet,
+    before: existing,
+    after: {
+      vetID: data.vetID ?? existing.vetID,
+      volunteerID: data.volunteerID !== undefined ? data.volunteerID : existing.volunteerID,
+      appointmentDate: data.appointmentDate ?? existing.appointmentDate,
+      appointmentReason: data.appointmentReason ?? existing.appointmentReason,
+    },
+    actorID: actor.userID,
+  });
 
   if (actor.role === "Veterinarian") return null;
   return getShelterAppointmentDetail(appointmentID, actor);
@@ -521,10 +583,13 @@ const cancelAppointment = async (appointmentID, actor) => {
     where: { appointmentID },
     select: {
       petID: true,
+      vetID: true,
+      volunteerID: true,
       shelterID: true,
       appointmentStatus: true,
       appointmentDate: true,
-      pet: { select: { petName: true } },
+      appointmentReason: true,
+      pet: { select: { petID: true, petName: true } },
     },
   });
   if (!appointment) {
@@ -542,9 +607,13 @@ const cancelAppointment = async (appointmentID, actor) => {
     data: { appointmentStatus: "Cancelled" },
   });
 
-  await notifyAdopter(appointment.petID, () =>
-    messages.appointmentCancelled({ petName: appointment.pet.petName, role: "Adopter" }),
-  );
+  await notifyAppointment({
+    appointmentID,
+    pet: appointment.pet,
+    before: appointment,
+    after: null,
+    actorID: actor.userID,
+  });
   return getShelterAppointmentDetail(appointmentID, actor);
 };
 

@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { notifyAfterLookup, messages } = require("../notifications");
 const { getEventDetails } = require("../public/events.service");
 
 const notFound = (eventID) => {
@@ -87,6 +88,25 @@ const resolveShelterIDForCreate = async ({ role, userID }, requestedShelterID) =
   return staff.shelterID;
 };
 
+// Who's on an event before an edit or delete. null if it can't be read —
+// that costs the notification, not the change.
+const assigneesBefore = async (eventID) => {
+  try {
+    const rows = await prisma.volunteerEvent.findMany({
+      where: { eventID },
+      select: { volunteerID: true },
+    });
+    return rows.map((row) => row.volunteerID);
+  } catch (err) {
+    console.error(`[notifications] couldn't read event ${eventID}'s volunteers: ${err.message}`);
+    return null;
+  }
+};
+
+// After the write — never throws.
+const notifyVolunteers = (eventID, volunteerIDs, message) =>
+  notifyAfterLookup(`the volunteers of event ${eventID}`, async () => [volunteerIDs, message]);
+
 // ——————————————— CREATE EVENT (POST /events) ———————————————
 // `data` is already validated and whitelisted by the controller. staffID
 // is set to the acting Staff member's own userID (never for an Admin actor
@@ -109,6 +129,11 @@ const createEvent = async ({ data, actor, requestedShelterID }) => {
     },
   });
 
+  await notifyVolunteers(
+    event.eventID,
+    volunteerIDs,
+    messages.eventAssigned({ eventName: event.eventName }),
+  );
   return getEventDetails(event.eventID);
 };
 
@@ -120,7 +145,7 @@ const createEvent = async ({ data, actor, requestedShelterID }) => {
 const updateEvent = async (eventID, data, { role, userID }) => {
   const existing = await prisma.event.findUnique({
     where: { eventID },
-    select: { shelterID: true },
+    select: { shelterID: true, eventName: true },
   });
   if (!existing) {
     throw notFound(eventID);
@@ -129,8 +154,10 @@ const updateEvent = async (eventID, data, { role, userID }) => {
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
 
   const { volunteerIDs, ...fields } = data;
+  let previous = null;
   if (volunteerIDs) {
     await assertVolunteersAtShelter(existing.shelterID, volunteerIDs);
+    previous = await assigneesBefore(eventID);
   }
 
   try {
@@ -152,6 +179,15 @@ const updateEvent = async (eventID, data, { role, userID }) => {
     throw err;
   }
 
+  // Only the newly added hear; anyone dropped from it has no type to tell
+  // them by (out of v1).
+  if (volunteerIDs && previous) {
+    await notifyVolunteers(
+      eventID,
+      volunteerIDs.filter((id) => !previous.includes(id)),
+      messages.eventAssigned({ eventName: fields.eventName ?? existing.eventName }),
+    );
+  }
   return getEventDetails(eventID);
 };
 
@@ -164,13 +200,18 @@ const updateEvent = async (eventID, data, { role, userID }) => {
 const deleteEvent = async (eventID, { role, userID }) => {
   const existing = await prisma.event.findUnique({
     where: { eventID },
-    select: { shelterID: true },
+    select: { shelterID: true, eventName: true, eventDate: true },
   });
   if (!existing) {
     throw notFound(eventID);
   }
 
   await assertStaffOwnsShelter(role, userID, existing.shelterID);
+
+  // Deleting an event that's still to come cancels it for the volunteers on
+  // it; tidying away a past one isn't news. Read before the rows go.
+  const upcoming = existing.eventDate?.getTime() > Date.now();
+  const assigned = upcoming ? await assigneesBefore(eventID) : null;
 
   try {
     await prisma.$transaction([
@@ -182,6 +223,14 @@ const deleteEvent = async (eventID, { role, userID }) => {
       throw notFound(eventID);
     }
     throw err;
+  }
+
+  if (assigned) {
+    await notifyVolunteers(
+      eventID,
+      assigned,
+      messages.eventCancelled({ eventName: existing.eventName }),
+    );
   }
 };
 

@@ -1,5 +1,6 @@
 const { TaskName } = require("@prisma/client");
 const prisma = require("../../config/prisma");
+const { notifyAfterLookup, messages } = require("../notifications");
 
 // taskName is the TaskName enum — validated strictly in the controller
 // against these generated values (client/src/logic/staff/tasks.ts holds the
@@ -214,6 +215,28 @@ const getTaskDetail = async (taskID, actor) => {
   return formatTask(task);
 };
 
+// Who's on a task before an edit, so only the newly added hear about it.
+// null if it can't be read — that costs the notification, not the edit.
+const assigneesBefore = async (taskID) => {
+  try {
+    const rows = await prisma.volunteerTask.findMany({
+      where: { taskID },
+      select: { volunteerID: true },
+    });
+    return rows.map((row) => row.volunteerID);
+  } catch (err) {
+    console.error(`[notifications] couldn't read task ${taskID}'s assignees: ${err.message}`);
+    return null;
+  }
+};
+
+// After the write — never throws.
+const notifyAssigned = (taskID, volunteerIDs, taskName) =>
+  notifyAfterLookup(`the assignment of task ${taskID}`, async () => [
+    volunteerIDs,
+    messages.taskAssigned({ taskName }),
+  ]);
+
 // ——————————————— CREATE TASK (POST /tasks) ———————————————
 // taskDate is the assignment date (now); staffID is the creating staff member.
 const createTask = async ({ data, actor, requestedShelterID }) => {
@@ -236,6 +259,7 @@ const createTask = async ({ data, actor, requestedShelterID }) => {
     select: { taskID: true },
   });
 
+  await notifyAssigned(task.taskID, data.volunteerIDs, data.taskName);
   return getTaskDetail(task.taskID, actor);
 };
 
@@ -245,7 +269,7 @@ const createTask = async ({ data, actor, requestedShelterID }) => {
 const updateTask = async (taskID, data, actor) => {
   const task = await prisma.task.findUnique({
     where: { taskID },
-    select: { shelterID: true, taskStatus: true },
+    select: { shelterID: true, taskStatus: true, taskName: true },
   });
   if (!task) {
     throw notFound(taskID);
@@ -258,8 +282,10 @@ const updateTask = async (taskID, data, actor) => {
   }
 
   const { volunteerIDs, ...fields } = data;
+  let previous = null;
   if (volunteerIDs) {
     await assertVolunteersAtShelter(task.shelterID, volunteerIDs);
+    previous = await assigneesBefore(taskID);
   }
 
   await prisma.$transaction([
@@ -274,6 +300,13 @@ const updateTask = async (taskID, data, actor) => {
       : []),
   ]);
 
+  if (volunteerIDs && previous) {
+    await notifyAssigned(
+      taskID,
+      volunteerIDs.filter((id) => !previous.includes(id)),
+      fields.taskName ?? task.taskName,
+    );
+  }
   return getTaskDetail(taskID, actor);
 };
 
