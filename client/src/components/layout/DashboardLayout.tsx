@@ -5,6 +5,7 @@ import DashboardSidebar from "./DashboardSidebar";
 import EmailVerificationBanner from "../ui/dashboard/EmailVerificationBanner";
 import useAuthStore from "../../logic/store/useAuthStore";
 import useResendVerification from "../../logic/hooks/useResendVerification";
+import useNotificationStream from "../../logic/hooks/useNotificationStream";
 
 interface DashboardLayoutProps {
   /** The role's own <DashboardRoutes /> — everything else here is identical
@@ -19,6 +20,9 @@ interface DashboardLayoutProps {
 // threaded through here.
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Live notifications for every dashboard page — one stream per tab.
+  useNotificationStream();
 
   // Dummy - replace with real unread state once the notification system exists.
   const hasNotifications = false;
