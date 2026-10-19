@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { notify, messages } = require("../notifications");
 const storage = require("../storage");
 
 // Scalar shape returned to the client for a created visit.
@@ -322,11 +323,24 @@ const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
     data.staffID = actingStaffID;
   }
 
-  return prisma.visit.update({
+  const updated = await prisma.visit.update({
     where: { visitID },
     data,
     select: LIST_SELECT,
   });
+
+  // Confirming is the update an adopter waits on; Completed happens with
+  // them there, and their own Cancel needs no telling.
+  if (visitStatus === "Confirmed") {
+    await notify(
+      [visit.adopterID],
+      messages.visitConfirmed({
+        shelterName: updated.shelter.shelterName,
+        petName: updated.pet?.petName,
+      }),
+    );
+  }
+  return updated;
 };
 
 module.exports = {

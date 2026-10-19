@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const storage = require("../storage");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
+const { notify, messages, acceptedAdopterForPet } = require("../notifications");
 
 const notFound = (appointmentID) => {
   const err = new Error(`No appointment exists with ID ${appointmentID}`);
@@ -382,13 +383,34 @@ const assertNoDuplicateSlot = async ({
   }
 };
 
+// The adopter holding the pet's Accepted application follows its vet
+// appointments (GET /adopters/me/appointments), so they hear about each
+// change. Called after the write — never throws, so the message is built
+// in here (from `buildMessage`) too.
+const notifyAdopter = async (petID, buildMessage) => {
+  try {
+    const adopterID = await acceptedAdopterForPet(petID);
+    if (adopterID !== null) await notify([adopterID], buildMessage());
+  } catch (err) {
+    console.error(`[notifications] couldn't notify the adopter of pet ${petID}: ${err.message}`);
+  }
+};
+
+// What the adopter's appointment list shows: an edit touching none of these
+// (a volunteer or staff reassignment) isn't news to them.
+const adopterVisibleChange = (existing, data) =>
+  (data.appointmentDate !== undefined &&
+    new Date(data.appointmentDate).getTime() !== existing.appointmentDate.getTime()) ||
+  (data.appointmentReason !== undefined && data.appointmentReason !== existing.appointmentReason) ||
+  (data.vetID !== undefined && data.vetID !== existing.vetID);
+
 // ——————————————— CREATE APPOINTMENT (POST /appointments) ———————————————
 const createAppointment = async ({ data, actor, requestedShelterID }) => {
   const shelterID = await resolveShelterIDForCreate(actor, requestedShelterID);
 
   const pet = await prisma.pet.findUnique({
     where: { petID: data.petID },
-    select: { petID: true, shelterID: true },
+    select: { petID: true, shelterID: true, petName: true },
   });
   if (!pet) {
     throw petNotFound(data.petID);
@@ -428,6 +450,7 @@ const createAppointment = async ({ data, actor, requestedShelterID }) => {
     throw err;
   }
 
+  await notifyAdopter(pet.petID, () => messages.appointmentScheduled({ petName: pet.petName }));
   return getShelterAppointmentDetail(appointment.appointmentID, actor);
 };
 
@@ -450,7 +473,9 @@ const updateAppointment = async (appointmentID, data, actor) => {
       vetID: true,
       shelterID: true,
       appointmentDate: true,
+      appointmentReason: true,
       appointmentStatus: true,
+      pet: { select: { petName: true } },
     },
   });
   if (!existing) {
@@ -483,6 +508,12 @@ const updateAppointment = async (appointmentID, data, actor) => {
     throw err;
   }
 
+  if (adopterVisibleChange(existing, data)) {
+    await notifyAdopter(existing.petID, () =>
+      messages.appointmentChanged({ petName: existing.pet.petName, role: "Adopter" }),
+    );
+  }
+
   if (actor.role === "Veterinarian") return null;
   return getShelterAppointmentDetail(appointmentID, actor);
 };
@@ -491,7 +522,13 @@ const updateAppointment = async (appointmentID, data, actor) => {
 const cancelAppointment = async (appointmentID, actor) => {
   const appointment = await prisma.appointment.findUnique({
     where: { appointmentID },
-    select: { shelterID: true, appointmentStatus: true, appointmentDate: true },
+    select: {
+      petID: true,
+      shelterID: true,
+      appointmentStatus: true,
+      appointmentDate: true,
+      pet: { select: { petName: true } },
+    },
   });
   if (!appointment) {
     throw notFound(appointmentID);
@@ -508,6 +545,9 @@ const cancelAppointment = async (appointmentID, actor) => {
     data: { appointmentStatus: "Cancelled" },
   });
 
+  await notifyAdopter(appointment.petID, () =>
+    messages.appointmentCancelled({ petName: appointment.pet.petName, role: "Adopter" }),
+  );
   return getShelterAppointmentDetail(appointmentID, actor);
 };
 
