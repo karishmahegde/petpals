@@ -122,13 +122,14 @@ export const getVisitsQueue = async (
 };
 
 // Staff/Admin transition — Confirmed is only valid from an unconfirmed
-// (null-status) visit; Completed is only valid from Confirmed (409
-// otherwise). Staff may only act on their own shelter's visits (403
+// (null-status) visit; Completed is only valid from Confirmed; Cancelled
+// from either, while the visit is still upcoming (409 otherwise). Confirm
+// and Cancel notify the adopter. Staff may only act on their own shelter's visits (403
 // otherwise) — server-enforced, not repeated here. Returns the updated
 // visit in the same (adopter-list) shape as GET /adopters/me/visits, not a
 // VisitQueueItem (no adopter/staff join) — callers invalidate the staff
 // queue query rather than rendering this response directly.
-export type StaffVisitTransition = "Confirmed" | "Completed";
+export type StaffVisitTransition = "Confirmed" | "Completed" | "Cancelled";
 
 export const updateVisitStatus = async (
   visitID: number,

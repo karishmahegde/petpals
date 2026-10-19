@@ -12,6 +12,8 @@ jest.mock("../../../config/prisma", () => ({
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  // notify() — the adopter's in-app notification after a Confirm/Cancel.
+  notification: { createManyAndReturn: jest.fn().mockResolvedValue([]) },
 }));
 
 // Only getAccountStatus is faked (authenticate.js's live per-request check).
@@ -372,6 +374,107 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
       expect(res.status).toBe(404);
     });
 
+    // ————— Staff/Admin Cancel (same terms as the adopter's) —————
+    const upcomingVisit = (overrides = {}) => ({
+      visitID: 1,
+      adopterID: 7,
+      shelterID: 9,
+      visitStatus: "Confirmed",
+      visitTime: new Date(Date.now() + 86400000),
+      ...overrides,
+    });
+
+    test("Staff cancelling an upcoming Confirmed visit → 200, staffID set, adopter notified", async () => {
+      prisma.visit.findUnique.mockResolvedValueOnce(upcomingVisit());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.visit.update.mockResolvedValueOnce(
+        buildUpdatedVisit({ visitStatus: "Cancelled", staffID: 42 }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/visits/1")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ visitStatus: "Cancelled" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.visit.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { visitStatus: "Cancelled", staffID: 42 } }),
+      );
+      expect(prisma.notification.createManyAndReturn).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            userID: 7,
+            type: "VisitCancelled",
+            body: "Athens Shelter cancelled your visit to meet Rex.",
+            link: "/adopter/visits",
+          }),
+        ],
+      });
+    });
+
+    test("Staff cancelling an unconfirmed visit → 200", async () => {
+      prisma.visit.findUnique.mockResolvedValueOnce(upcomingVisit({ visitStatus: null }));
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.visit.update.mockResolvedValueOnce(
+        buildUpdatedVisit({ visitStatus: "Cancelled", staffID: 42 }),
+      );
+
+      const res = await request(app)
+        .patch("/api/v1/visits/1")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ visitStatus: "Cancelled" });
+
+      expect(res.status).toBe(200);
+    });
+
+    test("Admin cancelling any shelter's visit → 200, no staffID, no shelter lookup", async () => {
+      prisma.visit.findUnique.mockResolvedValueOnce(upcomingVisit());
+      prisma.visit.update.mockResolvedValueOnce(buildUpdatedVisit({ visitStatus: "Cancelled" }));
+
+      const res = await request(app)
+        .patch("/api/v1/visits/1")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ visitStatus: "Cancelled" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.staff.findUnique).not.toHaveBeenCalled();
+      expect(prisma.visit.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { visitStatus: "Cancelled" } }),
+      );
+    });
+
+    test.each([
+      ["already Cancelled", { visitStatus: "Cancelled" }],
+      ["Completed", { visitStatus: "Completed", visitTime: new Date(Date.now() - 3600000) }],
+      ["in the past", { visitTime: new Date(Date.now() - 3600000) }],
+    ])("Staff cancelling a visit that's %s → 409 CONFLICT, nothing written or sent", async (_, overrides) => {
+      prisma.visit.findUnique.mockResolvedValueOnce(upcomingVisit(overrides));
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .patch("/api/v1/visits/1")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ visitStatus: "Cancelled" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONFLICT");
+      expect(prisma.visit.update).not.toHaveBeenCalled();
+      expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled();
+    });
+
+    test("Staff cancelling another shelter's visit → 403 FORBIDDEN", async () => {
+      prisma.visit.findUnique.mockResolvedValueOnce(upcomingVisit());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 3 });
+
+      const res = await request(app)
+        .patch("/api/v1/visits/1")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ visitStatus: "Cancelled" });
+
+      expect(res.status).toBe(403);
+      expect(prisma.visit.update).not.toHaveBeenCalled();
+    });
+
     // ————— Adopter branch of the same shared endpoint (Cancel) —————
     test("Adopter cancelling their own upcoming visit → 200", async () => {
       prisma.visit.findUnique.mockResolvedValueOnce({
@@ -392,6 +495,7 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
 
       expect(res.status).toBe(200);
       expect(prisma.staff.findUnique).not.toHaveBeenCalled();
+      expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled();
     });
 
     test("Adopter cancelling someone else's visit → 403 FORBIDDEN", async () => {

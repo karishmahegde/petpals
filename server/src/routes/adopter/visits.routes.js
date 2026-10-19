@@ -158,15 +158,17 @@ router.get(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *   patch:
- *     summary: Cancel (Adopter) or Confirm/Complete (Staff, Admin) a visit
+ *     summary: Cancel (Adopter) or Confirm/Complete/Cancel (Staff, Admin) a visit
  *     description: >
  *       Which transitions are valid depends on the caller's role, not a
  *       shared enum: Adopter may cancel their own visit, provided it hasn't
  *       already passed and isn't already Cancelled or Completed. Staff/Admin
  *       may confirm an unconfirmed (null-status) visit, then complete a
- *       Confirmed one — Staff only at their own shelter (403 otherwise);
- *       Admin any shelter. Confirming/completing sets staffID to the acting
- *       Staff member (never set for an Admin actor).
+ *       Confirmed one, and cancel one on the adopter's terms (not yet passed,
+ *       not Cancelled or Completed) — Staff only at their own shelter (403
+ *       otherwise); Admin any shelter. Each sets staffID to the acting Staff
+ *       member (never set for an Admin actor). A staff/admin Confirm or Cancel
+ *       sends the adopter an in-app notification.
  *     tags: [Visits, Staff]
  *     security:
  *       - bearerAuth: []
@@ -186,7 +188,7 @@ router.get(
  *             properties:
  *               visitStatus:
  *                 type: string
- *                 description: Cancelled (Adopter) or Confirmed/Completed (Staff, Admin)
+ *                 description: Cancelled (Adopter, Staff, Admin) or Confirmed/Completed (Staff, Admin)
  *                 enum: [Cancelled, Confirmed, Completed]
  *     responses:
  *       200:
