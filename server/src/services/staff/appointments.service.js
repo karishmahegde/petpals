@@ -682,4 +682,6 @@ module.exports = {
   LIST_SELECT,
   formatListItem,
   timeframeWhere,
+  // Exported for its unit tests (who hears about which edit).
+  notifyAppointment,
 };

@@ -35,7 +35,12 @@ jest.mock("../../../services/auth/userContact", () => ({
   getUserContact: jest.fn(),
 }));
 
+// Who hears about a decision in-app — see "Notifications" below.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
+
 const prisma = require("../../../config/prisma");
+const notifications = require("../../../services/notifications");
 const reviewNotices = require("../../../services/staff/reviewNotices");
 const { getUserContact } = require("../../../services/auth/userContact");
 const authService = require("../../../services/auth/auth.service");
@@ -562,6 +567,124 @@ describe("Application review workflow (Staff/Admin)", () => {
   });
 
   // ————————————————— PATCH /api/v1/adoption-applications/:id (assign staff) —————————————————
+  // ————————————————————— in-app notifications —————————————————————
+  describe("PATCH /api/v1/adoption-applications/:id/status — notifications", () => {
+    const { notify, messages } = notifications;
+    const NAMES = { petName: "Rex", shelterName: "Athens Shelter" };
+
+    const pendingApplication = (overrides = {}) => ({
+      applicationID: 1,
+      adopterID: 7,
+      shelterID: 9,
+      petID: 5,
+      applicationStatus: "Pending",
+      pet: { petName: "Rex", adoptionStatus: "available" },
+      adopter: { adopterName: "Emilie" },
+      ...overrides,
+    });
+
+    const decide = (status, token = `Bearer ${staffToken(42)}`) =>
+      request(app)
+        .patch("/api/v1/adoption-applications/1/status")
+        .set("Authorization", token)
+        .send({ status });
+
+    test("Accept: the applicant is approved, and every auto-declined applicant is told", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(pendingApplication());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Accepted", staffID: 42 }),
+      );
+      prisma.pet.update.mockResolvedValueOnce({});
+      prisma.adoptionApplication.findMany.mockResolvedValueOnce([
+        { adopterID: 11, adopter: { adopterName: "Ali", user: { userEmail: "ali@example.com" } } },
+        { adopterID: 12, adopter: { adopterName: "Bo", user: { userEmail: "bo@example.com" } } },
+      ]);
+
+      const res = await decide("Accepted");
+
+      expect(res.status).toBe(200);
+      expect(notify).toHaveBeenCalledWith([7], messages.applicationApproved(NAMES));
+      expect(notify).toHaveBeenCalledWith([11, 12], messages.applicationDeclined(NAMES));
+      // The auto-declined list is read in the same transaction as the decline.
+      expect(prisma.adoptionApplication.findMany.mock.calls[0][0].select).toHaveProperty(
+        "adopterID",
+        true,
+      );
+    });
+
+    test("Accept with no other applicants: the empty decline list stores nothing", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(pendingApplication());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Accepted", staffID: 42 }),
+      );
+      prisma.pet.update.mockResolvedValueOnce({});
+      prisma.adoptionApplication.findMany.mockResolvedValueOnce([]);
+
+      await decide("Accepted");
+
+      expect(notify).toHaveBeenCalledWith([7], messages.applicationApproved(NAMES));
+      expect(notify).toHaveBeenCalledWith([], messages.applicationDeclined(NAMES));
+    });
+
+    test("Reject: the applicant is told it was declined, and no one else", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(pendingApplication());
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Rejected" }),
+      );
+
+      const res = await decide("Rejected");
+
+      expect(res.status).toBe(200);
+      expect(notify).toHaveBeenCalledWith([7], messages.applicationDeclined(NAMES));
+      expect(notify).toHaveBeenCalledWith([], messages.applicationDeclined(NAMES));
+      expect(notifications.shelterStaffIDs).not.toHaveBeenCalled();
+    });
+
+    test("Admin decisions notify the same way", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(pendingApplication());
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Rejected" }),
+      );
+
+      await decide("Rejected", `Bearer ${adminToken()}`);
+
+      expect(notify).toHaveBeenCalledWith([7], messages.applicationDeclined(NAMES));
+    });
+
+    test("an adopter's Withdraw tells the shelter's staff, not the adopter", async () => {
+      notifications.shelterStaffIDs.mockResolvedValueOnce([42, 43]);
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(pendingApplication());
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Withdrawn" }),
+      );
+
+      const res = await decide("Withdrawn", `Bearer ${adopterToken(7)}`);
+
+      expect(res.status).toBe(200);
+      expect(notifications.shelterStaffIDs).toHaveBeenCalledWith(9);
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(
+        [42, 43],
+        messages.applicationWithdrawn({ adopterName: "Emilie", petName: "Rex" }),
+      );
+    });
+
+    test("a refused change (409) notifies no one", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(
+        pendingApplication({ applicationStatus: "Accepted" }),
+      );
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await decide("Rejected");
+
+      expect(res.status).toBe(409);
+      expect(notify).not.toHaveBeenCalled();
+    });
+  });
+
   describe("PATCH /api/v1/adoption-applications/:id (assign staff)", () => {
     // Application 1 is at shelter 9, managed by staff 42. Staff 43 is an
     // Active member of shelter 9 — a valid assignee.

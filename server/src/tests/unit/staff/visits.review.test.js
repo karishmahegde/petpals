@@ -12,9 +12,13 @@ jest.mock("../../../config/prisma", () => ({
     findUnique: jest.fn(),
     update: jest.fn(),
   },
-  // notify() — the adopter's in-app notification after a Confirm/Cancel.
-  notification: { createManyAndReturn: jest.fn().mockResolvedValue([]) },
+  // The adopter's name on the staff's notification when they cancel.
+  adopter: { findUnique: jest.fn() },
 }));
+
+// Who hears about a confirm/cancel in-app.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
 
 // Only getAccountStatus is faked (authenticate.js's live per-request check).
 jest.mock("../../../services/auth/auth.service", () => ({
@@ -23,6 +27,7 @@ jest.mock("../../../services/auth/auth.service", () => ({
 }));
 
 const prisma = require("../../../config/prisma");
+const notifications = require("../../../services/notifications");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
 
@@ -208,6 +213,10 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
           data: { visitStatus: "Confirmed", staffID: 42 },
         }),
       );
+      expect(notifications.notify).toHaveBeenCalledWith(
+        [7],
+        notifications.messages.visitConfirmed({ shelterName: "Athens Shelter", petName: "Rex" }),
+      );
     });
 
     test("Confirm an already-Confirmed visit → 409 CONFLICT, nothing written", async () => {
@@ -254,6 +263,8 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
           data: { visitStatus: "Completed", staffID: 42 },
         }),
       );
+      // The adopter was there — completing it isn't news to them.
+      expect(notifications.notify).not.toHaveBeenCalled();
     });
 
     // Transitions only move forward — a Completed visit can't be re-opened.
@@ -400,16 +411,10 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
       expect(prisma.visit.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { visitStatus: "Cancelled", staffID: 42 } }),
       );
-      expect(prisma.notification.createManyAndReturn).toHaveBeenCalledWith({
-        data: [
-          expect.objectContaining({
-            userID: 7,
-            type: "VisitCancelled",
-            body: "Athens Shelter cancelled your visit to meet Rex.",
-            link: "/adopter/visits",
-          }),
-        ],
-      });
+      expect(notifications.notify).toHaveBeenCalledWith(
+        [7],
+        notifications.messages.visitCancelled({ shelterName: "Athens Shelter", petName: "Rex" }),
+      );
     });
 
     test("Staff cancelling an unconfirmed visit → 200", async () => {
@@ -459,7 +464,7 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe("CONFLICT");
       expect(prisma.visit.update).not.toHaveBeenCalled();
-      expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled();
+      expect(notifications.notify).not.toHaveBeenCalled();
     });
 
     test("Staff cancelling another shelter's visit → 403 FORBIDDEN", async () => {
@@ -476,7 +481,9 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
     });
 
     // ————— Adopter branch of the same shared endpoint (Cancel) —————
-    test("Adopter cancelling their own upcoming visit → 200", async () => {
+    test("Adopter cancelling their own upcoming visit → 200, the shelter's staff notified", async () => {
+      notifications.shelterStaffIDs.mockResolvedValueOnce([42, 43]);
+      prisma.adopter.findUnique.mockResolvedValueOnce({ adopterName: "Emilie" });
       prisma.visit.findUnique.mockResolvedValueOnce({
         visitID: 1,
         adopterID: 7,
@@ -495,7 +502,12 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
 
       expect(res.status).toBe(200);
       expect(prisma.staff.findUnique).not.toHaveBeenCalled();
-      expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled();
+      expect(notifications.shelterStaffIDs).toHaveBeenCalledWith(9);
+      expect(notifications.notify).toHaveBeenCalledTimes(1);
+      expect(notifications.notify).toHaveBeenCalledWith(
+        [42, 43],
+        notifications.messages.visitCancelledByAdopter({ adopterName: "Emilie", petName: "Rex" }),
+      );
     });
 
     test("Adopter cancelling someone else's visit → 403 FORBIDDEN", async () => {

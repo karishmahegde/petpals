@@ -33,9 +33,14 @@ jest.mock("../../../services/geocoding", () => ({
 // suite doesn't need a real accountStatus-bearing table for the token's role.
 jest.mock("../../../services/auth/auth.service");
 
+// The capacity alert is an in-app notification to the shelter's manager.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
+
 const prisma = require("../../../config/prisma");
 const { resolveCoordsFromPostalCode } = require("../../../services/geocoding");
 const authService = require("../../../services/auth/auth.service");
+const { notify, messages } = require("../../../services/notifications");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
 
 const signToken = (role, userID = 1) =>
@@ -222,6 +227,71 @@ describe("Admin shelter management endpoints", () => {
     });
   });
 
+  // ————————————————————————————— POST /shelters/:id/capacity-alerts —————————————————————————————
+  describe("POST /api/v1/shelters/:id/capacity-alerts", () => {
+    const alert = (id = 3) =>
+      request(app)
+        .post(`/api/v1/shelters/${id}/capacity-alerts`)
+        .set("Authorization", `Bearer ${adminToken()}`);
+
+    const shelterWithManager = (accountStatus = "Active") => ({
+      shelterName: "PetPals Brooklyn",
+      manager: { userID: 60, staffName: "Morgan Lee", accountStatus },
+    });
+
+    test("alerts the shelter's active manager → 201 naming who was told", async () => {
+      prisma.shelter.findUnique.mockResolvedValueOnce(shelterWithManager());
+      notify.mockResolvedValueOnce([{ notificationID: 1 }]);
+
+      const res = await alert();
+
+      expect(res.status).toBe(201);
+      expect(res.body.data).toEqual({ managerID: 60, managerName: "Morgan Lee" });
+      expect(notify).toHaveBeenCalledWith(
+        [60],
+        messages.capacityAlert({ shelterName: "PetPals Brooklyn" }),
+      );
+    });
+
+    test.each([
+      ["no manager", { shelterName: "PetPals Brooklyn", manager: null }],
+      ["a manager who isn't Active", shelterWithManager("Deactivated")],
+    ])("%s → 409 CONFLICT, nothing sent", async (_label, shelter) => {
+      prisma.shelter.findUnique.mockResolvedValueOnce(shelter);
+
+      const res = await alert();
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe("PetPals Brooklyn has no active manager to alert");
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    test("unknown shelter → 404 NOT_FOUND", async () => {
+      prisma.shelter.findUnique.mockResolvedValueOnce(null);
+
+      const res = await alert(999);
+
+      expect(res.status).toBe(404);
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    test("sending is the request: a failed insert → 500, not a quiet success", async () => {
+      prisma.shelter.findUnique.mockResolvedValueOnce(shelterWithManager());
+      notify.mockResolvedValueOnce([]);
+
+      const res = await alert();
+
+      expect(res.status).toBe(500);
+    });
+
+    test("non-integer id → 400 BAD_REQUEST, nothing looked up", async () => {
+      const res = await alert("abc");
+
+      expect(res.status).toBe(400);
+      expect(prisma.shelter.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
   // ————————————————————————————— ROLE ENFORCEMENT —————————————————————————————
   describe("role enforcement", () => {
     test.each([
@@ -229,6 +299,7 @@ describe("Admin shelter management endpoints", () => {
       ["put", "/api/v1/shelters/3", { shelterSize: 10 }],
       ["patch", "/api/v1/shelters/3/status", { shelterStatus: "Open" }],
       ["patch", "/api/v1/shelters/3/manager", { managerStaffID: 1 }],
+      ["post", "/api/v1/shelters/3/capacity-alerts", {}],
     ])(
       "%s %s: non-Admin role → 403 FORBIDDEN, nothing written",
       async (method, path, body) => {
@@ -244,6 +315,7 @@ describe("Admin shelter management endpoints", () => {
         });
         expect(prisma.shelter.create).not.toHaveBeenCalled();
         expect(prisma.shelter.update).not.toHaveBeenCalled();
+        expect(notify).not.toHaveBeenCalled();
       },
     );
   });
