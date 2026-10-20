@@ -15,6 +15,8 @@ import {
   getMyAdoptedPets,
   getMyApplicationsCount,
 } from "../../../../../../logic/api/adoptersApi";
+import { getUnreadCount } from "../../../../../../logic/api/notificationsApi";
+import { notificationKeys } from "../../../../../../logic/notifications/notificationKeys";
 
 const StatsWidget = () => {
   const adoptedPetsQuery = useQuery({
@@ -25,9 +27,15 @@ const StatsWidget = () => {
     queryKey: ["adopter", "applications-count"],
     queryFn: getMyApplicationsCount,
   });
+  // Same key as the navbar bell, so the live stream keeps both in step.
+  const unreadCountQuery = useQuery({
+    queryKey: notificationKeys.unreadCount,
+    queryFn: getUnreadCount,
+  });
 
   const petsCount = adoptedPetsQuery.data?.length;
   const applicationsCount = applicationsCountQuery.data;
+  const unreadCount = unreadCountQuery.data;
 
   return (
     // Fixed 356x356 square — 2 tiles (144px) + gap (20px) + padding (24px each
@@ -55,12 +63,9 @@ const StatsWidget = () => {
           label={applicationsCount === 1 ? "Application" : "Applications"}
           color="rose"
         />
-        {/* No notification system exists yet anywhere in the app (see
-            DashboardNavbar's hardcoded hasNotifications=false) — same
-            placeholder treatment here. */}
         <StatTile
           icon={<PiBellBold />}
-          value={0}
+          value={unreadCount ?? "—"}
           label="Notifications"
           color="green"
         />

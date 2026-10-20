@@ -2,9 +2,11 @@
 // Shelters at or near capacity, on the admin Overview page — >=90% utilization
 // (from GET /analytics/shelters, same source/query key as SheltersWidget and
 // the Shelters tab). "Notify Manager" only shows when a manager is actually
-// assigned (nothing to notify otherwise, same as the Shelters tab row).
+// assigned (nothing to notify otherwise, same as the Shelters tab row); it
+// sends that manager an in-app CapacityAlert (POST /shelters/:id/capacity-alerts).
+import axios from "axios";
 import toast from "react-hot-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { OverviewWidgetCard } from "../../../../../../components/ui/dashboard/DashboardWidgetHeader";
 import {
   DashboardListRow,
@@ -15,6 +17,7 @@ import {
   getShelterAnalytics,
   type ShelterAnalyticsItem,
 } from "../../../../../../logic/api/analyticsApi";
+import { sendCapacityAlert } from "../../../../../../logic/api/sheltersApi";
 
 const FULL_THRESHOLD = 100;
 const ALMOST_FULL_THRESHOLD = 90;
@@ -33,18 +36,25 @@ const alertLevel = (shelter: ShelterAnalyticsItem): AlertLevel | null => {
   return null;
 };
 
-// No notification system exists yet anywhere in the app (see
-// DashboardNavbar's hardcoded hasNotifications=false) — same placeholder
-// treatment here, an honest toast instead of a fake "sent" confirmation.
-const notifyManager = (shelterName: string, managerName: string | null) =>
-  toast(
-    `Notifications aren't set up yet — let ${managerName ?? "the manager"} at ${shelterName} know directly for now.`,
-  );
-
 const CapacityAlertsWidget = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "shelters-analytics"],
     queryFn: () => getShelterAnalytics(),
+  });
+
+  // The analytics row can be stale (manager since removed or deactivated) —
+  // the 409's message names the shelter, so show it as-is.
+  const notifyMutation = useMutation({
+    mutationFn: (shelter: ShelterAnalyticsItem) =>
+      sendCapacityAlert(shelter.shelterID),
+    onSuccess: ({ managerName }, shelter) =>
+      toast.success(`${managerName} has been alerted about ${shelter.shelterName}`),
+    onError: (error) =>
+      toast.error(
+        axios.isAxiosError(error) && error.response?.status === 409
+          ? error.response.data.message
+          : "Couldn't send the alert. Please try again.",
+      ),
   });
 
   const alerts = (data ?? [])
@@ -75,8 +85,10 @@ const CapacityAlertsWidget = () => {
               actions={
                 shelter.managerStaffID != null && (
                   <RowActionButton
-                    onClick={() =>
-                      notifyManager(shelter.shelterName, shelter.managerName)
+                    onClick={() => notifyMutation.mutate(shelter)}
+                    disabled={
+                      notifyMutation.isPending &&
+                      notifyMutation.variables?.shelterID === shelter.shelterID
                     }
                   >
                     Notify Manager

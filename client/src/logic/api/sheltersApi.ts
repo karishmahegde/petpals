@@ -1,6 +1,6 @@
 // What it does: Admin-only shelter management API — create, edit, status,
-// and manager assignment. The read side (list + status badge + utilization)
-// is GET /analytics/shelters — see analyticsApi.ts.
+// manager assignment and capacity alerts. The read side (list + status badge
+// + utilization) is GET /analytics/shelters — see analyticsApi.ts.
 import axiosInstance from "./axiosInstance";
 
 export type ShelterStatus = "Open" | "Full" | "Closed";
@@ -64,6 +64,22 @@ export const updateShelterManager = async (
   const response = await axiosInstance.patch(
     `/shelters/${shelterID}/manager`,
     { managerStaffID },
+  );
+  return response.data.data;
+};
+
+export interface CapacityAlertResult {
+  managerID: number;
+  managerName: string;
+}
+
+// Sends the shelter's manager an in-app CapacityAlert notification. 409 when
+// the shelter has no manager or the manager's account isn't Active.
+export const sendCapacityAlert = async (
+  shelterID: number,
+): Promise<CapacityAlertResult> => {
+  const response = await axiosInstance.post(
+    `/shelters/${shelterID}/capacity-alerts`,
   );
   return response.data.data;
 };
