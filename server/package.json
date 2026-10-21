@@ -7,6 +7,8 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "test": "jest --runInBand",
+    "test:unit": "jest src/tests/unit --coverage",
+    "test:integration": "jest src/tests/integration --runInBand",
     "test:coverage": "jest --coverage --runInBand",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
