@@ -31,7 +31,7 @@ cd petpals
 
 1. [supabase.com](https://supabase.com) → **New project**. Any name/region/DB password works. Takes ~2 minutes to provision.
 2. **Project Settings → Data API** → copy the **Project URL** and the **`anon` public key** and **`service_role` key**.
-3. **Project Settings → Database → Connection string** → copy the **URI** (Direct connection, not the pgbouncer/pooled one — Prisma's migration step needs a direct connection).
+3. **Connect** (top bar) → **Direct** → set the method to **Session pooler** → copy the URI (host `aws-…pooler.supabase.com`, port **5432**, user `postgres.<project-ref>`), with your DB password filled in. The direct-connection host is IPv6-only, which Docker containers and Railway can't reach; the session pooler is IPv4 and keeps a real session, so Prisma's migrations work through it. Not the **transaction** pooler (port 6543) — migrations need session mode.
 
 You now have everything the server needs: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_KEY` (the anon key), `SUPABASE_SERVICE_ROLE_KEY`.
 

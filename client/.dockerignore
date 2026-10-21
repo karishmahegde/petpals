@@ -1,0 +1,13 @@
+# The build gets its VITE_* values from Dockerfile build args, never from a
+# local .env file; node_modules is installed inside the image.
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+cypress/videos
+cypress/screenshots
+Dockerfile
+.dockerignore
+**/.DS_Store

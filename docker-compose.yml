@@ -1,57 +1,38 @@
-#What it does: Defines three "containers" — PostgreSQL, the Express server, and the React app. Tells Docker how to run them all together with one command: docker-compose up.
-version: "3.9"
+# What it does: runs the Express API and the React client in containers with
+# one command — `docker compose up --build`. The database and file storage stay
+# on Supabase: the API reads everything from server/.env, the same file local
+# dev uses. Build the database once from the host first (README → Option B).
 
 services:
-  # ── PostgreSQL ───────────────────────────────────────────────
-  db:
-    image: postgres:15-alpine
-    container_name: petpals_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: petpals
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
   # ── Express API ──────────────────────────────────────────────
   server:
     build:
       context: ./server
-      dockerfile: Dockerfile
     container_name: petpals_server
     restart: unless-stopped
-    depends_on:
-      - db
+    env_file: ./server/.env
     ports:
       - "5000:5000"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/petpals
-      NODE_ENV: development
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: 7d
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_KEY: ${SUPABASE_KEY}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      AI_BASE_URL: ${AI_BASE_URL}
-      AI_API_KEY: ${AI_API_KEY}
-      AI_MODEL: ${AI_MODEL}
-    volumes:
-      - ./server/src:/app/src # hot-reload in dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── React Client ─────────────────────────────────────────────
+  # Served by nginx, which forwards /api/* to the server container like
+  # Vercel's rewrite does; the notification stream goes straight to the API.
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/v1
+        VITE_STREAM_URL: http://localhost:5000/api/v1
     container_name: petpals_client
     restart: unless-stopped
     depends_on:
-      - server
+      server:
+        condition: service_healthy
     ports:
       - "3000:80"
-
-volumes:
-  pgdata:

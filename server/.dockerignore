@@ -1,0 +1,11 @@
+# Keep secrets and host builds out of the image: .env is supplied at run time,
+# and node_modules is installed inside the image (bcrypt is a native module).
+node_modules
+.env
+.env.*
+!.env.example
+coverage
+src/tests
+Dockerfile
+.dockerignore
+**/.DS_Store
