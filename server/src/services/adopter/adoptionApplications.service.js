@@ -765,8 +765,8 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
     if (status === "Accepted") autoDeclined = results[2] ?? [];
   } catch (err) {
     // Another application for this pet was accepted at the same moment —
-    // the one-Accepted-per-pet partial unique index fired (migration
-    // …_one_accepted_application_per_pet). Nothing was written.
+    // the one-Accepted-per-pet partial unique index fired (in the baseline
+    // migration). Nothing was written.
     if (status === "Accepted" && isUniqueViolation(err)) {
       throw petNoLongerAvailable(application.pet.petName);
     }

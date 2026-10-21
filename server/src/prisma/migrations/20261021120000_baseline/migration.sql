@@ -1,4 +1,4 @@
--- PetPals baseline — the complete schema as of 2026-09-26.
+-- PetPals baseline — the complete schema as of 2026-10-21.
 --
 -- Generated with `prisma migrate diff --from-empty --to-schema` and then
 -- hand-edited to add what Prisma can't express, so that `prisma migrate
@@ -8,9 +8,10 @@
 --   * the human-facing reference codes (petCode, applicationCode, …) as
 --     Postgres GENERATED ALWAYS STORED columns — Prisma only sees them as
 --     plain nullable text, so never write them from application code
---   * the two partial unique indexes
--- Replaces the old 20260625234222_init migration plus the upgrade steps that
--- used to live in setup/manual-constraints.sql.
+--   * the partial and expression unique indexes at the end of this file
+-- Folds the first baseline (20260926000000) and the 15 migrations after it
+-- into one; their data-only backfills are left out, since a fresh database
+-- has no rows to fix.
 
 -- ── PostGIS ─────────────────────────────────────────────────────
 -- Supabase keeps extensions in their own schema (on the default search_path).
@@ -63,22 +64,28 @@ CREATE TYPE "ApplicationType" AS ENUM ('Adopt', 'Foster');
 CREATE TYPE "PaymentStatus" AS ENUM ('Paid');
 
 -- CreateEnum
-CREATE TYPE "AdopterAccountStatus" AS ENUM ('Active', 'Banned', 'Deactivated');
+CREATE TYPE "AdopterAccountStatus" AS ENUM ('Active', 'Banned', 'Deactivated', 'Closed');
 
 -- CreateEnum
-CREATE TYPE "DonorAccountStatus" AS ENUM ('Active', 'Banned', 'Deactivated');
+CREATE TYPE "DonorAccountStatus" AS ENUM ('Active', 'Banned', 'Deactivated', 'Closed');
 
 -- CreateEnum
-CREATE TYPE "StaffAccountStatus" AS ENUM ('Pending', 'Active', 'Deactivated');
+CREATE TYPE "StaffAccountStatus" AS ENUM ('Pending', 'Active', 'Deactivated', 'Closed', 'Declined');
 
 -- CreateEnum
-CREATE TYPE "VetAccountStatus" AS ENUM ('Pending', 'Active', 'Deactivated');
+CREATE TYPE "VetAccountStatus" AS ENUM ('Pending', 'Active', 'Deactivated', 'Closed', 'Declined');
 
 -- CreateEnum
-CREATE TYPE "AdminAccountStatus" AS ENUM ('Pending', 'Active', 'Deactivated');
+CREATE TYPE "AdminAccountStatus" AS ENUM ('Pending', 'Active', 'Deactivated', 'Closed', 'Declined');
 
 -- CreateEnum
-CREATE TYPE "VolunteerAccountStatus" AS ENUM ('Pending', 'Active', 'Banned', 'Deactivated');
+CREATE TYPE "VolunteerAccountStatus" AS ENUM ('Pending', 'Active', 'Banned', 'Deactivated', 'Closed', 'Declined');
+
+-- CreateEnum
+CREATE TYPE "AccountTokenPurpose" AS ENUM ('EmailVerification', 'PasswordReset', 'Reactivation', 'EmailChange');
+
+-- CreateEnum
+CREATE TYPE "NotificationType" AS ENUM ('ApplicationSubmitted', 'ApplicationApproved', 'ApplicationDeclined', 'VisitConfirmed', 'VisitCancelled', 'AppointmentScheduled', 'AppointmentChanged', 'AppointmentCancelled', 'GovernmentIdVerified', 'GovernmentIdRejected', 'NewApplication', 'NewVisitRequest', 'ApplicationWithdrawn', 'VisitCancelledByAdopter', 'SignupReadyForApproval', 'TransferIncoming', 'TransferCompleted', 'TransferRejected', 'TransferCancelled', 'CapacityAlert', 'AppointmentAssigned', 'TaskAssigned', 'EventAssigned', 'EventCancelled', 'AppointmentAssistAssigned', 'AppointmentAssistCancelled', 'DonationReceived', 'AdminSignupPending');
 
 -- CreateEnum
 CREATE TYPE "VisitStatus" AS ENUM ('Confirmed', 'Cancelled', 'Completed');
@@ -91,15 +98,6 @@ CREATE TYPE "AppointmentStatus" AS ENUM ('Scheduled', 'Completed', 'Cancelled');
 
 -- CreateEnum
 CREATE TYPE "ApplicationStatus" AS ENUM ('Pending', 'Accepted', 'Rejected', 'Withdrawn');
-
--- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('vaccination', 'appointment', 'task');
-
--- CreateEnum
-CREATE TYPE "NotificationStatus" AS ENUM ('Pending', 'Sent', 'Failed');
-
--- CreateEnum
-CREATE TYPE "RecipientType" AS ENUM ('adopter', 'staff', 'volunteer', 'veterinarian');
 
 -- CreateEnum
 CREATE TYPE "VolunteerAppStatus" AS ENUM ('Created', 'Accepted', 'Rejected');
@@ -262,6 +260,7 @@ CREATE TABLE "Pet" (
     "compatibleWithPets" BOOLEAN NOT NULL DEFAULT false,
     "specialNeeds" BOOLEAN NOT NULL DEFAULT false,
     "featuredFlag" BOOLEAN NOT NULL DEFAULT false,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Pet_pkey" PRIMARY KEY ("petID")
 );
@@ -316,6 +315,28 @@ CREATE TABLE "Adopter" (
 );
 
 -- CreateTable
+CREATE TABLE "AdopterQuiz" (
+    "adopterID" INTEGER NOT NULL,
+    "answers" JSONB NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AdopterQuiz_pkey" PRIMARY KEY ("adopterID")
+);
+
+-- CreateTable
+CREATE TABLE "AdopterMatch" (
+    "adopterID" INTEGER NOT NULL,
+    "petID" INTEGER NOT NULL,
+    "ruleScore" INTEGER NOT NULL,
+    "aiScore" INTEGER,
+    "totalScore" INTEGER NOT NULL,
+    "reason" VARCHAR(300),
+    "computedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AdopterMatch_pkey" PRIMARY KEY ("adopterID","petID")
+);
+
+-- CreateTable
 CREATE TABLE "Favorite" (
     "adopterID" INTEGER NOT NULL,
     "petID" INTEGER NOT NULL,
@@ -359,19 +380,6 @@ CREATE TABLE "Visit" (
 );
 
 -- CreateTable
-CREATE TABLE "Notification" (
-    "notificationID" SERIAL NOT NULL,
-    "recipientID" INTEGER NOT NULL,
-    "notificationType" "NotificationType" NOT NULL,
-    "notificationStatus" "NotificationStatus" NOT NULL DEFAULT 'Pending',
-    "recipientType" "RecipientType" NOT NULL,
-    "sendTime" TIMESTAMP(3) NOT NULL,
-    "textBody" VARCHAR(300) NOT NULL,
-
-    CONSTRAINT "Notification_pkey" PRIMARY KEY ("notificationID")
-);
-
--- CreateTable
 CREATE TABLE "HealthRecord" (
     "recordID" SERIAL NOT NULL,
     "petID" INTEGER NOT NULL,
@@ -379,8 +387,48 @@ CREATE TABLE "HealthRecord" (
     "lastUpdated" TIMESTAMP(3) NOT NULL,
     "vetID" INTEGER,
     "recordDesc" VARCHAR(500) NOT NULL,
+    "appointmentID" INTEGER,
 
     CONSTRAINT "HealthRecord_pkey" PRIMARY KEY ("recordID")
+);
+
+-- CreateTable
+CREATE TABLE "PetHealthSummary" (
+    "petID" INTEGER NOT NULL,
+    "inputHash" VARCHAR(64) NOT NULL,
+    "summary" VARCHAR(1500) NOT NULL,
+    "pointsToReview" JSONB NOT NULL,
+    "generatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PetHealthSummary_pkey" PRIMARY KEY ("petID")
+);
+
+-- CreateTable
+CREATE TABLE "AccountToken" (
+    "tokenID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
+    "purpose" "AccountTokenPurpose" NOT NULL,
+    "tokenHash" VARCHAR(64) NOT NULL,
+    "newEmail" VARCHAR(45),
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AccountToken_pkey" PRIMARY KEY ("tokenID")
+);
+
+-- CreateTable
+CREATE TABLE "Notification" (
+    "notificationID" SERIAL NOT NULL,
+    "userID" INTEGER NOT NULL,
+    "type" "NotificationType" NOT NULL,
+    "title" VARCHAR(120) NOT NULL,
+    "body" VARCHAR(300) NOT NULL,
+    "link" VARCHAR(200),
+    "readAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("notificationID")
 );
 
 -- CreateTable
@@ -399,7 +447,7 @@ CREATE TABLE "VaccinationRecord" (
     "petID" INTEGER NOT NULL,
     "vaccineID" INTEGER NOT NULL,
     "administeredDate" TIMESTAMP(3) NOT NULL,
-    "dueDate" TIMESTAMP(3) NOT NULL,
+    "dueDate" TIMESTAMP(3),
     "administeredBy" INTEGER,
     "administeredAt" INTEGER,
     "appointmentID" INTEGER,
@@ -427,7 +475,7 @@ CREATE TABLE "Appointment" (
     "appointmentID" SERIAL NOT NULL,
     "appointmentCode" TEXT GENERATED ALWAYS AS ('APT-' || lpad("appointmentID"::text, 5, '0')) STORED,
     "petID" INTEGER NOT NULL,
-    "vetID" INTEGER NOT NULL,
+    "vetID" INTEGER,
     "shelterID" INTEGER NOT NULL,
     "staffID" INTEGER,
     "volunteerID" INTEGER,
@@ -559,11 +607,13 @@ CREATE TABLE "Donor" (
 CREATE TABLE "Donation" (
     "donationID" SERIAL NOT NULL,
     "donationCode" TEXT GENERATED ALWAYS AS ('DON-' || lpad("donationID"::text, 5, '0')) STORED,
-    "donorID" INTEGER NOT NULL,
+    "donorID" INTEGER,
     "shelterID" INTEGER NOT NULL,
     "donationDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "donationAmt" DOUBLE PRECISION NOT NULL,
     "donationDesc" VARCHAR(300),
+    "stripeCheckoutSessionID" VARCHAR(255),
+    "stripePaymentIntentID" VARCHAR(255),
 
     CONSTRAINT "Donation_pkey" PRIMARY KEY ("donationID")
 );
@@ -587,6 +637,9 @@ CREATE INDEX "Pet_adoptionStatus_idx" ON "Pet"("adoptionStatus");
 CREATE INDEX "Pet_breedID_idx" ON "Pet"("breedID");
 
 -- CreateIndex
+CREATE INDEX "AdopterMatch_adopterID_totalScore_idx" ON "AdopterMatch"("adopterID", "totalScore");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "AdoptionApplication_applicationCode_key" ON "AdoptionApplication"("applicationCode");
 
 -- CreateIndex
@@ -597,6 +650,21 @@ CREATE INDEX "AdoptionApplication_petID_idx" ON "AdoptionApplication"("petID");
 
 -- CreateIndex
 CREATE INDEX "AdoptionApplication_shelterID_idx" ON "AdoptionApplication"("shelterID");
+
+-- CreateIndex
+CREATE INDEX "HealthRecord_appointmentID_idx" ON "HealthRecord"("appointmentID");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AccountToken_tokenHash_key" ON "AccountToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "AccountToken_userID_purpose_idx" ON "AccountToken"("userID", "purpose");
+
+-- CreateIndex
+CREATE INDEX "Notification_userID_createdAt_idx" ON "Notification"("userID", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Notification_userID_readAt_idx" ON "Notification"("userID", "readAt");
 
 -- CreateIndex
 CREATE INDEX "VaccinationRecord_appointmentID_idx" ON "VaccinationRecord"("appointmentID");
@@ -612,6 +680,9 @@ CREATE UNIQUE INDEX "GovernmentID_userID_userType_key" ON "GovernmentID"("userID
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Donation_donationCode_key" ON "Donation"("donationCode");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Donation_stripeCheckoutSessionID_key" ON "Donation"("stripeCheckoutSessionID");
 
 -- AddForeignKey
 ALTER TABLE "Admin" ADD CONSTRAINT "Admin_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -656,6 +727,15 @@ ALTER TABLE "Adopter" ADD CONSTRAINT "Adopter_preferredBreedID_fkey" FOREIGN KEY
 ALTER TABLE "Adopter" ADD CONSTRAINT "Adopter_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "AdopterQuiz" ADD CONSTRAINT "AdopterQuiz_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("userID") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AdopterMatch" ADD CONSTRAINT "AdopterMatch_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("userID") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AdopterMatch" ADD CONSTRAINT "AdopterMatch_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Favorite" ADD CONSTRAINT "Favorite_adopterID_fkey" FOREIGN KEY ("adopterID") REFERENCES "Adopter"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -690,6 +770,18 @@ ALTER TABLE "HealthRecord" ADD CONSTRAINT "HealthRecord_petID_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "HealthRecord" ADD CONSTRAINT "HealthRecord_vetID_fkey" FOREIGN KEY ("vetID") REFERENCES "Veterinarian"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "HealthRecord" ADD CONSTRAINT "HealthRecord_appointmentID_fkey" FOREIGN KEY ("appointmentID") REFERENCES "Appointment"("appointmentID") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PetHealthSummary" ADD CONSTRAINT "PetHealthSummary_petID_fkey" FOREIGN KEY ("petID") REFERENCES "Pet"("petID") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AccountToken" ADD CONSTRAINT "AccountToken_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VaccinationRecord" ADD CONSTRAINT "VaccinationRecord_administeredAt_fkey" FOREIGN KEY ("administeredAt") REFERENCES "Shelter"("shelterID") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -728,7 +820,7 @@ ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_petID_fkey" FOREIGN KEY ("
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_vetID_fkey" FOREIGN KEY ("vetID") REFERENCES "Veterinarian"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_vetID_fkey" FOREIGN KEY ("vetID") REFERENCES "Veterinarian"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_staffID_fkey" FOREIGN KEY ("staffID") REFERENCES "Staff"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -779,7 +871,7 @@ ALTER TABLE "VolunteerEvent" ADD CONSTRAINT "VolunteerEvent_volunteerID_fkey" FO
 ALTER TABLE "Donor" ADD CONSTRAINT "Donor_userID_fkey" FOREIGN KEY ("userID") REFERENCES "Users"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Donation" ADD CONSTRAINT "Donation_donorID_fkey" FOREIGN KEY ("donorID") REFERENCES "Donor"("userID") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Donation" ADD CONSTRAINT "Donation_donorID_fkey" FOREIGN KEY ("donorID") REFERENCES "Donor"("userID") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Donation" ADD CONSTRAINT "Donation_shelterID_fkey" FOREIGN KEY ("shelterID") REFERENCES "Shelter"("shelterID") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -788,11 +880,28 @@ ALTER TABLE "Donation" ADD CONSTRAINT "Donation_shelterID_fkey" FOREIGN KEY ("sh
 -- Spatial index for /shelters/nearby's ST_DWithin filter.
 CREATE INDEX "Shelter_shelterLocation_idx" ON "Shelter" USING GIST ("shelterLocation");
 
+-- Case-insensitive name uniqueness, so "Labrador" and "labrador" can't both
+-- exist. staff/species.service.js pre-checks for a clean 409 and maps a
+-- violation of these (a race) to the same 409. Species names are unique
+-- table-wide; breed names within their species ("Mixed" for Dog and Cat).
+CREATE UNIQUE INDEX "Species_speciesName_lower_key"
+  ON "Species" (LOWER("speciesName"));
+
+CREATE UNIQUE INDEX "Breed_speciesID_breedName_lower_key"
+  ON "Breed" ("speciesID", LOWER("breedName"));
+
 -- One active (Pending/Accepted) application per adopter+pet; resubmitting
 -- after a Rejected/Withdrawn one is still allowed.
 CREATE UNIQUE INDEX "AdoptionApplication_active_adopter_pet_key"
   ON "AdoptionApplication" ("adopterID", "petID")
   WHERE "applicationStatus" IN ('Pending', 'Accepted');
+
+-- At most one Accepted application per pet. adoptionApplications.service.js
+-- refuses to accept for a pet that's no longer available; this stops two
+-- simultaneous acceptances, and the service maps the violation to a 409.
+CREATE UNIQUE INDEX "AdoptionApplication_one_accepted_per_pet_key"
+  ON "AdoptionApplication" ("petID")
+  WHERE "applicationStatus" = 'Accepted';
 
 -- Double-submit guard: one Scheduled appointment per pet + vet + exact time.
 CREATE UNIQUE INDEX "Appointment_pet_vet_date_scheduled_key"

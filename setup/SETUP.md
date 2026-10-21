@@ -66,7 +66,7 @@ npm run setup
 
 One command, four steps:
 
-1. **`prisma migrate deploy`** builds the entire schema, including the parts `schema.prisma` can't describe: PostGIS and the shelter-location column, the human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`, …) as Postgres generated columns, and the partial unique indexes. They're written directly into the baseline migration's SQL.
+1. **`prisma migrate deploy`** builds the entire schema, including the parts `schema.prisma` can't describe: PostGIS and the shelter-location column, the human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`, …) as Postgres generated columns, and the partial and expression unique indexes. They're written directly into the baseline migration's SQL.
 2. **`prisma generate`** builds the Prisma client from the schema.
 3. **`setup-storage.js`** creates the two Supabase Storage buckets if they're missing (`pet-images`, public; `government-ids`, private), uploads `setup/pet-images/` to `pet-images/seed/`, uploads `placeholder.jpg` to the bucket root, and uploads `setup/government-ids/` to `government-ids/seed/`. Buckets live in Supabase's own `storage` schema, not the app's, which is why this is a script and not a migration.
 4. **`prisma db seed`** loads the sample data.

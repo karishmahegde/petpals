@@ -159,7 +159,7 @@ model Veterinarian {
 model Species {
   speciesID   Int     @id @default(autoincrement())
   // Unique case-insensitively — an expression index enforced in the DB only,
-  // not expressible here (migration 20260927060418_species_breed_name_ci_unique):
+  // not expressible here (it lives in the baseline migration):
   //   CREATE UNIQUE INDEX "Species_speciesName_lower_key" ON "Species" (LOWER("speciesName"));
   speciesName String  @db.VarChar(45)
   breeds      Breed[]
@@ -169,7 +169,7 @@ model Breed {
   breedID   Int       @id @default(autoincrement())
   speciesID Int
   // Unique case-insensitively within its species — DB-only expression index
-  // (migration 20260927060418_species_breed_name_ci_unique):
+  // (in the baseline migration):
   //   CREATE UNIQUE INDEX "Breed_speciesID_breedName_lower_key"
   //   ON "Breed" ("speciesID", LOWER("breedName"));
   breedName String    @db.VarChar(45)
@@ -365,8 +365,8 @@ model AdoptionApplication {
   //   CREATE UNIQUE INDEX "AdoptionApplication_active_adopter_pet_key"
   //   ON "AdoptionApplication" ("adopterID", "petID")
   //   WHERE "applicationStatus" IN ('Pending', 'Accepted');
-  // Added via raw SQL in the Supabase editor (same manual-migration workaround
-  // as the PostGIS shelterLocation column). Blocks a second active application
+  // Hand-written into the baseline migration (same workaround as the PostGIS
+  // shelterLocation column). Blocks a second active application
   // for the same adopter+pet; Rejected/Withdrawn rows are excluded so
   // resubmission stays possible.
 
