@@ -37,7 +37,7 @@ const createCheckout = async (req, res, next) => {
 
   let donationDesc = null;
   if (body.donationDesc !== undefined && body.donationDesc !== null) {
-    if (typeof body.donationDesc !== "string" || body.donationDesc.length > MAX_DESC_LEN) {
+    if (typeof body.donationDesc !== "string" || body.donationDesc.trim().length > MAX_DESC_LEN) {
       return next(
         badRequest(`donationDesc must be a string of at most ${MAX_DESC_LEN} characters`),
       );

@@ -133,7 +133,7 @@ const validateField = (field, rawValue) => {
       if (
         typeof rawValue !== "string" ||
         rawValue.trim().length === 0 ||
-        rawValue.length > STRING_MAX[field]
+        rawValue.trim().length > STRING_MAX[field]
       ) {
         throw badRequest(
           `${field} must be a non-empty string of at most ${STRING_MAX[field]} characters`,
@@ -142,7 +142,7 @@ const validateField = (field, rawValue) => {
       return rawValue.trim();
 
     case "petBGroup":
-      if (typeof rawValue !== "string" || rawValue.length > STRING_MAX.petBGroup) {
+      if (typeof rawValue !== "string" || rawValue.trim().length > STRING_MAX.petBGroup) {
         throw badRequest(
           `petBGroup must be a string of at most ${STRING_MAX.petBGroup} characters`,
         );
@@ -151,7 +151,7 @@ const validateField = (field, rawValue) => {
 
     case "microchipID":
       if (rawValue === null) return null; // clearable
-      if (typeof rawValue !== "string" || rawValue.length > STRING_MAX.microchipID) {
+      if (typeof rawValue !== "string" || rawValue.trim().length > STRING_MAX.microchipID) {
         throw badRequest(
           `microchipID must be a string of at most ${STRING_MAX.microchipID} characters`,
         );
@@ -163,7 +163,7 @@ const validateField = (field, rawValue) => {
       // null, so an empty string means the same thing there — the edit
       // form already collapses a blanked-out textarea to "" either way.
       if (rawValue === null || rawValue === "") return null;
-      if (typeof rawValue !== "string" || rawValue.length > STRING_MAX.petDesc) {
+      if (typeof rawValue !== "string" || rawValue.trim().length > STRING_MAX.petDesc) {
         throw badRequest(
           `petDesc must be a string of at most ${STRING_MAX.petDesc} characters`,
         );

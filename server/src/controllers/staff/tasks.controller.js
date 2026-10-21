@@ -28,7 +28,7 @@ const parseTaskName = (value) => {
 };
 
 const parseTaskDesc = (value) => {
-  if (typeof value !== "string" || value.trim().length === 0 || value.length > MAX_DESC_LEN) {
+  if (typeof value !== "string" || value.trim().length === 0 || value.trim().length > MAX_DESC_LEN) {
     throw badRequest(
       `taskDesc must be a non-empty string of at most ${MAX_DESC_LEN} characters`,
     );

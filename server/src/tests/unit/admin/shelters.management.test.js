@@ -123,6 +123,39 @@ describe("Admin shelter management endpoints", () => {
       expect(substitutions).toEqual([-73.93, 40.77, 9]);
     });
 
+    test("a stray space around the email → 201, stored trimmed (trimmed before the email pattern runs)", async () => {
+      resolveCoordsFromPostalCode.mockReturnValueOnce({ lat: 40.77, lng: -73.93 });
+      prisma.shelter.create.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.$executeRaw.mockResolvedValueOnce(undefined);
+      prisma.$queryRaw.mockResolvedValueOnce([buildShelterRow({ shelterID: 9 })]);
+
+      const res = await request(app)
+        .post("/api/v1/shelters")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ ...validPayload, shelterEmail: " astoria@petpals.org " });
+
+      expect(res.status).toBe(201);
+      expect(prisma.shelter.create.mock.calls[0][0].data.shelterEmail).toBe(
+        "astoria@petpals.org",
+      );
+    });
+
+    test("a name at the 45-character limit plus a trailing space → 201, the limit applies to the trimmed name", async () => {
+      const name = "N".repeat(45);
+      resolveCoordsFromPostalCode.mockReturnValueOnce({ lat: 40.77, lng: -73.93 });
+      prisma.shelter.create.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.$executeRaw.mockResolvedValueOnce(undefined);
+      prisma.$queryRaw.mockResolvedValueOnce([buildShelterRow({ shelterID: 9 })]);
+
+      const res = await request(app)
+        .post("/api/v1/shelters")
+        .set("Authorization", `Bearer ${adminToken()}`)
+        .send({ ...validPayload, shelterName: `${name} ` });
+
+      expect(res.status).toBe(201);
+      expect(prisma.shelter.create.mock.calls[0][0].data.shelterName).toBe(name);
+    });
+
     test("unresolvable ZIP → 400 BAD_REQUEST, nothing written", async () => {
       resolveCoordsFromPostalCode.mockReturnValueOnce(null);
 

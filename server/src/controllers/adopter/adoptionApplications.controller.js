@@ -55,7 +55,7 @@ const createApplication = async (req, res, next) => {
   if (shelterMessageRaw !== undefined && shelterMessageRaw !== null) {
     if (
       typeof shelterMessageRaw !== "string" ||
-      shelterMessageRaw.length > MAX_SHELTER_MESSAGE_LEN
+      shelterMessageRaw.trim().length > MAX_SHELTER_MESSAGE_LEN
     ) {
       return next(
         badRequest(
@@ -266,7 +266,7 @@ const updateApplicationStatus = async (req, res, next) => {
   // from the body at all for the Staff/Admin branch, never for Adopter.
   let staffRemark;
   if (isStaffActor && staffRemarkRaw !== undefined && staffRemarkRaw !== null) {
-    if (typeof staffRemarkRaw !== "string" || staffRemarkRaw.length > MAX_STAFF_REMARK_LEN) {
+    if (typeof staffRemarkRaw !== "string" || staffRemarkRaw.trim().length > MAX_STAFF_REMARK_LEN) {
       return next(
         badRequest(
           `staffRemark must be a string of at most ${MAX_STAFF_REMARK_LEN} characters`,
