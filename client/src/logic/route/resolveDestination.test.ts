@@ -54,6 +54,19 @@ describe("resolveDestination (after login)", () => {
     expect(resolveDestination(role, redirect)).toBe(dashboardPathFor(role));
   });
 
+  test.each([
+    "https://evil.com",
+    "//evil.com",
+    "/\\evil.com",
+    "\\\\evil.com",
+    "/\t/evil.com",
+    "/\n/evil.com",
+    "javascript:alert(1)",
+    "adopt",
+  ])("a redirect that isn't a path on this site (%j) → their own dashboard", (redirect) => {
+    expect(resolveDestination("Adopter", redirect)).toBe("/adopter");
+  });
+
   test("only the first path segment decides — /staff-portal isn't the staff dashboard", () => {
     expect(resolveDestination("Adopter", "/staff-portal/login")).toBe("/staff-portal/login");
     expect(resolveDestination("Adopter", "/adopters-info")).toBe("/adopters-info");
