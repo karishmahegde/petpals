@@ -3,7 +3,9 @@
 // only for what the API can't do for a test, the same shortcuts the
 // integration suites take: an available pet to apply for (creating one
 // through the API needs a fully approved staff member), marking an email
-// verified (the real link only exists in an email), finishing an adopter's
+// verified (the real link only exists in an email), approving a staff
+// sign-up (approval needs an onboarded staff member with a verified
+// government ID — covered by the integration journeys), finishing an adopter's
 // onboarding (applying is closed until the wizard is done), signing the
 // Stripe webhook that records a paid application, and removing everything
 // afterwards with the integration suites' own tracker
@@ -32,7 +34,7 @@ const tasks = {
   },
 
   // An Open shelter with one available pet of its own species; returns
-  // { petID, petName, shelterID, speciesID }.
+  // { petID, petName, shelterID, shelterName, speciesID }.
   async "db:availablePet"() {
     const id = stamp();
     const shelter = await prisma.shelter.create({
@@ -67,7 +69,7 @@ const tasks = {
       },
     });
     data.pet(pet.petID);
-    return { petID: pet.petID, petName: pet.petName, shelterID: shelter.shelterID, speciesID: species.speciesID };
+    return { petID: pet.petID, petName: pet.petName, shelterID: shelter.shelterID, shelterName: shelter.shelterName, speciesID: species.speciesID };
   },
 
   // A checkout.session.completed event for a paid application fee, signed
@@ -118,6 +120,16 @@ const tasks = {
     await prisma.adopter.update({
       where: { userID: user.userID },
       data: { onboardingComplete: true, onboardingStep: 7 },
+    });
+    return null;
+  },
+
+  // Approves a staff sign-up and finishes their onboarding, as the Sprint 10
+  // integration journeys do — what an admin or manager would do.
+  async "db:activateStaff"(userID) {
+    await prisma.staff.update({
+      where: { userID },
+      data: { accountStatus: "Active", onboardingComplete: true },
     });
     return null;
   },
