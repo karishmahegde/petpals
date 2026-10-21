@@ -209,6 +209,8 @@ describe("Donations — Stripe Checkout", () => {
           stripeCheckoutSessionID: "cs_test_donation",
           stripePaymentIntentID: "pi_123",
         },
+        // What the donor's in-app thank-you names.
+        select: { donationAmt: true, shelter: { select: { shelterName: true } } },
       });
     });
 

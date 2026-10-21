@@ -43,7 +43,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
 // mocked here so they never touch the mocked Prisma client.
 jest.mock("../../../services/auth/accountNotices");
 
+// Who hears that a sign-up is ready for approval.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
+
 const prisma = require("../../../config/prisma");
+const notifications = require("../../../services/notifications");
 const accountNotices = require("../../../services/auth/accountNotices");
 const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
@@ -499,6 +504,56 @@ describe("Volunteer self-service endpoints", () => {
       zip: "10001",
       country: "United States",
     };
+
+    test("a Pending Volunteer sign-up finishing: whoever approves it is told", async () => {
+      authService.getAccountStatus.mockResolvedValue("Pending");
+      notifications.signupApproverIDs.mockResolvedValueOnce([60]);
+      prisma.volunteer.findUnique.mockResolvedValueOnce({
+        ...filledIn,
+        ...{},
+        volunteerName: "Alex",
+        shelterID: 9,
+        accountStatus: "Pending",
+        onboardingComplete: false,
+      });
+      prisma.governmentID.findFirst.mockResolvedValueOnce({ governmentIDID: 9 });
+      prisma.volunteer.update.mockResolvedValueOnce(
+        buildVolunteerProfile({ onboardingComplete: true, onboardingStep: 5 }),
+      );
+
+      const res = await complete();
+
+      expect(res.status).toBe(200);
+      expect(notifications.signupApproverIDs).toHaveBeenCalledWith("Volunteer", 9);
+      expect(notifications.notify).toHaveBeenCalledWith(
+        [60],
+        notifications.messages.signupReadyForApproval({ name: "Alex", kind: "Volunteer" }),
+      );
+    });
+
+    test.each([
+      ["a repeat call (already onboarded)", "Pending", true],
+      ["an account that isn't Pending", "Active", false],
+    ])("%s tells no one", async (_label, accountStatus, onboardingComplete) => {
+      authService.getAccountStatus.mockResolvedValue(accountStatus);
+      prisma.volunteer.findUnique.mockResolvedValueOnce({
+        ...filledIn,
+        volunteerName: "Alex",
+        shelterID: 9,
+        accountStatus,
+        onboardingComplete,
+      });
+      prisma.governmentID.findFirst.mockResolvedValueOnce({ governmentIDID: 9 });
+      prisma.volunteer.update.mockResolvedValueOnce(
+        buildVolunteerProfile({ onboardingComplete: true, onboardingStep: 5 }),
+      );
+
+      const res = await complete();
+
+      expect(res.status).toBe(200);
+      expect(notifications.signupApproverIDs).not.toHaveBeenCalled();
+      expect(notifications.notify).not.toHaveBeenCalled();
+    });
 
     test("everything filled in and an ID submitted → 200, onboarding marked complete at step 5", async () => {
       prisma.volunteer.findUnique.mockResolvedValueOnce(filledIn);

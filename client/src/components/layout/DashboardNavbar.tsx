@@ -1,5 +1,5 @@
+import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { FaRegBell } from "react-icons/fa";
 import logoNav from "../../static/assets/images/branding/logoNav.png";
 import ButtonElement from "../ui/ButtonElement";
 
@@ -9,17 +9,17 @@ interface DashboardNavbarProps {
   /** Current sidebar state — drives the hamburger/close icon swap. */
   menuOpen?: boolean;
   /**
-   * Whether the adopter has unread notifications. When true the outline bell
-   * gets an unread dot; when false it's the plain outline bell. Defaults to
-   * false — dummy for now, wired to the real notification system later.
+   * The notification bell (and its dropdown), rendered by the dashboard
+   * layout — it talks to the notifications API, which this content-agnostic
+   * navbar doesn't.
    */
-  hasNotifications?: boolean;
+  notificationBell?: ReactNode;
 }
 
 const DashboardNavbar = ({
   onMenuToggle,
   menuOpen = false,
-  hasNotifications = false,
+  notificationBell,
 }: DashboardNavbarProps) => {
   return (
     <nav className="sticky top-0 z-50 bg-rose-lightest shadow-lg">
@@ -30,20 +30,7 @@ const DashboardNavbar = ({
         </NavLink>
 
         <div className="flex items-center gap-3 md:gap-4">
-          {/* Notification bell */}
-          <ButtonElement
-            aria-label={
-              hasNotifications ? "Notifications — unread" : "Notifications"
-            }
-            size="bare"
-            variant="outline"
-            className="relative text-rose-dark hover:text-teal-dark transition-colors"
-          >
-            <FaRegBell className="h-6 w-6" />
-            {hasNotifications && (
-              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-dark ring-2 ring-rose-lightest" />
-            )}
-          </ButtonElement>
+          {notificationBell}
 
           {/* Hamburger (mobile) — toggles the dashboard sidebar */}
           <ButtonElement

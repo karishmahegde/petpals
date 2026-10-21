@@ -43,6 +43,19 @@ const Visits = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A visit notification links here with ?visitID= to open that visit's
+  // details. Watched rather than read once on mount: clicking one while
+  // already on this page changes the URL without remounting it.
+  const linkedVisitID = searchParams.get("visitID");
+  useEffect(() => {
+    if (linkedVisitID === null) return;
+    const id = Number(linkedVisitID);
+    if (Number.isInteger(id) && id > 0) setOpenId(id);
+    const next = new URLSearchParams(searchParams);
+    next.delete("visitID");
+    setSearchParams(next, { replace: true });
+  }, [linkedVisitID, searchParams, setSearchParams]);
+
   const { data: visits, isLoading, isError } = useQuery({
     queryKey: ["adopter", "visits", "all"],
     queryFn: () => getMyVisits(),

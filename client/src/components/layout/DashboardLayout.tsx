@@ -5,6 +5,8 @@ import DashboardSidebar from "./DashboardSidebar";
 import EmailVerificationBanner from "../ui/dashboard/EmailVerificationBanner";
 import useAuthStore from "../../logic/store/useAuthStore";
 import useResendVerification from "../../logic/hooks/useResendVerification";
+import useNotificationStream from "../../logic/hooks/useNotificationStream";
+import NotificationBell from "../../pages/protected/shared/notifications/NotificationBell";
 
 interface DashboardLayoutProps {
   /** The role's own <DashboardRoutes /> — everything else here is identical
@@ -20,8 +22,8 @@ interface DashboardLayoutProps {
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Dummy - replace with real unread state once the notification system exists.
-  const hasNotifications = false;
+  // Live notifications for every dashboard page — one stream per tab.
+  useNotificationStream();
 
   // Strictly false — a session without the field yet shouldn't flash it.
   const emailUnverified = useAuthStore(
@@ -34,7 +36,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <DashboardNavbar
         menuOpen={menuOpen}
         onMenuToggle={() => setMenuOpen((prev) => !prev)}
-        hasNotifications={hasNotifications}
+        notificationBell={<NotificationBell />}
       />
 
       <div className="flex flex-1">

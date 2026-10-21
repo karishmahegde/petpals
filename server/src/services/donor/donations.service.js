@@ -2,6 +2,7 @@ const prisma = require("../../config/prisma");
 const { assertEmailVerified } = require("../auth/emailVerification.service");
 const stripe = require("../../config/stripe");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
+const { notifyAfterLookup, messages } = require("../notifications");
 
 // Donations through Stripe Checkout — the same flow as the adoption
 // application fee (adopter/adoptionApplications.service.js): POST
@@ -111,8 +112,9 @@ const createCheckoutSession = async ({ donorID, shelterID, amount, donationDesc 
 const finalizeDonation = async (session) => {
   const { donorID, shelterID, donationDesc } = session.metadata;
 
+  let donation;
   try {
-    await prisma.donation.create({
+    donation = await prisma.donation.create({
       data: {
         donorID: Number(donorID),
         shelterID: Number(shelterID),
@@ -121,13 +123,23 @@ const finalizeDonation = async (session) => {
         stripeCheckoutSessionID: session.id,
         stripePaymentIntentID: session.payment_intent || null,
       },
+      select: { donationAmt: true, shelter: { select: { shelterName: true } } },
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
-      return; // already recorded — a replayed event
+      return; // already recorded — a replayed event (and already thanked)
     }
     throw err;
   }
+
+  // The in-app thank-you (donation receipts aren't emailed).
+  await notifyAfterLookup(`the thank-you for donation session ${session.id}`, async () => [
+    [Number(donorID)],
+    messages.donationReceived({
+      amount: Number(donation.donationAmt),
+      shelterName: donation.shelter.shelterName,
+    }),
+  ]);
 };
 
 // ——————————————— DONATION HISTORY (GET /donors/me/donations[/:id], /stats) ———————————————

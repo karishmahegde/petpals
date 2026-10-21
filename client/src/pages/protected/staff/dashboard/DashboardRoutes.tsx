@@ -14,6 +14,7 @@ import Vets from "./Vets";
 import Adopters from "./Adopters";
 import IdVerification from "./IdVerification";
 import HealthPassport from "../../shared/HealthPassport";
+import NotificationsPage from "../../shared/notifications/NotificationsPage";
 
 // Renders the staff dashboard section that matches the current /staff/*
 // route (driven by the sidebar nav in DashboardSidebar.tsx). Most sections
@@ -36,6 +37,8 @@ const DashboardRoutes = () => (
     <Route path="team" element={<Staff />} />
     <Route path="vets" element={<Vets />} />
     <Route path="profile" element={<Profile />} />
+    {/* Reached from the bell, not the sidebar menu — shared by every role. */}
+    <Route path="notifications" element={<NotificationsPage />} />
     <Route path="*" element={<Navigate to="/staff" replace />} />
   </Routes>
 );

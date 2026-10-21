@@ -5,6 +5,7 @@ import Events from "./Events";
 import Appointments from "./Appointments";
 import Availability from "./Availability";
 import Profile from "./Profile";
+import NotificationsPage from "../../shared/notifications/NotificationsPage";
 
 // Renders the volunteer dashboard section that matches the current
 // /volunteer/* route (driven by the sidebar nav in DashboardSidebar.tsx).
@@ -18,6 +19,8 @@ const DashboardRoutes = () => (
     <Route path="appointments" element={<Appointments />} />
     <Route path="availability" element={<Availability />} />
     <Route path="profile" element={<Profile />} />
+    {/* Reached from the bell, not the sidebar menu — shared by every role. */}
+    <Route path="notifications" element={<NotificationsPage />} />
     <Route path="*" element={<Navigate to="/volunteer" replace />} />
   </Routes>
 );

@@ -32,9 +32,13 @@ jest.mock("../../../services/auth/auth.service", () => ({
 // The review emails are covered in staff/reviewNotices.test.js — mocked
 // here so they never touch the mocked Prisma client.
 jest.mock("../../../services/staff/reviewNotices");
+// The in-app notice to the ID's owner.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
 
 const prisma = require("../../../config/prisma");
 const reviewNotices = require("../../../services/staff/reviewNotices");
+const { notify, messages } = require("../../../services/notifications");
 const storage = require("../../../services/storage");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
@@ -179,6 +183,7 @@ describe("Government ID review — who may review which person types", () => {
 
       expect(res.status).toBe(403);
       expect(prisma.governmentID.update).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
       expect(reviewNotices.governmentIdReviewed).not.toHaveBeenCalled();
     });
 
@@ -216,7 +221,37 @@ describe("Government ID review — who may review which person types", () => {
         data: { verificationStatus: "Verified" },
       });
       expect(reviewNotices.governmentIdReviewed).toHaveBeenCalledWith(80, "Verified");
+      expect(notify).toHaveBeenCalledWith([80], messages.governmentIdVerified({ role: "Veterinarian" }));
+      expect(notify.mock.calls[0][1].link).toBe("/vet/profile");
       expect(res.body.data.personName).toBe("Adrian Nicholes");
+    });
+
+    test("Rejected: the owner is asked to upload a new one from their own Profile", async () => {
+      prisma.governmentID.findUnique
+        .mockResolvedValueOnce(idRecord({ userType: "Veterinarian", userID: 80 }))
+        .mockResolvedValueOnce(
+          idRecord({ userType: "Veterinarian", userID: 80, verificationStatus: "Rejected" }),
+        );
+      mockCaller();
+      prisma.veterinarian.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.governmentID.update.mockResolvedValueOnce({});
+      mockCaller();
+      prisma.veterinarian.findUnique
+        .mockResolvedValueOnce({ shelterID: 9 })
+        .mockResolvedValueOnce({
+          userID: 80,
+          vetName: "Adrian Nicholes",
+          avatarSeed: "seed",
+          user: { userEmail: "adrian@petpals.com" },
+        });
+
+      const res = await request(app)
+        .patch("/api/v1/government-ids/5/status")
+        .set("Authorization", `Bearer ${staffToken(MANAGER_ID)}`)
+        .send({ verificationStatus: "Rejected" });
+
+      expect(res.status).toBe(200);
+      expect(notify).toHaveBeenCalledWith([80], messages.governmentIdRejected({ role: "Veterinarian" }));
     });
 
     test("manager reviewing their own ID → 403", async () => {
@@ -286,6 +321,7 @@ describe("Government ID review — who may review which person types", () => {
 
       expect(res.status).toBe(200);
       expect(prisma.governmentID.update).toHaveBeenCalled();
+      expect(notify).toHaveBeenCalledWith([MANAGER_ID], messages.governmentIdVerified({ role: "Staff" }));
     });
 
     test("Admin reviewing a vet's ID → 403 (their manager's job)", async () => {

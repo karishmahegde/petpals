@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { notifyAfterLookup, messages, signupApproverIDs } = require("../notifications");
 const accountNotices = require("../auth/accountNotices");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
@@ -133,9 +134,16 @@ const REQUIRED_FOR_COMPLETION = {
 const completeOnboarding = async (userID) => {
   const vet = await prisma.veterinarian.findUnique({
     where: { userID },
-    select: Object.fromEntries(
-      Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
-    ),
+    select: {
+      ...Object.fromEntries(
+        Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
+      ),
+      // For the approvers' notification below.
+      vetName: true,
+      shelterID: true,
+      accountStatus: true,
+      onboardingComplete: true,
+    },
   });
   if (!vet) {
     throw notFound();
@@ -166,13 +174,24 @@ const completeOnboarding = async (userID) => {
     throw err;
   }
 
-  return toSelfProfile(
-    await prisma.veterinarian.update({
-      where: { userID },
-      data: { onboardingComplete: true, onboardingStep: LAST_ONBOARDING_STEP },
-      select: VET_SELF_SELECT,
-    }),
-  );
+  const updated = await prisma.veterinarian.update({
+    where: { userID },
+    data: { onboardingComplete: true, onboardingStep: LAST_ONBOARDING_STEP },
+    select: VET_SELF_SELECT,
+  });
+
+  // Finishing onboarding is what makes a Pending sign-up approvable
+  // (staffApproval.service.js), so whoever approves it hears now — once, not
+  // on a repeat call.
+  if (vet.accountStatus === "Pending" && !vet.onboardingComplete) {
+    const kind = "Veterinarian";
+    await notifyAfterLookup(`the sign-up of user ${userID}`, async () => [
+      await signupApproverIDs(kind, vet.shelterID),
+      messages.signupReadyForApproval({ name: vet.vetName, kind }),
+    ]);
+  }
+
+  return toSelfProfile(updated);
 };
 
 // ——————————————— CLOSE MY ACCOUNT (DELETE /vets/me) ———————————————

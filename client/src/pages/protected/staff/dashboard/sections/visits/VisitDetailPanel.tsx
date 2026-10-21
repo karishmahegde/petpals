@@ -7,7 +7,8 @@
 // pet, remarks, assigned staff), so the already-loaded row is passed down
 // directly instead of duplicating the fetch. Confirm/Complete live in the
 // footer, one at a time — Confirmed is only valid from an unconfirmed visit,
-// Completed only from Confirmed (see visitsApi.ts's updateVisitStatus).
+// Completed only from Confirmed (see visitsApi.ts's updateVisitStatus) —
+// with Cancel Visit below while the visit is still upcoming and open.
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -56,15 +57,33 @@ const extractError = (err: unknown): string =>
     ? String(err.response.data.message)
     : "Something went wrong. Please try again.";
 
-// The one transition available next, based on the visit's current status —
-// never both at once. null (never resolves further from here) once the
-// visit is Completed or Cancelled.
+// The one forward transition available next, based on the visit's current
+// status — never both at once. null (never resolves further from here) once
+// the visit is Completed or Cancelled. Cancelling is separate (canCancel).
 const nextTransition = (
   visitStatus: VisitQueueItem["visitStatus"],
 ): StaffVisitTransition | null => {
   if (visitStatus === null) return "Confirmed";
   if (visitStatus === "Confirmed") return "Completed";
   return null;
+};
+
+// Same terms as the server (and the adopter's own Cancel): still open and
+// not yet passed.
+const canCancel = (visit: VisitQueueItem): boolean =>
+  (visit.visitStatus === null || visit.visitStatus === "Confirmed") &&
+  new Date(visit.visitTime).getTime() > Date.now();
+
+const SUCCESS_TOAST: Record<StaffVisitTransition, string> = {
+  Confirmed: "Visit confirmed",
+  Completed: "Visit marked completed",
+  Cancelled: "Visit cancelled",
+};
+
+const CONFIRM_COPY: Record<StaffVisitTransition, { title: string; confirmLabel: string }> = {
+  Confirmed: { title: "Confirm this visit?", confirmLabel: "Confirm" },
+  Completed: { title: "Mark this visit completed?", confirmLabel: "Mark Completed" },
+  Cancelled: { title: "Cancel this visit?", confirmLabel: "Cancel Visit" },
 };
 
 const VisitDetailPanel = ({ visit, onClose }: VisitDetailPanelProps) => {
@@ -78,7 +97,7 @@ const VisitDetailPanel = ({ visit, onClose }: VisitDetailPanelProps) => {
       updateVisitStatus(visit!.visitID, status),
     onSuccess: (_, status) => {
       queryClient.invalidateQueries({ queryKey: ["staff", "visits-queue"] });
-      toast.success(status === "Confirmed" ? "Visit confirmed" : "Visit marked completed");
+      toast.success(SUCCESS_TOAST[status]);
       setPendingAction(null);
       onClose();
     },
@@ -86,6 +105,7 @@ const VisitDetailPanel = ({ visit, onClose }: VisitDetailPanelProps) => {
   });
 
   const action = visit ? nextTransition(visit.visitStatus) : null;
+  const cancellable = visit ? canCancel(visit) : false;
   const statusLabel = visit?.visitStatus ?? "Unconfirmed";
 
   return (
@@ -95,14 +115,27 @@ const VisitDetailPanel = ({ visit, onClose }: VisitDetailPanelProps) => {
         onClose={onClose}
         title="Visit Details"
         footer={
-          action && (
-            <ButtonElement
-              onClick={() => setPendingAction(action)}
-              size="panel"
-              className="w-full bg-teal-dark hover:brightness-95"
-            >
-              {action === "Confirmed" ? "Confirm Visit" : "Mark Completed"}
-            </ButtonElement>
+          (action || cancellable) && (
+            <div className="flex flex-col gap-3">
+              {action && (
+                <ButtonElement
+                  onClick={() => setPendingAction(action)}
+                  size="panel"
+                  className="w-full bg-teal-dark hover:brightness-95"
+                >
+                  {action === "Confirmed" ? "Confirm Visit" : "Mark Completed"}
+                </ButtonElement>
+              )}
+              {cancellable && (
+                <ButtonElement
+                  onClick={() => setPendingAction("Cancelled")}
+                  size="panel"
+                  className="w-full bg-red hover:brightness-95"
+                >
+                  Cancel Visit
+                </ButtonElement>
+              )}
+            </div>
           )
         }
       >
@@ -158,8 +191,8 @@ const VisitDetailPanel = ({ visit, onClose }: VisitDetailPanelProps) => {
 
       <ConfirmActionModal
         isOpen={pendingAction !== null}
-        title={pendingAction === "Confirmed" ? "Confirm this visit?" : "Mark this visit completed?"}
-        confirmLabel={pendingAction === "Confirmed" ? "Confirm" : "Mark Completed"}
+        title={pendingAction ? CONFIRM_COPY[pendingAction].title : ""}
+        confirmLabel={pendingAction ? CONFIRM_COPY[pendingAction].confirmLabel : ""}
         isPending={transition.isPending}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => pendingAction && transition.mutate(pendingAction)}
@@ -172,11 +205,17 @@ const VisitDetailPanel = ({ visit, onClose }: VisitDetailPanelProps) => {
                 {visit.pet ? ` to meet ${visit.pet.petName}` : ""} and assigns
                 it to you.
               </>
-            ) : (
+            ) : pendingAction === "Completed" ? (
               <>
                 This marks {visit.adopter.adopterName}'s visit
                 {visit.pet ? ` to meet ${visit.pet.petName}` : ""} as
                 completed.
+              </>
+            ) : (
+              <>
+                This cancels {visit.adopter.adopterName}'s visit
+                {visit.pet ? ` to meet ${visit.pet.petName}` : ""}. They'll
+                get a notification, and it can't be undone.
               </>
             )}
           </p>

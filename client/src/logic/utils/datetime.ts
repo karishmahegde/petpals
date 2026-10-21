@@ -65,6 +65,24 @@ export const formatTime = (date = new Date()): string =>
   date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
 /**
+ * How long ago something happened, for a feed: "Just now", "5m ago",
+ * "3h ago", "Yesterday", "4d ago", then the date ("Jun 25, 2026") after a
+ * week.
+ */
+export const formatRelativeTime = (value: Date | string, now = new Date()): string => {
+  const date = new Date(value);
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return formatShortDate(date);
+};
+
+/**
  * Relative badge for a scheduled event: "Soon" within the next 7 days,
  * "Upcoming" further out, "Past" once it has elapsed. Independent of any
  * stored status.

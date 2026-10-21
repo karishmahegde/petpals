@@ -188,9 +188,25 @@ const updateShelterManager = async (req, res, next) => {
   }
 };
 
+// ——————————————— POST /shelters/:id/capacity-alerts ———————————————
+const sendCapacityAlert = async (req, res, next) => {
+  const shelterID = Number(req.params.id);
+  if (!Number.isInteger(shelterID) || shelterID < 1) {
+    return next(badRequest("id must be a positive integer"));
+  }
+
+  try {
+    const result = await sheltersService.sendCapacityAlert(shelterID);
+    return successResponse(res, "Capacity alert sent to the shelter's manager", result, 201);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   createShelter,
   updateShelter,
   updateShelterStatus,
   updateShelterManager,
+  sendCapacityAlert,
 };

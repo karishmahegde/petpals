@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const prisma = require("../../config/prisma");
 const { PENDING_LOGIN_ROLES } = require("./pendingRoles");
 const { sendVerificationEmail } = require("./emailVerification.service");
+const { notifyAfterLookup, messages, activeAdminIDs } = require("../notifications");
 
 // Maps the incoming role string to the Prisma enum value, model accessor, and name field
 const ROLE_CONFIG = {
@@ -93,6 +94,7 @@ const register = async ({ name, email, password, role, shelterID }) => {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   // Both inserts run atomically — if the role-table insert fails, the Users row is rolled back
+  let pendingAdmin = false;
   const newUser = await prisma.$transaction(async (tx) => {
     const user = await tx.users.create({
       data: {
@@ -110,6 +112,7 @@ const register = async ({ name, email, password, role, shelterID }) => {
       const isFirstAdmin =
         role === "admin" && (await tx.admin.count()) === 0;
       accountStatus = isFirstAdmin ? "Active" : "Pending";
+      pendingAdmin = role === "admin" && !isFirstAdmin;
     }
 
     // Staff: the first sign-up at a shelter with no manager (and no
@@ -153,6 +156,15 @@ const register = async ({ name, email, password, role, shelterID }) => {
     await sendVerificationEmail({ userID: newUser.userID, email, name });
   } catch (err) {
     console.error(`[email] couldn't issue a verification link for user ${newUser.userID}: ${err.message}`);
+  }
+
+  // A new Admin waits for another Admin's approval, and has no onboarding
+  // step to wait for (the other roles' approvers hear on completeOnboarding).
+  if (pendingAdmin) {
+    await notifyAfterLookup(`the admin sign-up of user ${newUser.userID}`, async () => [
+      await activeAdminIDs(),
+      messages.adminSignupPending({ name }),
+    ]);
   }
 
   const { userPassword, refreshToken, ...safeUser } = newUser;

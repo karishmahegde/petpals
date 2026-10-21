@@ -168,14 +168,14 @@ const getVisitDetail = async (req, res, next) => {
 };
 
 // ——————————————— PATCH /visits/:id ———————————————
-// Adopter (Cancel) or Staff/Admin (Confirm/Complete) — which transitions are
+// Adopter (Cancel) or Staff/Admin (Confirm/Complete/Cancel) — which transitions are
 // valid depends on the caller's role, not a shared enum. Matches
 // adoptionApplications.controller.js's updateApplicationStatus design: an
 // Adopter reaching for a Staff-only value gets the same generic 400 any
 // other bogus value would, not a 403 that leaks that it's valid for someone
 // else.
 const VALID_ADOPTER_VISIT_STATUS_CHANGES = ["Cancelled"];
-const VALID_STAFF_VISIT_STATUS_CHANGES = ["Confirmed", "Completed"];
+const VALID_STAFF_VISIT_STATUS_CHANGES = ["Confirmed", "Completed", "Cancelled"];
 
 const updateVisitStatus = async (req, res, next) => {
   let visitID;

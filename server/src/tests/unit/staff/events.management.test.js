@@ -14,7 +14,7 @@ jest.mock("../../../config/prisma", () => ({
     delete: jest.fn(),
   },
   volunteer: { count: jest.fn() },
-  volunteerEvent: { deleteMany: jest.fn(), createMany: jest.fn() },
+  volunteerEvent: { deleteMany: jest.fn(), createMany: jest.fn(), findMany: jest.fn() },
   // The service always passes an array of already-invoked prisma calls
   // (each already a Promise) — Promise.all is a faithful enough stand-in for
   // the real transaction batching.
@@ -36,7 +36,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// Which volunteers hear about an event — see "Notifications" below.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
+
 const prisma = require("../../../config/prisma");
+const { notify, messages } = require("../../../services/notifications");
 const publicEventsService = require("../../../services/public/events.service");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app"); // requiring app.js runs dotenv.config(), populating process.env.JWT_SECRET from .env
@@ -535,6 +540,113 @@ describe("Event management (Staff/Admin)", () => {
 
       expect(res.status).toBe(401);
       expect(prisma.event.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  // ————————————————————— notifications —————————————————————
+  describe("Notifications", () => {
+    const staffRequest = (method, path) =>
+      request(app)[method](path).set("Authorization", `Bearer ${staffToken(42)}`);
+
+    test("POST: every assigned volunteer hears they're on it", async () => {
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(2);
+      prisma.event.create.mockResolvedValueOnce({ eventID: 10, eventName: "Adoption Day" });
+      publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
+
+      await staffRequest("post", "/api/v1/events").send({ ...VALID_CREATE_BODY, volunteerIDs: [5, 6] });
+
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(
+        [5, 6],
+        messages.eventAssigned({ eventName: "Adoption Day" }),
+      );
+    });
+
+    test("PUT: only the newly added volunteers hear, under the new name if renamed", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 9, eventName: "Adoption Day" });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(3);
+      prisma.volunteerEvent.findMany.mockResolvedValueOnce([{ volunteerID: 5 }, { volunteerID: 6 }]);
+      prisma.event.update.mockResolvedValueOnce({});
+      prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });
+      prisma.volunteerEvent.createMany.mockResolvedValueOnce({ count: 3 });
+      publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
+
+      const res = await staffRequest("put", "/api/v1/events/10").send({
+        eventName: "Spring Fair",
+        volunteerIDs: [5, 7, 8],
+      });
+
+      expect(res.status).toBe(200);
+      expect(prisma.volunteerEvent.findMany).toHaveBeenCalledWith({
+        where: { eventID: 10 },
+        select: { volunteerID: true },
+      });
+      expect(notify).toHaveBeenCalledWith([7, 8], messages.eventAssigned({ eventName: "Spring Fair" }));
+    });
+
+    test("PUT: the old volunteers can't be read → the edit saves, nobody is told", async () => {
+      const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 9, eventName: "Adoption Day" });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(1);
+      prisma.volunteerEvent.findMany.mockRejectedValueOnce(new Error("connection lost"));
+      prisma.event.update.mockResolvedValueOnce({});
+      prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 0 });
+      prisma.volunteerEvent.createMany.mockResolvedValueOnce({ count: 1 });
+      publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
+
+      const res = await staffRequest("put", "/api/v1/events/10").send({ volunteerIDs: [7] });
+
+      expect(res.status).toBe(200);
+      expect(prisma.volunteerEvent.createMany).toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    test("PUT without volunteerIDs tells no one", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({ shelterID: 9, eventName: "Adoption Day" });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.event.update.mockResolvedValueOnce({});
+      publicEventsService.getEventDetails.mockResolvedValueOnce(buildEventDetail());
+
+      await staffRequest("put", "/api/v1/events/10").send({ eventName: "Renamed" });
+
+      expect(prisma.volunteerEvent.findMany).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    test("DELETE of a future event: it's cancelled for every volunteer on it", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        eventName: "Adoption Day",
+        eventDate: new Date(Date.now() + 86400000),
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteerEvent.findMany.mockResolvedValueOnce([{ volunteerID: 5 }, { volunteerID: 6 }]);
+      prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });
+      prisma.event.delete.mockResolvedValueOnce({});
+
+      await staffRequest("delete", "/api/v1/events/10");
+
+      expect(notify).toHaveBeenCalledWith([5, 6], messages.eventCancelled({ eventName: "Adoption Day" }));
+    });
+
+    test("DELETE of a past event: tidying up isn't news", async () => {
+      prisma.event.findUnique.mockResolvedValueOnce({
+        shelterID: 9,
+        eventName: "Adoption Day",
+        eventDate: new Date(Date.now() - 86400000),
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });
+      prisma.event.delete.mockResolvedValueOnce({});
+
+      await staffRequest("delete", "/api/v1/events/10");
+
+      expect(prisma.volunteerEvent.findMany).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
     });
   });
 

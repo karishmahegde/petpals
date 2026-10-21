@@ -7,13 +7,13 @@ datasource db {
 }
 
 model Users {
-  userID        Int           @id @default(autoincrement())
-  userEmail     String        @unique @db.VarChar(45)
-  userPassword  String        @db.VarChar(255)
-  refreshToken  String?       @db.Text
+  userID        Int            @id @default(autoincrement())
+  userEmail     String         @unique @db.VarChar(45)
+  userPassword  String         @db.VarChar(255)
+  refreshToken  String?        @db.Text
   role          role
   // Account-level, so shared by every role (moved off Adopter/Admin).
-  emailVerified Boolean       @default(false)
+  emailVerified Boolean        @default(false)
   lastLoginAt   DateTime?
   admin         Admin?
   adopter       Adopter?
@@ -22,6 +22,7 @@ model Users {
   veterinarian  Veterinarian?
   volunteer     Volunteer?
   accountTokens AccountToken[]
+  notifications Notification[]
 }
 
 model Admin {
@@ -389,16 +390,6 @@ model Visit {
   staff       Staff?       @relation(fields: [staffID], references: [userID])
 }
 
-model Notification {
-  notificationID     Int                @id @default(autoincrement())
-  recipientID        Int
-  notificationType   NotificationType
-  notificationStatus NotificationStatus @default(Pending)
-  recipientType      RecipientType
-  sendTime           DateTime
-  textBody           String             @db.VarChar(300)
-}
-
 model HealthRecord {
   recordID      Int           @id @default(autoincrement())
   petID         Int
@@ -451,6 +442,26 @@ model AccountToken {
   user      Users               @relation(fields: [userID], references: [userID], onDelete: Cascade)
 
   @@index([userID, purpose])
+}
+
+// In-app notifications (the dashboard bell). One row per recipient; the row
+// is the source of truth and the live stream only signals new ones. Title,
+// body and link are built server-side (services/notifications/messages.js) so
+// the client just renders them; link is a client path, e.g.
+// "/adopter/applications". CASCADEs from Users.
+model Notification {
+  notificationID Int              @id @default(autoincrement())
+  userID         Int
+  type           NotificationType
+  title          String           @db.VarChar(120)
+  body           String           @db.VarChar(300)
+  link           String?          @db.VarChar(200)
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+  user           Users            @relation(fields: [userID], references: [userID], onDelete: Cascade)
+
+  @@index([userID, createdAt])
+  @@index([userID, readAt])
 }
 
 model Vaccine {
@@ -866,6 +877,46 @@ enum AccountTokenPurpose {
   EmailChange
 }
 
+// Every in-app notification the app sends (Sprint 10 — a curated set, not
+// every action). Grouped by who receives them; AppointmentChanged/Cancelled
+// go to the adopter and the vet alike.
+enum NotificationType {
+  // Adopter
+  ApplicationSubmitted
+  ApplicationApproved
+  ApplicationDeclined
+  VisitConfirmed
+  VisitCancelled
+  AppointmentScheduled
+  AppointmentChanged
+  AppointmentCancelled
+  GovernmentIdVerified
+  GovernmentIdRejected
+  // Shelter staff
+  NewApplication
+  NewVisitRequest
+  ApplicationWithdrawn
+  VisitCancelledByAdopter
+  SignupReadyForApproval
+  TransferIncoming
+  TransferCompleted
+  TransferRejected
+  TransferCancelled
+  CapacityAlert
+  // Veterinarian
+  AppointmentAssigned
+  // Volunteer
+  TaskAssigned
+  EventAssigned
+  EventCancelled
+  AppointmentAssistAssigned
+  AppointmentAssistCancelled
+  // Donor
+  DonationReceived
+  // Admin
+  AdminSignupPending
+}
+
 enum VisitStatus {
   Confirmed
   Cancelled
@@ -890,25 +941,6 @@ enum ApplicationStatus {
   Accepted
   Rejected
   Withdrawn
-}
-
-enum NotificationType {
-  vaccination
-  appointment
-  task
-}
-
-enum NotificationStatus {
-  Pending
-  Sent
-  Failed
-}
-
-enum RecipientType {
-  adopter
-  staff
-  volunteer
-  veterinarian
 }
 
 enum VolunteerAppStatus {
