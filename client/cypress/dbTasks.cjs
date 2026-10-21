@@ -4,7 +4,8 @@
 // integration suites take: an available pet to apply for (creating one
 // through the API needs a fully approved staff member), marking an email
 // verified (the real link only exists in an email), finishing an adopter's
-// onboarding (applying is closed until the wizard is done), and removing everything
+// onboarding (applying is closed until the wizard is done), signing the
+// Stripe webhook that records a paid application, and removing everything
 // afterwards with the integration suites' own tracker
 // (server/src/tests/integration/helpers/testData.js), even if a spec failed.
 //
@@ -15,6 +16,7 @@ const path = require("path");
 const serverDir = path.resolve(__dirname, "../../server");
 require(path.join(serverDir, "node_modules/dotenv")).config({ path: path.join(serverDir, ".env") });
 const prisma = require(path.join(serverDir, "src/config/prisma"));
+const stripe = require(path.join(serverDir, "src/config/stripe"));
 const { trackTestData } = require(path.join(serverDir, "src/tests/integration/helpers/testData"));
 
 // One tracker for the whole run; cleanUp empties it.
@@ -29,7 +31,8 @@ const tasks = {
     return null;
   },
 
-  // An Open shelter with one available pet; returns { petID, petName, shelterID }.
+  // An Open shelter with one available pet of its own species; returns
+  // { petID, petName, shelterID, speciesID }.
   async "db:availablePet"() {
     const id = stamp();
     const shelter = await prisma.shelter.create({
@@ -64,7 +67,41 @@ const tasks = {
       },
     });
     data.pet(pet.petID);
-    return { petID: pet.petID, petName: pet.petName, shelterID: shelter.shelterID };
+    return { petID: pet.petID, petName: pet.petName, shelterID: shelter.shelterID, speciesID: species.speciesID };
+  },
+
+  // A checkout.session.completed event for a paid application fee, signed
+  // with the server's webhook secret — what Stripe sends once an adopter
+  // pays. Returns { payload, signature } for the spec to POST to
+  // /webhooks/stripe, which creates the Pending application. Same approach
+  // as the Sprint 3 integration journey; nothing is sent to Stripe.
+  "stripe:paidApplicationEvent"({ adopterID, petID, shelterID }) {
+    const id = stamp();
+    const payload = JSON.stringify({
+      id: `evt_test_cypress_${id}`,
+      object: "event",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: `cs_test_cypress_${id}`,
+          object: "checkout.session",
+          payment_status: "paid",
+          payment_intent: `pi_test_cypress_${id}`,
+          metadata: {
+            petID: String(petID),
+            adopterID: String(adopterID),
+            shelterID: String(shelterID),
+            applicationType: "Adopt",
+            shelterMessage: "",
+          },
+        },
+      },
+    });
+    const signature = stripe.webhooks.generateTestHeaderString({
+      payload,
+      secret: process.env.STRIPE_WEBHOOK_SECRET,
+    });
+    return { payload, signature };
   },
 
   // Marks a login's email verified — what opening the emailed link does.

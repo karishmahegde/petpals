@@ -4,6 +4,7 @@ export interface TestAdopter {
   name: string;
   email: string;
   password: string;
+  userID: number;
 }
 
 const uniqueEmail = () =>
@@ -15,7 +16,7 @@ const uniqueEmail = () =>
 // account is recorded for the clean-up after each spec (support/e2e.ts). A
 // new sign-up's email is unverified, like a real one.
 Cypress.Commands.add("registerTestAdopter", (name = "Cypress Test Adopter") => {
-  const adopter: TestAdopter = {
+  const adopter = {
     name,
     email: uniqueEmail(),
     password: "Secret123!",
@@ -28,8 +29,12 @@ Cypress.Commands.add("registerTestAdopter", (name = "Cypress Test Adopter") => {
       password: adopter.password,
       role: "adopter",
     })
-    .then((res) => cy.task("db:trackUser", res.body.data.userID))
-    .then(() => adopter);
+    .then((res) => {
+      const userID: number = res.body.data.userID;
+      return cy
+        .task("db:trackUser", userID)
+        .then((): TestAdopter => ({ ...adopter, userID }));
+    });
 });
 
 // Signs in through the real login form and waits until it has left /login.
