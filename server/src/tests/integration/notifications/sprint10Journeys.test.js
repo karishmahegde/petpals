@@ -14,7 +14,12 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const stripe = require("../../../config/stripe");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // Each journey chains several sign-ups and dozens of requests across roles,
 // each a few round trips to the remote test database — well past the 60s
@@ -29,16 +34,11 @@ const login = (email, password) =>
 
 const daysFromNow = (n) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
 
-// Every account signed up here, recorded the moment it exists so afterAll
-// removes it even if a later step of its journey fails.
-const createdUserIDs = [];
-
 const register = async (name, role, extra = {}) => {
   const payload = { name, email: uniqueEmail(), password: "Secret123!", role, ...extra };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
   expect(registerRes.status).toBe(201);
-  createdUserIDs.push(registerRes.body.data.userID);
-  return { userID: registerRes.body.data.userID, payload };
+  return { userID: data.user(registerRes.body.data.userID), payload };
 };
 
 const loginAs = async ({ userID, payload }) => {
@@ -81,8 +81,6 @@ const typesOf = async (user) => (await notificationsOf(user)).data.map((n) => n.
 describe("Sprint 10 notification journeys", () => {
   let speciesID;
   let breedID;
-  const shelterIDs = [];
-  const petIDs = [];
 
   const makeShelter = async (label, zip) => {
     const shelter = await prisma.shelter.create({
@@ -95,7 +93,7 @@ describe("Sprint 10 notification journeys", () => {
         shelterSize: 10,
       },
     });
-    shelterIDs.push(shelter.shelterID);
+    data.shelter(shelter.shelterID);
     return shelter;
   };
 
@@ -117,7 +115,7 @@ describe("Sprint 10 notification journeys", () => {
         adoptionStatus: "available",
       },
     });
-    petIDs.push(pet.petID);
+    data.pet(pet.petID);
     return pet;
   };
 
@@ -163,28 +161,13 @@ describe("Sprint 10 notification journeys", () => {
     const species = await prisma.species.create({
       data: { speciesName: `S10JourneySpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
     const breed = await prisma.breed.create({ data: { speciesID, breedName: "S10JourneyBreed" } });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
   });
 
   afterAll(async () => {
-    const userIDs = createdUserIDs;
-    // Children before parents. Notifications cascade with their user.
-    await prisma.adoptionApplication.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.visit.deleteMany({ where: { adopterID: { in: userIDs } } });
-    await prisma.transferHistory.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.pet.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.shelter.updateMany({
-      where: { shelterID: { in: shelterIDs } },
-      data: { managerStaffID: null },
-    });
-    await prisma.staff.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.shelter.deleteMany({ where: { shelterID: { in: shelterIDs } } });
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -373,9 +356,9 @@ describe("Sprint 10 notification journeys", () => {
           const raw = buffer.slice(0, boundary);
           buffer = buffer.slice(boundary + 2);
           const event = raw.match(/^event: (.+)$/m)?.[1];
-          const data = raw.match(/^data: (.+)$/m)?.[1];
+          const json = raw.match(/^data: (.+)$/m)?.[1];
           if (!event) continue;
-          const frame = { event, data: JSON.parse(data) };
+          const frame = { event, data: JSON.parse(json) };
           seen.push(frame);
           if (predicate(frame)) return frame;
         }

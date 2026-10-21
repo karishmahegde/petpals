@@ -6,7 +6,10 @@ module.exports = {
   // orphaned rows behind — so the limit sits well above normal run times.
   // Unit tests are fully mocked and finish in milliseconds either way.
   // A suite needing more sets its own jest.setTimeout (sprint5_1Journeys).
-  testTimeout: 30000,
+  // 30s wasn't enough over the remote link: on 2026-10-21 a beforeAll with
+  // several sign-ups timed out, and its cleanup ran while it was still
+  // creating rows. 90s gives setup room; unit tests are unaffected.
+  testTimeout: 90000,
   // Coverage counts every source file, not just the ones some test happens
   // to load — an untested file shows up as 0% instead of being invisible.
   // The seed (src/prisma/) is a one-off script, not app code.

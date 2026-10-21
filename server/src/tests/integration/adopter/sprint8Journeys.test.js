@@ -25,15 +25,16 @@ jest.mock("../../../services/ai", () => ({
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const ai = require("../../../services/ai");
 const { MATCH_QUIZ_QUESTIONS } = require("../../../config/matchQuiz");
 
-const createdEmails = [];
-const uniqueEmail = () => {
-  const email = `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
-  createdEmails.push(email);
-  return email;
-};
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
+
+const uniqueEmail = () =>
+  `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 
 const PASSWORD = "Secret123!";
 const DAY = 24 * 60 * 60 * 1000;
@@ -43,10 +44,14 @@ const isoDate = (date) => date.toISOString().slice(0, 10);
 // database — give the chained journeys room (see sprint6Journeys).
 jest.setTimeout(120000);
 
-const register = (name, email, role, shelterID) =>
-  request(app)
+// Records the new account in the tracker before handing back the response.
+const register = async (name, email, role, shelterID) => {
+  const res = await request(app)
     .post("/api/v1/auth/register")
     .send({ name, email, password: PASSWORD, role, shelterID });
+  data.user(res.body.data?.userID);
+  return res;
+};
 
 const login = (email) =>
   request(app).post("/api/v1/auth/login").send({ email, password: PASSWORD });
@@ -72,7 +77,7 @@ const makeManager = async (shelter, name) => {
   const email = uniqueEmail();
   const res = await register(name, email, "staff", shelter.shelterID);
   expect(res.status).toBe(201);
-  const userID = res.body.data.userID;
+  const userID = data.user(res.body.data.userID);
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active", staffDesignation: "Manager", onboardingComplete: true },
@@ -89,7 +94,7 @@ const makeActiveVet = async (shelter, name) => {
   const email = uniqueEmail();
   const res = await register(name, email, "vet", shelter.shelterID);
   expect(res.status).toBe(201);
-  const userID = res.body.data.userID;
+  const userID = data.user(res.body.data.userID);
   await prisma.veterinarian.update({
     where: { userID },
     data: { accountStatus: "Active", onboardingComplete: true, onboardingStep: 5 },
@@ -103,7 +108,7 @@ const makeAdopter = async (name) => {
   const res = await register(name, email, "adopter");
   expect(res.status).toBe(201);
   const loginRes = await login(email);
-  return { userID: res.body.data.userID, email, name, token: loginRes.body.data.token };
+  return { userID: data.user(res.body.data.userID), email, name, token: loginRes.body.data.token };
 };
 
 // ——————————————— THE FAKE AI ———————————————
@@ -117,11 +122,11 @@ const journeyPetIDs = new Set();
 const exerciseQuestion = MATCH_QUIZ_QUESTIONS.find((q) => q.id === "exercise");
 
 const fakeAiReply = async ({ schemaName, user }) => {
-  const data = JSON.parse(user);
+  const prompt = JSON.parse(user);
   if (schemaName === "pet_fit") {
-    const exercise = data.quiz.find((q) => q.question === exerciseQuestion.prompt)?.answer;
+    const exercise = prompt.quiz.find((q) => q.question === exerciseQuestion.prompt)?.answer;
     return {
-      matches: data.pets.map(({ petID }) => ({
+      matches: prompt.pets.map(({ petID }) => ({
         petID,
         score: journeyPetIDs.has(petID) ? FAKE_FIT_SCORE : 0,
         reason: `You picked "${exercise}".`,
@@ -129,9 +134,9 @@ const fakeAiReply = async ({ schemaName, user }) => {
     };
   }
   if (schemaName === "passport_summary") {
-    const [newest] = data.healthRecords;
+    const [newest] = prompt.healthRecords;
     return {
-      summary: `Fake summary of ${data.healthRecords.length} health note(s).`,
+      summary: `Fake summary of ${prompt.healthRecords.length} health note(s).`,
       pointsToReview: newest
         ? [{ text: "Follow up on the latest note.", sourceType: "healthRecord", sourceID: newest.id }]
         : [],
@@ -158,7 +163,9 @@ describe("Sprint 8 AI journeys", () => {
     ai.generateStructured.mockImplementation(fakeAiReply);
 
     shelterA = await makeShelter("S8 Journey Shelter A", 10001);
+    data.shelter(shelterA.shelterID);
     shelterB = await makeShelter("S8 Journey Shelter B", 10002);
+    data.shelter(shelterB.shelterID);
     managerA = await makeManager(shelterA, "S8 Manager A");
     managerB = await makeManager(shelterB, "S8 Manager B");
     vetA = await makeActiveVet(shelterA, "S8 Vet A");
@@ -169,44 +176,13 @@ describe("Sprint 8 AI journeys", () => {
     const species = await prisma.species.create({
       data: { speciesName: `S8JourneySpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
     const breed = await prisma.breed.create({ data: { speciesID, breedName: "S8JourneyBreed" } });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
   });
 
   afterAll(async () => {
-    const users = await prisma.users.findMany({
-      where: { userEmail: { in: createdEmails } },
-      select: { userID: true },
-    });
-    const userIDs = users.map((u) => u.userID);
-
-    // Children before parents. The quiz, match and summary rows cascade
-    // from their adopter/pet anyway — deleted explicitly so a failed cascade
-    // can't leave them behind.
-    await prisma.adopterMatch.deleteMany({
-      where: { OR: [{ adopterID: { in: userIDs } }, { petID: { in: petIDs } }] },
-    });
-    await prisma.adopterQuiz.deleteMany({ where: { adopterID: { in: userIDs } } });
-    await prisma.petHealthSummary.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.healthRecord.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.petPhoto.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.pet.deleteMany({ where: { petID: { in: petIDs } } });
-    if (breedID) await prisma.breed.deleteMany({ where: { breedID } });
-    if (speciesID) await prisma.species.deleteMany({ where: { speciesID } });
-
-    const shelterIDs = [shelterA, shelterB].filter(Boolean).map((s) => s.shelterID);
-    // Shelter.managerStaffID → Staff and Staff.shelterID → Shelter point at
-    // each other: unlink first, then the role rows and users, then shelters.
-    await prisma.shelter.updateMany({
-      where: { shelterID: { in: shelterIDs } },
-      data: { managerStaffID: null },
-    });
-    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.veterinarian.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.staff.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.shelter.deleteMany({ where: { shelterID: { in: shelterIDs } } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -229,7 +205,7 @@ describe("Sprint 8 AI journeys", () => {
         adoptionStatus: "available",
       });
     expect(res.status).toBe(201);
-    petIDs.push(res.body.data.petID);
+    petIDs.push(data.pet(res.body.data.petID));
     return res.body.data;
   };
 

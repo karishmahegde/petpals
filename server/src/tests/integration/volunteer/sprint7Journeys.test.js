@@ -16,8 +16,13 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const storage = require("../../../services/storage");
 const { finalizeDonation } = require("../../../services/donor/donations.service");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const createdEmails = [];
 const uniqueEmail = () => {
@@ -35,10 +40,14 @@ const DAY = 24 * 60 * 60 * 1000;
 // afterAll deletes its data, so give it room rather than let the two race.
 jest.setTimeout(120000);
 
-const register = (name, email, role, shelterID) =>
-  request(app)
+// Records the new account in the tracker before handing back the response.
+const register = async (name, email, role, shelterID) => {
+  const res = await request(app)
     .post("/api/v1/auth/register")
     .send({ name, email, password: PASSWORD, role, shelterID });
+  data.user(res.body.data?.userID);
+  return res;
+};
 
 const login = (email) =>
   request(app).post("/api/v1/auth/login").send({ email, password: PASSWORD });
@@ -63,7 +72,7 @@ const makeManager = async (shelter, name) => {
   const email = uniqueEmail();
   const res = await register(name, email, "staff", shelter.shelterID);
   expect(res.status).toBe(201);
-  const userID = res.body.data.userID;
+  const userID = data.user(res.body.data.userID);
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active", staffDesignation: "Manager", onboardingComplete: true },
@@ -82,7 +91,7 @@ const makeActiveVolunteer = async (shelter, name) => {
   const email = uniqueEmail();
   const res = await register(name, email, "volunteer", shelter.shelterID);
   expect(res.status).toBe(201);
-  const userID = res.body.data.userID;
+  const userID = data.user(res.body.data.userID);
   await prisma.volunteer.update({
     where: { userID },
     data: { accountStatus: "Active", onboardingComplete: true, onboardingStep: 5 },
@@ -98,49 +107,32 @@ describe("Sprint 7 volunteer + donor journeys", () => {
 
   beforeAll(async () => {
     shelter = await makeShelter("S7 Journey Shelter", 10003);
+    data.shelter(shelter.shelterID);
     manager = await makeManager(shelter, "S7 Manager");
   });
 
   afterAll(async () => {
-    const users = await prisma.users.findMany({
-      where: { userEmail: { in: createdEmails } },
-      select: { userID: true },
-    });
-    const userIDs = users.map((u) => u.userID);
-    const shelterIDs = shelter ? [shelter.shelterID] : [];
-
-    // Children before parents: assignment rows FK tasks/events and
-    // volunteers (RESTRICT); tasks, events and donations FK the shelter (and
-    // staff).
-    await prisma.volunteerTask.deleteMany({ where: { task: { shelterID: { in: shelterIDs } } } });
-    await prisma.task.deleteMany({ where: { shelterID: { in: shelterIDs } } });
-    await prisma.volunteerEvent.deleteMany({ where: { event: { shelterID: { in: shelterIDs } } } });
-    await prisma.event.deleteMany({ where: { shelterID: { in: shelterIDs } } });
-    await prisma.donation.deleteMany({ where: { shelterID: { in: shelterIDs } } });
-
-    const ids = await prisma.governmentID.findMany({
-      where: { userID: { in: userIDs } },
-      select: { documentURL: true },
-    });
-    await Promise.all(
-      ids
-        .filter((id) => id.documentURL)
-        .map((id) => storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, id.documentURL)),
-    );
-    await prisma.governmentID.deleteMany({ where: { userID: { in: userIDs } } });
-
-    // Shelter.managerStaffID → Staff and Staff.shelterID → Shelter point at
-    // each other: unlink first, then the role rows and users, then the
-    // shelter.
-    await prisma.shelter.updateMany({
-      where: { shelterID: { in: shelterIDs } },
-      data: { managerStaffID: null },
-    });
-    await prisma.volunteer.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.donor.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.staff.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.shelter.deleteMany({ where: { shelterID: { in: shelterIDs } } });
+    // The uploaded ID documents live in Storage, which the tracker doesn't
+    // touch — remove those files first, then the rows. A failure here mustn't
+    // stop the row clean-up below.
+    try {
+      const users = await prisma.users.findMany({
+        where: { userEmail: { in: createdEmails } },
+        select: { userID: true },
+      });
+      const ids = await prisma.governmentID.findMany({
+        where: { userID: { in: users.map((u) => u.userID) } },
+        select: { documentURL: true },
+      });
+      await Promise.all(
+        ids
+          .filter((id) => id.documentURL)
+          .map((id) => storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, id.documentURL)),
+      );
+    } catch (err) {
+      console.error(`[test cleanup] ID document files: ${err.message}`);
+    }
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -151,7 +143,7 @@ describe("Sprint 7 volunteer + donor journeys", () => {
     const volunteerName = `S7 Journey Newcomer ${Date.now()}`;
     const registerRes = await register(volunteerName, email, "volunteer", shelter.shelterID);
     expect(registerRes.status).toBe(201);
-    const volunteerID = registerRes.body.data.userID;
+    const volunteerID = data.user(registerRes.body.data.userID);
 
     // 2. Logging in while Pending works, and says where they are.
     const loginRes = await login(email);
@@ -386,7 +378,7 @@ describe("Sprint 7 volunteer + donor journeys", () => {
     const email = uniqueEmail();
     const registerRes = await register("S7 Journey Donor", email, "donor");
     expect(registerRes.status).toBe(201);
-    const donorID = registerRes.body.data.userID;
+    const donorID = data.user(registerRes.body.data.userID);
     const loginRes = await login(email);
     expect(loginRes.status).toBe(200);
     const auth = bearer(loginRes.body.data.token);

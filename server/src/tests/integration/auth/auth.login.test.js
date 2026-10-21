@@ -3,6 +3,11 @@ const jwt = require("jsonwebtoken"); //to verify the JWT token
 
 const app = require("../../../app"); // loads dotenv, so process.env.JWT_SECRET is populated below
 const prisma = require("../../../config/prisma"); //to interact with the database
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // Runs against the DATABASE_URL configured in server/.env — the seed user
 // created for this suite is removed in afterAll so no test data accumulates.
@@ -26,7 +31,7 @@ describe("POST /api/v1/auth/login", () => {
 
     seedUser = {
       //to store the seed user data
-      userID: res.body.data.userID,
+      userID: data.user(res.body.data.userID),
       email: payload.email,
       password: payload.password,
       role: res.body.data.role, // "Adopter"
@@ -34,9 +39,8 @@ describe("POST /api/v1/auth/login", () => {
   });
 
   afterAll(async () => {
-    await prisma.adopter.deleteMany({ where: { userID: seedUser.userID } }); //to delete the seed user data from the database
-    await prisma.users.deleteMany({ where: { userID: seedUser.userID } });
-    await prisma.$disconnect(); //to disconnect from the database
+    await data.cleanUp();
+    await prisma.$disconnect();
   });
 
   // —————————————————— VALID CREDENTIALS ——————————————————
@@ -117,7 +121,7 @@ describe("POST /api/v1/auth/login — blocked adopter accountStatus", () => {
       const res = await request(app)
         .post("/api/v1/auth/register")
         .send(payload);
-      const userID = res.body.data.userID;
+      const userID = data.user(res.body.data.userID);
       await prisma.adopter.update({
         where: { userID },
         data: { accountStatus: status },
@@ -127,9 +131,7 @@ describe("POST /api/v1/auth/login — blocked adopter accountStatus", () => {
   });
 
   afterAll(async () => {
-    const userIDs = Object.values(blockedUsers).map((u) => u.userID);
-    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

@@ -1,18 +1,18 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // Runs against the DATABASE_URL configured in server/.env, same convention as
 // auth.login.test.js — seeds via API calls where an endpoint exists, cleans up
-// via Prisma in afterAll.
-// Every account a test creates is remembered, so afterAll can sweep up any a
-// failing test didn't reach its own cleanup for.
-const createdEmails = [];
-const uniqueEmail = () => {
-  const email = `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
-  createdEmails.push(email);
-  return email;
-};
+// via Prisma in afterAll (the tracker above catches anything a failing test
+// didn't reach its own cleanup for).
+const uniqueEmail = () =>
+  `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 
 const registerAndLoginAdopter = async () => {
   const payload = {
@@ -24,7 +24,7 @@ const registerAndLoginAdopter = async () => {
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });
@@ -46,12 +46,12 @@ describe("DELETE /api/v1/adopters/me", () => {
     const species = await prisma.species.create({
       data: { speciesName: `CloseAcctTestSpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
 
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "CloseAcctTestBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
 
     const shelter = await prisma.shelter.create({
       data: {
@@ -63,7 +63,7 @@ describe("DELETE /api/v1/adopters/me", () => {
         shelterSize: 10,
       },
     });
-    shelterID = shelter.shelterID;
+    shelterID = data.shelter(shelter.shelterID);
 
     const pet = await prisma.pet.create({
       data: {
@@ -81,28 +81,11 @@ describe("DELETE /api/v1/adopters/me", () => {
         adoptionStatus: "available",
       },
     });
-    petID = pet.petID;
+    petID = data.pet(pet.petID);
   });
 
   afterAll(async () => {
-    // Accounts a failed test left behind (the tests clean up their own
-    // otherwise, so this usually finds nothing). Children before parents.
-    const leftovers = await prisma.users.findMany({
-      where: { userEmail: { in: createdEmails } },
-      select: { userID: true },
-    });
-    const userIDs = leftovers.map((u) => u.userID);
-    await prisma.adoptionApplication.deleteMany({ where: { adopterID: { in: userIDs } } });
-    await prisma.favorite.deleteMany({ where: { adopterID: { in: userIDs } } });
-    await prisma.visit.deleteMany({ where: { adopterID: { in: userIDs } } });
-    await prisma.governmentID.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-
-    await prisma.pet.deleteMany({ where: { petID } });
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
-    await prisma.shelter.deleteMany({ where: { shelterID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

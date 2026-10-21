@@ -2,6 +2,11 @@ const request = require("supertest");
 
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // GET /shelters/nearby uses PostGIS (a `geography` column Prisma marks
 // Unsupported — see CLAUDE.md's "PostGIS migration drift" note), so
@@ -18,7 +23,6 @@ describe("GET /api/v1/shelters/nearby (integration)", () => {
   let outsideShelter;
   let postalShelter;
   let exactBoundaryKm;
-  const createdShelterIDs = [];
   let emailCounter = 0;
   // shelterEmail is VARCHAR(45), so the generated address must stay short —
   // same constraint the auth integration tests work around.
@@ -39,7 +43,7 @@ describe("GET /api/v1/shelters/nearby (integration)", () => {
         shelterStatus: "Open",
       },
     });
-    createdShelterIDs.push(shelter.shelterID);
+    data.shelter(shelter.shelterID);
     await prisma.$executeRaw`
       UPDATE "Shelter"
       SET "shelterLocation" = ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)
@@ -99,9 +103,7 @@ describe("GET /api/v1/shelters/nearby (integration)", () => {
   });
 
   afterAll(async () => {
-    await prisma.shelter.deleteMany({
-      where: { shelterID: { in: createdShelterIDs } },
-    });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

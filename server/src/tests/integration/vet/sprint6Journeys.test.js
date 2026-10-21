@@ -14,7 +14,12 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const storage = require("../../../services/storage");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const createdEmails = [];
 const uniqueEmail = () => {
@@ -34,10 +39,14 @@ const DAY = 24 * HOUR;
 // the two race.
 jest.setTimeout(120000);
 
-const register = (name, email, role, shelterID) =>
-  request(app)
+// Records the new account in the tracker before handing back the response.
+const register = async (name, email, role, shelterID) => {
+  const res = await request(app)
     .post("/api/v1/auth/register")
     .send({ name, email, password: PASSWORD, role, shelterID });
+  data.user(res.body.data?.userID);
+  return res;
+};
 
 const login = (email) =>
   request(app).post("/api/v1/auth/login").send({ email, password: PASSWORD });
@@ -63,7 +72,7 @@ const makeManager = async (shelter, name) => {
   const email = uniqueEmail();
   const res = await register(name, email, "staff", shelter.shelterID);
   expect(res.status).toBe(201);
-  const userID = res.body.data.userID;
+  const userID = data.user(res.body.data.userID);
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active", staffDesignation: "Manager", onboardingComplete: true },
@@ -82,7 +91,7 @@ const makeActiveVet = async (shelter, name) => {
   const email = uniqueEmail();
   const res = await register(name, email, "vet", shelter.shelterID);
   expect(res.status).toBe(201);
-  const userID = res.body.data.userID;
+  const userID = data.user(res.body.data.userID);
   await prisma.veterinarian.update({
     where: { userID },
     data: { accountStatus: "Active", onboardingComplete: true, onboardingStep: 5 },
@@ -105,7 +114,9 @@ describe("Sprint 6 veterinarian journeys", () => {
 
   beforeAll(async () => {
     shelterA = await makeShelter("S6 Journey Shelter A", 10001);
+    data.shelter(shelterA.shelterID);
     shelterB = await makeShelter("S6 Journey Shelter B", 10002);
+    data.shelter(shelterB.shelterID);
     managerA = await makeManager(shelterA, "S6 Manager A");
     managerB = await makeManager(shelterB, "S6 Manager B");
     vetA = await makeActiveVet(shelterA, "S6 Vet A");
@@ -114,11 +125,11 @@ describe("Sprint 6 veterinarian journeys", () => {
     const species = await prisma.species.create({
       data: { speciesName: `S6JourneySpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "S6JourneyBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
 
     // The vaccine catalog is real API surface too — added by a vet.
     const vaccineRes = await request(app)
@@ -131,51 +142,31 @@ describe("Sprint 6 veterinarian journeys", () => {
       });
     expect(vaccineRes.status).toBe(201);
     vaccine = vaccineRes.body.data;
+    data.vaccine(vaccine.vaccineID);
   });
 
   afterAll(async () => {
-    const users = await prisma.users.findMany({
-      where: { userEmail: { in: createdEmails } },
-      select: { userID: true },
-    });
-    const userIDs = users.map((u) => u.userID);
-
-    // Children before parents: doses/records/appointments/transfers FK the
-    // pets (and vets/staff/shelters); pets FK staff, breed and shelter.
-    await prisma.vaccinationRecord.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.healthRecord.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.appointment.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.transferHistory.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.petPhoto.deleteMany({ where: { petID: { in: petIDs } } });
-    await prisma.pet.deleteMany({ where: { petID: { in: petIDs } } });
-    if (vaccine) {
-      await prisma.vaccine.deleteMany({ where: { vaccineID: vaccine.vaccineID } });
+    // The uploaded ID documents live in Storage, which the tracker doesn't
+    // touch — remove those files first, then the rows. A failure here mustn't
+    // stop the row clean-up below.
+    try {
+      const users = await prisma.users.findMany({
+        where: { userEmail: { in: createdEmails } },
+        select: { userID: true },
+      });
+      const ids = await prisma.governmentID.findMany({
+        where: { userID: { in: users.map((u) => u.userID) } },
+        select: { documentURL: true },
+      });
+      await Promise.all(
+        ids
+          .filter((id) => id.documentURL)
+          .map((id) => storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, id.documentURL)),
+      );
+    } catch (err) {
+      console.error(`[test cleanup] ID document files: ${err.message}`);
     }
-    if (breedID) await prisma.breed.deleteMany({ where: { breedID } });
-    if (speciesID) await prisma.species.deleteMany({ where: { speciesID } });
-
-    const ids = await prisma.governmentID.findMany({
-      where: { userID: { in: userIDs } },
-      select: { documentURL: true },
-    });
-    await Promise.all(
-      ids
-        .filter((id) => id.documentURL)
-        .map((id) => storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, id.documentURL)),
-    );
-    await prisma.governmentID.deleteMany({ where: { userID: { in: userIDs } } });
-
-    const shelterIDs = [shelterA, shelterB].filter(Boolean).map((s) => s.shelterID);
-    // Shelter.managerStaffID → Staff and Staff.shelterID → Shelter point at
-    // each other: unlink first, then vets/staff/users, then the shelters.
-    await prisma.shelter.updateMany({
-      where: { shelterID: { in: shelterIDs } },
-      data: { managerStaffID: null },
-    });
-    await prisma.veterinarian.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.staff.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.shelter.deleteMany({ where: { shelterID: { in: shelterIDs } } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -198,7 +189,7 @@ describe("Sprint 6 veterinarian journeys", () => {
         adoptionStatus: "available",
       });
     expect(res.status).toBe(201);
-    petIDs.push(res.body.data.petID);
+    petIDs.push(data.pet(res.body.data.petID));
     return res.body.data;
   };
 
@@ -229,7 +220,7 @@ describe("Sprint 6 veterinarian journeys", () => {
     const email = uniqueEmail();
     const registerRes = await register("S6 Journey Newcomer Vet", email, "vet", shelterA.shelterID);
     expect(registerRes.status).toBe(201);
-    const vetID = registerRes.body.data.userID;
+    const vetID = data.user(registerRes.body.data.userID);
 
     // 2. Logging in while Pending works, and says where they are.
     const loginRes = await login(email);

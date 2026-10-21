@@ -1,6 +1,10 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if setup failed.
+const data = trackTestData();
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -15,7 +19,7 @@ const registerAndLoginAdopter = async (name) => {
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });
@@ -38,7 +42,7 @@ const registerAndLoginActiveStaff = async (name, overrides = {}) => {
   };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
   expect(registerRes.status).toBe(201);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active", ...overrides },
@@ -54,7 +58,7 @@ const registerAndLoginActiveStaff = async (name, overrides = {}) => {
 const registerAndLoginActiveAdmin = async (name) => {
   const payload = { name, email: uniqueEmail(), password: "Secret123!", role: "admin" };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   await prisma.admin.update({ where: { userID }, data: { accountStatus: "Active" } });
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
@@ -80,12 +84,12 @@ describe("visits", () => {
     const species = await prisma.species.create({
       data: { speciesName: `VisitTestSpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
 
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "VisitTestBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
 
     const shelter = await prisma.shelter.create({
       data: {
@@ -97,7 +101,7 @@ describe("visits", () => {
         shelterSize: 10,
       },
     });
-    shelterID = shelter.shelterID;
+    shelterID = data.shelter(shelter.shelterID);
 
     const otherShelter = await prisma.shelter.create({
       data: {
@@ -109,7 +113,7 @@ describe("visits", () => {
         shelterSize: 10,
       },
     });
-    otherShelterID = otherShelter.shelterID;
+    otherShelterID = data.shelter(otherShelter.shelterID);
 
     const pet = await prisma.pet.create({
       data: {
@@ -127,7 +131,7 @@ describe("visits", () => {
         adoptionStatus: "available",
       },
     });
-    petID = pet.petID;
+    petID = data.pet(pet.petID);
 
     adopterA = await registerAndLoginAdopter("Visit Test Adopter A");
     adopterB = await registerAndLoginAdopter("Visit Test Adopter B");
@@ -139,34 +143,9 @@ describe("visits", () => {
   });
 
   afterAll(async () => {
-    // Safety net — every test below also cleans up the rows it creates.
-    await prisma.visit.deleteMany({
-      where: { adopterID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.adopter.deleteMany({
-      where: { userID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.staff.deleteMany({
-      where: { userID: { in: [staffAtShelter.userID, staffAtOtherShelter.userID] } },
-    });
-    await prisma.admin.deleteMany({ where: { userID: admin.userID } });
-    await prisma.users.deleteMany({
-      where: {
-        userID: {
-          in: [
-            adopterA.userID,
-            adopterB.userID,
-            staffAtShelter.userID,
-            staffAtOtherShelter.userID,
-            admin.userID,
-          ],
-        },
-      },
-    });
-    await prisma.pet.deleteMany({ where: { petID } });
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
-    await prisma.shelter.deleteMany({ where: { shelterID: { in: [shelterID, otherShelterID] } } });
+    // Each test also removes its own visits; this catches anything a failed
+    // test left, plus the accounts, pet, shelters and catalogue rows.
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

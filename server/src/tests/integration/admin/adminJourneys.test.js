@@ -31,6 +31,11 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -41,7 +46,7 @@ const uniqueEmail = () =>
 const registerAdopter = async (name) => {
   const payload = { name, email: uniqueEmail(), password: "Secret123!", role: "adopter" };
   const res = await request(app).post("/api/v1/auth/register").send(payload);
-  return { userID: res.body.data.userID, email: payload.email, password: payload.password };
+  return { userID: data.user(res.body.data.userID), email: payload.email, password: payload.password };
 };
 
 const login = (email, password) =>
@@ -54,7 +59,7 @@ const login = (email, password) =>
 const registerAndLoginActiveAdmin = async (name) => {
   const payload = { name, email: uniqueEmail(), password: "Secret123!", role: "admin" };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   await prisma.admin.update({ where: { userID }, data: { accountStatus: "Active" } });
   const loginRes = await login(payload.email, payload.password);
   return { userID, token: loginRes.body.data.token };
@@ -76,7 +81,7 @@ const registerActiveStaff = async (name, overrides = {}) => {
   };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
   expect(registerRes.status).toBe(201);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active", ...overrides },
@@ -102,21 +107,18 @@ describe("Admin oversight journeys", () => {
     const species = await prisma.species.create({
       data: { speciesName: `AdminJourneySpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
 
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "AdminJourneyBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
 
     admin = await registerAndLoginActiveAdmin("Admin Journey Admin");
   });
 
   afterAll(async () => {
-    await prisma.admin.deleteMany({ where: { userID: admin.userID } });
-    await prisma.users.deleteMany({ where: { userID: admin.userID } });
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -134,7 +136,7 @@ describe("Admin oversight journeys", () => {
         shelterSize: 25,
       });
     expect(createRes.status).toBe(201);
-    const shelterID = createRes.body.data.shelterID;
+    const shelterID = data.shelter(createRes.body.data.shelterID);
     expect(createRes.body.data.shelterStatus).toBe("Open");
     expect(createRes.body.data.lat).toEqual(expect.any(Number));
     expect(createRes.body.data.lng).toEqual(expect.any(Number));
@@ -180,9 +182,11 @@ describe("Admin oversight journeys", () => {
     const shelterA = await prisma.shelter.create({
       data: makeShelterPayload("Reassign Shelter A", 10001),
     });
+    data.shelter(shelterA.shelterID);
     const shelterB = await prisma.shelter.create({
       data: makeShelterPayload("Reassign Shelter B", 11201),
     });
+    data.shelter(shelterB.shelterID);
 
     const staffMember = await registerActiveStaff("Reassign Test Staff", {
       shelterID: shelterA.shelterID,
@@ -269,6 +273,7 @@ describe("Admin oversight journeys", () => {
     const shelter = await prisma.shelter.create({
       data: makeShelterPayload("Analytics Shelter", 10001),
     });
+    data.shelter(shelter.shelterID);
     const petData = {
       breedID,
       petDOB: new Date("2020-01-01"),

@@ -10,7 +10,12 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const storage = require("../../../services/storage");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // Chained register/login/HTTP round trips, plus real Storage uploads (photo,
 // government ID) on top of that — the 5s Jest default is too tight.
@@ -40,7 +45,7 @@ const registerAndLoginActiveStaff = async (name, overrides = {}) => {
   };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
   expect(registerRes.status).toBe(201);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active", ...overrides },
@@ -52,7 +57,7 @@ const registerAndLoginActiveStaff = async (name, overrides = {}) => {
 const registerAdopter = async (name) => {
   const payload = { name, email: uniqueEmail(), password: "Secret123!", role: "adopter" };
   const res = await request(app).post("/api/v1/auth/register").send(payload);
-  return { userID: res.body.data.userID };
+  return { userID: data.user(res.body.data.userID) };
 };
 
 const makeShelterPayload = (label, zip) => ({
@@ -100,17 +105,16 @@ describe("Sprint 5.1 Staff journeys", () => {
     const species = await prisma.species.create({
       data: { speciesName: `S51JourneySpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
 
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "S51JourneyBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
   });
 
   afterAll(async () => {
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -119,6 +123,7 @@ describe("Sprint 5.1 Staff journeys", () => {
     const shelter = await prisma.shelter.create({
       data: makeShelterPayload("Onboarding Shelter", 10001),
     });
+    data.shelter(shelter.shelterID);
     const staff = await registerAndLoginActiveStaff("Onboarding Journey Staff", {
       shelterID: shelter.shelterID,
     });
@@ -171,6 +176,7 @@ describe("Sprint 5.1 Staff journeys", () => {
     const shelter = await prisma.shelter.create({
       data: makeShelterPayload("Pet Lifecycle Shelter", 10001),
     });
+    data.shelter(shelter.shelterID);
     const staff = await registerAndLoginActiveStaff("Pet Lifecycle Staff", {
       shelterID: shelter.shelterID,
     });
@@ -231,6 +237,7 @@ describe("Sprint 5.1 Staff journeys", () => {
     const shelter = await prisma.shelter.create({
       data: makeShelterPayload("Acceptance Shelter", 10001),
     });
+    data.shelter(shelter.shelterID);
     const staff = await registerAndLoginActiveStaff("Acceptance Journey Staff", {
       shelterID: shelter.shelterID,
     });
@@ -287,9 +294,11 @@ describe("Sprint 5.1 Staff journeys", () => {
     const shelterA = await prisma.shelter.create({
       data: makeShelterPayload("Isolation Shelter A", 10001),
     });
+    data.shelter(shelterA.shelterID);
     const shelterB = await prisma.shelter.create({
       data: makeShelterPayload("Isolation Shelter B", 11201),
     });
+    data.shelter(shelterB.shelterID);
     const staffA = await registerAndLoginActiveStaff("Isolation Staff A", {
       shelterID: shelterA.shelterID,
     });
