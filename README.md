@@ -216,7 +216,25 @@ npm run cypress:open       # needs both dev servers running (cypress:run for hea
 
 **CI:** GitHub Actions runs the server unit tests (with the coverage gate) and the client typecheck, lint and Vitest on every pull request into `dev` and `main`; both are required checks. Integration and Cypress run locally — they need the database and the dev servers. See [`setup/SETUP.md`](./setup/SETUP.md#running-the-tests) for what each needs.
 
-## 🔶 License
+## 🔶 Deployment
+
+PetPals runs entirely on free tiers, so hosting it costs nothing.
+
+| Part | Host | How |
+| --- | --- | --- |
+| Client | **Vercel** (Hobby) | Builds `client/`. [`client/vercel.json`](./client/vercel.json) forwards `/api/*` to the API, so the login cookie stays on the site's own domain, and serves the app for every other route |
+| API | **Render** (free web service) | Runs [`server/Dockerfile`](./server/Dockerfile) from the [`render.yaml`](./render.yaml) Blueprint, applying any new database migrations on startup |
+| Database + file storage | **Supabase** (free) | Postgres + PostGIS and the photo / ID buckets, reached through Supabase's Session pooler |
+| Payments · email · AI | **Stripe** (test mode) · **Brevo** · **Groq** | Free tiers; email and AI are optional |
+
+> ⏳ The free API sleeps after 15 minutes without traffic, so the first request after a quiet spell takes about 30–60 seconds while it wakes up. A free Supabase project also pauses after about a week without activity; it's restored from the Supabase dashboard.
+
+To deploy your own copy:
+
+1. **API:** Render → **New → Blueprint** → this repo. Fill in the values it asks for from your `server/.env`, using Supabase's **Session pooler** URI for `DATABASE_URL` (see [`setup/SETUP.md`](./setup/SETUP.md#2-create-a-supabase-project)) and your Vercel URL for `CLIENT_URL`.
+2. **Client:** point the `/api` rewrite in `client/vercel.json` at your Render URL, then import the repo into Vercel with root directory `client/`, `VITE_API_URL=/api/v1` and `VITE_STREAM_URL=https://<your-api>.onrender.com/api/v1`.
+
+## 🟤 License
 
 Distributed under the MIT License. See [`LICENSE`](./LICENSE) for details.
 
