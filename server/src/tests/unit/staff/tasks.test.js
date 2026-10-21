@@ -13,7 +13,7 @@ jest.mock("../../../config/prisma", () => ({
     create: jest.fn(),
     update: jest.fn(),
   },
-  volunteerTask: { deleteMany: jest.fn(), createMany: jest.fn() },
+  volunteerTask: { deleteMany: jest.fn(), createMany: jest.fn(), findMany: jest.fn() },
   $transaction: jest.fn(),
 }));
 
@@ -23,7 +23,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// Which volunteers hear about a task — see "Notifications" below.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
+
 const prisma = require("../../../config/prisma");
+const { notify, messages } = require("../../../services/notifications");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -622,5 +627,88 @@ describe("Tasks (Staff)", () => {
         expect(prisma.task.findUnique).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe("Notifications", () => {
+    test("POST: every assigned volunteer hears, once each, with the task's kind", async () => {
+      prisma.staff.findUnique.mockResolvedValue({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(2);
+      prisma.task.create.mockResolvedValueOnce({ taskID: 5 });
+      prisma.task.findUnique.mockResolvedValueOnce(taskRow());
+
+      await request(app)
+        .post("/api/v1/tasks")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send(VALID_BODY());
+
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith([30, 31], messages.taskAssigned({ taskName: "Feeding" }));
+    });
+
+    test("PATCH: only the newly added volunteers hear, with the new kind if it changed", async () => {
+      prisma.task.findUnique
+        .mockResolvedValueOnce({ shelterID: 9, taskStatus: "In_progress", taskName: "Feeding" })
+        .mockResolvedValueOnce(taskRow());
+      prisma.staff.findUnique.mockResolvedValue({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(2);
+      prisma.volunteerTask.findMany.mockResolvedValueOnce([{ volunteerID: 30 }]);
+      prisma.$transaction.mockResolvedValueOnce([]);
+
+      const res = await request(app)
+        .patch("/api/v1/tasks/5")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ taskName: "Cleaning", volunteerIDs: [30, 32] });
+
+      expect(res.status).toBe(200);
+      expect(prisma.volunteerTask.findMany).toHaveBeenCalledWith({
+        where: { taskID: 5 },
+        select: { volunteerID: true },
+      });
+      expect(notify).toHaveBeenCalledWith([32], messages.taskAssigned({ taskName: "Cleaning" }));
+    });
+
+    test("PATCH: the old assignees can't be read → the edit saves, nobody is told", async () => {
+      const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      prisma.task.findUnique
+        .mockResolvedValueOnce({ shelterID: 9, taskStatus: "In_progress", taskName: "Feeding" })
+        .mockResolvedValueOnce(taskRow());
+      prisma.staff.findUnique.mockResolvedValue({ shelterID: 9 });
+      prisma.volunteer.count.mockResolvedValueOnce(1);
+      prisma.volunteerTask.findMany.mockRejectedValueOnce(new Error("connection lost"));
+      prisma.$transaction.mockResolvedValueOnce([]);
+
+      const res = await request(app)
+        .patch("/api/v1/tasks/5")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ volunteerIDs: [32] });
+
+      expect(res.status).toBe(200);
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    test("PATCH without volunteerIDs, and status changes, tell no one", async () => {
+      prisma.task.findUnique
+        .mockResolvedValueOnce({ shelterID: 9, taskStatus: "In_progress", taskName: "Feeding" })
+        .mockResolvedValueOnce(taskRow())
+        .mockResolvedValueOnce({ shelterID: 9, taskStatus: "In_progress" })
+        .mockResolvedValueOnce(taskRow({ taskStatus: "Cancelled" }));
+      prisma.staff.findUnique.mockResolvedValue({ shelterID: 9 });
+      prisma.$transaction.mockResolvedValueOnce([]);
+      prisma.task.update.mockResolvedValueOnce({});
+
+      await request(app)
+        .patch("/api/v1/tasks/5")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ taskDesc: "Evening feed" });
+      await request(app)
+        .patch("/api/v1/tasks/5/status")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send({ taskStatus: "Cancelled" });
+
+      expect(prisma.volunteerTask.findMany).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
   });
 });

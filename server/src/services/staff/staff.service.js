@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const { notifyAfterLookup, messages, signupApproverIDs } = require("../notifications");
 const accountNotices = require("../auth/accountNotices");
 const { staffStatusDates } = require("../../utils/staffDates");
 const storage = require("../storage");
@@ -129,9 +130,17 @@ const REQUIRED_FOR_COMPLETION = {
 const completeOnboarding = async (userID) => {
   const staff = await prisma.staff.findUnique({
     where: { userID },
-    select: Object.fromEntries(
-      Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
-    ),
+    select: {
+      ...Object.fromEntries(
+        Object.keys(REQUIRED_FOR_COMPLETION).map((field) => [field, true]),
+      ),
+      // For the approvers' notification below.
+      staffName: true,
+      shelterID: true,
+      accountStatus: true,
+      onboardingComplete: true,
+      staffDesignation: true,
+    },
   });
   if (!staff) {
     throw notFound();
@@ -160,13 +169,24 @@ const completeOnboarding = async (userID) => {
     throw err;
   }
 
-  return toSelfProfile(
-    await prisma.staff.update({
-      where: { userID },
-      data: { onboardingComplete: true, onboardingStep: LAST_ONBOARDING_STEP },
-      select: STAFF_SELF_SELECT,
-    }),
-  );
+  const updated = await prisma.staff.update({
+    where: { userID },
+    data: { onboardingComplete: true, onboardingStep: LAST_ONBOARDING_STEP },
+    select: STAFF_SELF_SELECT,
+  });
+
+  // Finishing onboarding is what makes a Pending sign-up approvable
+  // (staffApproval.service.js), so whoever approves it hears now — once, not
+  // on a repeat call.
+  if (staff.accountStatus === "Pending" && !staff.onboardingComplete) {
+    const kind = staff.staffDesignation === "Manager" ? "Manager" : "Staff";
+    await notifyAfterLookup(`the sign-up of user ${userID}`, async () => [
+      await signupApproverIDs(kind, staff.shelterID),
+      messages.signupReadyForApproval({ name: staff.staffName, kind }),
+    ]);
+  }
+
+  return toSelfProfile(updated);
 };
 
 // ——————————————— CLOSE MY ACCOUNT (DELETE /staff/me) ———————————————

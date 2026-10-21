@@ -17,6 +17,10 @@ const buildApp = () => {
   app.get("/protected", authenticate, (req, res) => {
     res.status(200).json({ success: true, data: req.user }); //to send the user data to the client
   });
+  // The notification stream ends itself at the token's expiry.
+  app.get("/expiry", authenticate, (req, res) => {
+    res.status(200).json({ success: true, data: { tokenExpiresAt: req.tokenExpiresAt } });
+  });
   // The opt-in variant used by the few routes a Pending staff member, vet or
   // volunteer needs to onboard before approval (GET/PUT /staff/me, their government
   // ID, the onboarding endpoints, logout).
@@ -36,6 +40,17 @@ describe("authenticate middleware", () => {
   beforeEach(() => {
     app = buildApp(); //to build the express app
     authService.getAccountStatus.mockReset().mockResolvedValue("Active");
+  });
+
+  // —————————————————— TOKEN EXPIRY ON THE REQUEST ——————————————————
+  test("a valid token sets req.tokenExpiresAt to its exp, in milliseconds", async () => {
+    const token = jwt.sign({ userID: 1, role: "Adopter" }, JWT_SECRET, { expiresIn: "15m" });
+    const { exp } = jwt.decode(token);
+
+    const res = await request(app).get("/expiry").set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.tokenExpiresAt).toBe(exp * 1000);
   });
 
   // —————————————————— NO AUTHORIZATION HEADER ——————————————————

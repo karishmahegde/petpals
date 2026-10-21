@@ -1,4 +1,14 @@
 const prisma = require("../../config/prisma");
+const { notify, notifyAfterLookup, messages, shelterStaffIDs } = require("../notifications");
+
+// The name staff see on a visit notification.
+const adopterNameOf = async (adopterID) =>
+  (
+    await prisma.adopter.findUnique({
+      where: { userID: adopterID },
+      select: { adopterName: true },
+    })
+  ).adopterName;
 const storage = require("../storage");
 
 // Scalar shape returned to the client for a created visit.
@@ -43,17 +53,18 @@ const createVisit = async ({
 
   // petID is optional (a plain shelter visit has no pet). Validate it only when
   // supplied, so a bad reference is a clean 404 rather than an FK error.
+  let pet = null;
   if (petID != null) {
-    const pet = await prisma.pet.findUnique({
+    pet = await prisma.pet.findUnique({
       where: { petID },
-      select: { petID: true },
+      select: { petID: true, petName: true },
     });
     if (!pet) {
       throw notFound(`No pet exists with ID ${petID}`);
     }
   }
 
-  return prisma.visit.create({
+  const visit = await prisma.visit.create({
     data: {
       adopterID,
       shelterID,
@@ -63,6 +74,12 @@ const createVisit = async ({
     },
     select: VISIT_SELECT,
   });
+
+  await notifyAfterLookup(`the new visit request ${visit.visitID}`, async () => [
+    await shelterStaffIDs(shelterID),
+    messages.newVisitRequest({ adopterName: await adopterNameOf(adopterID), petName: pet?.petName }),
+  ]);
+  return visit;
 };
 
 // ——————————————— LIST VISITS FOR AN ADOPTER (GET /adopters/me/visits) ———————————————
@@ -248,12 +265,27 @@ const listVisitsForStaff = async (
 // transitions are valid depends on the caller's role, not a shared enum.
 // Adopter may only move their own, still-future, non-closed visit to
 // 'Cancelled'. Staff/Admin may move an unconfirmed (null) visit to
-// 'Confirmed', then a 'Confirmed' visit to 'Completed' — Staff only at their
+// 'Confirmed', then a 'Confirmed' visit to 'Completed', and cancel one on the
+// same terms as the adopter (future, not closed) — Staff only at their
 // own shelter (403 otherwise); Admin any shelter. staffID is only ever set
 // for a genuine Staff actor (FKs Staff.userID, which an Admin doesn't have),
 // same as staffID on AdoptionApplication.
 const describeStatus = (visitStatus) =>
   visitStatus === null ? "unconfirmed" : visitStatus.toLowerCase();
+
+// Either side may cancel an upcoming visit that's still open (unconfirmed or
+// Confirmed).
+const assertCancellable = (visit) => {
+  if (visit.visitStatus === "Cancelled") {
+    throw conflict("This visit is already cancelled");
+  }
+  if (visit.visitStatus === "Completed") {
+    throw conflict("A completed visit can't be cancelled");
+  }
+  if (visit.visitTime.getTime() <= Date.now()) {
+    throw conflict("A visit in the past can't be cancelled");
+  }
+};
 
 const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
   const visit = await prisma.visit.findUnique({
@@ -279,18 +311,10 @@ const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
       err.code = "FORBIDDEN";
       throw err;
     }
-    if (visit.visitStatus === "Cancelled") {
-      throw conflict("This visit is already cancelled");
-    }
-    if (visit.visitStatus === "Completed") {
-      throw conflict("A completed visit can't be cancelled");
-    }
-    if (visit.visitTime.getTime() <= Date.now()) {
-      throw conflict("A visit in the past can't be cancelled");
-    }
+    assertCancellable(visit);
   } else {
     // Staff or Admin — controller has already restricted `visitStatus` to
-    // Confirmed/Completed for this branch.
+    // Confirmed/Completed/Cancelled for this branch.
     if (actor.role === "Staff") {
       const staff = await prisma.staff.findUnique({
         where: { userID: actor.userID },
@@ -315,6 +339,9 @@ const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
         `A ${describeStatus(visit.visitStatus)} visit can't be completed`,
       );
     }
+    if (visitStatus === "Cancelled") {
+      assertCancellable(visit);
+    }
   }
 
   const data = { visitStatus };
@@ -322,11 +349,34 @@ const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
     data.staffID = actingStaffID;
   }
 
-  return prisma.visit.update({
+  const updated = await prisma.visit.update({
     where: { visitID },
     data,
     select: LIST_SELECT,
   });
+
+  // The adopter hears when the shelter confirms or cancels; Completed
+  // happens with them there. Their own Cancel tells the shelter's staff.
+  if (actor.role === "Adopter") {
+    await notifyAfterLookup(`the cancellation of visit ${visitID}`, async () => [
+      await shelterStaffIDs(visit.shelterID),
+      messages.visitCancelledByAdopter({
+        adopterName: await adopterNameOf(visit.adopterID),
+        petName: updated.pet?.petName,
+      }),
+    ]);
+  } else if (visitStatus !== "Completed") {
+    const names = {
+      shelterName: updated.shelter.shelterName,
+      petName: updated.pet?.petName,
+      visitID,
+    };
+    await notify(
+      [visit.adopterID],
+      visitStatus === "Confirmed" ? messages.visitConfirmed(names) : messages.visitCancelled(names),
+    );
+  }
+  return updated;
 };
 
 module.exports = {

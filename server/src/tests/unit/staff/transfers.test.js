@@ -33,7 +33,12 @@ jest.mock("../../../services/auth/auth.service", () => ({
   getAccountStatus: jest.fn(),
 }));
 
+// Which side of a transfer hears — see "Notifications" below.
+jest.mock("../../../services/notifications", () =>
+  require("../notifications/notificationsMock"));
+
 const prisma = require("../../../config/prisma");
+const notifications = require("../../../services/notifications");
 const authService = require("../../../services/auth/auth.service");
 const app = require("../../../app");
 
@@ -695,6 +700,144 @@ describe("Transfers (Staff/Admin)", () => {
         .set("Authorization", `Bearer ${staffToken()}`);
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  // ————————————————————————————— notifications —————————————————————————————
+  describe("Notifications", () => {
+    const { notify, messages } = notifications;
+    const NAMES = { petName: "Rex", fromShelterName: "Athens Shelter", toShelterName: "Tifton Shelter" };
+
+    const initiate = async (transferRow) => {
+      prisma.staff.findUnique
+        .mockResolvedValueOnce({ shelterID: ORIGIN })
+        .mockResolvedValueOnce({ shelterID: ORIGIN });
+      prisma.pet.findUnique.mockResolvedValueOnce({
+        petID: 5,
+        shelterID: ORIGIN,
+        adoptionStatus: "available",
+      });
+      prisma.shelter.findUnique.mockResolvedValueOnce({
+        shelterID: DESTINATION,
+        managerStaffID: transferRow.toShelterStaff,
+      });
+      prisma.transferHistory.create.mockResolvedValueOnce(transferRow);
+      prisma.pet.update.mockResolvedValueOnce({});
+      return request(app)
+        .post("/api/v1/transfers")
+        .set("Authorization", `Bearer ${staffToken()}`)
+        .send(VALID_CREATE_BODY);
+    };
+
+    // A Staff caller's shelter is checked (the side the status belongs to);
+    // an Admin's isn't, so no Staff row is queued for one.
+    const resolve = async (status, transferRow, { asAdmin = false } = {}) => {
+      prisma.transferHistory.findUnique.mockResolvedValueOnce({
+        recordID: 1,
+        petID: 5,
+        fromShelterID: ORIGIN,
+        toShelterID: DESTINATION,
+        transferStatus: "In_Progress",
+      });
+      if (!asAdmin) {
+        prisma.staff.findUnique.mockResolvedValueOnce({
+          shelterID: status === "Cancelled" ? ORIGIN : DESTINATION,
+        });
+      }
+      prisma.transferHistory.update.mockResolvedValueOnce(transferRow);
+      prisma.pet.update.mockResolvedValueOnce({});
+      return request(app)
+        .patch("/api/v1/transfers/1/status")
+        .set("Authorization", `Bearer ${asAdmin ? adminToken() : staffToken()}`)
+        .send({ status });
+    };
+
+    test("initiated: the destination's assigned staff member (its manager) hears", async () => {
+      const res = await initiate(buildTransferRow());
+
+      expect(res.status).toBe(201);
+      expect(notify).toHaveBeenCalledWith([DESTINATION_MANAGER], messages.transferIncoming(NAMES));
+      expect(notifications.shelterStaffIDs).not.toHaveBeenCalled();
+    });
+
+    test("initiated to a shelter with no manager: its whole team hears instead", async () => {
+      notifications.shelterStaffIDs.mockResolvedValueOnce([70, 71]);
+
+      await initiate(buildTransferRow({ toShelterStaff: null, toStaff: null }));
+
+      expect(notifications.shelterStaffIDs).toHaveBeenCalledWith(DESTINATION);
+      expect(notify).toHaveBeenCalledWith([70, 71], messages.transferIncoming(NAMES));
+    });
+
+    test.each([
+      ["Completed", "transferCompleted"],
+      ["Rejected", "transferRejected"],
+    ])("%s by the destination: the origin's staff member hears", async (status, builder) => {
+      const res = await resolve(status, buildTransferRow({ transferStatus: status }));
+
+      expect(res.status).toBe(200);
+      expect(notify).toHaveBeenCalledWith([42], messages[builder](NAMES));
+    });
+
+    test("Cancelled by the origin: the destination's staff member hears", async () => {
+      const res = await resolve("Cancelled", buildTransferRow({ transferStatus: "Cancelled" }));
+
+      expect(res.status).toBe(200);
+      expect(notify).toHaveBeenCalledWith([DESTINATION_MANAGER], messages.transferCancelled(NAMES));
+    });
+
+    test("an Admin-initiated transfer (no origin staff) answered: the origin's whole team hears", async () => {
+      notifications.shelterStaffIDs.mockResolvedValueOnce([42, 43]);
+
+      await resolve(
+        "Completed",
+        buildTransferRow({ transferStatus: "Completed", fromShelterStaff: null, fromStaff: null }),
+        { asAdmin: true },
+      );
+
+      expect(notifications.shelterStaffIDs).toHaveBeenCalledWith(ORIGIN);
+      expect(notify).toHaveBeenCalledWith([42, 43], messages.transferCompleted(NAMES));
+    });
+
+    describe("reassigning the destination staff", () => {
+      const reassign = async ({ from, to, actor = DESTINATION_MANAGER }) => {
+        prisma.transferHistory.findUnique.mockResolvedValueOnce({
+          toShelterID: DESTINATION,
+          toShelterStaff: from,
+          transferStatus: "In_Progress",
+          toShelter: { managerStaffID: DESTINATION_MANAGER },
+        });
+        prisma.staff.findUnique.mockResolvedValueOnce({
+          shelterID: DESTINATION,
+          accountStatus: "Active",
+        });
+        prisma.transferHistory.update.mockResolvedValueOnce(buildTransferRow({ toShelterStaff: to }));
+        return request(app)
+          .patch("/api/v1/transfers/1")
+          .set("Authorization", `Bearer ${staffToken(actor)}`)
+          .send({ toShelterStaff: to });
+      };
+
+      test("the new assignee picks it up", async () => {
+        const res = await reassign({ from: DESTINATION_MANAGER, to: 61 });
+
+        expect(res.status).toBe(200);
+        expect(notify).toHaveBeenCalledWith([61], messages.transferIncoming(NAMES));
+      });
+
+      test("taking it yourself tells no one", async () => {
+        const res = await reassign({ from: 61, to: DESTINATION_MANAGER });
+
+        expect(res.status).toBe(200);
+        expect(notify).not.toHaveBeenCalled();
+      });
+
+      test("reassigning it to whoever already has it tells no one", async () => {
+        const res = await reassign({ from: 61, to: 61 });
+
+        expect(res.status).toBe(200);
+        expect(notify).not.toHaveBeenCalled();
+      });
     });
   });
 });

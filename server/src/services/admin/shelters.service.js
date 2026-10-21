@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const { resolveCoordsFromPostalCode } = require("../geocoding");
+const { notify, messages } = require("../notifications");
 
 const notFound = (shelterID) => {
   const err = new Error(`No shelter exists with ID ${shelterID}`);
@@ -179,9 +180,46 @@ const updateShelterManager = async (shelterID, managerStaffID) => {
   return getShelterWithCoords(shelterID);
 };
 
+// ——————————————— CAPACITY ALERT (POST /shelters/:id/capacity-alerts) ———————————————
+// The admin's Notify Manager: an in-app CapacityAlert to the shelter's
+// manager. The admin picks the shelter (the Overview lists those near
+// capacity), so no utilisation check here. Unlike the other hooks, sending
+// IS the request — so a failed insert is an error, not a log line.
+const sendCapacityAlert = async (shelterID) => {
+  const shelter = await prisma.shelter.findUnique({
+    where: { shelterID },
+    select: {
+      shelterName: true,
+      manager: { select: { userID: true, staffName: true, accountStatus: true } },
+    },
+  });
+  if (!shelter) {
+    throw notFound(shelterID);
+  }
+  if (shelter.manager?.accountStatus !== "Active") {
+    const err = new Error(`${shelter.shelterName} has no active manager to alert`);
+    err.code = "CONFLICT";
+    throw err;
+  }
+
+  const sent = await notify(
+    [shelter.manager.userID],
+    messages.capacityAlert({ shelterName: shelter.shelterName }),
+  );
+  if (sent.length === 0) {
+    throw new Error("The capacity alert couldn't be sent — please try again");
+  }
+
+  return {
+    managerID: shelter.manager.userID,
+    managerName: shelter.manager.staffName,
+  };
+};
+
 module.exports = {
   createShelter,
   updateShelter,
   updateShelterStatus,
   updateShelterManager,
+  sendCapacityAlert,
 };

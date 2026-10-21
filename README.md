@@ -25,11 +25,13 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 | **Multi-shelter network**      | Unified animal listings and workflows across all branches of an organisation      |
 | **Inter-shelter transfers**    | Capacity-aware transfer requests with full transfer history                       |
 | **Universal health passport**  | Medical records that travel with an animal across shelter relocations             |
-| **AI compatibility matcher**   | OpenAI-powered pet–adopter matching to improve adoption success rates             |
+| **AI compatibility matcher**   | Personality quiz + rule scoring, refined by an LLM (Groq or any OpenAI-compatible provider) with a short reason per match; falls back to rule-only scores without AI |
+| **AI health-passport summary** | One-click summary of a pet's medical history for staff and vets, with points to review that link to the records they cite |
 | **Role-based access control**  | Six distinct roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor |
 | **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                     |
 | **Two-token JWT auth**         | Short-lived access token + httpOnly refresh cookie, with post-login redirect-back |
 | **Email & account security**   | Email verification, password reset, self-service reactivation and email change by emailed link, plus account and review notices (Brevo, optional) |
+| **Live in-app notifications**  | 28 event types across all six roles, pushed in real time over Server-Sent Events — bell with unread badge, a Notifications page, and an optional chime |
 | **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                         |
 | **Donation management**        | Stripe-integrated donor flow with impact tracking                                 |
 
@@ -177,20 +179,27 @@ Interactive Swagger/OpenAPI docs are served at **`/api/docs`** once the server i
 | Visits                | `/visits`                        |
 | Staff operations      | `/staff`                         |
 | Appointments          | `/appointments`                  |
-| Vaccinations          | `/appointments/:id/vaccinations` |
+| Vaccinations          | `/vaccines`, `/appointments/:id/vaccinations` |
+| Health records        | `/health-records`, `/pets/:id/health-records` |
+| Veterinarians         | `/vets`                          |
+| Volunteers            | `/volunteers`                    |
+| Government IDs        | `/government-ids`                |
+| AI matcher            | `/match-quiz`, `/adopters/me/matches` |
+| Admin                 | `/admins`, `/analytics`          |
 | Tasks                 | `/tasks`                         |
 | Events                | `/events`                        |
 | Donors & Donations    | `/donors`, `/donations`          |
 | Shelter Transfers     | `/transfers`                     |
+| Notifications         | `/notifications` (+ `/notifications/stream`, SSE) |
 
 ## 🟤 Testing
 
-- **Unit & Integration:** Jest + Supertest (`server/tests/`)
-- **End-to-End:** Cypress (`e2e/`)
+- **Unit & Integration:** Jest + Supertest (`server/src/tests/` — `unit/` mocks Prisma; `integration/` runs against the database in `server/.env`, creating and removing its own test data)
+- **End-to-End:** Cypress (`client/cypress/e2e/`) — needs both dev servers running
 
 ```bash
-npm run test --prefix server
-npm run test:e2e
+npm test --prefix server            # unit + integration
+npm run test:e2e --prefix client    # Cypress, headless
 ```
 
 > Note: Jest's `.toBe()` checks reference equality; `.toEqual()` checks deep value equality — use `.toEqual()` when comparing objects/arrays.

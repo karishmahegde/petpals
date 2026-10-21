@@ -14,6 +14,9 @@ interface AuthState {
   // Patches fields on the current user in place — e.g. onboardingStep after
   // advancing a wizard step, without a full re-login/refresh round trip.
   updateUser: (patch: Partial<AuthUser>) => void;
+  // Swaps in a renewed access token (POST /auth/refresh-token) and leaves
+  // the rest of the session as it is.
+  setToken: (token: string) => void;
 }
 
 const useAuthStore = create<AuthState>((set) => ({
@@ -32,6 +35,8 @@ const useAuthStore = create<AuthState>((set) => ({
 
   updateUser: (patch) =>
     set((state) => (state.user ? { user: { ...state.user, ...patch } } : {})),
+
+  setToken: (token) => set((state) => (state.user ? { token } : {})),
 }));
 
 export default useAuthStore;

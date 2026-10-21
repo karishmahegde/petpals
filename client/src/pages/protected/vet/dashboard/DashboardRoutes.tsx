@@ -5,6 +5,7 @@ import HealthRecords from "./HealthRecords";
 import Vaccinations from "./Vaccinations";
 import Profile from "./Profile";
 import HealthPassport from "../../shared/HealthPassport";
+import NotificationsPage from "../../shared/notifications/NotificationsPage";
 
 // Renders the vet dashboard section that matches the current /vet/* route
 // (driven by the sidebar nav in DashboardSidebar.tsx).
@@ -20,6 +21,8 @@ const DashboardRoutes = () => (
     />
     <Route path="vaccinations" element={<Vaccinations />} />
     <Route path="profile" element={<Profile />} />
+    {/* Reached from the bell, not the sidebar menu — shared by every role. */}
+    <Route path="notifications" element={<NotificationsPage />} />
     <Route path="*" element={<Navigate to="/vet" replace />} />
   </Routes>
 );
