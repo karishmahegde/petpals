@@ -345,7 +345,9 @@ describe("GET /api/v1/adopters/me/applications and /adopted-pets", () => {
         orderBy: { createdAt: "desc" },
       }),
     );
-    expect(res.body.data[0].pet.petPhoto).toMatch(/^https?:\/\/.*\/pet-images\/biscuit\.jpg$/);
+    expect(res.body.data[0].pet.petPhoto).toBe(
+      `${process.env.SUPABASE_URL}/storage/v1/object/public/pet-images/biscuit.jpg`,
+    );
     expect(res.body.pagination).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
   });
 
