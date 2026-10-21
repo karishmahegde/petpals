@@ -10,5 +10,6 @@ afterEach(() => {
   cleanup();
   // A signed-in user must never carry over into the next test.
   useAuthStore.setState({ user: null, token: null, role: null });
-  window.localStorage.clear();
+  // Absent in a suite that opts into the plain Node environment.
+  if (typeof window !== "undefined") window.localStorage.clear();
 });
