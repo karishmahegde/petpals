@@ -14,7 +14,12 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const storage = require("../../../services/storage");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const createdEmails = [];
 const uniqueEmail = () => {
@@ -31,10 +36,14 @@ const PASSWORD = "Secret123!";
 // its data, so give it room rather than let the two race.
 jest.setTimeout(120000);
 
-const register = (name, email, shelterID) =>
-  request(app)
+// Records the new account in the tracker before handing back the response.
+const register = async (name, email, shelterID) => {
+  const res = await request(app)
     .post("/api/v1/auth/register")
     .send({ name, email, password: PASSWORD, role: "staff", shelterID });
+  data.user(res.body.data?.userID);
+  return res;
+};
 
 const login = (email) =>
   request(app).post("/api/v1/auth/login").send({ email, password: PASSWORD });
@@ -54,13 +63,14 @@ describe("Staff onboarding journey (onboard before approval)", () => {
         shelterSize: 10,
       },
     });
+    data.shelter(shelter.shelterID);
 
     // The first sign-up at a manager-less shelter registers as its (Pending)
     // Manager — activate them directly.
     const email = uniqueEmail();
     const registerRes = await register("Journey Manager", email, shelter.shelterID);
     expect(registerRes.status).toBe(201);
-    const managerID = registerRes.body.data.userID;
+    const managerID = data.user(registerRes.body.data.userID);
     await prisma.staff.update({
       where: { userID: managerID },
       data: { accountStatus: "Active", staffDesignation: "Manager", onboardingComplete: true },
@@ -74,34 +84,27 @@ describe("Staff onboarding journey (onboard before approval)", () => {
   });
 
   afterAll(async () => {
-    const users = await prisma.users.findMany({
-      where: { userEmail: { in: createdEmails } },
-      select: { userID: true },
-    });
-    const userIDs = users.map((u) => u.userID);
-    const ids = await prisma.governmentID.findMany({
-      where: { userID: { in: userIDs } },
-      select: { documentURL: true },
-    });
-    await Promise.all(
-      ids
-        .filter((id) => id.documentURL)
-        .map((id) => storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, id.documentURL)),
-    );
-    await prisma.governmentID.deleteMany({ where: { userID: { in: userIDs } } });
-    if (shelter) {
-      // Shelter.managerStaffID → Staff and Staff.shelterID → Shelter point at
-      // each other: unlink first, then staff/users, then the shelter.
-      await prisma.shelter.update({
-        where: { shelterID: shelter.shelterID },
-        data: { managerStaffID: null },
+    // The uploaded ID documents live in Storage, which the tracker doesn't
+    // touch — remove those files first, then the rows. A failure here mustn't
+    // stop the row clean-up below.
+    try {
+      const users = await prisma.users.findMany({
+        where: { userEmail: { in: createdEmails } },
+        select: { userID: true },
       });
+      const ids = await prisma.governmentID.findMany({
+        where: { userID: { in: users.map((u) => u.userID) } },
+        select: { documentURL: true },
+      });
+      await Promise.all(
+        ids
+          .filter((id) => id.documentURL)
+          .map((id) => storage.deletePrivateFile(storage.GOVERNMENT_IDS_BUCKET, id.documentURL)),
+      );
+    } catch (err) {
+      console.error(`[test cleanup] ID document files: ${err.message}`);
     }
-    await prisma.staff.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-    if (shelter) {
-      await prisma.shelter.delete({ where: { shelterID: shelter.shelterID } });
-    }
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -110,7 +113,7 @@ describe("Staff onboarding journey (onboard before approval)", () => {
     const email = uniqueEmail();
     const registerRes = await register("Journey Newcomer", email, shelter.shelterID);
     expect(registerRes.status).toBe(201);
-    const newcomerID = registerRes.body.data.userID;
+    const newcomerID = data.user(registerRes.body.data.userID);
 
     // 2. Logging in while Pending works, and says where they are.
     const loginRes = await login(email);

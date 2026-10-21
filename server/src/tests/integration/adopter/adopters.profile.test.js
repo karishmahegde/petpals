@@ -1,6 +1,11 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // Runs against the DATABASE_URL configured in server/.env, same convention as
 // adopters.updateProfile.test.js — seeds via API calls, cleans up via Prisma
@@ -18,7 +23,7 @@ const registerAndLoginAdopter = async () => {
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });
@@ -44,7 +49,7 @@ const registerAndLoginStaff = async (created) => {
       shelterSize: 10,
     },
   });
-  created.shelterID = shelter.shelterID;
+  created.shelterID = data.shelter(shelter.shelterID);
   const payload = {
     name: "Profile Test Staff",
     email: uniqueEmail(),
@@ -56,7 +61,7 @@ const registerAndLoginStaff = async (created) => {
     .post("/api/v1/auth/register")
     .send(payload);
   expect(registerRes.status).toBe(201);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   created.userID = userID;
   await prisma.staff.update({
     where: { userID },
@@ -203,6 +208,7 @@ describe("PUT /api/v1/adopters/me", () => {
   });
 
   afterAll(async () => {
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 });

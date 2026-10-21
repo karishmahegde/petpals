@@ -11,6 +11,11 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -44,7 +49,7 @@ const registerAndLoginActiveStaff = async (name, shelterID) => {
   };
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
   expect(registerRes.status).toBe(201);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   await prisma.staff.update({ where: { userID }, data: { accountStatus: "Active" } });
   const loginRes = await login(payload.email, payload.password);
   return { userID, token: loginRes.body.data.token };
@@ -55,7 +60,7 @@ const registerAndLoginAdopter = async (name) => {
   const registerRes = await request(app).post("/api/v1/auth/register").send(payload);
   expect(registerRes.status).toBe(201);
   const loginRes = await login(payload.email, payload.password);
-  return { userID: registerRes.body.data.userID, token: loginRes.body.data.token };
+  return { userID: data.user(registerRes.body.data.userID), token: loginRes.body.data.token };
 };
 
 describe("Sprint 5.2 Staff journeys", () => {
@@ -69,7 +74,9 @@ describe("Sprint 5.2 Staff journeys", () => {
 
   beforeAll(async () => {
     shelter = await makeShelter("S52 Journey Shelter", 10001);
+    data.shelter(shelter.shelterID);
     otherShelter = await makeShelter("S52 Other Shelter", 10002);
+    data.shelter(otherShelter.shelterID);
     staff = await registerAndLoginActiveStaff("S52 Journey Staff", shelter.shelterID);
     otherStaff = await registerAndLoginActiveStaff(
       "S52 Other Staff",
@@ -79,19 +86,7 @@ describe("Sprint 5.2 Staff journeys", () => {
   });
 
   afterAll(async () => {
-    // Children before parents: visits/events FK staff, adopter, shelter.
-    await prisma.visit.deleteMany({ where: { visitID: { in: visitIDs } } });
-    await prisma.volunteerEvent.deleteMany({ where: { eventID: { in: eventIDs } } });
-    await prisma.event.deleteMany({ where: { eventID: { in: eventIDs } } });
-    const userIDs = [staff, otherStaff, adopter].filter(Boolean).map((u) => u.userID);
-    await prisma.staff.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.shelter.deleteMany({
-      where: {
-        shelterID: { in: [shelter, otherShelter].filter(Boolean).map((s) => s.shelterID) },
-      },
-    });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

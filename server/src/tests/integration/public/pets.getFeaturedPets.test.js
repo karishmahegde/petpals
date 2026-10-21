@@ -2,6 +2,11 @@ const request = require("supertest");
 
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const formatAgeFromDOBYears = (dob, today) => {
   const dobDate = new Date(dob);
@@ -58,6 +63,7 @@ describe("GET /api/v1/pets/featured (integration)", () => {
     species = await prisma.species.create({
       data: { speciesName: "IntegrationFeaturedSpecies" },
     });
+    data.species(species.speciesID);
     breed = await prisma.breed.create({
       data: {
         speciesID: species.speciesID,
@@ -75,6 +81,7 @@ describe("GET /api/v1/pets/featured (integration)", () => {
         shelterStatus: "Open",
       },
     });
+    data.shelter(shelter.shelterID);
 
     const now = new Date();
     ageCheckDOB = yearsAgo(2, now);
@@ -118,10 +125,7 @@ describe("GET /api/v1/pets/featured (integration)", () => {
   });
 
   afterAll(async () => {
-    await prisma.pet.deleteMany({ where: { shelterID: shelter.shelterID } });
-    await prisma.breed.delete({ where: { breedID: breed.breedID } });
-    await prisma.species.delete({ where: { speciesID: species.speciesID } });
-    await prisma.shelter.delete({ where: { shelterID: shelter.shelterID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

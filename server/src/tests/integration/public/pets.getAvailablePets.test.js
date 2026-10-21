@@ -2,6 +2,11 @@ const request = require("supertest");
 
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // Replicates pets.service.js's formatAgeFromDOBYears exactly, so the
 // "correct petAge" assertion checks the actual computed value — not just
@@ -36,8 +41,6 @@ describe("GET /api/v1/pets (integration)", () => {
   let shelterMain;
   let shelterOnlyA;
   let shelterOnlyB;
-  let allSpeciesIDs;
-  let allShelterIDs;
   let ageCheckDOB;
 
   const yearsAgo = (n, ref) =>
@@ -71,10 +74,11 @@ describe("GET /api/v1/pets (integration)", () => {
     speciesDog = await prisma.species.create({
       data: { speciesName: "IntegrationListSpeciesDog" },
     });
+    data.species(speciesDog.speciesID);
     speciesCat = await prisma.species.create({
       data: { speciesName: "IntegrationListSpeciesCat" },
     });
-    allSpeciesIDs = [speciesDog.speciesID, speciesCat.speciesID];
+    data.species(speciesCat.speciesID);
 
     shelterMain = await prisma.shelter.create({
       data: {
@@ -87,6 +91,7 @@ describe("GET /api/v1/pets (integration)", () => {
         shelterStatus: "Open",
       },
     });
+    data.shelter(shelterMain.shelterID);
     shelterOnlyA = await prisma.shelter.create({
       data: {
         shelterName: "IntegrationListShelterOnlyA",
@@ -98,6 +103,7 @@ describe("GET /api/v1/pets (integration)", () => {
         shelterStatus: "Open",
       },
     });
+    data.shelter(shelterOnlyA.shelterID);
     shelterOnlyB = await prisma.shelter.create({
       data: {
         shelterName: "IntegrationListShelterOnlyB",
@@ -109,11 +115,7 @@ describe("GET /api/v1/pets (integration)", () => {
         shelterStatus: "Open",
       },
     });
-    allShelterIDs = [
-      shelterMain.shelterID,
-      shelterOnlyA.shelterID,
-      shelterOnlyB.shelterID,
-    ];
+    data.shelter(shelterOnlyB.shelterID);
 
     // ── Combined species+breed+size+age dataset ──────────────────────
     // Two breeds share the exact same breedName across different species —
@@ -212,18 +214,7 @@ describe("GET /api/v1/pets (integration)", () => {
   });
 
   afterAll(async () => {
-    await prisma.pet.deleteMany({
-      where: { shelterID: { in: allShelterIDs } },
-    });
-    await prisma.breed.deleteMany({
-      where: { speciesID: { in: allSpeciesIDs } },
-    });
-    await prisma.species.deleteMany({
-      where: { speciesID: { in: allSpeciesIDs } },
-    });
-    await prisma.shelter.deleteMany({
-      where: { shelterID: { in: allShelterIDs } },
-    });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
