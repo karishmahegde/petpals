@@ -10,7 +10,7 @@ Multi-shelter pet adoption platform (solo full-stack learning project). Unifies 
 
 **Frontend (`client/`):** React 18 + Vite + TS · React Router v6 · Zustand (auth `{ user, token, role }`, access token in memory) · TanStack Query (all server state) · Axios (`logic/api/axiosInstance.ts`) · Tailwind (tokens in `tailwind.config.js`: rose/gold/teal + neutrals; Benne display, Montserrat body) · react-icons (Fa/Hi/Pi/Tb) · react-hot-toast (`<Toaster/>` mounted once near root, styled there — not per call) · embla-carousel (Home carousel autoplay, Featured Pets slider drag-only).
 
-**Backend (`server/`):** Node 18 + Express · Prisma (`server/src/prisma/schema.prisma`) · PostgreSQL 15 + PostGIS (`ST_MakePoint/SetSRID/Distance/DWithin`) · Supabase (managed Postgres + storage; buckets `pet-images`, `government-ids` private) · `zipcodes` npm (offline US zip→coords, behind `services/geocoding/`) · JWT two-token · bcrypt (10 rounds) · cookie-parser · Stripe (application-fee Checkout) · `services/email/` (optional transactional email — `index.js` is the ONLY import, same rule as ai/; `brevoApi.js` posts to Brevo's HTTPS API over plain `fetch`, no SDK and no SMTP — Railway blocks outbound SMTP below its Pro plan; `EMAIL_API_KEY` + `EMAIL_FROM` both set → `isEmailConfigured()`, else every email prints to the server console, links included, so all flows work locally; `queueEmail` is fire-and-forget after the DB commit — a failure is logged, never thrown) · `services/ai/` (optional AI — `index.js` is the ONLY import, same rule as geocoding/ and storage/; `openAiCompatible.js` speaks OpenAI chat-completions over plain `fetch`, no SDK, so Groq/Ollama/OpenRouter are an `.env` change; `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` all set → `isAiConfigured()`, else features fall back; `generateStructured` sends a strict `json_schema` response format and returns parsed JSON; failures throw with `err.reason` ∈ `AI_ERROR_REASONS` — not_configured, timeout, unreachable, rate_limited, auth_failed, provider_error, invalid_response).
+**Backend (`server/`):** Node 18 + Express · Prisma (`server/src/prisma/schema.prisma`) · PostgreSQL 15 + PostGIS (`ST_MakePoint/SetSRID/Distance/DWithin`) · Supabase (managed Postgres + storage; buckets `pet-images`, `government-ids` private) · `zipcodes` npm (offline US zip→coords, behind `services/geocoding/`) · JWT two-token · bcrypt (10 rounds) · cookie-parser · Stripe (application-fee Checkout) · `services/email/` (optional transactional email — `index.js` is the ONLY import, same rule as ai/; `brevoApi.js` posts to Brevo's HTTPS API over plain `fetch`, no SDK and no SMTP — Railway blocks outbound SMTP below its Pro plan; `EMAIL_API_KEY` + `EMAIL_FROM` both set → `isEmailConfigured()`, else every email prints to the server console, links included, so all flows work locally; `queueEmail` is fire-and-forget after the DB commit — a failure is logged, never thrown) · `services/ai/` (optional AI — `index.js` is the ONLY import, same rule as geocoding/ and storage/; `openAiCompatible.js` speaks OpenAI chat-completions over plain `fetch`, no SDK, so Groq/Ollama/OpenRouter are an `.env` change; `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` all set → `isAiConfigured()`, else features fall back; `generateStructured` sends a strict `json_schema` response format and returns parsed JSON; failures throw with `err.reason` ∈ `AI_ERROR_REASONS` — not_configured, timeout, unreachable, rate_limited, auth_failed, provider_error, invalid_response) · `services/notifications/` (in-app notifications + live Server-Sent Events stream — `index.js` is the ONLY import, same rule as email/ and ai/; `messages.js` one builder per `NotificationType`; `hub.js` the in-process stream registry; `notify(userIDs, messages.x(...))` is awaited after the DB commit but never throws — see Notifications below) · `config/prisma.js` sets `transactionOptions` 10s maxWait / 15s timeout on the client (Prisma's 2s/5s defaults failed requests over the remote Supabase link — batch `$transaction([...])` included, since the PrismaPg adapter runs those as real transactions).
 
 **Infra:** Docker Compose (local) · Vercel (FE) / Railway (BE) · branches `main` → `dev` → `feature/*`.
 **Testing:** Jest + Supertest (unit + integration, target 70%) · Cypress (critical adoption flows only — `client/cypress/e2e/`; needs both dev servers running locally, `npm run cypress:open` / `cypress:run` from `client/`). Specs seed their own data via `cy.request()` straight to the API (e.g. `cy.registerTestAdopter()`), never pre-existing fixtures.
@@ -31,7 +31,7 @@ Multi-shelter pet adoption platform (solo full-stack learning project). Unifies 
 
 Two-token: **access** (Zustand memory, 15 min, `Authorization: Bearer` on every protected call) + **refresh** (httpOnly cookie, 7 days, only issues new access tokens). Central `USERS` table (`userID` PK/FK shared by all six role tables) holds `userEmail`, `userPassword` (hashed), `role`, `refreshToken` (hashed), `emailVerified`.
 
-**Session restore:** `App.tsx` calls `POST /auth/refresh-token` (cookie) on every load; success populates Zustand incl. the name from the role table and `emailVerified`, failure → public pages only.
+**Session restore:** `App.tsx` calls `POST /auth/refresh-token` (cookie) on every load; success populates Zustand incl. the name from the role table and `emailVerified`, failure → public pages only. **An open dashboard stays signed in** for the refresh token's 7 days (Sprint 10): the notification stream ends at the access token's expiry, and `useNotificationStream` renews it with the refresh cookie (`setToken` on the auth store) and reconnects; a failed renewal ends the session like a 401.
 
 | Endpoint | Auth | Notes |
 | --- | --- | --- |
@@ -60,10 +60,11 @@ Login and refresh return `emailVerified` for every role. Login refuses Closed (`
 ```
 client/src/
   logic/
-    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), donorsApi (/donors/me/*, /donations/checkout), volunteersApi (/volunteers/me self-service) vs shelterVolunteersApi (staff's /volunteers), selfGovernmentIdApi (per-role /me/government-id calls)
+    api/         axiosInstance, authApi, petsApi, adoptersApi, adoptionApplicationsApi, visitsApi, vetsApi (/vets/me/*, POST /pets/:id/health-records), vaccinationsApi (/vaccines catalogue + appointment doses), donorsApi (/donors/me/*, /donations/checkout), volunteersApi (/volunteers/me self-service) vs shelterVolunteersApi (staff's /volunteers), selfGovernmentIdApi (per-role /me/government-id calls), notificationsApi (list/count/mark + `openNotificationStream`, a fetch-streaming SSE reader — EventSource can't send the Bearer header)
     route/       ProtectedRoute, RoleRoute
     store/       useAuthStore (Zustand: { user, token, role }) · useMatchesPopupStore (AI matches popup open/retake)
-    hooks/       useEndSession · useResendVerification (every Verify/Resend button: toasts, 409 already-verified → session catches up, 429 wait)
+    hooks/       useEndSession · useResendVerification (every Verify/Resend button: toasts, 409 already-verified → session catches up, 429 wait) · useNotificationStream (mounted once in the shared DashboardLayout)
+    notifications/ notificationKeys (everything under ["notifications"]) · notificationSound (new-notification chime)
     utils/       … password.ts (the five password rules, mirrors server utils/password.js)
     toast/       shared toast helpers
     adopter/     adopter-domain view helpers (applicationStatus.ts)
@@ -91,7 +92,7 @@ client/src/
         overview/  *Widget.tsx
         sections/matches/  MatchesLauncher, MatchesPopup, QuizFlow + QuizQuestion, MatchesList   (AI matcher)
         shared/    ApplicationsList, VisitsList, matchQuiz.ts (matcher query keys + topMatchesQuery)
-    protected/shared/   used by 2+ roles: AccountSecuritySection (change password + email, on all six Profiles) · EmailUnverifiedNotice (adopt/donate soft gate) · AwaitingApproval (role prop — /staff/pending, /vet/pending, /volunteer/pending: Pending staff/vets/volunteers wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi / volunteerGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/
+    protected/shared/   used by 2+ roles: AccountSecuritySection (change password + email, on all six Profiles) · EmailUnverifiedNotice (adopt/donate soft gate) · AwaitingApproval (role prop — /staff/pending, /vet/pending, /volunteer/pending: Pending staff/vets/volunteers wait here once onboarded) · GovernmentIdSection (takes an `api` from logic/api/selfGovernmentIdApi.ts — staffGovernmentIdApi / vetGovernmentIdApi / volunteerGovernmentIdApi) · HealthPassport (role prop — /staff/pets/:petID/health-passport, /vet/health-records/:petID/health-passport; vet-only Add Record → AddHealthRecordModal) · PetsFilterBar (Species/Breed/Size/Age + optional Status — Staff Pets tab and vet Health Records) · idVerification/ · notifications/ (NotificationBell — navbar slot, NotificationItem, NotificationsPage — `/<role>/notifications` on all six dashboards, not in ROLE_NAV, useNotificationActions)
     protected/staff/
       onboarding/  StaffOnboardingWizard + steps/   (mandatory, before approval)
       dashboard/   DashboardLayout routes + one file per tab
@@ -120,14 +121,16 @@ server/src/
   services/storage/     index.js is the ONLY import (Supabase Storage)
   services/ai/          index.js is the ONLY import; openAiCompatible.js the only file that talks to the provider
   services/email/       index.js is the ONLY import (sendEmail, queueEmail, templates); brevoApi.js the only file that talks to the provider; templates.js one function per email
+  services/notifications/ index.js is the ONLY import (notify, notifyAfterLookup, messages, recipient lookups, the inbox + stream); messages.js one builder per type; hub.js / inbox.js / stream.js behind it
   services/auth/        … accountTokens.service (issue/consume emailed-link tokens), emailVerification / passwords / reactivation / emailChange services, accountNotices (close/approve/decline/deactivate/ban/restore emails), userContact (email + name + status for any role)
   config/email.js       token lifetimes, resend cooldown, provider timeout
+  config/notifications.js   read-notification retention, page sizes, stream heartbeat
   config/matchScoring.js · matchQuiz.js · passportSummary.js   every matcher/summary knob (weights, quiz, AI call sizes)
   services/governmentIds/selfGovernmentId.service.js   every role's GET/POST /<role>/me/government-id (keyed by userType) — add new roles to its OWNERS map, don't copy it
   utils/        errors.js, response.js
   config/prisma.js   singleton Prisma client (PrismaPg adapter)
   prisma/       schema.prisma, seed.js
-  tests/        setup/noAiProvider.js + noEmailProvider.js (jest setupFiles — blank AI_* / EMAIL_* so no test can reach either provider; suites that assert on AI or email mock services/ai / services/email) · unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys, adopter/sprint8Journeys — fakes services/ai via jest.mock, auth/sprint9Journeys — captures emails via a mocked services/email and follows their links)
+  tests/        setup/noAiProvider.js + noEmailProvider.js (jest setupFiles — blank AI_* / EMAIL_* so no test can reach either provider; suites that assert on AI or email mock services/ai / services/email) · unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys, adopter/sprint8Journeys — fakes services/ai via jest.mock, auth/sprint9Journeys — captures emails via a mocked services/email and follows their links, notifications/sprint10Journeys — reads each recipient's inbox, and a live stream over `app.listen(0)`) · unit/notifications/ (notificationsMock.js is the shared `jest.mock` target for suites that assert which notifications a service sends)
   app.js / index.js
 ```
 
@@ -174,7 +177,7 @@ Base: `http://localhost:5000/api/v1` (dev) · `https://petpals-api.up.railway.ap
 | GET | `/adoption-applications/:id` | adopter (own) or staff |
 | PATCH | `/adoption-applications/:id/status` | `{ status: "Withdrawn" }` — adopter, from `Pending`/`Accepted`; fee non-refundable, re-apply OK. Staff transitions TBD |
 | GET / POST | `/adopters/me/visits` · `/visits` | `?upcoming=true` |
-| PATCH | `/visits/:id` | `{ visitStatus: "Cancelled" }` — adopter, future non-closed visits. Staff confirm/complete TBD |
+| PATCH | `/visits/:id` | `{ visitStatus }` — adopter: `Cancelled` only, own future non-closed visits. Staff/Admin: unconfirmed → `Confirmed` → `Completed`, or `Cancelled` on the adopter's terms (future, not closed); Staff only at their shelter (403) |
 | GET | `/adopters/me/appointments` | `?upcoming=true`; vet appointments for pets the adopter has an **Accepted** application for |
 | GET | `/adopters/me/favorites` · `/adopters/me/adopted-pets` | favorites = full pet-detail shape; adopted-pets = `PetCard` shape |
 | GET / POST | `/adopters/me/government-id` | ID-doc upload → `government-ids` bucket |
@@ -243,6 +246,21 @@ Matcher endpoints are Adopter-only. AI is optional throughout — see AI Matcher
 | GET | `/pets/:id/health-passport/summary` | Staff/Veterinarian/Admin, same access as the passport (Staff elsewhere → 403, vet elsewhere → 404). AI not configured → `{ aiAvailable: false, summary: null, pointsToReview: [] }`. Empty passport → fixed summary, no AI call. AI failure → 503 `SERVICE_UNAVAILABLE` ("try again shortly"), not cached. Points: `{ text, source: { type: healthRecord\|vaccination\|transfer, recordID }, origin: rules\|ai }` |
 
 The passport payloads (`/staff/me/pets/:id/health-passport`, `/vets/me/pets/:id/health-passport`) carry `aiSummaryAvailable` (= `isAiConfigured()`, no AI call) so the client can enable the button.
+
+### Notifications (Sprint 10)
+
+Every role, plain `authenticate` (a Pending user has no dashboard yet). Each query is scoped to the caller — another user's notification answers exactly like a missing one.
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET | `/notifications` | newest first; `unread` (`true`/`false`, 400 otherwise), `page`, `limit` (default 20, max 50). `unreadCount` (the caller's total, whatever the filter) sits top-level beside `pagination` — an envelope extension. First deletes the caller's notifications read more than 90 days ago (lazy, no cron); unread ones are never deleted |
+| GET | `/notifications/unread-count` | `{ unreadCount }` |
+| PATCH | `/notifications/:id` | `{ read: true\|false }` → `{ notification, unreadCount }`; re-marking read keeps the first `readAt` |
+| PATCH | `/notifications` | `{ read: true }` only (mark all read) → `{ updated, unreadCount: 0 }` |
+| GET | `/notifications/stream` | Server-Sent Events: `unread-count` `{ unreadCount }` on connect and after any mark-read (so every tab agrees), `notification` `<item>` for each new row, `token-expired` `{}` right before the server ends the stream at the access token's `exp`; a `: heartbeat` comment every 25s. Auth via the Bearer header (`req.tokenExpiresAt` set by `authenticate`) |
+| POST | `/shelters/:id/capacity-alerts` | Admin — the Overview's Notify Manager. Sends the shelter's manager a CapacityAlert → 201 `{ managerID, managerName }`; no Active manager → 409; unknown shelter → 404. Sending *is* the request, so a failed insert → 500 (unlike every other hook) |
+
+Item shape (REST and stream alike): the row minus `userID` — `notificationID`, `type`, `title`, `body`, `link`, `readAt`, `createdAt`.
 
 ---
 
@@ -346,12 +364,32 @@ Onboarding is skippable (`/donor/onboarding/step/:step`; `OnboardingGate`'s `SKI
 
 ---
 
+## Notifications (Sprint 10)
+
+**Model.** The database is the record; the stream only nudges. `notify()` stores one row per recipient (nulls and repeats dropped, text clipped to the columns), then pushes each row to its owner's open streams via `hub.publish`. It's called by services **after** their write commits, awaited, never throws (logged) — same rule as `queueEmail`. `notifyAfterLookup(context, prepare)` wraps a hook whose recipients or text need a lookup first. Recipient helpers (index.js) return Active accounts only: `shelterStaffIDs`, `shelterManagerID`, `activeAdminIDs`, `acceptedAdopterForPet`, `signupApproverIDs(kind, shelterID)` (Volunteer → shelter staff, Staff/Veterinarian → manager, Manager → admins). Nobody is told about their own action. The hub is in-memory — fine for one Railway instance; scaling out means Postgres LISTEN/NOTIFY behind the same `publish`.
+
+**Text.** One builder per type in `messages.js` → `{ type, title, body, link }`; no dates or times in the text (the linked page shows them in the viewer's zone). `link` is a client path; a page that can open the item itself takes a query param (`/adopter/visits?visitID=` opens that visit — `Visits.tsx` watches the param, so it works when already on the page).
+
+**Event catalogue** (`NotificationType`, PascalCase):
+- **Adopter** — ApplicationSubmitted (the Stripe webhook created the row) · ApplicationApproved / ApplicationDeclined (staff decision; accepting also tells every auto-declined applicant, found by the `findMany` in the same transaction) · VisitConfirmed / VisitCancelled (staff on `PATCH /visits/:id`; Completed isn't news) · AppointmentScheduled / AppointmentChanged / AppointmentCancelled (to the adopter holding the pet's Accepted application; Changed = new date, reason or vet — a volunteer swap isn't) · GovernmentIdVerified / GovernmentIdRejected (any role with an ID; link → that role's Profile).
+- **Shelter staff** — NewApplication, NewVisitRequest, ApplicationWithdrawn, VisitCancelledByAdopter (every Active staff member at the shelter) · SignupReadyForApproval (the approvers, when a Pending sign-up finishes onboarding — once) · TransferIncoming (the destination's assigned staff, or its whole team when none; also the new assignee on reassign) · TransferCompleted / TransferRejected (origin side) · TransferCancelled (destination side) · CapacityAlert (the manager, from the admin endpoint).
+- **Veterinarian** — AppointmentAssigned · AppointmentChanged / AppointmentCancelled (a vet swap cancels for the old vet, assigns the new). `notifyAppointment({ before, after, actorID })` in `staff/appointments.service.js` covers adopter + vet + volunteer.
+- **Volunteer** — TaskAssigned, EventAssigned (only volunteers newly added by the edit; the old set is read first, and a failed read skips the notice, not the edit) · EventCancelled (deleting a future event) · AppointmentAssistAssigned / AppointmentAssistCancelled.
+- **Donor** — DonationReceived (the webhook recorded it; donation receipts aren't emailed).
+- **Admin** — AdminSignupPending (a non-first admin registered).
+Email stays for account/security; a few events (decisions, ID reviews) send both. Not notified in v1: favourites, matches, health records, preferences, digests.
+
+**Client.** `useNotificationStream` (in the shared `DashboardLayout`, so it runs on every dashboard page and stops on logout) holds the stream open, sets `["notifications","unread-count"]` from `unread-count` events, bumps it on `notification` and invalidates the lists; every (re)connect invalidates everything, so anything missed while disconnected is refetched. Reconnect backoff 1s → 30s; `token-expired` (or a 401 at open) renews the token and reconnects (one retry after 1s — the refresh token rotates and two tabs can race; a 401 within 10s of a renewal ends the session). `NotificationBell` (navbar slot): unread badge (9+), latest 10 while open, mark one/all, View all → `NotificationsPage` (All/Unread, pagination, per-row read/unread). The adopter Overview's Notifications tile reads the same unread-count query. **Chime:** `notificationSound.ts` — Web Audio, no file or library; only for live `notification` events, never the reconnect backlog; one tab plays per notificationID (localStorage); unlocks on the first click/key (browser autoplay rule); on/off per browser via the speaker toggle in the bell dropdown, default on.
+
+---
+
 ## Database Notes
 
 - `Pet.petDOB` replaced static `petAge` (age computed at request time). `Pet.featuredFlag BOOLEAN DEFAULT FALSE` powers `/pets/featured` (set via SQL for now, staff toggle planned).
 - Partial and expression unique indexes (not expressible in `schema.prisma`) live only in migration SQL — see Known Issues. Case-insensitive name uniqueness (migration `20260927060418_species_breed_name_ci_unique`): `LOWER(speciesName)` table-wide, `(speciesID, LOWER(breedName))` per species; `staff/species.service.js` pre-checks for a clean 409 and maps the index's violation (a race) to the same 409. Active-application uniqueness: `UNIQUE (adopterID, petID) WHERE applicationStatus IN ('Pending','Accepted')`. One Accepted application per pet: `UNIQUE (petID) WHERE applicationStatus = 'Accepted'` (migration `…_one_accepted_application_per_pet`) — accepting an application also declines the pet's other Pending ones with an automatic `staffRemark`, and accepting for a pet that's no longer `available` is a 409; the index stops two simultaneous acceptances. Double-submit guard on Appointment: `UNIQUE (petID, vetID, appointmentDate) WHERE appointmentStatus = 'Scheduled'` — same pet+vet+timestamp can't have two Scheduled rows (a resubmitted create after a perceived failure).
 - Donation (migration `…_donation_stripe`): `stripeCheckoutSessionID` (UNIQUE — a replayed webhook can't record twice) and `stripePaymentIntentID`, both nullable for pre-Stripe rows; `donorID` nullable with `ON DELETE SET NULL` so a deleted donor's donations stay (same treatment as `Appointment.vetID`).
 - `Volunteer.volunteerSchedule` holds structured availability compactly (`"Mon:MA;Wed:E"`); older free text is left as-is. Volunteer onboarding backfill: every non-Pending volunteer marked onboarded (`…_volunteer_onboarding_backfill`).
+- Sprint 10: `Notification` (`userID` FK `ON DELETE CASCADE`, `type NotificationType`, `title VARCHAR(120)`, `body VARCHAR(300)`, `link VARCHAR(200)` null, `readAt` null = unread, `createdAt`; indexes `(userID, createdAt)` and `(userID, readAt)`). Migration `20261018120000_in_app_notifications` **replaced** the original, never-used Notification table (scheduled reminders, no FK) and dropped its three enums. Seed: rows covering every type, built with `messages.js` so they read like real ones; the adopter visit notices link to real seeded visits.
 - Sprint 9: `Users.emailVerified` (backfilled `true` for existing accounts); `Closed` added to every role's account-status enum and `Declined` to Staff/Vet/Admin/Volunteer (own migration — a new enum value can't be used in the transaction that adds it); `AccountToken` (`tokenHash VARCHAR(64)` UNIQUE, `purpose` enum, `newEmail` for email changes, `expiresAt`, `usedAt`; `ON DELETE CASCADE` from Users). Admins whose own deactivation was on record were relabelled Closed; other pre-split Deactivated rows stay Deactivated (origin unknown).
 - Sprint 8 AI tables, all `ON DELETE CASCADE` (disposable caches + quiz): `AdopterQuiz` (PK `adopterID`, `answers` JSON of option codes; `…_adopter_match_quiz`), `AdopterMatch` (PK `(adopterID, petID)`, `ruleScore`, `aiScore` null = rule-only, `totalScore`, `reason VARCHAR(300)`, `computedAt`; same migration; cascades from adopter and pet), `PetHealthSummary` (PK `petID`, `inputHash VARCHAR(64)`, `summary VARCHAR(1500)`, `pointsToReview` JSON, `generatedAt`; `…_pet_health_summary`). `Pet.updatedAt` (`@updatedAt`, `…_pet_updated_at`) exists for match-cache staleness.
 
@@ -389,9 +427,10 @@ Onboarding is skippable (`/donor/onboarding/step/:step`; `OnboardingGate`'s `SKI
 | 6 | Veterinarian portal — onboarding before approval, appointment queue + completion, vaccinations + vaccine catalogue, health records, universal health passport, profile/close account | ✅ |
 | 7 | Volunteer + donor portals — volunteer onboarding before approval, tasks, events (read-only, staff assign), assisted appointments, availability; donor skippable onboarding, Stripe donations, history + stats; both profiles/close account | ✅ |
 | 8 | AI compatibility matcher + health-passport summary (Groq / any OpenAI-compatible provider via `services/ai/`) — personality quiz, rule scorer + one AI call per recompute, cached matches and summaries, rule-only fallback | ✅ |
-| 9 | Email & account security — Brevo HTTPS email service (console fallback), email verification + soft gate on applying/donating, forgot/reset/change password, self-service reactivation of Closed accounts, two-step email change, Closed/Declined status split, account + review notice emails | in progress |
-| 10 | Testing to 70% (+ a Cypress spec for the email-verification apply gate) | — |
-| 11 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
+| 9 | Email & account security — Brevo HTTPS email service (console fallback), email verification + soft gate on applying/donating, forgot/reset/change password, self-service reactivation of Closed accounts, two-step email change, Closed/Declined status split, account + review notice emails | ✅ |
+| 10 | In-app notifications — 28 event types across all six roles, live over Server-Sent Events (bell + dropdown, Notifications page, unread counts, token renewal on an open dashboard, chime), admin capacity alerts, staff visit cancel | in progress |
+| 11 | Testing to 70% (+ a Cypress spec for the email-verification apply gate) | — |
+| 12 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
 
 ---
 

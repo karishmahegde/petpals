@@ -30,6 +30,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 | **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                     |
 | **Two-token JWT auth**         | Short-lived access token + httpOnly refresh cookie, with post-login redirect-back |
 | **Email & account security**   | Email verification, password reset, self-service reactivation and email change by emailed link, plus account and review notices (Brevo, optional) |
+| **Live in-app notifications**  | 28 event types across all six roles, pushed in real time over Server-Sent Events — bell with unread badge, a Notifications page, and an optional chime |
 | **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                         |
 | **Donation management**        | Stripe-integrated donor flow with impact tracking                                 |
 
@@ -182,6 +183,7 @@ Interactive Swagger/OpenAPI docs are served at **`/api/docs`** once the server i
 | Events                | `/events`                        |
 | Donors & Donations    | `/donors`, `/donations`          |
 | Shelter Transfers     | `/transfers`                     |
+| Notifications         | `/notifications` (+ `/notifications/stream`, SSE) |
 
 ## 🟤 Testing
 
