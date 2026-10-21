@@ -24,8 +24,8 @@ const SAMPLE_ARGS = {
   applicationSubmitted: { petName: "Rocky", shelterName: "Downtown" },
   applicationApproved: { petName: "Rocky", shelterName: "Downtown" },
   applicationDeclined: { petName: "Rocky", shelterName: "Downtown" },
-  visitConfirmed: { shelterName: "Downtown", petName: "Rocky" },
-  visitCancelled: { shelterName: "Downtown", petName: "Rocky" },
+  visitConfirmed: { shelterName: "Downtown", petName: "Rocky", visitID: 5 },
+  visitCancelled: { shelterName: "Downtown", petName: "Rocky", visitID: 5 },
   appointmentScheduled: { petName: "Rocky" },
   appointmentChanged: { petName: "Rocky", role: "Adopter" },
   appointmentCancelled: { petName: "Rocky", role: "Adopter" },
@@ -65,12 +65,12 @@ describe.each(Object.keys(SAMPLE_ARGS))("%s", (name) => {
     expect(row.type).toBe(pascal(name));
   });
 
-  test("fits the Notification columns and links to a client path", () => {
+  test("fits the Notification columns and links to a client path (+ an item's ID)", () => {
     expect(row.title.length).toBeGreaterThan(0);
     expect(row.title.length).toBeLessThanOrEqual(120);
     expect(row.body.length).toBeGreaterThan(0);
     expect(row.body.length).toBeLessThanOrEqual(300);
-    expect(row.link).toMatch(/^\/[a-z]+(\/[a-z-]+)*$/);
+    expect(row.link).toMatch(/^\/[a-z]+(\/[a-z-]+)*(\?[a-zA-Z]+=\d+)?$/);
   });
 
   test("leaves no blanks from missing arguments", () => {
@@ -109,12 +109,23 @@ describe("role-dependent links", () => {
   });
 });
 
+describe("item links", () => {
+  test.each(["visitConfirmed", "visitCancelled"])(
+    "%s opens that visit on the adopter's Visits page",
+    (name) => {
+      expect(messages[name]({ shelterName: "Downtown", petName: "Rocky", visitID: 42 }).link).toBe(
+        "/adopter/visits?visitID=42",
+      );
+    },
+  );
+});
+
 describe("optional and mapped values", () => {
   test.each(["visitConfirmed", "visitCancelled"])(
     "%s without a pet is a plain shelter visit",
     (name) => {
-      const withPet = messages[name]({ shelterName: "Downtown", petName: "Rocky" });
-      const withoutPet = messages[name]({ shelterName: "Downtown", petName: undefined });
+      const withPet = messages[name]({ shelterName: "Downtown", petName: "Rocky", visitID: 5 });
+      const withoutPet = messages[name]({ shelterName: "Downtown", petName: undefined, visitID: 5 });
       expect(withPet.body).toContain("to meet Rocky");
       expect(withoutPet.body).toMatch(/^Downtown (confirmed|cancelled) your visit\.$/);
     },

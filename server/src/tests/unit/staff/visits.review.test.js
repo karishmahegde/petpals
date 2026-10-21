@@ -215,7 +215,7 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
       );
       expect(notifications.notify).toHaveBeenCalledWith(
         [7],
-        notifications.messages.visitConfirmed({ shelterName: "Athens Shelter", petName: "Rex" }),
+        notifications.messages.visitConfirmed({ shelterName: "Athens Shelter", petName: "Rex", visitID: 1 }),
       );
     });
 
@@ -413,7 +413,7 @@ describe("Visit queue & staff transitions (Staff/Admin)", () => {
       );
       expect(notifications.notify).toHaveBeenCalledWith(
         [7],
-        notifications.messages.visitCancelled({ shelterName: "Athens Shelter", petName: "Rex" }),
+        notifications.messages.visitCancelled({ shelterName: "Athens Shelter", petName: "Rex", visitID: 1 }),
       );
     });
 

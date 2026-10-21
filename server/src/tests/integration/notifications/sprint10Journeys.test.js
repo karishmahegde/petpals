@@ -275,6 +275,8 @@ describe("Sprint 10 notification journeys", () => {
     expect(confirmed).toMatchObject({
       type: "VisitConfirmed",
       body: `${shelter.shelterName} confirmed your visit to meet S10 Pepper.`,
+      // Opens this visit's details on the adopter's Visits page.
+      link: `/adopter/visits?visitID=${visitRes.body.data.visitID}`,
     });
 
     const readRes = await request(app)

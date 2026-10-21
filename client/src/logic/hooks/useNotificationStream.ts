@@ -25,6 +25,10 @@ import {
   type NotificationStreamEvent,
 } from "../api/notificationsApi";
 import { notificationKeys } from "../notifications/notificationKeys";
+import {
+  playNotificationSound,
+  primeNotificationSound,
+} from "../notifications/notificationSound";
 
 // Reconnect backoff after a dropped stream: doubles from MIN up to MAX, and
 // resets once a stream opens.
@@ -47,6 +51,7 @@ const applyEvent = (queryClient: QueryClient, event: NotificationStreamEvent) =>
     queryClient.setQueryData<number>(notificationKeys.unreadCount, (count) =>
       count === undefined ? undefined : count + 1,
     );
+    playNotificationSound(event.data.notificationID);
   } else if (event.event === "unread-count") {
     queryClient.setQueryData<number>(notificationKeys.unreadCount, event.data.unreadCount);
   }
@@ -69,6 +74,7 @@ const useNotificationStream = () => {
 
   useEffect(() => {
     if (!token) return;
+    primeNotificationSound();
     const controller = new AbortController();
     let retryDelay = RETRY_MIN_MS;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;

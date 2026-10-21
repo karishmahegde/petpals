@@ -2,7 +2,8 @@
 // returning { type, title, body, link } — the row notify() stores. Callers
 // reach these through services/notifications/index.js (and the seed, so its
 // rows read exactly like real ones).
-// `link` is a client path to the page where the person acts on it.
+// `link` is a client path to the page where the person acts on it (with a
+// query parameter where that page can open the item itself).
 // No dates or times in the text: the server would have to pick a timezone,
 // and the linked page already shows them in the viewer's own.
 
@@ -58,24 +59,25 @@ const applicationDeclined = ({ petName, shelterName }) =>
     "/adopter/applications",
   );
 
-const visitConfirmed = ({ shelterName, petName }) =>
+// ?visitID= opens that visit's details on the Visits page.
+const visitConfirmed = ({ shelterName, petName, visitID }) =>
   message(
     "VisitConfirmed",
     "Visit confirmed",
     petName
       ? `${shelterName} confirmed your visit to meet ${petName}.`
       : `${shelterName} confirmed your visit.`,
-    "/adopter/visits",
+    `/adopter/visits?visitID=${visitID}`,
   );
 
-const visitCancelled = ({ shelterName, petName }) =>
+const visitCancelled = ({ shelterName, petName, visitID }) =>
   message(
     "VisitCancelled",
     "Visit cancelled",
     petName
       ? `${shelterName} cancelled your visit to meet ${petName}.`
       : `${shelterName} cancelled your visit.`,
-    "/adopter/visits",
+    `/adopter/visits?visitID=${visitID}`,
   );
 
 const appointmentScheduled = ({ petName }) =>

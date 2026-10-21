@@ -7,6 +7,9 @@
 // live stream (useNotificationStream) keeps current. The list is only
 // fetched while the dropdown is open.
 //
+// The speaker toggle in the header turns the new-notification chime on or
+// off for this browser (logic/notifications/notificationSound.ts).
+//
 // Non-modal, like the account menu: an outside click or Escape closes it
 // (Escape hands focus back to the bell), and focus moves to its heading on
 // open.
@@ -14,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { FaRegBell } from "react-icons/fa";
+import { PiSpeakerHighBold, PiSpeakerSlashBold } from "react-icons/pi";
 import ButtonElement from "../../../../components/ui/ButtonElement";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
 import {
@@ -22,6 +26,10 @@ import {
   type AppNotification,
 } from "../../../../logic/api/notificationsApi";
 import { notificationKeys } from "../../../../logic/notifications/notificationKeys";
+import {
+  isNotificationSoundEnabled,
+  setNotificationSoundEnabled,
+} from "../../../../logic/notifications/notificationSound";
 import { dashboardPathFor } from "../../../../logic/route/resolveDestination";
 import useAuthStore from "../../../../logic/store/useAuthStore";
 import NotificationItem from "./NotificationItem";
@@ -37,6 +45,7 @@ const NotificationBell = () => {
   const navigate = useNavigate();
   const role = useAuthStore((state) => state.role);
   const [open, setOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(isNotificationSoundEnabled);
   // The wrapper, for outside clicks and finding the bell (its first button)
   // to hand focus back — ButtonElement doesn't forward refs.
   const rootRef = useRef<HTMLDivElement>(null);
@@ -135,17 +144,37 @@ const NotificationBell = () => {
             >
               Notifications
             </h2>
-            {unreadCount > 0 && (
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <ButtonElement
+                  onClick={() => markAll.mutate()}
+                  disabled={markAll.isPending}
+                  size="bare"
+                  variant="outline"
+                  className="font-body text-xs text-teal-dark hover:underline disabled:opacity-50"
+                >
+                  Mark all as read
+                </ButtonElement>
+              )}
               <ButtonElement
-                onClick={() => markAll.mutate()}
-                disabled={markAll.isPending}
+                onClick={() => {
+                  setNotificationSoundEnabled(!soundOn);
+                  setSoundOn(!soundOn);
+                }}
+                aria-pressed={soundOn}
+                aria-label="Notification sound"
+                title={soundOn ? "Sound on — click to mute" : "Sound off — click to unmute"}
                 size="bare"
                 variant="outline"
-                className="font-body text-xs text-teal-dark hover:underline disabled:opacity-50"
+                className="text-neutral-gray hover:text-teal-dark"
               >
-                Mark all as read
+                {soundOn ? (
+                  <PiSpeakerHighBold className="h-5 w-5" />
+                ) : (
+                  <PiSpeakerSlashBold className="h-5 w-5" />
+                )}
               </ButtonElement>
-            )}
+            </div>
           </div>
 
           <div className="max-h-[60vh] overflow-y-auto">

@@ -2141,6 +2141,16 @@ async function main() {
   // real ones. Spread over the main logins (and a few others) so every
   // dashboard's bell has something; read and unread mixed, newest first.
   const notices = require("../services/notifications/messages");
+  // The visit notices link to a real visit (the link opens its details).
+  const emelieVisitID = async (petID, visitStatus) =>
+    (
+      await prisma.visit.findFirst({
+        where: { adopterID: emelie.userID, petID, visitStatus },
+        select: { visitID: true },
+      })
+    ).visitID;
+  const biscuitVisitID = await emelieVisitID(pet.Biscuit, "Confirmed");
+  const cleoVisitID = await emelieVisitID(pet.Cleo, "Cancelled");
   const note = (user, built, daysAgo, read = false) => ({
     userID: user.userID,
     ...built,
@@ -2151,13 +2161,13 @@ async function main() {
     data: [
       // Adopters
       note(emelie, notices.appointmentScheduled({ petName: "Buddy" }), 0.2),
-      note(emelie, notices.visitConfirmed({ shelterName: "PetPals Downtown", petName: "Bella" }), 1),
+      note(emelie, notices.visitConfirmed({ shelterName: "PetPals Downtown", petName: "Biscuit", visitID: biscuitVisitID }), 1),
+      note(emelie, notices.visitCancelled({ shelterName: "PetPals Downtown", petName: "Cleo", visitID: cleoVisitID }), 2.5, true),
       note(emelie, notices.appointmentChanged({ petName: "Buddy", role: "Adopter" }), 3),
       note(emelie, notices.applicationApproved({ petName: "Buddy", shelterName: "PetPals Downtown" }), 40, true),
       note(emelie, notices.applicationSubmitted({ petName: "Buddy", shelterName: "PetPals Downtown" }), 45, true),
       note(emelie, notices.governmentIdVerified({ role: "Adopter" }), 50, true),
       note(noah, notices.applicationDeclined({ petName: "Apollo", shelterName: "PetPals Downtown" }), 2),
-      note(noah, notices.visitCancelled({ shelterName: "PetPals Brooklyn", petName: "Hazel" }), 4),
       note(noah, notices.governmentIdRejected({ role: "Adopter" }), 6, true),
       // Shelter staff (Downtown's manager, a Downtown senior, Brooklyn's manager)
       note(sasha, notices.newApplication({ adopterName: "Noah Bennett", petName: "Apollo" }), 0.1),

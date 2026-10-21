@@ -366,7 +366,11 @@ const updateVisitStatus = async (visitID, { visitStatus }, actor) => {
       }),
     ]);
   } else if (visitStatus !== "Completed") {
-    const names = { shelterName: updated.shelter.shelterName, petName: updated.pet?.petName };
+    const names = {
+      shelterName: updated.shelter.shelterName,
+      petName: updated.pet?.petName,
+      visitID,
+    };
     await notify(
       [visit.adopterID],
       visitStatus === "Confirmed" ? messages.visitConfirmed(names) : messages.visitCancelled(names),
