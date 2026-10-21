@@ -1,14 +1,14 @@
-# The API image — used by docker-compose locally and by Railway in production.
+# The API image — used by docker-compose locally and by Render in production.
 # Configuration comes from the environment at run time (server/.env via
-# compose's env_file, Railway's variables); nothing secret is baked in.
+# compose's env_file, Render's environment); nothing secret is baked in.
 
 # ── Build stage ───────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Production dependencies only. The Prisma CLI is one of them: Railway's
-# pre-deploy command runs `npx prisma migrate deploy` in this image.
+# Production dependencies only. The Prisma CLI is one of them: on Render the
+# container runs `npx prisma migrate deploy` before starting (render.yaml).
 COPY package*.json ./
 RUN npm ci --omit=dev
 

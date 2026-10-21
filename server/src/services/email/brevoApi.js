@@ -1,6 +1,6 @@
 // The ONLY file that talks to the email provider — Brevo's transactional email
-// API over HTTPS. Not SMTP: Railway blocks outbound SMTP below its Pro plan,
-// and an HTTPS API works everywhere. Uses global fetch (like services/ai/ and
+// API over HTTPS. Not SMTP: hosting platforms often block outbound SMTP ports,
+// especially on free plans, and an HTTPS API works everywhere. Uses global fetch (like services/ai/ and
 // services/storage/) so no SDK dependency is needed. Moving to another HTTPS
 // provider (Resend, Postmark, …) means rewriting this one file.
 

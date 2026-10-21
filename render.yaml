@@ -1,0 +1,59 @@
+# Render Blueprint for the API (Render dashboard → New → Blueprint → this repo).
+# Free plan: 750 instance hours a month, 512 MB; it sleeps after 15 minutes
+# without requests and the next request waits while it wakes.
+#
+# Secrets are `sync: false` — Render asks for each value when the Blueprint is
+# first applied, and they never live in this file.
+services:
+  - type: web
+    name: petpals-api
+    runtime: docker
+    plan: free
+    # Same AWS region as the Supabase project (us-east-2).
+    region: ohio
+    # No `branch:` — it's picked when the Blueprint is connected in the
+    # dashboard (the sprint branch while testing, main once merged).
+    autoDeploy: true
+    # Paths are from the repo root; only server changes redeploy the API.
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    buildFilter:
+      paths:
+        - server/**
+    # Pre-deploy commands are a paid feature, so migrations run at startup
+    # instead — a no-op when the database is already up to date.
+    dockerCommand: sh -c "npx prisma migrate deploy && exec node src/index.js"
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Supabase Session pooler URI (IPv4) — not the direct db.<ref> host.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # The Vercel site's origin, no trailing slash.
+      - key: CLIENT_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: AI_BASE_URL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        sync: false
+      - key: EMAIL_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_FROM_NAME
+        sync: false

@@ -12,7 +12,7 @@ const { parseCorsOrigins } = require("./config/cors");
 //Creates the Express app
 const app = express();
 
-// Railway terminates HTTPS at its proxy, one hop in front of the app, so
+// Render terminates HTTPS at its proxy, one hop in front of the app, so
 // req.ip / req.protocol / req.secure come from its X-Forwarded-* headers.
 app.set("trust proxy", 1);
 

@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://petpals-api.up.railway.app/api/:path*"
+      "destination": "https://petpals-api.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",

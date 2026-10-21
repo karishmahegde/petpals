@@ -4,7 +4,7 @@
 // tab). Only index.js requires this file.
 //
 // It lives in memory, so it only reaches streams on THIS server process —
-// fine for the single Railway instance. Scaling out would need Postgres
+// fine for the single Render instance. Scaling out would need Postgres
 // LISTEN/NOTIFY behind the same publish(). Nothing is lost if a push misses:
 // the rows are already stored, and the client refetches when it reconnects.
 const streams = new Map(); // userID → Set<res>

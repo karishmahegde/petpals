@@ -1,8 +1,8 @@
 // Origins the browser may call this API from with credentials (app.js's cors()).
 //
 // In production the client's REST calls never need this: Vercel rewrites
-// /api/* to Railway, so they're same-origin. Only the notification stream
-// connects to Railway directly (VITE_STREAM_URL — a rewrite may buffer it),
+// /api/* to Render, so they're same-origin. Only the notification stream
+// connects to Render directly (VITE_STREAM_URL — a rewrite may buffer it),
 // so the Vercel site must be listed here.
 //
 // CLIENT_URL is the site's one origin (Stripe return URLs and emailed links

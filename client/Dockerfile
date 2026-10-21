@@ -14,7 +14,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Defaults match compose: REST through nginx's /api proxy (like Vercel's
-# rewrite), the notification stream straight to the API (like Railway).
+# rewrite), the notification stream straight to the API (like Render).
 ARG VITE_API_URL=/api/v1
 ARG VITE_STREAM_URL=http://localhost:5000/api/v1
 ENV VITE_API_URL=$VITE_API_URL VITE_STREAM_URL=$VITE_STREAM_URL
