@@ -247,7 +247,7 @@ Matcher endpoints are Adopter-only. AI is optional throughout — see AI Matcher
 
 The passport payloads (`/staff/me/pets/:id/health-passport`, `/vets/me/pets/:id/health-passport`) carry `aiSummaryAvailable` (= `isAiConfigured()`, no AI call) so the client can enable the button.
 
-### Notifications (Sprint 10)
+### Notifications (Sprint 10 ✅)
 
 Every role, plain `authenticate` (a Pending user has no dashboard yet). Each query is scoped to the caller — another user's notification answers exactly like a missing one.
 
@@ -364,7 +364,7 @@ Onboarding is skippable (`/donor/onboarding/step/:step`; `OnboardingGate`'s `SKI
 
 ---
 
-## Notifications (Sprint 10)
+## Notifications (Sprint 10 ✅)
 
 **Model.** The database is the record; the stream only nudges. `notify()` stores one row per recipient (nulls and repeats dropped, text clipped to the columns), then pushes each row to its owner's open streams via `hub.publish`. It's called by services **after** their write commits, awaited, never throws (logged) — same rule as `queueEmail`. `notifyAfterLookup(context, prepare)` wraps a hook whose recipients or text need a lookup first. Recipient helpers (index.js) return Active accounts only: `shelterStaffIDs`, `shelterManagerID`, `activeAdminIDs`, `acceptedAdopterForPet`, `signupApproverIDs(kind, shelterID)` (Volunteer → shelter staff, Staff/Veterinarian → manager, Manager → admins). Nobody is told about their own action. The hub is in-memory — fine for one Railway instance; scaling out means Postgres LISTEN/NOTIFY behind the same `publish`.
 
@@ -428,7 +428,7 @@ Email stays for account/security; a few events (decisions, ID reviews) send both
 | 7 | Volunteer + donor portals — volunteer onboarding before approval, tasks, events (read-only, staff assign), assisted appointments, availability; donor skippable onboarding, Stripe donations, history + stats; both profiles/close account | ✅ |
 | 8 | AI compatibility matcher + health-passport summary (Groq / any OpenAI-compatible provider via `services/ai/`) — personality quiz, rule scorer + one AI call per recompute, cached matches and summaries, rule-only fallback | ✅ |
 | 9 | Email & account security — Brevo HTTPS email service (console fallback), email verification + soft gate on applying/donating, forgot/reset/change password, self-service reactivation of Closed accounts, two-step email change, Closed/Declined status split, account + review notice emails | ✅ |
-| 10 | In-app notifications — 28 event types across all six roles, live over Server-Sent Events (bell + dropdown, Notifications page, unread counts, token renewal on an open dashboard, chime), admin capacity alerts, staff visit cancel | in progress |
+| 10 | In-app notifications — 28 event types across all six roles, live over Server-Sent Events (bell + dropdown, Notifications page, unread counts, token renewal on an open dashboard, chime), admin capacity alerts, staff visit cancel | ✅ |
 | 11 | Testing to 70% (+ a Cypress spec for the email-verification apply gate) | — |
 | 12 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
 
