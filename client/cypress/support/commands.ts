@@ -11,9 +11,9 @@ const uniqueEmail = () =>
 
 // Registers a fresh throwaway adopter straight against the API (POST
 // /auth/register) — no UI involved. Specs use this for setup so they're
-// self-contained and never depend on pre-seeded fixture accounts. The
-// generated email is unique per call, so nothing needs cleaning up between
-// runs (mirrors the uniqueEmail() convention in server/src/tests/integration).
+// self-contained and never depend on pre-seeded fixture accounts. The new
+// account is recorded for the clean-up after each spec (support/e2e.ts). A
+// new sign-up's email is unverified, like a real one.
 Cypress.Commands.add("registerTestAdopter", (name = "Cypress Test Adopter") => {
   const adopter: TestAdopter = {
     name,
@@ -28,7 +28,16 @@ Cypress.Commands.add("registerTestAdopter", (name = "Cypress Test Adopter") => {
       password: adopter.password,
       role: "adopter",
     })
+    .then((res) => cy.task("db:trackUser", res.body.data.userID))
     .then(() => adopter);
+});
+
+// Signs in through the real login form and waits until it has left /login.
+Cypress.Commands.add("loginThroughForm", (email: string, password: string) => {
+  cy.get("#email").type(email);
+  cy.get("#password").type(password);
+  cy.get('form button[type="submit"]').click();
+  cy.location("pathname", { timeout: 10000 }).should("not.eq", "/login");
 });
 
 declare global {
@@ -36,6 +45,7 @@ declare global {
   namespace Cypress {
     interface Chainable {
       registerTestAdopter(name?: string): Chainable<TestAdopter>;
+      loginThroughForm(email: string, password: string): Chainable<void>;
     }
   }
 }
