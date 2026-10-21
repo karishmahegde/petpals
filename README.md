@@ -63,7 +63,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 ### Infrastructure
 
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white) ![Railway](https://img.shields.io/badge/Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white) ![Render](https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white)
 
 ### Tooling
 
@@ -73,7 +73,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 ### Prerequisites
 
-- **Node.js 18+** and **Git**
+- **Node.js 22** (20.19+ works — Prisma 7's minimum) and **Git**
 - **Docker + Docker Compose** _(Option B only)_
 - A free **[Supabase](https://supabase.com)** account — the project's database (Postgres + PostGIS) and file storage both run on it, even in local dev
 
@@ -130,7 +130,7 @@ cp server/.env.example server/.env
 cd server && npm install && npm run setup && cd ..
 
 # 3. Build and start the API and client
-docker-compose up --build
+docker compose up --build
 ```
 
 | Service | URL                   |
@@ -155,7 +155,8 @@ petpals/
 │   ├── government-ids/    #    Sample ID documents for the seeded ID verifications
 │   └── placeholder.jpg    #    Photo a new pet shows until staff upload one
 ├── docs/                  # Project documentation (design PDFs, diagrams, screenshots)
-├── docker-compose.yml     # Orchestrates Postgres + server + client — `docker-compose up`
+├── docker-compose.yml     # Runs the API + client in containers against Supabase — `docker compose up`
+├── render.yaml            # Render Blueprint for the hosted API (free plan)
 ├── CLAUDE.md              # Full architecture, API, and conventions reference
 ├── LICENSE
 └── README.md              # You are here

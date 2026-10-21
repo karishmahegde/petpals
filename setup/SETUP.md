@@ -31,7 +31,7 @@ cd petpals
 
 1. [supabase.com](https://supabase.com) → **New project**. Any name/region/DB password works. Takes ~2 minutes to provision.
 2. **Project Settings → Data API** → copy the **Project URL** and the **`anon` public key** and **`service_role` key**.
-3. **Connect** (top bar) → **Direct** → set the method to **Session pooler** → copy the URI (host `aws-…pooler.supabase.com`, port **5432**, user `postgres.<project-ref>`), with your DB password filled in. The direct-connection host is IPv6-only, which Docker containers and Railway can't reach; the session pooler is IPv4 and keeps a real session, so Prisma's migrations work through it. Not the **transaction** pooler (port 6543) — migrations need session mode.
+3. **Connect** (top bar) → **Direct** → set the method to **Session pooler** → copy the URI (host `aws-…pooler.supabase.com`, port **5432**, user `postgres.<project-ref>`), with your DB password filled in. The direct-connection host is IPv6-only, which Docker containers and Render can't reach; the session pooler is IPv4 and keeps a real session, so Prisma's migrations work through it. Not the **transaction** pooler (port 6543) — migrations need session mode.
 
 You now have everything the server needs: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_KEY` (the anon key), `SUPABASE_SERVICE_ROLE_KEY`.
 
@@ -228,12 +228,12 @@ Subject: Verify your PetPals email address
 
 ### With Brevo (real email)
 
-Email goes through [Brevo](https://www.brevo.com)'s HTTPS API, not SMTP. Railway, where the server is deployed, blocks outbound SMTP below its Pro plan. The free plan allows 300 emails a day.
+Email goes through [Brevo](https://www.brevo.com)'s HTTPS API, not SMTP — hosting platforms often block outbound SMTP, especially on free plans. Brevo's free plan allows 300 emails a day.
 
 1. Sign up at [brevo.com](https://www.brevo.com) and complete the account profile it asks for.
 2. **Verify a sender.** Go to **Senders, Domains & Dedicated IPs → Senders → Add a sender**, enter `PetPals` as the name and an address you can receive mail at, then confirm the code Brevo emails to it. Recipients see this address, so use a dedicated one rather than a personal address once other people use the app.
 3. **Create an API key.** Go to **SMTP & API → API Keys → Generate a new API key**. Copy it straight away, because Brevo shows it only once. It starts with `xkeysib-`. The SMTP key (`xsmtpsib-…`) won't work.
-4. **Authorised IPs.** Newer accounts block API calls from IP addresses Brevo doesn't recognise. Under **Security → Authorised IPs**, add your IP, or turn the blocking off. Turn it off for Railway, whose outgoing IPs change.
+4. **Authorised IPs.** Newer accounts block API calls from IP addresses Brevo doesn't recognise. Under **Security → Authorised IPs**, add your IP, or turn the blocking off. Turn it off for Render, whose outgoing IPs change.
 5. In `server/.env`:
 
    ```bash
