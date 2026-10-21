@@ -1,7 +1,12 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const storage = require("../../../services/storage");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -16,7 +21,7 @@ const registerAndLoginAdopter = async () => {
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });
@@ -171,5 +176,6 @@ describe("GET /api/v1/adopters/me/government-id", () => {
 });
 
 afterAll(async () => {
+  await data.cleanUp();
   await prisma.$disconnect();
 });

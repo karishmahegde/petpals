@@ -1,6 +1,11 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -15,7 +20,7 @@ const registerAndLoginAdopter = async (name) => {
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   // New sign-ups start unverified, and applying needs a verified email
   // (the soft gate — covered in auth/sprint9Journeys.test.js). Verified
   // directly here, since these tests are about applying, not verifying.
@@ -60,12 +65,12 @@ describe("adoption applications", () => {
     const species = await prisma.species.create({
       data: { speciesName: `ApplicationTestSpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
 
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "ApplicationTestBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
 
     const shelter = await prisma.shelter.create({
       data: {
@@ -77,7 +82,7 @@ describe("adoption applications", () => {
         shelterSize: 10,
       },
     });
-    shelterID = shelter.shelterID;
+    shelterID = data.shelter(shelter.shelterID);
 
     const petData = {
       breedID,
@@ -107,25 +112,7 @@ describe("adoption applications", () => {
   });
 
   afterAll(async () => {
-    // Every test that seeds a row deletes it itself (each test's own active
-    // Pending row would otherwise collide with the next test's, via the
-    // partial unique index on (adopterID, petID)) — this is just a safety
-    // net in case a failed assertion skipped that cleanup.
-    await prisma.adoptionApplication.deleteMany({
-      where: { adopterID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.adopter.deleteMany({
-      where: { userID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.users.deleteMany({
-      where: { userID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.pet.deleteMany({
-      where: { petID: { in: [petAvailableID, petUnavailableID] } },
-    });
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
-    await prisma.shelter.deleteMany({ where: { shelterID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

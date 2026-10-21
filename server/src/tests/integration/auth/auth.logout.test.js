@@ -2,6 +2,11 @@ const request = require("supertest"); //to make http requests to the server
 
 const app = require("../../../app"); // loads dotenv
 const prisma = require("../../../config/prisma"); //to interact with the database
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // Runs against the DATABASE_URL configured in server/.env — the seed user
 // created for this suite is removed in afterAll so no test data accumulates.
@@ -33,16 +38,15 @@ describe("POST /api/v1/auth/logout", () => {
 
     seedUser = {
       //to store the seed user data
-      userID: registerRes.body.data.userID,
+      userID: data.user(registerRes.body.data.userID),
       email: payload.email,
       password: payload.password,
     };
   });
 
   afterAll(async () => {
-    await prisma.adopter.deleteMany({ where: { userID: seedUser.userID } }); //to delete the seed user data from the database
-    await prisma.users.deleteMany({ where: { userID: seedUser.userID } });
-    await prisma.$disconnect(); //to disconnect from the database
+    await data.cleanUp();
+    await prisma.$disconnect();
   });
 
   // logging in because we need to test the HTTTP Cookie-based refresh token flow

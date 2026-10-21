@@ -8,7 +8,12 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const stripe = require("../../../config/stripe");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -23,7 +28,7 @@ const registerAndLoginAdopter = async (name) => {
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   // New sign-ups start unverified, and applying needs a verified email
   // (the soft gate — covered in auth/sprint9Journeys.test.js). Verified
   // directly here, since these tests are about applying, not verifying.
@@ -50,12 +55,12 @@ describe("Sprint 3 adopter journeys", () => {
     const species = await prisma.species.create({
       data: { speciesName: `JourneyTestSpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
 
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "JourneyTestBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
 
     const shelter = await prisma.shelter.create({
       data: {
@@ -67,7 +72,7 @@ describe("Sprint 3 adopter journeys", () => {
         shelterSize: 10,
       },
     });
-    shelterID = shelter.shelterID;
+    shelterID = data.shelter(shelter.shelterID);
 
     const petData = {
       breedID,
@@ -93,23 +98,7 @@ describe("Sprint 3 adopter journeys", () => {
   });
 
   afterAll(async () => {
-    await prisma.favorite.deleteMany({ where: { adopterID: adopter.userID } });
-    await prisma.visit.deleteMany({ where: { adopterID: adopter.userID } });
-    await prisma.vaccinationRecord.deleteMany({ where: { petID: petForVaccinationID } });
-    await prisma.vaccine.deleteMany({ where: { vaccineName: { startsWith: "JourneyVax-" } } });
-    await prisma.adoptionApplication.deleteMany({ where: { adopterID: adopter.userID } });
-    await prisma.adopter.deleteMany({ where: { userID: adopter.userID } });
-    await prisma.users.deleteMany({ where: { userID: adopter.userID } });
-    await prisma.pet.deleteMany({
-      where: {
-        petID: {
-          in: [petForAppID, petForVisitID, petForFavoriteID, petForVaccinationID],
-        },
-      },
-    });
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
-    await prisma.shelter.deleteMany({ where: { shelterID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -263,9 +252,11 @@ describe("Sprint 3 adopter journeys", () => {
     const vaccine1 = await prisma.vaccine.create({
       data: { vaccineName: "JourneyVax-Rabies" },
     });
+    data.vaccine(vaccine1.vaccineID);
     const vaccine2 = await prisma.vaccine.create({
       data: { vaccineName: "JourneyVax-DHPP" },
     });
+    data.vaccine(vaccine2.vaccineID);
     const record1 = await prisma.vaccinationRecord.create({
       data: {
         petID: petForVaccinationID,

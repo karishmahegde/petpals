@@ -1,6 +1,11 @@
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 const uniqueEmail = () =>
   `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
@@ -15,7 +20,7 @@ const registerAndLoginAdopter = async (name) => {
   const registerRes = await request(app)
     .post("/api/v1/auth/register")
     .send(payload);
-  const userID = registerRes.body.data.userID;
+  const userID = data.user(registerRes.body.data.userID);
   const loginRes = await request(app)
     .post("/api/v1/auth/login")
     .send({ email: payload.email, password: payload.password });
@@ -38,12 +43,12 @@ describe("favorites, adopted pets, and vaccinations", () => {
     const species = await prisma.species.create({
       data: { speciesName: `FavAdoptedVaxTestSpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
 
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "FavAdoptedVaxTestBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
 
     const shelter = await prisma.shelter.create({
       data: {
@@ -55,7 +60,7 @@ describe("favorites, adopted pets, and vaccinations", () => {
         shelterSize: 10,
       },
     });
-    shelterID = shelter.shelterID;
+    shelterID = data.shelter(shelter.shelterID);
 
     const petData = {
       breedID,
@@ -80,7 +85,7 @@ describe("favorites, adopted pets, and vaccinations", () => {
     const vaccine = await prisma.vaccine.create({
       data: { vaccineName: "TestVax-Rabies" },
     });
-    vaccineID = vaccine.vaccineID;
+    vaccineID = data.vaccine(vaccine.vaccineID);
 
     adopterA = await registerAndLoginAdopter("Fav/Adopted/Vax Test Adopter A");
     adopterB = await registerAndLoginAdopter("Fav/Adopted/Vax Test Adopter B");
@@ -116,30 +121,7 @@ describe("favorites, adopted pets, and vaccinations", () => {
   });
 
   afterAll(async () => {
-    await prisma.favorite.deleteMany({
-      where: { adopterID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.vaccinationRecord.deleteMany({ where: { vaccineID } });
-    await prisma.vaccine.deleteMany({ where: { vaccineID } });
-    await prisma.adoptionApplication.deleteMany({
-      where: { adopterID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.adopter.deleteMany({
-      where: { userID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.users.deleteMany({
-      where: { userID: { in: [adopterA.userID, adopterB.userID] } },
-    });
-    await prisma.pet.deleteMany({
-      where: {
-        petID: {
-          in: [petFavID, petAcceptedAdoptedID, petAcceptedNotAdoptedID, petPendingAdoptedID],
-        },
-      },
-    });
-    await prisma.breed.deleteMany({ where: { breedID } });
-    await prisma.species.deleteMany({ where: { speciesID } });
-    await prisma.shelter.deleteMany({ where: { shelterID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

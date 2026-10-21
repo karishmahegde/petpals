@@ -6,6 +6,10 @@
 describe("Post-login redirect-back flow", () => {
   it("sends an unauthenticated visit to a protected route through /login, then back to that route after login", () => {
     cy.registerTestAdopter().then((adopter) => {
+      // A brand-new adopter is sent to the onboarding wizard after logging in
+      // (OnboardingGate) — finished here so the redirect is what's tested.
+      cy.task("db:completeOnboarding", adopter.email);
+
       // No session exists — visiting a protected page redirects to /login
       // with the attempted destination as ?redirect=.
       cy.visit("/adopter/profile");

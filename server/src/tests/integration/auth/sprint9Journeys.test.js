@@ -22,14 +22,15 @@ jest.mock("../../../services/email", () => ({
 const request = require("supertest");
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
 const { queueEmail } = require("../../../services/email");
 
-const createdEmails = [];
-const uniqueEmail = () => {
-  const email = `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
-  createdEmails.push(email);
-  return email;
-};
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
+
+const uniqueEmail = () =>
+  `t${Date.now()}${Math.floor(Math.random() * 1000000)}@ex.com`;
 
 const PASSWORD = "Secret123!";
 const NEW_PASSWORD = "Fresh456#";
@@ -38,10 +39,14 @@ const NEW_PASSWORD = "Fresh456#";
 // database — past the 30s config default (jest.config.js).
 jest.setTimeout(120000);
 
-const register = (name, email, role, shelterID) =>
-  request(app)
+// Records the new account in the tracker before handing back the response.
+const register = async (name, email, role, shelterID) => {
+  const res = await request(app)
     .post("/api/v1/auth/register")
     .send({ name, email, password: PASSWORD, role, shelterID });
+  data.user(res.body.data?.userID);
+  return res;
+};
 
 const login = (email, password = PASSWORD) =>
   request(app).post("/api/v1/auth/login").send({ email, password });
@@ -87,7 +92,7 @@ const makeManager = async (shelter, name) => {
   const email = uniqueEmail();
   const res = await register(name, email, "staff", shelter.shelterID);
   expect(res.status).toBe(201);
-  const userID = res.body.data.userID;
+  const userID = data.user(res.body.data.userID);
   await prisma.staff.update({
     where: { userID },
     data: { accountStatus: "Active", staffDesignation: "Manager", onboardingComplete: true },
@@ -106,7 +111,7 @@ const registerAdopter = async (name) => {
   expect(res.status).toBe(201);
   const loginRes = await login(email);
   expect(loginRes.status).toBe(200);
-  return { userID: res.body.data.userID, email, token: loginRes.body.data.token };
+  return { userID: data.user(res.body.data.userID), email, token: loginRes.body.data.token };
 };
 
 describe("Sprint 9 email + account journeys", () => {
@@ -133,21 +138,22 @@ describe("Sprint 9 email + account journeys", () => {
         adoptionStatus: "available",
       },
     });
-    petIDs.push(pet.petID);
+    petIDs.push(data.pet(pet.petID));
     return pet;
   };
 
   beforeAll(async () => {
     shelter = await makeShelter("S9 Journey Shelter", 10004);
+    data.shelter(shelter.shelterID);
     manager = await makeManager(shelter, "S9 Manager");
     const species = await prisma.species.create({
       data: { speciesName: `S9JourneySpecies-${Date.now()}` },
     });
-    speciesID = species.speciesID;
+    speciesID = data.species(species.speciesID);
     const breed = await prisma.breed.create({
       data: { speciesID, breedName: "S9JourneyBreed" },
     });
-    breedID = breed.breedID;
+    breedID = data.breed(breed.breedID);
   });
 
   beforeEach(() => {
@@ -155,32 +161,7 @@ describe("Sprint 9 email + account journeys", () => {
   });
 
   afterAll(async () => {
-    const users = await prisma.users.findMany({
-      where: { userEmail: { in: createdEmails } },
-      select: { userID: true },
-    });
-    const userIDs = users.map((u) => u.userID);
-    const shelterIDs = shelter ? [shelter.shelterID] : [];
-
-    // Children before parents. AccountToken rows cascade from Users.
-    await prisma.adoptionApplication.deleteMany({ where: { adopterID: { in: userIDs } } });
-    await prisma.governmentID.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.pet.deleteMany({ where: { petID: { in: petIDs } } });
-    if (breedID) await prisma.breed.deleteMany({ where: { breedID } });
-    if (speciesID) await prisma.species.deleteMany({ where: { speciesID } });
-
-    // Shelter.managerStaffID → Staff and Staff.shelterID → Shelter point at
-    // each other: unlink first, then the role rows and users, then the
-    // shelter.
-    await prisma.shelter.updateMany({
-      where: { shelterID: { in: shelterIDs } },
-      data: { managerStaffID: null },
-    });
-    await prisma.adopter.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.volunteer.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.staff.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.users.deleteMany({ where: { userID: { in: userIDs } } });
-    await prisma.shelter.deleteMany({ where: { shelterID: { in: shelterIDs } } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
@@ -311,7 +292,7 @@ describe("Sprint 9 email + account journeys", () => {
     const email = uniqueEmail();
     const registerRes = await register("S9 Closing Volunteer", email, "volunteer", shelter.shelterID);
     expect(registerRes.status).toBe(201);
-    const volunteerID = registerRes.body.data.userID;
+    const volunteerID = data.user(registerRes.body.data.userID);
     // Already approved — their approval is covered elsewhere.
     await prisma.volunteer.update({
       where: { userID: volunteerID },
@@ -406,7 +387,7 @@ describe("Sprint 9 email + account journeys", () => {
       const email = uniqueEmail();
       const res = await register(name, email, "volunteer", shelter.shelterID);
       expect(res.status).toBe(201);
-      const userID = res.body.data.userID;
+      const userID = data.user(res.body.data.userID);
       await prisma.volunteer.update({
         where: { userID },
         data: { onboardingComplete: true, onboardingStep: 5 },

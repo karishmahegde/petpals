@@ -2,6 +2,11 @@ const request = require("supertest");
 
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // GET /pets/:id has no corresponding create-pet endpoint yet (pets are
 // seeded via seed.js / managed by staff tooling not built until a later
@@ -19,6 +24,7 @@ describe("GET /api/v1/pets/:id (integration)", () => {
     species = await prisma.species.create({
       data: { speciesName: "IntegrationTestSpecies" },
     });
+    data.species(species.speciesID);
 
     breed = await prisma.breed.create({
       data: { speciesID: species.speciesID, breedName: "IntegrationTestBreed" },
@@ -35,6 +41,7 @@ describe("GET /api/v1/pets/:id (integration)", () => {
         shelterStatus: "Open",
       },
     });
+    data.shelter(shelter.shelterID);
 
     pet = await prisma.pet.create({
       data: {
@@ -82,10 +89,7 @@ describe("GET /api/v1/pets/:id (integration)", () => {
   });
 
   afterAll(async () => {
-    await prisma.pet.deleteMany({ where: { shelterID: shelter.shelterID } });
-    await prisma.breed.delete({ where: { breedID: breed.breedID } });
-    await prisma.species.delete({ where: { speciesID: species.speciesID } });
-    await prisma.shelter.delete({ where: { shelterID: shelter.shelterID } });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 

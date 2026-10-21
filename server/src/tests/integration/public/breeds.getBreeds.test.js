@@ -2,6 +2,11 @@ const request = require("supertest");
 
 const app = require("../../../app");
 const prisma = require("../../../config/prisma");
+const { trackTestData } = require("../helpers/testData");
+
+// Everything this file creates — removed in afterAll even if a test or the
+// setup failed part-way (helpers/testData.js).
+const data = trackTestData();
 
 // GET /breeds has no create-breed endpoint to seed through, so — unlike the
 // auth integration tests — this suite seeds directly via Prisma and cleans
@@ -17,12 +22,15 @@ describe("GET /api/v1/breeds (integration)", () => {
     speciesA = await prisma.species.create({
       data: { speciesName: "IntegrationBreedsSpeciesA" },
     });
+    data.species(speciesA.speciesID);
     speciesB = await prisma.species.create({
       data: { speciesName: "IntegrationBreedsSpeciesB" },
     });
+    data.species(speciesB.speciesID);
     speciesEmpty = await prisma.species.create({
       data: { speciesName: "IntegrationBreedsSpeciesEmpty" },
     });
+    data.species(speciesEmpty.speciesID);
 
     // Inserted out of alphabetical order on purpose, to prove the response
     // ordering is a real DB sort, not just insertion order.
@@ -42,20 +50,7 @@ describe("GET /api/v1/breeds (integration)", () => {
   });
 
   afterAll(async () => {
-    await prisma.breed.deleteMany({
-      where: {
-        speciesID: {
-          in: [speciesA.speciesID, speciesB.speciesID, speciesEmpty.speciesID],
-        },
-      },
-    });
-    await prisma.species.deleteMany({
-      where: {
-        speciesID: {
-          in: [speciesA.speciesID, speciesB.speciesID, speciesEmpty.speciesID],
-        },
-      },
-    });
+    await data.cleanUp();
     await prisma.$disconnect();
   });
 
