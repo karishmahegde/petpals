@@ -147,8 +147,12 @@ export const openNotificationStream = async ({
   onOpen: () => void;
   onEvent: (event: NotificationStreamEvent) => void;
 }): Promise<void> => {
+  // In production REST goes through Vercel's /api rewrite, but the stream
+  // connects to the API directly (VITE_STREAM_URL) so no proxy can buffer
+  // it; locally both are the same URL.
+  const baseUrl = import.meta.env.VITE_STREAM_URL || import.meta.env.VITE_API_URL;
   const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/notifications/stream`,
+    `${baseUrl}/notifications/stream`,
     {
       headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
       signal,

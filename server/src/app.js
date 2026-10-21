@@ -7,14 +7,19 @@ const cors = require("cors");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swagger");
+const { parseCorsOrigins } = require("./config/cors");
 
 //Creates the Express app
 const app = express();
 
+// Railway terminates HTTPS at its proxy, one hop in front of the app, so
+// req.ip / req.protocol / req.secure come from its X-Forwarded-* headers.
+app.set("trust proxy", 1);
+
 // ── Middleware ─────────────────────────────────────────────────
 app.use(
   cors({
-    origin: "http://localhost:3000", //Allows Cross-origin requests. Since our client and server will be on different ports, the browser would block it as per Same-Origin policy. This line will tell the browser to allow cross-origin requests.
+    origin: parseCorsOrigins(), // the client's origin(s) — see config/cors.js
     credentials: true, // required for httpOnly cookies to work
   }),
 );
