@@ -59,7 +59,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 ### Testing
 
-![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) ![Supertest](https://img.shields.io/badge/Supertest-323330?style=flat-square) ![Cypress](https://img.shields.io/badge/Cypress-17202C?style=flat-square&logo=cypress&logoColor=white)
+![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) ![Supertest](https://img.shields.io/badge/Supertest-323330?style=flat-square) ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white) ![Testing Library](https://img.shields.io/badge/Testing_Library-E33332?style=flat-square&logo=testinglibrary&logoColor=white) ![Cypress](https://img.shields.io/badge/Cypress-17202C?style=flat-square&logo=cypress&logoColor=white)
 
 ### Infrastructure
 
@@ -194,15 +194,26 @@ Interactive Swagger/OpenAPI docs are served at **`/api/docs`** once the server i
 
 ## 🟤 Testing
 
-- **Unit & Integration:** Jest + Supertest (`server/src/tests/` — `unit/` mocks Prisma; `integration/` runs against the database in `server/.env`, creating and removing its own test data)
-- **End-to-End:** Cypress (`client/cypress/e2e/`) — needs both dev servers running
+| Layer | Tool | What it covers |
+| --- | --- | --- |
+| Server unit | Jest + Supertest | Every route, controller and service with Prisma, Stripe, storage, AI and email mocked — 2,100+ tests, **95% lines / 86% branches** |
+| Server integration | Jest + Supertest | One journey per sprint against the real database, creating and removing its own data |
+| Client | Vitest + React Testing Library | Routing and auth logic, password rules, the live notification stream, and the components that guard the adoption flow |
+| End-to-end | Cypress | The critical adoption flows in a real browser: login redirect-back, the email-verification gate, applying up to the Stripe hand-off + withdrawing, and a visit confirmed by staff reaching the adopter's bell live |
 
 ```bash
-npm test --prefix server            # unit + integration
-npm run test:e2e --prefix client    # Cypress, headless
+# server/
+npm run test:unit          # unit tests + coverage; fails below 80% lines / 70% branches
+npm run test:integration   # against the database in server/.env
+npm run test:leftovers     # read-only report of any test data left behind
+
+# client/
+npm test                   # Vitest
+npm run typecheck && npm run lint
+npm run cypress:open       # needs both dev servers running (cypress:run for headless)
 ```
 
-> Note: Jest's `.toBe()` checks reference equality; `.toEqual()` checks deep value equality — use `.toEqual()` when comparing objects/arrays.
+**CI:** GitHub Actions runs the server unit tests (with the coverage gate) and the client typecheck, lint and Vitest on every pull request into `dev` and `main`; both are required checks. Integration and Cypress run locally — they need the database and the dev servers. See [`setup/SETUP.md`](./setup/SETUP.md#running-the-tests) for what each needs.
 
 ## 🔶 License
 

@@ -254,12 +254,30 @@ Email goes through [Brevo](https://www.brevo.com)'s HTTPS API, not SMTP. Railway
 
 **Tests never send email.** `server/src/tests/setup/noEmailProvider.js` runs before every test file and blanks the `EMAIL_*` variables, so a real key in `server/.env` is never used. Suites that test email mock it instead.
 
+<a id="running-the-tests"></a>
+
+## Running the tests
+
+Nothing extra to install — `npm install` in `server/` and `client/` brings Jest, Vitest and Cypress.
+
+| Run | From | Needs |
+| --- | --- | --- |
+| `npm run test:unit` | `server/` | Nothing beyond `npm install` + `npx prisma generate` (done by `npm run setup`) — everything external is mocked, no database. Fails below 80% lines / 70% branches. |
+| `npm run test:integration` | `server/` | `server/.env` from step 3. Runs against that database, creating its own test data (logins end in `@ex.com`) and removing it afterwards. The Stripe-webhook journeys need `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (test mode). Slow over a remote database — several minutes. |
+| `npm run test:leftovers` | `server/` | Read-only: lists any test data a crashed run left behind. Nothing is deleted. |
+| `npm test` · `npm run typecheck` · `npm run lint` | `client/` | Nothing — no servers, no database. |
+| `npm run cypress:open` / `cypress:run` | `client/` | Both dev servers running (steps 4 and 5) and the Stripe test keys in `server/.env` (the apply spec creates a real test-mode Checkout Session; Stripe's page itself is never loaded). Specs create and remove their own data in the same database. |
+
+Tests never call the AI provider or send email, whatever is in `server/.env` (see the notes under AI features and Email).
+
 ## Troubleshooting
 
 - **Prisma asks to reset the database / mentions drift** — you (or a script) ran `migrate dev` instead of `migrate deploy`. Don't confirm the reset; re-read the callout in step 3.
 - **`npm run setup` stops at the storage step** — check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `server/.env` (the service-role key, not the anon key). If it says a bucket "exists but is public/private", someone changed it by hand: fix it in **Supabase → Storage → bucket settings** (`government-ids` must be private) and re-run `npm run setup:storage`.
 - **Pet photos or ID documents look broken** — the seed files weren't uploaded, or were deleted through the app. Run `npm run setup:storage` from `server/`; it doesn't touch the database.
 - **`/shelters/nearby` returns nothing / errors** — usually means the `postgis` extension didn't enable during `migrate deploy` (check **Database → Extensions** in Supabase, then re-run `npx prisma migrate deploy`).
+- **A test run left data behind** (`npm run test:leftovers` lists rows) — usually a run stopped part-way (Ctrl-C, or the database link dropped). Rerunning the suite doesn't remove another run's rows; delete the listed ones (they're all test data, but check before removing species or vaccines someone may have added by hand).
+- **A Cypress spec lands on the onboarding wizard or "no entry" page** — the spec's user hasn't finished onboarding (use `db:completeOnboarding`), or a `cy.request` login left another user's refresh cookie behind (`cy.clearAllCookies()` before `cy.visit`).
 - **Adoption application never appears after "paying"** — the `AdoptionApplication` row is only created by the Stripe webhook after a successful checkout, not by the initial POST (see `CLAUDE.md`). Without Stripe configured, you can exercise everything up to checkout but the row won't be created — this is expected, not a bug.
 
 ## Docker Compose alternative

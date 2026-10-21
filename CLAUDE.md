@@ -13,7 +13,7 @@ Multi-shelter pet adoption platform (solo full-stack learning project). Unifies 
 **Backend (`server/`):** Node 18 + Express · Prisma (`server/src/prisma/schema.prisma`) · PostgreSQL 15 + PostGIS (`ST_MakePoint/SetSRID/Distance/DWithin`) · Supabase (managed Postgres + storage; buckets `pet-images`, `government-ids` private) · `zipcodes` npm (offline US zip→coords, behind `services/geocoding/`) · JWT two-token · bcrypt (10 rounds) · cookie-parser · Stripe (application-fee Checkout) · `services/email/` (optional transactional email — `index.js` is the ONLY import, same rule as ai/; `brevoApi.js` posts to Brevo's HTTPS API over plain `fetch`, no SDK and no SMTP — Railway blocks outbound SMTP below its Pro plan; `EMAIL_API_KEY` + `EMAIL_FROM` both set → `isEmailConfigured()`, else every email prints to the server console, links included, so all flows work locally; `queueEmail` is fire-and-forget after the DB commit — a failure is logged, never thrown) · `services/ai/` (optional AI — `index.js` is the ONLY import, same rule as geocoding/ and storage/; `openAiCompatible.js` speaks OpenAI chat-completions over plain `fetch`, no SDK, so Groq/Ollama/OpenRouter are an `.env` change; `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` all set → `isAiConfigured()`, else features fall back; `generateStructured` sends a strict `json_schema` response format and returns parsed JSON; failures throw with `err.reason` ∈ `AI_ERROR_REASONS` — not_configured, timeout, unreachable, rate_limited, auth_failed, provider_error, invalid_response) · `services/notifications/` (in-app notifications + live Server-Sent Events stream — `index.js` is the ONLY import, same rule as email/ and ai/; `messages.js` one builder per `NotificationType`; `hub.js` the in-process stream registry; `notify(userIDs, messages.x(...))` is awaited after the DB commit but never throws — see Notifications below) · `config/prisma.js` sets `transactionOptions` 10s maxWait / 15s timeout on the client (Prisma's 2s/5s defaults failed requests over the remote Supabase link — batch `$transaction([...])` included, since the PrismaPg adapter runs those as real transactions).
 
 **Infra:** Docker Compose (local) · Vercel (FE) / Railway (BE) · branches `main` → `dev` → `feature/*`.
-**Testing:** Jest + Supertest (unit + integration, target 70%) · Cypress (critical adoption flows only — `client/cypress/e2e/`; needs both dev servers running locally, `npm run cypress:open` / `cypress:run` from `client/`). Specs seed their own data via `cy.request()` straight to the API (e.g. `cy.registerTestAdopter()`), never pre-existing fixtures.
+**Testing:** Jest + Supertest (server unit + integration; unit run gated at 80% lines / 70% branches) · Vitest + React Testing Library (client logic + a few critical components) · Cypress (critical adoption flows only) · GitHub Actions CI on every PR into `dev`/`main`. Details in **Testing** below.
 
 ---
 
@@ -112,7 +112,13 @@ client/src/
       dashboard/   DashboardRoutes (shared DashboardLayout; ROLE_NAV.Donor) + Overview, Donate, DonateConfirmation, History, Profile
         overview/  donorQueries.ts, StatsWidget, RecentDonationsWidget
         shared/    DonateForm, CloseAccountModal
+  test/          setup.ts (jest-dom, cleanup, resets the auth store + localStorage) · render.tsx (renderWithProviders(ui, { route, user }) — fresh QueryClient, MemoryRouter, optional signed-in user)
   App.tsx        routes + session restore on mount
+
+client/cypress/
+  e2e/           one spec per critical flow (redirect-back, email-verification-gate, apply-and-withdraw, visit-confirmed-notification)
+  support/       commands.ts (registerTestAdopter → { name, email, password, userID }, loginThroughForm) · e2e.ts (global after() → db:cleanUp)
+  dbTasks.cjs    cy.task()s against server/.env's database (CommonJS; loaded by cypress.config.ts via createRequire)
 
 server/src/
   routes/ controllers/ services/   grouped auth/ public/ adopter/ staff/ admin/ vet/ volunteer/ donor/ webhooks/ — one <domain>.<layer>.js per file
@@ -130,7 +136,7 @@ server/src/
   utils/        errors.js, response.js
   config/prisma.js   singleton Prisma client (PrismaPg adapter)
   prisma/       schema.prisma, seed.js
-  tests/        setup/noAiProvider.js + noEmailProvider.js (jest setupFiles — blank AI_* / EMAIL_* so no test can reach either provider; suites that assert on AI or email mock services/ai / services/email) · unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys, adopter/sprint8Journeys — fakes services/ai via jest.mock, auth/sprint9Journeys — captures emails via a mocked services/email and follows their links, notifications/sprint10Journeys — reads each recipient's inbox, and a live stream over `app.listen(0)`) · unit/notifications/ (notificationsMock.js is the shared `jest.mock` target for suites that assert which notifications a service sends)
+  tests/        setup/noAiProvider.js + noEmailProvider.js (jest setupFiles — blank AI_* / EMAIL_* so no test can reach either provider; suites that assert on AI or email mock services/ai / services/email) · unit/<role>/ (Prisma fully mocked) · integration/<role>/ (live DB; journey files sprint3Journeys, adminJourneys, sprint5_1Journeys, sprint5_2Journeys, staffOnboarding.journey, vet/sprint6Journeys, volunteer/sprint7Journeys, adopter/sprint8Journeys — fakes services/ai via jest.mock, auth/sprint9Journeys — captures emails via a mocked services/email and follows their links, notifications/sprint10Journeys — reads each recipient's inbox, and a live stream over `app.listen(0)`) · unit/notifications/ (notificationsMock.js is the shared `jest.mock` target for suites that assert which notifications a service sends) · integration/helpers/ (testData.js — the cleanup tracker; leftovers.js — `npm run test:leftovers`)
   app.js / index.js
 ```
 
@@ -383,6 +389,31 @@ Email stays for account/security; a few events (decisions, ID reviews) send both
 
 ---
 
+## Testing (Sprint 11 ✅)
+
+| Layer | Where | Runs against | Command |
+| --- | --- | --- | --- |
+| Server unit | `server/src/tests/unit/` (80 suites, ~2,100 tests) | Prisma, Stripe, storage, AI, email all mocked | `npm run test:unit` (from `server/`, with coverage + the gate) |
+| Server integration | `server/src/tests/integration/` (26 suites) | the real database in `server/.env` (the dev DB — no separate test project) | `npm run test:integration` (`--runInBand`), then `npm run test:leftovers` |
+| Client unit/component | `client/src/**/*.test.{ts,tsx}` | jsdom, API modules mocked with `vi.mock` | `npm test` (from `client/`) · `test:watch` · `test:coverage` |
+| End-to-end | `client/cypress/e2e/` | both dev servers + the dev DB | `npm run cypress:open` / `cypress:run` (from `client/`) |
+
+`npm test` in `server/` still runs unit + integration together (`--runInBand`); `test:coverage` is the same with coverage.
+
+**Coverage gate.** `server/jest.config.js` counts every `src/**/*.js` (minus `src/tests/**` and the seed), so an untested file shows as 0% instead of disappearing; `coverageThreshold` fails a `--coverage` run below 80% lines/statements/functions or 70% branches. Measured 2026-10-21: 95.1% lines / 86.3% branches (baseline before Sprint 11: 89.3 / 78.2). The client isn't gated — its tests cover logic and the few components that guard the adoption flow, not every page.
+
+**Integration data — crash-proof cleanup.** Every suite records what it creates the moment it exists with the tracker from `integration/helpers/testData.js` (`const data = trackTestData(); data.user(id) / data.shelter(id) / data.species(id) / data.pet(id) …`) and calls `await data.cleanUp()` in `afterAll`. `cleanUp` removes dependants children-first, each step guarded so one failure can't stop the rest — rows are never found by name or email pattern. `npm run test:leftovers` is a read-only report of anything left (test logins `@ex.com`, their shelters, unseeded species/pets); delete leftovers only with the user's OK. Jest `testTimeout` is 90s (the remote Supabase link — a timed-out hook keeps running and races the cleanup).
+
+**Client tests (Vitest).** Config in `vite.config.ts` (`test` block, jsdom, `src/test/setup.ts`). No globals — import `describe/test/expect/vi` from `vitest`. Logic first (`logic/**`), then components through `renderWithProviders`; mock the `logic/api/*` module, never axios. A suite needing Node APIs (streams) sets `// @vitest-environment node`. Client `lib` is ES2020 (no `Array.at`) and there's no `@types/node`.
+
+**Cypress.** Specs create their own data: accounts through the API (`cy.registerTestAdopter()`, `cy.request`), and through `cy.task()` (`cypress/dbTasks.cjs`) only what the API can't do for a test — `db:availablePet` (Open shelter + own species + available pet → `{ petID, petName, shelterID, shelterName, speciesID }`), `db:verifyEmail`, `db:completeOnboarding` (the OnboardingGate blocks `/adopt/apply` and dashboards until it's done), `db:activateStaff`, `stripe:paidApplicationEvent` (a locally signed `checkout.session.completed` to POST to `/webhooks/stripe`; nothing is sent to Stripe). Everything is recorded with the integration tracker and removed by a global `after()` → `db:cleanUp`, even when a spec fails. Gotchas: `cy.request` shares the browser's cookies and the app restores a session from the refresh cookie on every page load — after logging a second user in through `cy.request`, `cy.clearAllCookies()` before the next `cy.visit`; pages keep hidden `role="dialog"` elements mounted, so find a modal by its title (`cy.contains('[role="dialog"]', "Withdraw application?")`); Stripe's hosted page is stubbed with `cy.intercept("GET", "https://checkout.stripe.com/**", …)` and the spec stops at the hand-off. The apply spec creates a real Stripe test-mode Checkout Session, so `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` must be set. `cypress/tsconfig.json` is type-checked by `npm run typecheck`.
+
+**CI** (`.github/workflows/ci.yml`, Node 22) on every PR into `dev`/`main` and every push to them: **Server unit tests** (`npm ci`, `prisma generate`, `test:unit` — the gate; placeholder `JWT_SECRET`/`DATABASE_URL`, nothing connects) and **Client checks** (typecheck incl. Cypress, lint, Vitest). Both are required status checks. Integration and Cypress stay local — they need the database and running servers.
+
+**Known flake (accepted).** About 1 server unit run in 20–30 fails one random test with `read ECONNRESET` (a Supertest connection dropped, macOS, Node 22); rerun. Investigated in Sprint 11, not fixed.
+
+---
+
 ## Database Notes
 
 - `Pet.petDOB` replaced static `petAge` (age computed at request time). `Pet.featuredFlag BOOLEAN DEFAULT FALSE` powers `/pets/featured` (set via SQL for now, staff toggle planned).
@@ -429,7 +460,7 @@ Email stays for account/security; a few events (decisions, ID reviews) send both
 | 8 | AI compatibility matcher + health-passport summary (Groq / any OpenAI-compatible provider via `services/ai/`) — personality quiz, rule scorer + one AI call per recompute, cached matches and summaries, rule-only fallback | ✅ |
 | 9 | Email & account security — Brevo HTTPS email service (console fallback), email verification + soft gate on applying/donating, forgot/reset/change password, self-service reactivation of Closed accounts, two-step email change, Closed/Declined status split, account + review notice emails | ✅ |
 | 10 | In-app notifications — 28 event types across all six roles, live over Server-Sent Events (bell + dropdown, Notifications page, unread counts, token renewal on an open dashboard, chime), admin capacity alerts, staff visit cancel | ✅ |
-| 11 | Testing to 70% (+ a Cypress spec for the email-verification apply gate) | — |
+| 11 | Testing — honest coverage + 80/70 gate, backend gaps closed (95% lines / 86% branches), crash-proof integration cleanup + leftover report, Vitest + RTL client tests, GitHub Actions CI, Cypress specs (email-verification gate, apply → Stripe hand-off + withdraw, visit confirmed → live notification) | ✅ |
 | 12 | Deployment, polish, final report — incl. fixing Docker: `docker-compose.yml` hardcodes a local Postgres (no PostGIS → baseline migration fails) and omits `SUPABASE_SERVICE_ROLE_KEY`; point the server at `server/.env` and drop the bundled DB. Also check `server/Dockerfile`: it runs `npx prisma generate` after a production-only install, but `prisma` is a devDependency. README already documents this target setup (containers run against Supabase via `server/.env`, one-time `npm run setup` from the host), so make compose match it | — |
 
 ---
@@ -440,7 +471,7 @@ Email stays for account/security; a few events (decisions, ID reviews) send both
 - Controllers thin — business logic in services · standard response envelope on every response
 - **Never expose** `userPassword`, `refreshToken`, `governmentID`, `stripeCustomerID`
 - Prisma for all DB access — raw SQL only for PostGIS (`prisma.$queryRaw`)
-- Tests in `server/src/tests/unit|integration/`; integration seeds via API calls, cleans up via Prisma in `afterAll`, runs `--runInBand`
+- Tests in `server/src/tests/unit|integration/`; integration seeds via API calls, records every row with the `trackTestData()` tracker as it's created and calls `cleanUp()` in `afterAll`, runs `--runInBand` (see Testing)
 - Filters: closed/fixed-value validated strictly (400 on bad input); open/DB-driven unvalidated (unmatched value → zero rows, not an error)
 - React state: never mutate in place — build a new array/object every time (`.filter`/`.map`/spread); reference equality drives re-renders
-- **Verify before merge — frontend and backend are asymmetric:** frontend has `npm run typecheck` + `npm run lint` (run from `client/`) and both must be clean. The backend has **neither** — it's plain JS (no TypeScript, so nothing for a typechecker to check) and ESLint isn't installed or configured there at all (no config file, not in `package.json`). Don't assume a backend lint/typecheck step exists. The closest backend sanity check is loading the app to catch syntax/require errors: `node -e "require('./src/app.js')"`.
+- **Verify before merge — frontend and backend are asymmetric:** frontend has `npm run typecheck` (incl. the Cypress specs) + `npm run lint` + `npm test` (run from `client/`) and all must be clean. The backend has **neither** — it's plain JS (no TypeScript, so nothing for a typechecker to check) and ESLint isn't installed or configured there at all (no config file, not in `package.json`). Don't assume a backend lint/typecheck step exists. The closest backend sanity check is loading the app to catch syntax/require errors: `node -e "require('./src/app.js')"`, plus `npm run test:unit` (the coverage gate).
