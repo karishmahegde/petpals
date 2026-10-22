@@ -310,11 +310,28 @@ const getAccountStatus = async (userID, role) => {
   return record ? record.accountStatus : "DELETED";
 };
 
-const storeRefreshToken = async (userID, hashedRefreshToken) => {
-  //Once user is autheticaated, controller creates the refreshToken and hashes it. This is stored in the User table
+// Refresh tokens are long random JWTs, not passwords someone chose, so a fast
+// SHA-256 hex stores them safely (as accountTokens.service.js does for the
+// emailed links) — bcrypt's deliberate slowness only cost seconds on every
+// login and page load on the host's small CPU. Hashes written before the
+// switch are bcrypt ("$2…"); they're still accepted until their session's
+// next refresh replaces them, so nobody was signed out by it.
+const hashRefreshToken = (rawToken) =>
+  crypto.createHash("sha256").update(rawToken).digest("hex");
+
+const refreshTokenMatches = async (rawToken, storedHash) => {
+  if (storedHash.startsWith("$2")) return bcrypt.compare(rawToken, storedHash);
+  const given = Buffer.from(hashRefreshToken(rawToken), "hex");
+  const stored = Buffer.from(storedHash, "hex");
+  return given.length === stored.length && crypto.timingSafeEqual(given, stored);
+};
+
+const storeRefreshToken = async (userID, rawRefreshToken) => {
+  // Once the user is authenticated, the controller creates the refresh token;
+  // only its hash is stored in the Users table.
   await prisma.users.update({
     where: { userID },
-    data: { refreshToken: hashedRefreshToken },
+    data: { refreshToken: hashRefreshToken(rawRefreshToken) },
   });
 };
 
@@ -375,14 +392,14 @@ const refreshToken = async (userID, rawOldRT, rawNewRT) => {
     throw err;
   }
 
-  const match = await bcrypt.compare(rawOldRT, user.refreshToken); // Check if old refreshToken from the request and the refreshToken in DB match, which authenticates the request
+  const match = await refreshTokenMatches(rawOldRT, user.refreshToken); // Check if old refreshToken from the request and the refreshToken in DB match, which authenticates the request
   if (!match) {
     const err = new Error("Invalid refresh token");
     err.code = "UNAUTHORIZED";
     throw err;
   }
 
-  const newHash = await bcrypt.hash(rawNewRT, 10); // Hash the new refreshToken and store in the DB
+  const newHash = hashRefreshToken(rawNewRT); // Hash the new refreshToken and store in the DB
   await prisma.users.update({
     where: { userID },
     data: { refreshToken: newHash },

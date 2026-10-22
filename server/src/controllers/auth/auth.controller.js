@@ -1,5 +1,4 @@
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
 const authService = require("../../services/auth/auth.service");
 const emailVerificationService = require("../../services/auth/emailVerification.service");
 const passwordsService = require("../../services/auth/passwords.service");
@@ -29,8 +28,7 @@ const startRefreshSession = async (res, userID) => {
   const refreshToken = jwt.sign({ userID }, process.env.JWT_SECRET, {
     expiresIn: `${REFRESH_TOKEN_DAYS}d`,
   });
-  const hashedRT = await bcrypt.hash(refreshToken, 10);
-  await authService.storeRefreshToken(userID, hashedRT); // Store the refreshToken against the user's record in the user table
+  await authService.storeRefreshToken(userID, refreshToken); // Store the refreshToken's hash against the user's record in the user table
   res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS); // return the refreshToken in an httpOnly cookie
 };
 
