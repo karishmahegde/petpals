@@ -44,4 +44,13 @@ const StatTile = ({ icon, value, label, color }: StatTileProps) => {
   );
 };
 
+// The row the tiles sit in. Phones: two tile-wide columns centred in the
+// card (with plain 1fr columns the fixed-width tiles hug the left of each),
+// and an odd last tile centred on its own row. sm and up: one wrapping row.
+export const StatTileRow = ({ children }: { children: ReactNode }) => (
+  <div className="grid grid-cols-[repeat(2,9rem)] justify-center gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:justify-self-center sm:flex sm:flex-wrap sm:justify-start sm:gap-5">
+    {children}
+  </div>
+);
+
 export default StatTile;

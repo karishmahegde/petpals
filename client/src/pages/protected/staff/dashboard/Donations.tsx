@@ -4,7 +4,7 @@ import { PiCalendarCheckBold, PiHandHeartBold, PiPiggyBankBold } from "react-ico
 import DashboardHeading from "../../../../components/ui/dashboard/DashboardHeading";
 import DashboardWidgetHeader from "../../../../components/ui/dashboard/DashboardWidgetHeader";
 import DashboardEmptyMessage from "../../../../components/ui/dashboard/DashboardEmptyMessage";
-import StatTile from "../../../../components/ui/dashboard/StatTile";
+import StatTile, { StatTileRow } from "../../../../components/ui/dashboard/StatTile";
 import PaginationControls from "../../../../components/ui/dashboard/PaginationControls";
 import Card from "../../../../components/ui/Card";
 import SelectField from "../../../../components/ui/SelectField";
@@ -98,7 +98,7 @@ const Donations = () => {
       />
 
       <Card className="mb-6 p-4 sm:p-6">
-        <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-5">
+        <StatTileRow>
           <StatTile
             icon={<PiPiggyBankBold />}
             value={stats ? formatUSD(stats.totalAmount) : "—"}
@@ -117,7 +117,7 @@ const Donations = () => {
             label="This Month"
             color="rose"
           />
-        </div>
+        </StatTileRow>
       </Card>
 
       <Card className="p-6">

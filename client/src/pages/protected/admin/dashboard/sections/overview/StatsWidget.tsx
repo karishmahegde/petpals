@@ -10,7 +10,7 @@ import {
   PiChartLineUpBold,
 } from "react-icons/pi";
 import Card from "../../../../../../components/ui/Card";
-import StatTile from "../../../../../../components/ui/dashboard/StatTile";
+import StatTile, { StatTileRow } from "../../../../../../components/ui/dashboard/StatTile";
 import { getAnalyticsOverview } from "../../../../../../logic/api/analyticsApi";
 
 const StatsWidget = () => {
@@ -26,7 +26,7 @@ const StatsWidget = () => {
 
   return (
     <Card className="p-4 sm:p-6">
-      <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-5">
+      <StatTileRow>
         <StatTile
           icon={<PiBuildingsBold />}
           value={data?.shelters.total ?? "—"}
@@ -57,7 +57,7 @@ const StatsWidget = () => {
           label="Adoption Rate"
           color="gold"
         />
-      </div>
+      </StatTileRow>
     </Card>
   );
 };

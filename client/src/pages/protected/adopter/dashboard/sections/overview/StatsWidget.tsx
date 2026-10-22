@@ -38,11 +38,12 @@ const StatsWidget = () => {
   const unreadCount = unreadCountQuery.data;
 
   return (
-    // Fixed 356x356 square — 2 tiles (144px) + gap (20px) + padding (24px each
-    // side), both dimensions, always 2 columns x 2 rows regardless of viewport
-    // (not just mobile).
-    <Card className="h-[356px] w-[356px] shrink-0 p-6">
-      <div className="grid grid-cols-2 gap-5">
+    // Always 2 columns x 2 rows. lg and up: a fixed 356x356 square beside the
+    // pets widget — 2 tiles (144px) + gap (20px) + padding (24px each side).
+    // Below lg the widgets stack and a phone's content area is narrower than
+    // 356px, so the card spans the width with the tiles centred in it.
+    <Card className="w-full shrink-0 p-4 lg:h-[356px] lg:w-[356px] lg:p-6">
+      <div className="grid grid-cols-[repeat(2,9rem)] justify-center gap-4 lg:gap-5">
         <StatTile
           icon={<PiCatBold />}
           value={petsCount ?? "—"}
