@@ -32,10 +32,11 @@ const VolunteerInfo = () => {
       {/* Section 2 */}
       <SectionContainer className="bg-gold-light">
         <SectionHeadingCenter>{stepsSection.heading}</SectionHeadingCenter>
-        <div className="w-4/5 lg:w-3/5 mx-auto rounded-xl bg-gold-md p-6">
+        <div className="w-full sm:w-4/5 lg:w-3/5 mx-auto rounded-xl bg-gold-md p-4 sm:p-6">
           {stepsSection.steps.map((step) => (
             <div className="mb-6" key={step.number}>
-              <div className="flex items-start space-x-4 bg-neutral-offwhite rounded-lg p-5 m-1 lg:m-3">
+              {/* Phones: number centred on top, text below; sm+: side by side. */}
+              <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-start sm:gap-4 sm:text-left bg-neutral-offwhite rounded-lg p-5 m-1 lg:m-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-500 font-bold text-white">
                   {step.number}
                 </span>
@@ -57,7 +58,7 @@ const VolunteerInfo = () => {
         <div className="text-center">
           <p className="text-md font-light">{joinSection.description}</p>
           <ButtonElement
-            to="/adopt"
+            to="/register?role=volunteer"
             className="bg-teal-dark hover:bg-gold-dark"
           >
             {joinSection.button}

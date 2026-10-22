@@ -9,7 +9,7 @@
 //   - On failure: displays server error message inline
 // Route: /register
 import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -68,12 +68,18 @@ const ROLE_OPTIONS: RoleOption[] = [
 const Register = () => {
   const { token, role: sessionRole } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  // ?role= preselects an option (the volunteer page's Sign up links with
+  // ?role=volunteer); anything that isn't one of ROLE_OPTIONS is ignored.
+  const [role, setRole] = useState(() => {
+    const requested = searchParams.get("role") ?? "";
+    return ROLE_OPTIONS.some((option) => option.value === requested) ? requested : "";
+  });
   const [shelterID, setShelterID] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [confirmAge, setConfirmAge] = useState(false);
@@ -274,6 +280,7 @@ const Register = () => {
                   <ButtonElement
                     key={option.value}
                     onClick={() => setRole(option.value)}
+                    aria-pressed={selected}
                     size="bare"
                     variant="outline"
                     className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left ${
