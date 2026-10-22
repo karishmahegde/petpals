@@ -12,6 +12,8 @@ Connecting shelters, adopters, vets, volunteers, and donors on one platform with
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
 
+**🌐 Live:** [petpals-adopt.vercel.app](https://petpals-adopt.vercel.app) · API docs: [petpals-api.onrender.com/api/docs](https://petpals-api.onrender.com/api/docs) _(free hosting — the first load after a quiet spell can take up to a minute)_
+
 ## 🟤 About the Project
 
 Animal shelters typically operate in isolation. Each branch manages intake, adoptions, and medical records separately, with no shared visibility across locations. Animals get overlooked, applications get lost, and adopters face inconsistent experiences depending on which shelter they contact.
@@ -218,7 +220,7 @@ npm run cypress:open       # needs both dev servers running (cypress:run for hea
 
 ## 🔶 Deployment
 
-PetPals runs entirely on free tiers, so hosting it costs nothing.
+PetPals runs entirely on free tiers, so hosting it costs nothing. Live at **[petpals-adopt.vercel.app](https://petpals-adopt.vercel.app)**.
 
 | Part | Host | How |
 | --- | --- | --- |
