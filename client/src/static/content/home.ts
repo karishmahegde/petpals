@@ -4,9 +4,17 @@ import carousel3 from "../assets/images/home/Carousel3.png";
 import featVolunteerImg from "../assets/images/home/featVolunteerImg.png";
 import adoptImage from "../assets/images/adopt/adopt.png";
 
+// The carousel images are 2452×1000 banners with the heading and text drawn
+// in. Desktop shows the whole banner; phones show `crop` (the picture alone,
+// as fractions of the image) above `heading` and `body` as real text, on the
+// banner's own flat `background`.
 export interface Slide {
   src: string;
-  alt: string;
+  heading: string;
+  body: string;
+  pictureAlt: string;
+  background: string;
+  crop: { left: number; right: number; top: number; bottom: number };
 }
 
 export interface AdoptStep {
@@ -71,7 +79,28 @@ export const homeStatic: HomeStatic = {
 };
 
 export const carouselSlides: Slide[] = [
-  { src: carousel1, alt: "Happy cat being adopted" },
-  { src: carousel2, alt: "Volunteer walking a dog" },
-  { src: carousel3, alt: "Family with their new pet" },
+  {
+    src: carousel1,
+    heading: "Get your family a new member.",
+    body: "Open your hearts and homes to animals in need and they will be thankful for the rest of their lives.",
+    pictureAlt: "A tabby kitten",
+    background: "#fffaf9",
+    crop: { left: 450 / 2452, right: 1000 / 2452, top: 0.13, bottom: 0.86 },
+  },
+  {
+    src: carousel2,
+    heading: "Adopt, don’t shop.",
+    body: "Pets are not products. Shelter animals need homes more than backyard breeders need your money.",
+    pictureAlt: "A curly-haired puppy in a cardboard box",
+    background: "#f5fbfd",
+    crop: { left: 1370 / 2452, right: 1950 / 2452, top: 0.13, bottom: 0.86 },
+  },
+  {
+    src: carousel3,
+    heading: "Become a volunteer.",
+    body: "Sign up today and experience unforgettable moments while giving to animals in need.",
+    pictureAlt: "A smiling volunteer hugging a beagle",
+    background: "#f6ecdb",
+    crop: { left: 410 / 2452, right: 1110 / 2452, top: 0.12, bottom: 0.86 },
+  },
 ];
