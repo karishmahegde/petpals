@@ -10,19 +10,28 @@ const { successResponse } = require("../../utils/response");
 
 const VALID_ROLES = ["admin", "adopter", "staff", "vet", "volunteer", "donor"];
 
+// The refresh token and its cookie share one lifetime. Without maxAge the
+// cookie was a session cookie, which browsers (iOS Safari especially) drop
+// when the tab or app closes — the 7-day sign-in never survived. Every
+// refresh re-sets it, so the 7 days count from the last visit.
+const REFRESH_TOKEN_DAYS = 7;
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "strict",
+  secure: process.env.NODE_ENV === "production", // Cookie is sent securely only in HTTPS
+  maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
+};
+
 // Signs a new 7-day refresh token, stores its hash (replacing any other
 // session's) and sets it as the httpOnly cookie. Used by login and by a
 // password change, which keeps the current session while signing out others.
 const startRefreshSession = async (res, userID) => {
-  const refreshToken = jwt.sign({ userID }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  const refreshToken = jwt.sign({ userID }, process.env.JWT_SECRET, {
+    expiresIn: `${REFRESH_TOKEN_DAYS}d`,
+  });
   const hashedRT = await bcrypt.hash(refreshToken, 10);
   await authService.storeRefreshToken(userID, hashedRT); // Store the refreshToken against the user's record in the user table
-  res.cookie("refreshToken", refreshToken, {
-    //return the refreshToken in an httpOnly cookie
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production", // Cookie is sent securely only in HTTPS
-  });
+  res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS); // return the refreshToken in an httpOnly cookie
 };
 
 // ——————————————— REGISTER ———————————————
@@ -135,7 +144,7 @@ const refreshToken = async (req, res, next) => {
     //Create new refreshToken
     { userID: decoded.userID },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" },
+    { expiresIn: `${REFRESH_TOKEN_DAYS}d` },
   );
 
   try {
@@ -151,12 +160,7 @@ const refreshToken = async (req, res, next) => {
       process.env.JWT_SECRET,
       { expiresIn: "15m" },
     );
-    res.cookie("refreshToken", newRefreshToken, {
-      // Append new refreshToken to the cookie
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    });
+    res.cookie("refreshToken", newRefreshToken, REFRESH_COOKIE_OPTIONS); // Append new refreshToken to the cookie
     return successResponse(res, "Token refreshed successfully", {
       //return the 2 new tokens and the userID and role back
       token: newAccessToken,

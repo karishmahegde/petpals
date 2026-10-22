@@ -186,6 +186,19 @@ describe("Login and session restore", () => {
       expect(res.body.data.user).not.toHaveProperty("accountStatus");
     });
 
+    test("the refresh cookie lasts 7 days — not a session cookie a closed tab or app drops", async () => {
+      mockAccount("Adopter", { accountStatus: "Active", onboardingComplete: true, onboardingStep: 5 });
+
+      const res = await login();
+
+      expect(res.status).toBe(200);
+      const cookie = res.headers["set-cookie"].find((c) => c.startsWith("refreshToken="));
+      expect(cookie).toMatch(/Max-Age=604800/);
+      expect(cookie).toMatch(/Expires=/);
+      expect(cookie).toMatch(/HttpOnly/);
+      expect(cookie).toMatch(/SameSite=Strict/);
+    });
+
     test("Active Veterinarian → 200 with the same fields as Staff", async () => {
       mockAccount("Veterinarian", {
         accountStatus: "Active",
@@ -359,6 +372,31 @@ describe("Login and session restore", () => {
         accountStatus: "Pending",
         emailVerified: false,
       });
+    });
+
+    test("each refresh re-sets the cookie for another 7 days", async () => {
+      const cookieToken = jwt.sign({ userID: 42 }, process.env.JWT_SECRET, { expiresIn: "7d" });
+      prisma.users.findUnique.mockResolvedValueOnce({
+        userID: 42,
+        role: "Adopter",
+        refreshToken: await bcrypt.hash(cookieToken, 4),
+        emailVerified: true,
+      });
+      prisma.adopter.findUnique.mockResolvedValueOnce({
+        adopterName: "Sam Taylor",
+        avatarSeed: "seed-42",
+        accountStatus: "Active",
+        onboardingComplete: true,
+        onboardingStep: 5,
+      });
+
+      const res = await request(app)
+        .post("/api/v1/auth/refresh-token")
+        .set("Cookie", `refreshToken=${cookieToken}`);
+
+      expect(res.status).toBe(200);
+      const cookie = res.headers["set-cookie"].find((c) => c.startsWith("refreshToken="));
+      expect(cookie).toMatch(/Max-Age=604800/);
     });
 
     test("Pending Veterinarian → 200, session carries accountStatus and onboarding progress", async () => {
