@@ -12,13 +12,13 @@ import { unstable_batchedUpdates } from "react-dom";
 import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
-import axios from "axios";
 import { errorReason, login as loginApi } from "../../../logic/api/authApi";
 import { clearOnboardingSkipped } from "../../../logic/onboardingSkip";
 import ReactivationOffer from "./shared/ReactivationOffer";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background-admin.png";
 import { resolveDestination } from "../../../logic/route/resolveDestination";
+import { requestErrorMessage } from "../../../logic/utils/requestError";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -77,11 +77,7 @@ const WorkerLogin = () => {
         navigate(resolveDestination(user.role, redirect), { replace: true });
       });
     } catch (err: unknown) {
-      const message =
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? String(err.response.data.message)
-          : "Unable to connect to the server. Please try again later.";
-      setError(message);
+      setError(requestErrorMessage(err));
       if (errorReason(err) === "account_closed") setClosedEmail(email.trim());
     } finally {
       setLoading(false);

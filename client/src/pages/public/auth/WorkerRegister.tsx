@@ -15,7 +15,6 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
@@ -32,6 +31,7 @@ import {
 import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background-admin.png";
+import { requestErrorMessage } from "../../../logic/utils/requestError";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const nameRegex = /^[A-Za-z][A-Za-z'-]*(?: [A-Za-z'-]+)*$/;
@@ -171,11 +171,7 @@ const WorkerRegister = () => {
       );
       navigate("/staff-portal/login", { replace: true });
     } catch (err: unknown) {
-      const message =
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? String(err.response.data.message)
-          : "Unable to connect to the server. Please try again later.";
-      setError(message);
+      setError(requestErrorMessage(err));
     } finally {
       setLoading(false);
     }
