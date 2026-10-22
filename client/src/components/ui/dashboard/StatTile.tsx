@@ -27,7 +27,7 @@ const StatTile = ({ icon, value, label, color }: StatTileProps) => {
 
   return (
     <div
-      className={`min-h-36 w-36 shrink-0 rounded-2xl p-5 shadow-md ${bg}`}
+      className={`min-h-36 w-full shrink-0 rounded-2xl p-5 shadow-md ${bg}`}
     >
       <div className={`mb-6 text-3xl ${iconColor}`} aria-hidden>
         {icon}
@@ -44,11 +44,13 @@ const StatTile = ({ icon, value, label, color }: StatTileProps) => {
   );
 };
 
-// The row the tiles sit in. Phones: two tile-wide columns centred in the
-// card (with plain 1fr columns the fixed-width tiles hug the left of each),
-// and an odd last tile centred on its own row. sm and up: one wrapping row.
+// The row the tiles sit in (a tile fills whatever width it's given).
+// Phones: two columns filling the card, the gap matching the card's p-4, so
+// the space between tiles equals the space around them; an odd last tile
+// keeps that width, centred on its own row. sm and up: a wrapping row of
+// 9rem tiles.
 export const StatTileRow = ({ children }: { children: ReactNode }) => (
-  <div className="grid grid-cols-[repeat(2,9rem)] justify-center gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:justify-self-center sm:flex sm:flex-wrap sm:justify-start sm:gap-5">
+  <div className="grid grid-cols-2 gap-4 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 max-sm:[&>*:last-child:nth-child(odd)]:w-[calc(50%-0.5rem)] max-sm:[&>*:last-child:nth-child(odd)]:justify-self-center sm:flex sm:flex-wrap sm:gap-5 sm:[&>*]:w-36">
     {children}
   </div>
 );
