@@ -8,11 +8,11 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Production dependencies only. The Prisma CLI is one of them: on Render the
-# container runs `npx prisma migrate deploy` before starting (render.yaml).
+# container runs migrate-and-start.sh (`prisma migrate deploy`, then the API).
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY prisma.config.ts swagger.js ./
+COPY prisma.config.ts swagger.js migrate-and-start.sh ./
 COPY src ./src
 
 # prisma.config.ts reads DATABASE_URL, but generating the client never
@@ -29,7 +29,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/package.json /app/prisma.config.ts /app/swagger.js ./
+COPY --from=builder --chown=node:node /app/package.json /app/prisma.config.ts /app/swagger.js /app/migrate-and-start.sh ./
 COPY --from=builder --chown=node:node /app/src ./src
 
 USER node

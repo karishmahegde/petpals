@@ -21,8 +21,9 @@ services:
       paths:
         - server/**
     # Pre-deploy commands are a paid feature, so migrations run at startup
-    # instead — a no-op when the database is already up to date.
-    dockerCommand: sh -c "npx prisma migrate deploy && exec node src/index.js"
+    # instead — a no-op when the database is already up to date. A script,
+    # not `sh -c "… && …"`: Render keeps the quotes in this field literally.
+    dockerCommand: sh migrate-and-start.sh
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
