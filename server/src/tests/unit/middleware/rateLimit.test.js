@@ -60,7 +60,7 @@ describe("rateLimiter", () => {
     expect(res.headers.ratelimit).toBeDefined();
   });
 
-  test("keys login by email as well as IP, so one account's limit doesn't block another", async () => {
+  test("keys login by the email tried, so one account's limit doesn't block another", async () => {
     const app = buildApp("login");
     const { limit } = RATE_LIMITS.login;
 

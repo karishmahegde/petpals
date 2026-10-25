@@ -2,14 +2,15 @@
 // requests per window, then answers 429 TOO_MANY_REQUESTS in the standard
 // envelope with details { reason: "rate_limited", retryAfterSeconds }.
 // Keyed by IP (trust proxy is set in app.js, so req.ip is the client's), except
-// login (IP + email) and ai (the signed-in user — mount it after authenticate).
+// login (the email tried) and ai (the signed-in user — mount it after
+// authenticate).
 // RATE_LIMITS=off skips every limiter.
 const { rateLimit } = require("express-rate-limit");
 const { RATE_LIMITS } = require("../config/rateLimits");
 const { errorResponse } = require("../utils/response");
 
 const KEY_GENERATORS = {
-  login: (req) => `${req.ip}|${String(req.body?.email ?? "").trim().toLowerCase()}`,
+  login: (req) => `email:${String(req.body?.email ?? "").trim().toLowerCase()}`,
   ai: (req) => `user:${req.user?.userID ?? req.ip}`,
 };
 

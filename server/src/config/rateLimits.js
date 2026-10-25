@@ -7,8 +7,10 @@
 const MINUTE_MS = 60 * 1000;
 
 const RATE_LIMITS = Object.freeze({
-  // Per IP + email, so guessing one account's password is slowed without a
-  // shared IP (an office, a school) locking everyone else out.
+  // Per email, wherever the tries come from — guessing one account's password
+  // is capped even from many addresses, and nobody else is locked out. (The
+  // trade-off: wrong passwords on purpose can lock that one account out for
+  // the window.)
   login: { windowMs: 15 * MINUTE_MS, limit: 10 },
   register: { windowMs: 60 * MINUTE_MS, limit: 10 },
   // Requests that send an email (reset, verification, reactivation, email
