@@ -14,6 +14,8 @@ Connecting shelters, adopters, vets, volunteers, and donors on one platform with
 
 **🌐 Live:** [petpals-adopt.vercel.app](https://petpals-adopt.vercel.app) · API docs: [petpals-api.onrender.com/api/docs](https://petpals-api.onrender.com/api/docs) _(free hosting — the first load after a quiet spell can take up to a minute)_
 
+**Demo logins** for the live site: `adopter@petpals.com` / `Adopter@123`, `volunteer@petpals.com` / `Volunteer@123`, `donor@petpals.com` / `Donor@123`. Admin, Staff and Vet logins are available on request. It's a portfolio demo, so please don't enter real personal details or upload a real ID.
+
 ## 🟤 About the Project
 
 Animal shelters typically operate in isolation. Each branch manages intake, adoptions, and medical records separately, with no shared visibility across locations. Animals get overlooked, applications get lost, and adopters face inconsistent experiences depending on which shelter they contact.
@@ -114,7 +116,7 @@ cd server && npm run dev      # → http://localhost:5000
 cd client && npm run dev      # → http://localhost:3000
 ```
 
-Log in with any of the seeded test accounts, e.g. `adopter@petpals.com` / `Adopter@123`.
+Log in with any of the seeded test accounts, e.g. `adopter@petpals.com` / `Adopter@123` (locally every role works — see SETUP.md).
 
 **[`setup/SETUP.md`](./setup/SETUP.md)** is the full guide: where to find each Supabase value, what `npm run setup` does, the complete test-account list, and troubleshooting.
 

@@ -107,7 +107,7 @@ Runs at `http://localhost:3000`.
 
 <a id="test-accounts"></a>
 
-One fully-featured login per role:
+One fully-featured login per role, created by the seed in **your own** database:
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -118,7 +118,9 @@ One fully-featured login per role:
 | Volunteer | `volunteer@petpals.com` | `Volunteer@123` |
 | Donor | `donor@petpals.com` | `Donor@123` |
 
-Every other seeded account uses its role's password above. The ones worth knowing:
+Every other seeded account uses its role's password above. On the live demo site, the Admin, Staff and Veterinarian accounts have private passwords instead, so only the Adopter, Volunteer and Donor logins work there.
+
+The seeded accounts worth knowing:
 
 | Email | Case |
 | --- | --- |
