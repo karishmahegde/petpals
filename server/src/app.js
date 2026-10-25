@@ -53,6 +53,24 @@ app.get("/health", (req, res) => {
 // AI routes themselves — see config/rateLimits.js.
 const { rateLimiter } = require("./middleware/rateLimit");
 app.use("/api/v1", rateLimiter("api"));
+
+// TEMPORARY (Sprint 12 hardening): shows the caller the addresses the app
+// receives, to find where the visitor's own IP sits behind Render's (and
+// Vercel's) proxies. Remove once the rate limiter's key is set.
+app.get("/api/v1/client-ip", (req, res) => {
+  const pick = (name) => req.get(name) ?? null;
+  res.json({
+    ip: req.ip,
+    ips: req.ips,
+    socket: req.socket.remoteAddress,
+    xForwardedFor: pick("x-forwarded-for"),
+    xRealIp: pick("x-real-ip"),
+    cfConnectingIp: pick("cf-connecting-ip"),
+    trueClientIp: pick("true-client-ip"),
+    xVercelForwardedFor: pick("x-vercel-forwarded-for"),
+    forwarded: pick("forwarded"),
+  });
+});
 const authRouter = require("./routes/auth/auth.routes");
 app.use("/api/v1/auth", authRouter);
 const petsRouter = require("./routes/public/pets.routes");
