@@ -2,6 +2,7 @@
 const express = require("express");
 const authController = require("../../controllers/auth/auth.controller");
 const authenticate = require("../../middleware/authenticate");
+const { rateLimiter } = require("../../middleware/rateLimit");
 
 const router = express.Router();
 
@@ -47,8 +48,9 @@ const router = express.Router();
  *         description: >
  *           A required field is missing, role is invalid, or the password is
  *           too weak (error.details.unmet lists the missing rules)
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
-router.post("/register", authController.register);
+router.post("/register", rateLimiter("register"), authController.register);
 
 /**
  * @swagger
@@ -89,8 +91,9 @@ router.post("/register", authController.register);
  *           offer a reactivation link; a Declined one "account_declined".
  *       404:
  *         description: No account found with this email
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
-router.post("/login", authController.login);
+router.post("/login", rateLimiter("login"), authController.login);
 
 /**
  * @swagger
@@ -146,7 +149,8 @@ router.post("/refresh-token", authController.refreshToken);
  *         description: Already verified — error.details.reason = "already_verified"
  *       429:
  *         description: >
- *           Asked again within 60 seconds of the last link —
+ *           Asked again within 60 seconds of the last link, or a rate limit
+ *           reached (error.details.reason = "rate_limited") —
  *           error.details.retryAfterSeconds says how long to wait
  *   patch:
  *     summary: Verify an email address with the token from the emailed link
@@ -168,15 +172,17 @@ router.post("/refresh-token", authController.refreshToken);
  *         description: >
  *           Link invalid, expired or already used — error.details.reason is
  *           token_invalid, token_expired or token_used
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
 // allowPending: a Pending staff member, vet or volunteer can verify while
 // they onboard, before approval.
 router.post(
   "/email-verification",
+  rateLimiter("emailLinkRequest"),
   authenticate.allowPending,
   authController.requestEmailVerification,
 );
-router.patch("/email-verification", authController.verifyEmail);
+router.patch("/email-verification", rateLimiter("tokenRedeem"), authController.verifyEmail);
 
 /**
  * @swagger
@@ -204,6 +210,7 @@ router.patch("/email-verification", authController.verifyEmail);
  *         description: Request accepted (data is null)
  *       422:
  *         description: email missing
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  *   patch:
  *     summary: Set a new password with the token from the reset link
  *     description: >
@@ -232,9 +239,10 @@ router.patch("/email-verification", authController.verifyEmail);
  *           token_invalid, token_expired or token_used
  *       422:
  *         description: Password too weak — error.details.unmet lists the missing rules
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
-router.post("/password-reset", authController.requestPasswordReset);
-router.patch("/password-reset", authController.resetPassword);
+router.post("/password-reset", rateLimiter("emailLinkRequest"), authController.requestPasswordReset);
+router.patch("/password-reset", rateLimiter("tokenRedeem"), authController.resetPassword);
 
 /**
  * @swagger
@@ -269,10 +277,16 @@ router.patch("/password-reset", authController.resetPassword);
  *           (error.details.reason = "wrong_password")
  *       422:
  *         description: New password too weak (error.details.unmet), or the same as the current one
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
 // allowPending: a Pending staff member, vet or volunteer can change it while
 // they onboard.
-router.patch("/password", authenticate.allowPending, authController.changePassword);
+router.patch(
+  "/password",
+  rateLimiter("tokenRedeem"),
+  authenticate.allowPending,
+  authController.changePassword,
+);
 
 /**
  * @swagger
@@ -299,6 +313,7 @@ router.patch("/password", authenticate.allowPending, authController.changePasswo
  *         description: Request accepted (data is null)
  *       422:
  *         description: email missing
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  *   patch:
  *     summary: Reopen a Closed account with the token from the emailed link
  *     description: >
@@ -322,9 +337,10 @@ router.patch("/password", authenticate.allowPending, authController.changePasswo
  *         description: Link invalid, expired or already used (error.details.reason token_invalid / token_expired / token_used)
  *       409:
  *         description: The account is no longer Closed (error.details.reason = "not_closed"); the link stays unused
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
-router.post("/reactivation", authController.requestReactivation);
-router.patch("/reactivation", authController.reactivate);
+router.post("/reactivation", rateLimiter("emailLinkRequest"), authController.requestReactivation);
+router.patch("/reactivation", rateLimiter("tokenRedeem"), authController.reactivate);
 
 /**
  * @swagger
@@ -358,7 +374,10 @@ router.patch("/reactivation", authController.reactivate);
  *       422:
  *         description: newEmail missing, invalid, longer than 45 characters, or the same as the current one
  *       429:
- *         description: Asked again within 60 seconds (error.details.retryAfterSeconds)
+ *         description: >
+ *           Asked again within 60 seconds, or a rate limit reached
+ *           (error.details.reason = "rate_limited") —
+ *           error.details.retryAfterSeconds says how long to wait
  *   patch:
  *     summary: Confirm an email change with the token from the link
  *     description: >
@@ -381,8 +400,14 @@ router.patch("/reactivation", authController.reactivate);
  *         description: Link invalid, expired or already used (error.details.reason token_invalid / token_expired / token_used)
  *       409:
  *         description: Someone else took the address meanwhile (error.details.reason = "email_taken")
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
-router.post("/email-change", authenticate, authController.requestEmailChange);
-router.patch("/email-change", authController.confirmEmailChange);
+router.post(
+  "/email-change",
+  rateLimiter("emailLinkRequest"),
+  authenticate,
+  authController.requestEmailChange,
+);
+router.patch("/email-change", rateLimiter("tokenRedeem"), authController.confirmEmailChange);
 
 module.exports = router;

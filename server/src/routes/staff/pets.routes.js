@@ -9,6 +9,7 @@ const petsController = require("../../controllers/staff/pets.controller");
 const passportSummaryController = require("../../controllers/staff/healthPassportSummary.controller");
 const authenticate = require("../../middleware/authenticate");
 const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
+const { rateLimiter } = require("../../middleware/rateLimit");
 const { singleFile } = require("../../middleware/upload");
 const router = express.Router();
 
@@ -247,11 +248,13 @@ router.get(
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
 router.get(
   "/pets/:id/health-passport/summary",
   authenticate,
   authorizeRoles(ROLES.STAFF, ROLES.VETERINARIAN, ROLES.ADMIN),
+  rateLimiter("ai"),
   passportSummaryController.getPassportSummary,
 );
 

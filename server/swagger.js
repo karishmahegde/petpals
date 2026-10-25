@@ -1822,6 +1822,15 @@ const options = {
             },
           },
         },
+        TooManyRequests: {
+          description:
+            "Rate limit reached (config/rateLimits.js) — error.details = { reason: \"rate_limited\", retryAfterSeconds }",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/Error" },
+            },
+          },
+        },
       },
     },
     security: [{ bearerAuth: [] }],

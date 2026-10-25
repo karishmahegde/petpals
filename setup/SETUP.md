@@ -55,6 +55,7 @@ Open `.env` and fill in:
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | leave the placeholders if skipping payments |
 | `CLIENT_URL` | `http://localhost:3000` (default is fine) |
 | `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | *optional* — leave blank to run without AI; see [AI features (optional)](#ai-features-optional) |
+| `RATE_LIMITS` | *optional* — `off` switches off the login/sign-up/email-link/AI rate limits (`server/src/config/rateLimits.js`) for repeated local Cypress runs; leave blank in production |
 
 `PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. The client has its own env file, configured in step 5. To switch on the AI features, follow [AI features (optional)](#ai-features-optional) once you're set up.
 
@@ -266,9 +267,9 @@ Nothing extra to install — `npm install` in `server/` and `client/` brings Jes
 | `npm run test:integration` | `server/` | `server/.env` from step 3. Runs against that database, creating its own test data (logins end in `@ex.com`) and removing it afterwards. The Stripe-webhook journeys need `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (test mode). Slow over a remote database — several minutes. |
 | `npm run test:leftovers` | `server/` | Read-only: lists any test data a crashed run left behind. Nothing is deleted. |
 | `npm test` · `npm run typecheck` · `npm run lint` | `client/` | Nothing — no servers, no database. |
-| `npm run cypress:open` / `cypress:run` | `client/` | Both dev servers running (steps 4 and 5) and the Stripe test keys in `server/.env` (the apply spec creates a real test-mode Checkout Session; Stripe's page itself is never loaded). Specs create and remove their own data in the same database. |
+| `npm run cypress:open` / `cypress:run` | `client/` | Both dev servers running (steps 4 and 5) and the Stripe test keys in `server/.env` (the apply spec creates a real test-mode Checkout Session; Stripe's page itself is never loaded). Specs create and remove their own data in the same database. Set `RATE_LIMITS=off` in `server/.env` if repeated runs start getting 429s. |
 
-Tests never call the AI provider or send email, whatever is in `server/.env` (see the notes under AI features and Email).
+Tests never call the AI provider or send email, and Jest switches the rate limits off, whatever is in `server/.env` (see the notes under AI features and Email).
 
 ## Troubleshooting
 

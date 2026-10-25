@@ -4,6 +4,7 @@ const express = require("express");
 const controller = require("../../controllers/adopter/matches.controller");
 const authenticate = require("../../middleware/authenticate");
 const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
+const { rateLimiter } = require("../../middleware/rateLimit");
 const router = express.Router();
 
 /**
@@ -39,11 +40,13 @@ const router = express.Router();
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
 router.get(
   "/adopters/me/matches",
   authenticate,
   authorizeRoles(ROLES.ADOPTER),
+  rateLimiter("ai"),
   controller.getMyMatches,
 );
 

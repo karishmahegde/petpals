@@ -48,6 +48,11 @@ app.get("/health", (req, res) => {
 });
 
 // ── API Routes ────────────
+// Backstop limit per IP on the whole API (the Stripe webhook above is
+// mounted first, so it's never counted). Tighter limits sit on the auth and
+// AI routes themselves — see config/rateLimits.js.
+const { rateLimiter } = require("./middleware/rateLimit");
+app.use("/api/v1", rateLimiter("api"));
 const authRouter = require("./routes/auth/auth.routes");
 app.use("/api/v1/auth", authRouter);
 const petsRouter = require("./routes/public/pets.routes");
