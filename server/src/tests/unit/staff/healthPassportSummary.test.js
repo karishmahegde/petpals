@@ -314,6 +314,18 @@ describe("GET /api/v1/pets/:id/health-passport/summary — summary", () => {
     expect(prisma.petHealthSummary.upsert).not.toHaveBeenCalled();
   });
 
+  test("daily AI cap reached → 503 saying to try tomorrow, nothing cached", async () => {
+    mockPassport({ records: [recordRow(11)] });
+    ai.generateStructured.mockRejectedValueOnce(
+      Object.assign(new Error("cap"), { reason: ai.AI_ERROR_REASONS.DAILY_LIMIT }),
+    );
+
+    const res = await get();
+    expect(res.status).toBe(503);
+    expect(res.body.message).toBe("Today's AI summaries are used up — try again tomorrow");
+    expect(prisma.petHealthSummary.upsert).not.toHaveBeenCalled();
+  });
+
   test("AI error with an out-of-date cached summary → 503, the old row is left alone", async () => {
     prisma.petHealthSummary.findUnique.mockResolvedValueOnce({
       petID: 5,

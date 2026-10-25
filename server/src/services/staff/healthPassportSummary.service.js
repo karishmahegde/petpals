@@ -165,8 +165,14 @@ const parseAiSummary = (reply, sentIDs) => {
   return { summary, pointsToReview: points };
 };
 
-const unavailable = () => {
-  const err = new Error("The AI summary is unavailable right now — try again shortly");
+// The app's daily AI cap (services/ai/dailyCap.js) won't clear "shortly", so
+// it gets its own wording.
+const unavailable = (reason) => {
+  const err = new Error(
+    reason === AI_ERROR_REASONS.DAILY_LIMIT
+      ? "Today's AI summaries are used up — try again tomorrow"
+      : "The AI summary is unavailable right now — try again shortly",
+  );
   err.code = "SERVICE_UNAVAILABLE";
   err.quiet = true;
   return err;
@@ -220,7 +226,7 @@ const getAiSummary = async (pet, records, doses, transfers) => {
     // A bad or revoked key won't fix itself — louder than a passing timeout.
     const log = err.reason === AI_ERROR_REASONS.AUTH_FAILED ? console.error : console.warn;
     log(`[passport-summary] AI unavailable for pet ${pet.petID} (${err.reason}): ${err.message}`);
-    throw unavailable();
+    throw unavailable(err.reason);
   }
 
   const parsed = parseAiSummary(reply, {

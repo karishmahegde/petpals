@@ -244,7 +244,10 @@ router.get(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       503:
- *         description: The AI provider failed or returned nothing usable — retry later
+ *         description: >
+ *           The AI provider failed or returned nothing usable — retry later; or
+ *           the app-wide daily AI cap (config/aiUsage.js) is used up — retry
+ *           the next UTC day (the message says which)
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

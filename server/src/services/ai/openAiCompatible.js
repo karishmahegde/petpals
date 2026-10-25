@@ -32,6 +32,7 @@ const AI_ERROR_REASONS = Object.freeze({
   AUTH_FAILED: "auth_failed", // HTTP 401/403 — bad or revoked key
   PROVIDER_ERROR: "provider_error", // any other non-OK status
   INVALID_RESPONSE: "invalid_response", // empty reply, or not valid JSON
+  DAILY_LIMIT: "daily_limit", // the app's own daily cap reached (services/ai/dailyCap.js) — nothing sent
 });
 
 // `reason` (one of AI_ERROR_REASONS) lets callers tell the fall-back cases
