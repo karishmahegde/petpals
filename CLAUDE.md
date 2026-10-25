@@ -478,6 +478,10 @@ Email stays for account/security; a few events (decisions, ID reviews) send both
 
 ---
 
+## Security Design Record
+
+`docs/security-design.md` lists every security decision with its reason and known limits (auth, authorization, emailed links, rate limits + AI cap, AI safety, data protection, payments, infra, the public demo). It's a portfolio highlight: **any change that adds or alters a security measure updates that file in the same commit.**
+
 ## Code Style
 
 - 2-space indent · single quotes (JS) · TS throughout frontend · async/await, not `.then()` chains
