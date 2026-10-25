@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
+import DemoNotice from "../../../components/ui/DemoNotice";
 import PasswordRequirements from "../../../components/ui/PasswordRequirements";
 import { meetsPasswordRequirements } from "../../../logic/utils/password";
 import {
@@ -205,6 +206,12 @@ const WorkerRegister = () => {
             Sign up
           </ButtonElement>
         </div>
+
+        <DemoNotice className="mb-6">
+          PetPals is a portfolio demo. Use a real email if you want the
+          verification link, but please make up everything else — name, phone
+          and address.
+        </DemoNotice>
 
         {/* Form */}
         <form

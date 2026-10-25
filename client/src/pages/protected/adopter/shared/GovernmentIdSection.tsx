@@ -4,6 +4,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { PiClock, PiSealCheck, PiXCircle } from "react-icons/pi";
 import ButtonElement from "../../../../components/ui/ButtonElement";
+import DemoNotice from "../../../../components/ui/DemoNotice";
 import {
   getGovernmentId,
   uploadGovernmentId,
@@ -224,6 +225,10 @@ const GovernmentIdSection = ({ isEditing }: GovernmentIdSectionProps) => {
               />
             </div>
           </div>
+
+          <DemoNotice>
+            Demo site — upload a sample or made-up document, never a real ID.
+          </DemoNotice>
 
           <div className="flex flex-col gap-1.5">
             <label
