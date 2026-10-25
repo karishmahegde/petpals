@@ -480,7 +480,7 @@ Email stays for account/security; a few events (decisions, ID reviews) send both
 
 ## Security Design Record
 
-`docs/security-design.md` lists every security decision with its reason and known limits (auth, authorization, emailed links, rate limits + AI cap, AI safety, data protection, payments, infra, the public demo). It's a portfolio highlight: **any change that adds or alters a security measure updates that file in the same commit.**
+`docs/19-Security Design.pdf` lists every security decision with its reason and known limits (auth, authorization, emailed links, rate limits + AI cap, AI safety, data protection, payments, infra, the public demo). Its Word source, like every numbered doc's, lives outside git in `~/Desktop/Petpals/documentation/19-Security Design.docx`; the user exports the PDF. It's a portfolio highlight: **any change that adds or alters a security measure also updates that document.**
 
 ## Code Style
 
