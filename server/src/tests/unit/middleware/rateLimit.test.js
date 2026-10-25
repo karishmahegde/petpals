@@ -1,7 +1,7 @@
 const express = require("express");
 const request = require("supertest");
 
-const { rateLimiter } = require("../../../middleware/rateLimit");
+const { rateLimiter, clientIp } = require("../../../middleware/rateLimit");
 const { RATE_LIMITS } = require("../../../config/rateLimits");
 
 // A bare app per test (a fresh limiter, so counts never carry over) with the
@@ -92,5 +92,52 @@ describe("rateLimiter", () => {
 
   test("throws on an unknown limiter name", () => {
     expect(() => rateLimiter("nope")).toThrow('Unknown rate limit "nope"');
+  });
+
+  test("counts per visitor IP from the proxy headers, not Render's rotating load balancer", async () => {
+    const app = buildApp("emailLinkRequest");
+    const { limit } = RATE_LIMITS.emailLinkRequest;
+    const fromVisitor = () =>
+      request(app)
+        .post("/limited")
+        .set("x-vercel-forwarded-for", "171.76.85.168")
+        .set("cf-connecting-ip", "3.108.223.212");
+
+    for (let i = 0; i < limit; i += 1) {
+      await fromVisitor();
+    }
+    expect((await fromVisitor()).status).toBe(429);
+    // Another visitor through the same Vercel address has their own count.
+    const other = await request(app)
+      .post("/limited")
+      .set("x-vercel-forwarded-for", "203.0.113.9")
+      .set("cf-connecting-ip", "3.108.223.212");
+    expect(other.status).toBe(200);
+  });
+});
+
+describe("clientIp", () => {
+  const fakeReq = (headers, ip = "10.25.1.16") => ({
+    ip,
+    get: (name) => headers[name.toLowerCase()],
+  });
+
+  test("through Vercel → x-vercel-forwarded-for (first entry)", () => {
+    expect(
+      clientIp(
+        fakeReq({
+          "x-vercel-forwarded-for": "171.76.85.168, 3.108.223.212",
+          "cf-connecting-ip": "3.108.223.212",
+        }),
+      ),
+    ).toBe("171.76.85.168");
+  });
+
+  test("straight to the API → cf-connecting-ip", () => {
+    expect(clientIp(fakeReq({ "cf-connecting-ip": "171.76.85.168" }))).toBe("171.76.85.168");
+  });
+
+  test("no proxy headers (local) → req.ip", () => {
+    expect(clientIp(fakeReq({}, "::1"))).toBe("::1");
   });
 });
