@@ -1,20 +1,35 @@
+<div align="center">
+
+<img src="./docs/assets/petpals.gif" alt="PetPals banner - a multi-shelter animal adoption platform" width="15%" />
+
 # PetPals
 
 **A unified, multi-shelter Animal Adoption Management System**
 
-<div align="center">
-<img src="./docs/assets/petpals.gif" alt="PetPals banner — a multi-shelter animal adoption platform" width="20%" /> 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
+
 </div>
 
 Connecting shelters, adopters, vets, volunteers, and donors on one platform with inter-shelter animal transfers, a universal pet health passport, and AI-powered adopter matching.
 
-<!-- Badges -->
+<div align="center">
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
+[![Live site](https://img.shields.io/badge/🌐_Live_site-petpals--adopt.vercel.app-000000?style=flat-square&logo=vercel&logoColor=white)](https://petpals-adopt.vercel.app)
+[![API docs](https://img.shields.io/badge/📖_API_docs-Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black)](https://petpals-api.onrender.com/api/docs)
 
-**🌐 Live:** [petpals-adopt.vercel.app](https://petpals-adopt.vercel.app) · API docs: [petpals-api.onrender.com/api/docs](https://petpals-api.onrender.com/api/docs) _(free hosting — the first load after a quiet spell can take up to a minute)_
+</div>
 
-**Demo logins** for the live site: `adopter@petpals.com` / `Adopter@123`, `volunteer@petpals.com` / `Volunteer@123`, `donor@petpals.com` / `Donor@123`. Admin, Staff and Vet logins are available on request. It's a portfolio demo, so please don't enter real personal details or upload a real ID.
+### 🔑 Demo logins
+
+| Role      | Email                   | Password        |
+| --------- | ----------------------- | --------------- |
+| Adopter   | `adopter@petpals.com`   | `Adopter@123`   |
+| Volunteer | `volunteer@petpals.com` | `Volunteer@123` |
+| Donor     | `donor@petpals.com`     | `Donor@123`     |
+
+Admin, Staff and Vet logins are available on request.
+
+> ⚠️ **This is a portfolio demo** - please don't enter real personal details or upload a real ID.
 
 ## 🟤 About the Project
 
@@ -22,22 +37,24 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 **PetPals** is a full-stack Animal Adoption Management System designed to unify multiple shelters into a single collaborative network. It was built using production-quality engineering tools, frameworks and practices end-to-end including user-focused design, sprint-based delivery, formal specs, API documentation, automated testing, and CI/CD.
 
+📚 Detailed documentation for every feature, from the database and API design to the AI features, notifications, testing and security, is in [`docs/`](./docs).
+
 ## 🔶 Key Features
 
-| Feature                        | Description                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------- |
-| **Multi-shelter network**      | Unified animal listings and workflows across all branches of an organisation      |
-| **Inter-shelter transfers**    | Capacity-aware transfer requests with full transfer history                       |
-| **Universal health passport**  | Medical records that travel with an animal across shelter relocations             |
+| Feature                        | Description                                                                                                                                                          |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Multi-shelter network**      | Unified animal listings and workflows across all branches of an organisation                                                                                         |
+| **Inter-shelter transfers**    | Capacity-aware transfer requests with full transfer history                                                                                                          |
+| **Universal health passport**  | Medical records that travel with an animal across shelter relocations                                                                                                |
 | **AI compatibility matcher**   | Personality quiz + rule scoring, refined by an LLM (Groq or any OpenAI-compatible provider) with a short reason per match; falls back to rule-only scores without AI |
-| **AI health-passport summary** | One-click summary of a pet's medical history for staff and vets, with points to review that link to the records they cite |
-| **Role-based access control**  | Six distinct roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor |
-| **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                     |
-| **Two-token JWT auth**         | Short-lived access token + httpOnly refresh cookie, with post-login redirect-back |
-| **Email & account security**   | Email verification, password reset, self-service reactivation and email change by emailed link, plus account and review notices (Brevo, optional) |
-| **Live in-app notifications**  | 28 event types across all six roles, pushed in real time over Server-Sent Events — bell with unread badge, a Notifications page, and an optional chime |
-| **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                         |
-| **Donation management**        | Stripe-integrated donor flow with impact tracking                                 |
+| **AI health-passport summary** | One-click summary of a pet's medical history for staff and vets, with points to review that link to the records they cite                                            |
+| **Role-based access control**  | Six distinct roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor                                                                                    |
+| **Geospatial shelter search**  | PostGIS-powered "find shelters near me" with radius filtering                                                                                                        |
+| **Email & account security**   | Email verification, password reset, self-service reactivation and email change by emailed link, plus account and review notices (Brevo, optional)                    |
+| **Live in-app notifications**  | 28 event types across all six roles, pushed in real time over Server-Sent Events - bell with unread badge, a Notifications page, and an optional chime               |
+| **Stripe-backed applications** | Adoption applications gated behind a $15 Checkout session                                                                                                            |
+| **Donation management**        | Stripe-integrated donor flow with impact tracking                                                                                                                    |
+| **Security by design**         | Rate limits, hashed single-use emailed links, a daily AI budget, private ID storage and more - see [Security](#-security)                                            |
 
 ## 🟤 Tech Stack
 
@@ -67,7 +84,7 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 ### Infrastructure
 
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white) ![Render](https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white) ![Render](https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white) ![UptimeRobot](https://img.shields.io/badge/UptimeRobot-3BD671?style=flat-square&logo=uptimerobot&logoColor=white)
 
 ### Tooling
 
@@ -77,9 +94,9 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 
 ### Prerequisites
 
-- **Node.js 22** (20.19+ works — Prisma 7's minimum) and **Git**
+- **Node.js 22** (20.19+ works - Prisma 7's minimum) and **Git**
 - **Docker + Docker Compose** _(Option B only)_
-- A free **[Supabase](https://supabase.com)** account — the project's database (Postgres + PostGIS) and file storage both run on it, even in local dev
+- A free **[Supabase](https://supabase.com)** account - the project's database (Postgres + PostGIS) and file storage both run on it, even in local dev
 
 ### Option A: Local Setup (recommended)
 
@@ -88,11 +105,11 @@ Animal shelters typically operate in isolation. Each branch manages intake, adop
 git clone https://github.com/karishmahegde/petpals.git
 cd petpals
 
-# 2. Configure the server — fill in your Supabase / JWT (/ optional Stripe) values,
+# 2. Configure the server - fill in your Supabase / JWT (/ optional Stripe) values,
 #    plus the optional Groq AI values (AI_BASE_URL / AI_API_KEY / AI_MODEL; leave them
-#    blank to run without AI — see setup/SETUP.md "AI features (optional)"), and the
+#    blank to run without AI - see setup/SETUP.md "AI features (optional)"), and the
 #    optional Brevo email values (EMAIL_API_KEY / EMAIL_FROM; leave them blank and
-#    every email prints to the server terminal — see setup/SETUP.md "Email (optional)")
+#    every email prints to the server terminal - see setup/SETUP.md "Email (optional)")
 cd server
 npm install
 cp .env.example .env
@@ -116,18 +133,18 @@ cd server && npm run dev      # → http://localhost:5000
 cd client && npm run dev      # → http://localhost:3000
 ```
 
-Log in with any of the seeded test accounts, e.g. `adopter@petpals.com` / `Adopter@123` (locally every role works — see SETUP.md).
+Log in with any of the [demo logins](#-demo-logins) above; locally every role works.
 
-**[`setup/SETUP.md`](./setup/SETUP.md)** is the full guide: where to find each Supabase value, what `npm run setup` does, the complete test-account list, and troubleshooting.
+**[`setup/SETUP.md`](./setup/SETUP.md)** is the full guide: where to find each Supabase value, what `npm run setup` does, the complete test-account list (all six roles), and troubleshooting.
 
-> ⚠️ `npm run setup` is for **first-time setup only** — its last step re-seeds, which wipes the database. Afterwards, re-seed with `npx prisma db seed`.
+> ⚠️ `npm run setup` is for **first-time setup only** - its last step re-seeds, which wipes the database. Afterwards, re-seed with `npx prisma db seed`.
 
 ### Option B: Docker
 
-Runs the API and client in containers against your Supabase project — the database and file storage stay on Supabase, configured through `server/.env`.
+Runs the API and client in containers against your Supabase project - the database and file storage stay on Supabase, configured through `server/.env`.
 
 ```bash
-# 1. Configure the server — same values as Option A
+# 1. Configure the server - same values as Option A
 cp server/.env.example server/.env
 
 # 2. One-time: build the database, storage buckets and sample data
@@ -158,8 +175,9 @@ petpals/
 │   ├── pet-images/        #    Seed pet photos, one per seeded pet
 │   ├── government-ids/    #    Sample ID documents for the seeded ID verifications
 │   └── placeholder.jpg    #    Photo a new pet shows until staff upload one
-├── docs/                  # Project documentation (design PDFs, diagrams, screenshots)
-├── docker-compose.yml     # Runs the API + client in containers against Supabase — `docker compose up`
+├── .github/workflows/     # GitHub Actions CI (server unit tests + client checks on every PR)
+├── docs/                  # Project documentation PDFs (design, API references, features, testing, security)
+├── docker-compose.yml     # Runs the API + client in containers against Supabase - `docker compose up`
 ├── render.yaml            # Render Blueprint for the hosted API (free plan)
 ├── CLAUDE.md              # Full architecture, API, and conventions reference
 ├── LICENSE
@@ -168,43 +186,46 @@ petpals/
 
 ## 🔶 API Reference
 
+Base URL (production): `https://petpals-api.onrender.com/api/v1`
 Base URL (dev): `http://localhost:5000/api/v1`
 
-Interactive Swagger/OpenAPI docs are served at **`/api/docs`** once the server is running.
+Interactive Swagger/OpenAPI docs are served at **`/api/docs`** (live link at the top, or locally once the server is running).
 
 ### Resource domains
 
-| Domain                | Base path                        |
-| --------------------- | -------------------------------- |
-| Auth                  | `/auth`                          |
-| Pets (public catalog) | `/pets`, `/species`, `/breeds`   |
-| Shelters              | `/shelters`                      |
-| Adopters              | `/adopters`                      |
-| Adoption Applications | `/adoption-applications`         |
-| Visits                | `/visits`                        |
-| Staff operations      | `/staff`                         |
-| Appointments          | `/appointments`                  |
-| Vaccinations          | `/vaccines`, `/appointments/:id/vaccinations` |
-| Health records        | `/health-records`, `/pets/:id/health-records` |
-| Veterinarians         | `/vets`                          |
-| Volunteers            | `/volunteers`                    |
-| Government IDs        | `/government-ids`                |
-| AI matcher            | `/match-quiz`, `/adopters/me/matches` |
-| Admin                 | `/admins`, `/analytics`          |
-| Tasks                 | `/tasks`                         |
-| Events                | `/events`                        |
-| Donors & Donations    | `/donors`, `/donations`          |
-| Shelter Transfers     | `/transfers`                     |
-| Notifications         | `/notifications` (+ `/notifications/stream`, SSE) |
+| Domain                    | Base path                                         |
+| ------------------------- | ------------------------------------------------- |
+| Auth                      | `/auth`                                           |
+| Pets (public catalog)     | `/pets`, `/species`, `/breeds`                    |
+| Shelters                  | `/shelters`                                       |
+| Adopters                  | `/adopters`                                       |
+| Adoption Applications     | `/adoption-applications`                          |
+| Visits                    | `/visits`                                         |
+| Staff operations          | `/staff`                                          |
+| Appointments              | `/appointments`                                   |
+| Vaccinations              | `/vaccines`, `/appointments/:id/vaccinations`     |
+| Health records            | `/health-records`, `/pets/:id/health-records`     |
+| Veterinarians             | `/vets`                                           |
+| Volunteers                | `/volunteers`                                     |
+| Government IDs            | `/government-ids`                                 |
+| AI matcher                | `/match-quiz`, `/adopters/me/matches`             |
+| AI passport summary       | `/pets/:id/health-passport/summary`               |
+| Admin                     | `/admins`, `/analytics`                           |
+| Tasks                     | `/tasks`                                          |
+| Events                    | `/events`                                         |
+| Donors & Donations        | `/donors`, `/donations`                           |
+| Shelter Transfers         | `/transfers`                                      |
+| Notifications             | `/notifications` (+ `/notifications/stream`, SSE) |
+| Payments (Stripe webhook) | `/webhooks/stripe`                                |
 
 ## 🟤 Testing
 
-| Layer | Tool | What it covers |
-| --- | --- | --- |
-| Server unit | Jest + Supertest | Every route, controller and service with Prisma, Stripe, storage, AI and email mocked — 2,100+ tests, **95% lines / 86% branches** |
-| Server integration | Jest + Supertest | One journey per sprint against the real database, creating and removing its own data |
-| Client | Vitest + React Testing Library | Routing and auth logic, password rules, the live notification stream, and the components that guard the adoption flow |
-| End-to-end | Cypress | The critical adoption flows in a real browser: login redirect-back, the email-verification gate, applying up to the Stripe hand-off + withdrawing, and a visit confirmed by staff reaching the adopter's bell live |
+| Layer              | Tool                           | What it covers                                                                                                                                                                                                     |
+| ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Server unit        | Jest + Supertest               | Every route, controller and service with Prisma, Stripe, storage, AI and email mocked - 2,130 tests in 83 suites, **95% lines / 86% branches**                                                                     |
+| Server integration | Jest + Supertest               | One journey per sprint against the real database, creating and removing its own data                                                                                                                               |
+| Client             | Vitest + React Testing Library | Routing and auth logic, password rules, the live notification stream, and the components that guard the adoption flow                                                                                              |
+| End-to-end         | Cypress                        | The critical adoption flows in a real browser: login redirect-back, the email-verification gate, applying up to the Stripe hand-off + withdrawing, and a visit confirmed by staff reaching the adopter's bell live |
 
 ```bash
 # server/
@@ -218,27 +239,40 @@ npm run typecheck && npm run lint
 npm run cypress:open       # needs both dev servers running (cypress:run for headless)
 ```
 
-**CI:** GitHub Actions runs the server unit tests (with the coverage gate) and the client typecheck, lint and Vitest on every pull request into `dev` and `main`; both are required checks. Integration and Cypress run locally — they need the database and the dev servers. See [`setup/SETUP.md`](./setup/SETUP.md#running-the-tests) for what each needs.
+**CI:** GitHub Actions runs the server unit tests (with the coverage gate) and the client typecheck, lint and Vitest on every pull request into `dev` and `main`; both are required checks. Integration and Cypress run locally - they need the database and the dev servers. See [`setup/SETUP.md`](./setup/SETUP.md#running-the-tests) for what each needs.
 
 ## 🔶 Deployment
 
-PetPals runs entirely on free tiers, so hosting it costs nothing. Live at **[petpals-adopt.vercel.app](https://petpals-adopt.vercel.app)**.
+PetPals runs entirely on free tiers, so hosting it costs nothing.
 
-| Part | Host | How |
-| --- | --- | --- |
-| Client | **Vercel** (Hobby) | Builds `client/`. [`client/vercel.json`](./client/vercel.json) forwards `/api/*` to the API, so the login cookie stays on the site's own domain, and serves the app for every other route |
-| API | **Render** (free web service) | Runs [`server/Dockerfile`](./server/Dockerfile) from the [`render.yaml`](./render.yaml) Blueprint, applying any new database migrations on startup |
-| Database + file storage | **Supabase** (free) | Postgres + PostGIS and the photo / ID buckets, reached through Supabase's Session pooler |
-| Payments · email · AI | **Stripe** (test mode) · **Brevo** · **Groq** | Free tiers; email and AI are optional |
+| Part                    | Host                                          | How                                                                                                                                                                                       |
+| ----------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client                  | **Vercel** (Hobby)                            | Builds `client/`. [`client/vercel.json`](./client/vercel.json) forwards `/api/*` to the API, so the login cookie stays on the site's own domain, and serves the app for every other route |
+| API                     | **Render** (free web service)                 | Runs [`server/Dockerfile`](./server/Dockerfile) from the [`render.yaml`](./render.yaml) Blueprint, applying any new database migrations on startup                                        |
+| Database + file storage | **Supabase** (free)                           | Postgres + PostGIS and the photo / ID buckets, reached through Supabase's Session pooler                                                                                                  |
+| Payments · email · AI   | **Stripe** (test mode) · **Brevo** · **Groq** | Free tiers; email and AI are optional                                                                                                                                                     |
+| Uptime monitoring | **UptimeRobot** (free) | Calls `GET /api/v1/species` every 10 minutes, so the API never sleeps and the database stays active |
 
-> ⏳ The free API sleeps after 15 minutes without traffic, so the first request after a quiet spell takes about 30–60 seconds while it wakes up. A free Supabase project also pauses after about a week without activity; it's restored from the Supabase dashboard.
+> ⏳ On their own, the free API sleeps after 15 minutes without traffic (a 30–60 second first load) and a free Supabase project pauses after about a week without activity. The UptimeRobot ping keeps both awake, and alerts by email if the API goes down.
 
 To deploy your own copy:
 
 1. **API:** Render → **New → Blueprint** → this repo. Fill in the values it asks for from your `server/.env`, using Supabase's **Session pooler** URI for `DATABASE_URL` (see [`setup/SETUP.md`](./setup/SETUP.md#2-create-a-supabase-project)) and your Vercel URL for `CLIENT_URL`.
 2. **Client:** point the `/api` rewrite in `client/vercel.json` at your Render URL, then import the repo into Vercel with root directory `client/`, `VITE_API_URL=/api/v1` and `VITE_STREAM_URL=https://<your-api>.onrender.com/api/v1`.
+3. **Keep-awake (optional):** add a free UptimeRobot HTTP(s) monitor on `https://<your-api>.onrender.com/api/v1/species` with a 10-minute interval.
 
-## 🟤 License
+## 🟤 Security
+
+Designed in from the start and hardened before launch. Every decision is detailed in the **[Security Design document](./docs/19-Security%20Design.pdf)**.
+
+- **Sessions:** bcrypt passwords; short-lived access token in memory, refresh token in an `httpOnly`, `SameSite=Strict` cookie
+- **Access control:** role checks on every endpoint; users see only their own data, staff only their shelter's
+- **Emailed links:** single-use, short-lived and stored only as a hash
+- **Abuse protection:** rate limits on login, sign-up, emailed links and AI, plus an app-wide daily AI cap
+- **Data protection:** government IDs in private storage behind short-lived signed links; sensitive fields never returned
+- **Payments:** handled by Stripe Checkout, with verified webhook signatures
+
+## 🔶 License
 
 Distributed under the MIT License. See [`LICENSE`](./LICENSE) for details.
 
