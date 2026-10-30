@@ -89,18 +89,18 @@ Admin, Staff and Vet logins are available on request.
 
 ## Key Features
 
-| Feature                        | Description                                                         |
-| ------------------------------ | ------------------------------------------------------------------- |
-| **Multi-shelter network**      | One catalog and shared workflows across every branch               |
-| **Inter-shelter transfers**    | Capacity-aware transfers with full history                          |
-| **Universal health passport**  | Medical records that follow an animal from shelter to shelter       |
-| **AI compatibility matcher**   | Personality quiz + rule scoring, refined by an LLM with a reason per match |
-| **AI health-passport summary** | One-click medical summary, with points to review linked to records  |
-| **Role-based access control**  | Six roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor |
-| **Geospatial shelter search**  | PostGIS "shelters near me" with a radius filter                     |
-| **Email & account security**   | Verification, password reset, reactivation and email change by link |
-| **Live notifications**         | 28 event types pushed in real time over Server-Sent Events          |
-| **Stripe payments**            | Application fees and shelter donations through Stripe Checkout      |
+| Feature                        | Description                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| **Multi-shelter network**      | One catalog and shared workflows across every branch                             |
+| **Inter-shelter transfers**    | Capacity-aware transfers with full history                                       |
+| **Universal health passport**  | Medical records that follow an animal from shelter to shelter                    |
+| **AI compatibility matcher**   | Personality quiz + rule scoring, refined by an LLM with a reason per match       |
+| **AI health-passport summary** | One-click medical summary, with points to review linked to records               |
+| **Role-based access control**  | Six roles: Admin, Shelter Staff, Adopter, Veterinarian, Volunteer, Donor         |
+| **Geospatial shelter search**  | PostGIS "shelters near me" with a radius filter                                  |
+| **Email & account security**   | Verification, password reset, reactivation and email change by link              |
+| **Live notifications**         | 28 event types pushed in real time over Server-Sent Events                       |
+| **Stripe payments**            | Application fees and shelter donations through Stripe Checkout                   |
 | **Security by design**         | Rate limits, hashed single-use links, a daily AI cap - see [Security](#security) |
 
 ## Architecture
@@ -274,7 +274,7 @@ Interactive Swagger/OpenAPI docs are served at **`/api/docs`** (live link at the
 
 | Layer              | Tool                           | What it covers                                                                                                                                                                                                     |
 | ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Server unit        | Jest + Supertest               | Every route, controller and service with Prisma, Stripe, storage, AI and email mocked - 2,100+ tests, gated at 80% lines / 70% branches (current figure in the coverage badge)                                                                     |
+| Server unit        | Jest + Supertest               | Every route, controller and service with Prisma, Stripe, storage, AI and email mocked - 2,100+ tests, gated at 80% lines / 70% branches (current figure in the coverage badge)                                     |
 | Server integration | Jest + Supertest               | One journey per sprint against the real database, creating and removing its own data                                                                                                                               |
 | Client             | Vitest + React Testing Library | Routing and auth logic, password rules, the live notification stream, and the components that guard the adoption flow                                                                                              |
 | End-to-end         | Cypress                        | The critical adoption flows in a real browser: login redirect-back, the email-verification gate, applying up to the Stripe hand-off + withdrawing, and a visit confirmed by staff reaching the adopter's bell live |
@@ -295,7 +295,7 @@ Unit tests, typecheck, lint and Vitest also run in CI on every PR; integration a
 
 ## Engineering Practices
 
-- **Design first:** screens designed in Figma before development ([initial design file](https://www.figma.com/design/dtiJqWSoBhaMrgrs12fXYK/PetPals)); the built app evolved from it as features grew.
+- **Design first:** all screens designed in Figma before implementation. [View designs](https://www.figma.com/design/dtiJqWSoBhaMrgrs12fXYK/PetPals)
 - **Sprints with specs:** 12 sprints planned on a Trello board; every feature has a written spec or design doc in [`docs/`](./docs).
 - **Branching:** `feature/sprint-N` → `dev` → `main`, with `dev` and `main` changed only through pull requests.
 - **PR-gated CI:** GitHub Actions runs the server unit tests (coverage gate 80% lines / 70% branches) and the client typecheck, lint and Vitest on every pull request; both are required checks.
@@ -311,7 +311,7 @@ PetPals runs entirely on free tiers, so hosting it costs nothing.
 | API                     | **Render** (free web service)                 | Runs [`server/Dockerfile`](./server/Dockerfile) from the [`render.yaml`](./render.yaml) Blueprint, applying any new database migrations on startup                                        |
 | Database + file storage | **Supabase** (free)                           | Postgres + PostGIS and the photo / ID buckets, reached through Supabase's Session pooler                                                                                                  |
 | Payments · email · AI   | **Stripe** (test mode) · **Brevo** · **Groq** | Free tiers; email and AI are optional                                                                                                                                                     |
-| Uptime monitoring | **UptimeRobot** (free) | Calls `GET /api/v1/species` every 10 minutes, so the API never sleeps and the database stays active |
+| Uptime monitoring       | **UptimeRobot** (free)                        | Calls `GET /api/v1/species` every 10 minutes, so the API never sleeps and the database stays active                                                                                       |
 
 > ⏳ On their own, the free API sleeps after 15 minutes without traffic (a 30–60 second first load) and a free Supabase project pauses after about a week without activity. The UptimeRobot ping keeps both awake, and alerts by email if the API goes down.
 
