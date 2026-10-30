@@ -309,6 +309,18 @@ describe("Donor self-service endpoints", () => {
       );
     });
 
+    test.each(["deactivate", "delete"])("the shared demo login, mode=%s → 409 demo_account, nothing written", async (mode) => {
+      accountNotices.lookupContact.mockResolvedValueOnce({ email: "donor@petpals.com" });
+
+      const res = await close({ mode });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.details).toEqual({ reason: "demo_account" });
+      expect(prisma.donor.update).not.toHaveBeenCalled();
+      expect(prisma.donor.delete).not.toHaveBeenCalled();
+      expect(accountNotices.accountClosed).not.toHaveBeenCalled();
+    });
+
     test.each([undefined, "archive"])("mode %p → 422, nothing written", async (mode) => {
       const res = await close(mode === undefined ? {} : { mode });
 

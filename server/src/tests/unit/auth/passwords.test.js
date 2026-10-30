@@ -130,6 +130,19 @@ describe("POST /api/v1/auth/password-reset", () => {
     expect(prisma.accountToken.create).not.toHaveBeenCalled();
   });
 
+  test("a shared demo login → the same 200, no link issued or sent", async () => {
+    prisma.users.findUnique
+      .mockResolvedValueOnce({ userID: 7 })
+      .mockResolvedValueOnce(contactRow({ userEmail: "donor@petpals.com" }));
+
+    const res = await forgot({ email: "donor@petpals.com" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe(SAME_MESSAGE);
+    expect(prisma.accountToken.create).not.toHaveBeenCalled();
+    expect(queueEmail).not.toHaveBeenCalled();
+  });
+
   test.each(["Banned", "Declined"])("%s account → the same 200, nothing sent", async (accountStatus) => {
     prisma.users.findUnique
       .mockResolvedValueOnce({ userID: 7 })
@@ -234,10 +247,12 @@ describe("PATCH /api/v1/auth/password", () => {
   const change = (body, token = tokenFor(7)) =>
     request(app).patch("/api/v1/auth/password").set("Authorization", `Bearer ${token}`).send(body);
 
+  // changePassword reads the contact first (the demo-account guard), then the
+  // stored hash.
   test("right current password → new hash, this session re-issued, notice sent", async () => {
     prisma.users.findUnique
-      .mockResolvedValueOnce({ userPassword: currentHash })
-      .mockResolvedValueOnce(contactRow());
+      .mockResolvedValueOnce(contactRow())
+      .mockResolvedValueOnce({ userPassword: currentHash });
 
     const res = await change({ currentPassword: CURRENT, newPassword: STRONG });
 
@@ -254,7 +269,9 @@ describe("PATCH /api/v1/auth/password", () => {
   });
 
   test("wrong current password → 401 wrong_password, nothing written", async () => {
-    prisma.users.findUnique.mockResolvedValueOnce({ userPassword: currentHash });
+    prisma.users.findUnique
+      .mockResolvedValueOnce(contactRow())
+      .mockResolvedValueOnce({ userPassword: currentHash });
 
     const res = await change({ currentPassword: "Nope1234!", newPassword: STRONG });
 
@@ -265,7 +282,9 @@ describe("PATCH /api/v1/auth/password", () => {
   });
 
   test("same as the current password → 422", async () => {
-    prisma.users.findUnique.mockResolvedValueOnce({ userPassword: currentHash });
+    prisma.users.findUnique
+      .mockResolvedValueOnce(contactRow())
+      .mockResolvedValueOnce({ userPassword: currentHash });
 
     const res = await change({ currentPassword: CURRENT, newPassword: CURRENT });
 
@@ -284,14 +303,26 @@ describe("PATCH /api/v1/auth/password", () => {
   test("a Pending staff member mid-onboarding can change it (allowPending)", async () => {
     authService.getAccountStatus.mockResolvedValue("Pending");
     prisma.users.findUnique
-      .mockResolvedValueOnce({ userPassword: currentHash })
       .mockResolvedValueOnce(
         contactRow({ role: "Staff", adopter: null, staff: { staffName: "Kim", accountStatus: "Pending" } }),
-      );
+      )
+      .mockResolvedValueOnce({ userPassword: currentHash });
 
     const res = await change({ currentPassword: CURRENT, newPassword: STRONG }, tokenFor(7, "Staff"));
 
     expect(res.status).toBe(200);
+  });
+
+  test("a shared demo login → 409 demo_account, before the password is checked", async () => {
+    prisma.users.findUnique.mockResolvedValueOnce(contactRow({ userEmail: "Adopter@PetPals.com" }));
+
+    const res = await change({ currentPassword: CURRENT, newPassword: STRONG });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.details).toEqual({ reason: "demo_account" });
+    expect(prisma.users.findUnique).toHaveBeenCalledTimes(1);
+    expect(prisma.users.update).not.toHaveBeenCalled();
+    expect(queueEmail).not.toHaveBeenCalled();
   });
 
   test("no session → 401", async () => {

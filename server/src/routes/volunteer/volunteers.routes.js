@@ -350,7 +350,8 @@ router.post(
  *       409:
  *         description: >
  *           The volunteer still has upcoming appointments or open tasks —
- *           error.details.blockers lists which ("appointments", "tasks")
+ *           error.details.blockers lists which ("appointments", "tasks") —
+ *           or the account is a shared demo login (error.details.reason = "demo_account")
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

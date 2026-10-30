@@ -192,8 +192,8 @@ router.patch("/email-verification", rateLimiter("tokenRedeem"), authController.v
  *     description: >
  *       Always 200 with the same message, whether or not the email has an
  *       account — so it can't be used to find out who's registered. A link is
- *       only sent to an existing account that isn't Banned or Declined, at
- *       most once a minute (a quicker repeat sends nothing). The link expires
+ *       only sent to an existing account that isn't Banned or Declined or a
+ *       shared demo login, at most once a minute (a quicker repeat sends nothing). The link expires
  *       in 1 hour and replaces any earlier unused one.
  *     tags: [Auth]
  *     requestBody:
@@ -275,6 +275,8 @@ router.patch("/password-reset", rateLimiter("tokenRedeem"), authController.reset
  *         description: >
  *           Not signed in, or the current password is wrong
  *           (error.details.reason = "wrong_password")
+ *       409:
+ *         description: The account is a shared demo login (error.details.reason = "demo_account")
  *       422:
  *         description: New password too weak (error.details.unmet), or the same as the current one
  *       429: { $ref: '#/components/responses/TooManyRequests' }
@@ -370,7 +372,9 @@ router.patch("/reactivation", rateLimiter("tokenRedeem"), authController.reactiv
  *       401:
  *         description: Not signed in, or the current password is wrong (error.details.reason = "wrong_password")
  *       409:
- *         description: Another account already uses that address (error.details.reason = "email_taken")
+ *         description: >
+ *           Another account already uses that address (error.details.reason =
+ *           "email_taken"), or the account is a shared demo login (error.details.reason = "demo_account")
  *       422:
  *         description: newEmail missing, invalid, longer than 45 characters, or the same as the current one
  *       429:

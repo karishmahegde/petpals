@@ -4,6 +4,7 @@ const { queueEmail, templates } = require("../email");
 const { issueToken, consumeToken } = require("./accountTokens.service");
 const { getUserContact } = require("./userContact");
 const { assertStrongPassword } = require("../../utils/password");
+const { isDemoAccount, assertNotDemoAccount } = require("./demoAccounts");
 
 // Forgot/reset password (no session) and change password (signed in).
 // Every successful change emails a "your password was changed" notice.
@@ -35,6 +36,8 @@ const requestPasswordReset = async (email) => {
 
   const contact = await getUserContact(user.userID);
   if (!contact || NO_RESET_STATUSES.has(contact.accountStatus)) return;
+  // A shared demo login's address isn't a real inbox (config/demoAccounts.js).
+  if (isDemoAccount(contact.email)) return;
 
   let token;
   try {
@@ -100,6 +103,8 @@ const assertCurrentPassword = async (userID, password) => {
 // stays signed in while any other one is signed out.
 const changePassword = async (userID, currentPassword, newPassword) => {
   assertStrongPassword(newPassword, "newPassword");
+  const contact = await getUserContact(userID);
+  assertNotDemoAccount(contact);
   await assertCurrentPassword(userID, currentPassword);
   // currentPassword was just confirmed, so comparing the two is enough.
   if (newPassword === currentPassword) {
@@ -113,7 +118,6 @@ const changePassword = async (userID, currentPassword, newPassword) => {
     data: { userPassword: await bcrypt.hash(newPassword, 10) },
   });
 
-  const contact = await getUserContact(userID);
   if (contact) notifyPasswordChanged(contact);
 };
 

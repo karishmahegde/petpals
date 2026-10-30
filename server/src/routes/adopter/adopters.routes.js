@@ -180,7 +180,9 @@ router.patch(
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       409:
- *         description: Adopter has an Accepted adoption application on record
+ *         description: >
+ *           Adopter has an Accepted adoption application on record, or the
+ *           account is a shared demo login (error.details.reason = "demo_account")
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

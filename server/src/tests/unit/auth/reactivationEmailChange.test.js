@@ -305,6 +305,20 @@ describe("POST /api/v1/auth/email-change", () => {
     expect(queueEmail).not.toHaveBeenCalled();
   });
 
+  test("a shared demo login → 409 demo_account, before the password is checked", async () => {
+    prisma.users.findUnique.mockResolvedValueOnce(
+      contactRow("Adopter", "Active", { userEmail: "adopter@petpals.com" }),
+    );
+
+    const res = await ask(valid);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.details).toEqual({ reason: "demo_account" });
+    expect(prisma.users.findUnique).toHaveBeenCalledTimes(1);
+    expect(prisma.accountToken.create).not.toHaveBeenCalled();
+    expect(queueEmail).not.toHaveBeenCalled();
+  });
+
   test("the account no longer exists (deleted mid-session) → 404, nothing sent", async () => {
     prisma.users.findUnique.mockResolvedValueOnce(null);
 

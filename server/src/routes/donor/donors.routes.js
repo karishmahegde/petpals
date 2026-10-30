@@ -204,6 +204,11 @@ router.patch(
  *         description: Account deactivated or deleted
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
+ *       409:
+ *         description: The account is a shared demo login (error.details.reason = "demo_account")
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  *       422:
  *         description: mode is missing or not one of 'deactivate'/'delete'
  *         content:
