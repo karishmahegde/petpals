@@ -35,6 +35,42 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npm run test:unit # fails below 80% lines / 70% branches
+      - uses: actions/upload-artifact@v4 # for the coverage badge job below
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: coverage-summary
+          path: server/coverage/coverage-summary.json
+
+  coverage-badge:
+    name: Coverage badge
+    # Only for what's on main: the README badge shows main's coverage.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: server
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # pushes the badge file to the badges branch
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-summary
+      # A shields.io endpoint file, read by the README's coverage badge.
+      - run: |
+          node -e '
+            const pct = require("./coverage-summary.json").total.lines.pct;
+            const color = pct >= 90 ? "brightgreen" : pct >= 80 ? "green" : pct >= 70 ? "yellow" : "red";
+            console.log(JSON.stringify({ schemaVersion: 1, label: "coverage", message: pct.toFixed(1) + "%", color }));
+          ' > coverage.json
+      # The badges branch holds only this file, replaced on every run.
+      - run: |
+          mkdir badge && mv coverage.json badge/ && cd badge
+          git init -q -b badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add coverage.json
+          git commit -q -m "Coverage badge"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   client:
     name: Client checks
