@@ -82,7 +82,9 @@ const Adopt = () => {
       </SectionContainer>
 
       {/* Search + Catalog */}
-      <div id="catalog">
+      {/* scroll-mt-24 = the sticky navbar's height, so a #catalog link lands
+          with the heading below it, not under it */}
+      <div id="catalog" className="scroll-mt-24">
         <PetCatalog />
       </div>
     </div>

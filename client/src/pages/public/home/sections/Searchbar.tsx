@@ -94,7 +94,8 @@ const Searchbar = () => {
   // Builds the /adopt URL and navigates — this component never fetches
   // pets directly. PetCatalog.tsx (a separate page) is the sole owner of
   // filter state and the pets query; it's expected to read these query
-  // params on mount and seed its own state from them.
+  // params on mount and seed its own state from them. #catalog lands the
+  // visitor on the results (Adopt's useScrollToHash), like Featured Pets.
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -106,7 +107,7 @@ const Searchbar = () => {
       // Species is stored here by name (for display), but /pets filters
       // by speciesID — look up the matching ID before navigating.
       const match = species.find((s) => s.speciesName === selectedSpecies);
-      navigate(`/adopt?speciesID=${match?.speciesID}`);
+      navigate(`/adopt?speciesID=${match?.speciesID}#catalog`);
       return;
     }
 
@@ -114,9 +115,9 @@ const Searchbar = () => {
     // takes priority over a typed zip, even if both are present —
     // matches the same rule used in ShelterLocationFilter.
     if (coords) {
-      navigate(`/adopt?lat=${coords.lat}&lng=${coords.lng}`);
+      navigate(`/adopt?lat=${coords.lat}&lng=${coords.lng}#catalog`);
     } else if (/^\d{5}$/.test(zipInput)) {
-      navigate(`/adopt?postalCode=${zipInput}`);
+      navigate(`/adopt?postalCode=${zipInput}#catalog`);
     } else {
       toast.error("Enter a ZIP code or use your current location.");
     }
