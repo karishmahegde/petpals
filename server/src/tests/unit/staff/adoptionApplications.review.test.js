@@ -288,7 +288,7 @@ describe("Application review workflow (Staff/Admin)", () => {
         petName: "Rex",
         shelterName: "Athens Shelter",
         applications: [
-          { email: "emilie@example.com", name: "Emilie", status: "Accepted", staffRemark: "See you Saturday" },
+          { email: "emilie@example.com", name: "Emilie", status: "Accepted", staffRemark: "See you Saturday", revoked: false },
           {
             email: "ali@example.com",
             name: "Ali",
@@ -407,7 +407,7 @@ describe("Application review workflow (Staff/Admin)", () => {
       expect(reviewNotices.applicationsDecided).toHaveBeenCalledWith(
         expect.objectContaining({
           applications: [
-            { email: "emilie@example.com", name: "Emilie", status: "Rejected", staffRemark: "Not a good fit" },
+            { email: "emilie@example.com", name: "Emilie", status: "Rejected", staffRemark: "Not a good fit", revoked: false },
           ],
         }),
       );
@@ -502,7 +502,7 @@ describe("Application review workflow (Staff/Admin)", () => {
       expect(reviewNotices.applicationsDecided).not.toHaveBeenCalled();
     });
 
-    test("Adopter withdrawing their own Accepted application → 200, pet back to 'available' in the same transaction", async () => {
+    test("Adopter surrendering (withdrawing their own Accepted application) → 200, pet back to 'incoming' in the same transaction", async () => {
       prisma.adoptionApplication.findUnique.mockResolvedValueOnce({
         applicationID: 1,
         adopterID: 7,
@@ -523,12 +523,92 @@ describe("Application review workflow (Staff/Admin)", () => {
       expect(res.status).toBe(200);
       expect(prisma.pet.updateMany).toHaveBeenCalledWith({
         where: { petID: 5, adoptionStatus: "adopted" },
-        data: { adoptionStatus: "available" },
+        data: { adoptionStatus: "incoming" },
       });
       expect(prisma.$transaction).toHaveBeenCalledWith([
         expect.anything(),
         expect.anything(),
       ]);
+    });
+
+    const acceptedApplication = {
+      applicationID: 1,
+      adopterID: 7,
+      shelterID: 9,
+      petID: 5,
+      applicationStatus: "Accepted",
+      pet: { petName: "Rex", adoptionStatus: "adopted" },
+      adopter: { adopterName: "Emilie" },
+    };
+
+    test("Staff revoking an Accepted application → 200, Rejected with the remark, pet back to 'incoming', adopter emailed", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(acceptedApplication);
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Rejected" }),
+      );
+      prisma.pet.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      const res = await request(app)
+        .patch("/api/v1/adoption-applications/1/status")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ status: "Rejected", staffRemark: "Not collected within 14 days" });
+
+      expect(res.status).toBe(200);
+      expect(prisma.adoptionApplication.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { applicationStatus: "Rejected", staffRemark: "Not collected within 14 days" },
+        }),
+      );
+      expect(prisma.pet.updateMany).toHaveBeenCalledWith({
+        where: { petID: 5, adoptionStatus: "adopted" },
+        data: { adoptionStatus: "incoming" },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledWith([expect.anything(), expect.anything()]);
+      expect(reviewNotices.applicationsDecided).toHaveBeenCalledWith(
+        expect.objectContaining({
+          applications: [
+            {
+              email: "emilie@example.com",
+              name: "Emilie",
+              status: "Rejected",
+              staffRemark: "Not collected within 14 days",
+              revoked: true,
+            },
+          ],
+        }),
+      );
+    });
+
+    test("Staff revoking without a remark → 400 BAD_REQUEST, nothing written", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(acceptedApplication);
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .patch("/api/v1/adoption-applications/1/status")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ status: "Rejected", staffRemark: "   " });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("BAD_REQUEST");
+      expect(prisma.adoptionApplication.update).not.toHaveBeenCalled();
+      expect(prisma.pet.updateMany).not.toHaveBeenCalled();
+    });
+
+    test("Staff can't reject a Withdrawn application → 409 CONFLICT", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce({
+        ...acceptedApplication,
+        applicationStatus: "Withdrawn",
+      });
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+
+      const res = await request(app)
+        .patch("/api/v1/adoption-applications/1/status")
+        .set("Authorization", `Bearer ${staffToken(42)}`)
+        .send({ status: "Rejected", staffRemark: "Too late" });
+
+      expect(res.status).toBe(409);
+      expect(prisma.adoptionApplication.update).not.toHaveBeenCalled();
     });
 
     test("Adopter withdrawing someone else's application → 403 FORBIDDEN", async () => {
@@ -583,11 +663,11 @@ describe("Application review workflow (Staff/Admin)", () => {
       ...overrides,
     });
 
-    const decide = (status, token = `Bearer ${staffToken(42)}`) =>
+    const decide = (status, token = `Bearer ${staffToken(42)}`, staffRemark) =>
       request(app)
         .patch("/api/v1/adoption-applications/1/status")
         .set("Authorization", token)
-        .send({ status });
+        .send({ status, staffRemark });
 
     test("Accept: the applicant is approved, and every auto-declined applicant is told", async () => {
       prisma.adoptionApplication.findUnique.mockResolvedValueOnce(pendingApplication());
@@ -672,13 +752,50 @@ describe("Application review workflow (Staff/Admin)", () => {
       );
     });
 
+    test("an adopter's Surrender tells the shelter's staff the pet is back", async () => {
+      notifications.shelterStaffIDs.mockResolvedValueOnce([42, 43]);
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(
+        pendingApplication({ applicationStatus: "Accepted" }),
+      );
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Withdrawn" }),
+      );
+      prisma.pet.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      const res = await decide("Withdrawn", `Bearer ${adopterToken(7)}`);
+
+      expect(res.status).toBe(200);
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(
+        [42, 43],
+        messages.applicationWithdrawn({ adopterName: "Emilie", petName: "Rex", surrendered: true }),
+      );
+    });
+
+    test("Revoke: the adopter is told the adoption was cancelled", async () => {
+      prisma.adoptionApplication.findUnique.mockResolvedValueOnce(
+        pendingApplication({ applicationStatus: "Accepted" }),
+      );
+      prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
+      prisma.adoptionApplication.update.mockResolvedValueOnce(
+        buildUpdatedApplication({ applicationStatus: "Rejected" }),
+      );
+      prisma.pet.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      const res = await decide("Rejected", undefined, "Never collected");
+
+      expect(res.status).toBe(200);
+      expect(notify).toHaveBeenCalledWith([7], messages.applicationDeclined({ ...NAMES, revoked: true }));
+      expect(notify).not.toHaveBeenCalledWith([7], messages.applicationDeclined(NAMES));
+    });
+
     test("a refused change (409) notifies no one", async () => {
       prisma.adoptionApplication.findUnique.mockResolvedValueOnce(
         pendingApplication({ applicationStatus: "Accepted" }),
       );
       prisma.staff.findUnique.mockResolvedValueOnce({ shelterID: 9 });
 
-      const res = await decide("Rejected");
+      const res = await decide("Accepted");
 
       expect(res.status).toBe(409);
       expect(notify).not.toHaveBeenCalled();

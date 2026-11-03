@@ -15,6 +15,46 @@ export const APPLICATION_STATUS_META: Record<
   Withdrawn: { label: "Withdrawn", tone: "gray" },
 };
 
-// The adopter can only withdraw an application that's still in play.
-export const canWithdraw = (status: ApplicationStatus): boolean =>
-  status === "Pending" || status === "Accepted";
+// How the adopter can end an application that's still in play: withdraw it
+// while it's under consideration, or surrender the pet once it's approved
+// (the pet goes back to the shelter as incoming). Both send status
+// "Withdrawn"; null = nothing to end.
+export type ReleaseAction = "withdraw" | "surrender";
+
+export const releaseActionFor = (
+  status: ApplicationStatus,
+): ReleaseAction | null =>
+  status === "Pending"
+    ? "withdraw"
+    : status === "Accepted"
+      ? "surrender"
+      : null;
+
+export const RELEASE_ACTION_COPY: Record<
+  ReleaseAction,
+  {
+    rowLabel: string;
+    panelLabel: string;
+    modalTitle: string;
+    confirmLabel: string;
+    successToast: string;
+    errorToast: string;
+  }
+> = {
+  withdraw: {
+    rowLabel: "Withdraw",
+    panelLabel: "Withdraw Application",
+    modalTitle: "Withdraw application?",
+    confirmLabel: "Withdraw",
+    successToast: "Application withdrawn",
+    errorToast: "Couldn't withdraw the application. Please try again.",
+  },
+  surrender: {
+    rowLabel: "Surrender",
+    panelLabel: "Surrender Pet",
+    modalTitle: "Surrender this pet?",
+    confirmLabel: "Surrender",
+    successToast: "Pet surrendered to the shelter",
+    errorToast: "Couldn't surrender the pet. Please try again.",
+  },
+};

@@ -2,7 +2,7 @@
 // The adopter's application rows — used by both the Overview preview widget and
 // the full Applications section. This is now just the Applications-specific
 // config for the generic DashboardActionList: the row markup + the withdraw
-// action. "View Details" routes to the Applications tab with the application id
+// (under consideration) / surrender (approved) action. "View Details" routes to the Applications tab with the application id
 // in the query string — the tab will eventually read that and open an inline
 // detail view there.
 import { useNavigate } from "react-router-dom";
@@ -18,8 +18,14 @@ import { withdrawApplication } from "../../../../../logic/api/adoptionApplicatio
 import { formatFullDate } from "../../../../../logic/utils/datetime";
 import {
   APPLICATION_STATUS_META,
-  canWithdraw,
+  RELEASE_ACTION_COPY,
+  releaseActionFor,
 } from "../../../../../logic/adopter/applicationStatus";
+import ReleaseApplicationBody from "./ReleaseApplicationBody";
+
+// Every row with a confirm action has one, so the non-null assertion holds.
+const copyFor = (application: AdoptionApplicationListItem) =>
+  RELEASE_ACTION_COPY[releaseActionFor(application.applicationStatus)!];
 
 interface ApplicationsListProps {
   applications: AdoptionApplicationListItem[];
@@ -44,9 +50,10 @@ const ApplicationsList = ({
     <DashboardActionList
       items={applications}
       getKey={(application) => application.applicationID}
-      renderRow={(application, confirmWithdraw) => {
+      renderRow={(application, confirmRelease) => {
         const { pet, shelter, applicationStatus, createdAt } = application;
         const status = APPLICATION_STATUS_META[applicationStatus];
+        const releaseAction = releaseActionFor(applicationStatus);
 
         return (
           <DashboardListRow
@@ -82,12 +89,12 @@ const ApplicationsList = ({
                 >
                   View Details
                 </RowActionButton>
-                {canWithdraw(applicationStatus) && (
+                {releaseAction && (
                   <RowActionButton
                     variant="danger"
-                    onClick={() => confirmWithdraw(application)}
+                    onClick={() => confirmRelease(application)}
                   >
-                    Withdraw
+                    {RELEASE_ACTION_COPY[releaseAction].rowLabel}
                   </RowActionButton>
                 )}
               </>
@@ -98,23 +105,24 @@ const ApplicationsList = ({
       confirmAction={{
         mutationFn: (application) =>
           withdrawApplication(application.applicationID),
-        // Covers the preview widget, the paginated section, and the Overview
-        // stat tile's separate count query.
+        // Covers the preview widget, the paginated section, the Overview
+        // stat tiles' separate count queries and My Pets (a surrender
+        // removes the pet).
         invalidateKeys: [
           ["adopter", "applications"],
           ["adopter", "applications-count"],
+          ["adopter", "adopted-pets"],
         ],
-        successToast: "Application withdrawn",
-        errorToast: "Couldn't withdraw the application. Please try again.",
-        modalTitle: "Withdraw application?",
-        confirmLabel: "Withdraw",
+        successToast: (application) => copyFor(application).successToast,
+        errorToast: (application) => copyFor(application).errorToast,
+        modalTitle: (application) => copyFor(application).modalTitle,
+        confirmLabel: (application) => copyFor(application).confirmLabel,
         renderBody: (application) => (
-          <>
-            This withdraws your application for{" "}
-            <strong>{application.pet.petName}</strong> at{" "}
-            {application.shelter.shelterName}. The $15 processing fee isn't
-            refunded, and you'd need to re-apply if you change your mind.
-          </>
+          <ReleaseApplicationBody
+            action={releaseActionFor(application.applicationStatus)!}
+            petName={application.pet.petName}
+            shelterName={application.shelter.shelterName}
+          />
         ),
       }}
     />
