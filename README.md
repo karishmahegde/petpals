@@ -33,7 +33,7 @@ Detailed documentation for every feature, from the database and API design to th
 
 ## Live Demo
 
-https://github.com/user-attachments/assets/dd308386-7744-44dd-9ab5-e92771eea029
+https://github.com/user-attachments/assets/2a9ef80c-0198-4283-929c-cfc12cd909bc
 
 <p align="center"><sub>Search by ZIP code → AI matches → apply and pay (Stripe test mode) → shelter staff approve → the adopter is notified live.</sub></p>
 
