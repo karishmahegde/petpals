@@ -33,9 +33,13 @@ Detailed documentation for every feature, from the database and API design to th
 
 ## Live Demo
 
-https://github.com/user-attachments/assets/2a9ef80c-0198-4283-929c-cfc12cd909bc
+<p align="center">
+  <img src="./docs/assets/demo.gif" alt="Demo: an adopter searches by ZIP code, gets AI matches, applies and pays; shelter staff approve, and the adopter is notified live" width="900" />
+</p>
 
 <p align="center"><sub>Search by ZIP code → AI matches → apply and pay (Stripe test mode) → shelter staff approve → the adopter is notified live.</sub></p>
+
+<p align="center"><a href="https://github.com/user-attachments/assets/2a9ef80c-0198-4283-929c-cfc12cd909bc">Watch it as a video</a></p>
 
 The live site (linked above) is a portfolio demo. The demo logins below are shared, so anything you do with them is visible to the next visitor; their password, email and account can't be changed. Please don't enter real personal details or upload a real ID.
 
@@ -48,7 +52,7 @@ The live site (linked above) is a portfolio demo. The demo logins below are shar
 | Volunteer | `volunteer@petpals.com` | `Volunteer@123` |
 | Donor     | `donor@petpals.com`     | `Donor@123`     |
 
-Admin, Staff and Vet logins are available on request.
+<sub>Admin, Staff and Vet logins are available on request.</sub>
 
 </details>
 
@@ -57,22 +61,22 @@ Admin, Staff and Vet logins are available on request.
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="./docs/assets/screenshots/01-ai-health-passport.png"><img src="./docs/assets/screenshots/01-ai-health-passport.png" alt="Health passport with AI summary" /></a>
-      <br /><b>Health passport with AI summary</b><br /><sub>A vet's view of Rocky's passport: the AI summary with points to review, each linked to the record it cites.</sub>
+      <a href="./docs/assets/screenshots/01-pet-catalog.png"><img src="./docs/assets/screenshots/01-pet-catalog.png" alt="Public pet catalog" /></a>
+      <br /><b>Public pet catalog</b><br /><sub>Every shelter's animals in one catalog, filtered by species, breed, size, age, shelter and distance.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="./docs/assets/screenshots/02-transfers.png"><img src="./docs/assets/screenshots/02-transfers.png" alt="Inter-shelter transfers" /></a>
-      <br /><b>Inter-shelter transfers</b><br /><sub>Incoming and outgoing transfers between branches, with the approve / decline panel.</sub>
+      <a href="./docs/assets/screenshots/02-admin-overview.png"><img src="./docs/assets/screenshots/02-admin-overview.png" alt="Admin overview" /></a>
+      <br /><b>Admin overview</b><br /><sub>Network-wide numbers, monthly intake and adoptions, shelters and capacity alerts.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="./docs/assets/screenshots/03-admin-overview.png"><img src="./docs/assets/screenshots/03-admin-overview.png" alt="Admin overview" /></a>
-      <br /><b>Admin overview</b><br /><sub>Network-wide numbers, monthly intake and adoptions, shelters and capacity alerts.</sub>
+      <a href="./docs/assets/screenshots/03-ai-health-passport.png"><img src="./docs/assets/screenshots/03-ai-health-passport.png" alt="Health passport with AI summary" /></a>
+      <br /><b>Health passport with AI summary</b><br /><sub>A vet's view of Rocky's passport: the AI summary with points to review, each linked to the record it cites.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="./docs/assets/screenshots/04-pet-catalog.png"><img src="./docs/assets/screenshots/04-pet-catalog.png" alt="Public pet catalog" /></a>
-      <br /><b>Public pet catalog</b><br /><sub>Every shelter's animals in one catalog, filtered by species, breed, size, age, shelter and distance.</sub>
+      <a href="./docs/assets/screenshots/04-transfers.png"><img src="./docs/assets/screenshots/04-transfers.png" alt="Inter-shelter transfers" /></a>
+      <br /><b>Inter-shelter transfers</b><br /><sub>Incoming and outgoing transfers between branches, with the approve / decline panel.</sub>
     </td>
   </tr>
   <tr>
@@ -109,7 +113,15 @@ Admin, Staff and Vet logins are available on request.
   <a href="./docs/assets/architecture.png"><img src="./docs/assets/architecture.png" alt="PetPals system architecture: React client on Vercel, /api rewrite proxy to the Express API on Render (Docker), Supabase Postgres + PostGIS and storage, with Stripe, Groq and Brevo as external services" width="700" /></a>
 </p>
 
-The browser reaches the API through Vercel's `/api` rewrite, so the login cookie stays on the site's own domain; only the live notification stream connects to Render directly. Stripe confirms payments by webhook, and AI and email are optional add-ons with fallbacks.
+- **Client (Vercel):** a React single-page app. Zustand holds the session, with the access token kept in memory only, and TanStack Query manages all server data and caching.
+- **Request path:** REST calls go through Vercel's `/api` rewrite, so the refresh-token cookie stays on the site's own domain. The live notification stream (Server-Sent Events) connects to Render directly, so no proxy can buffer it.
+- **API (Render, Docker):** Express with two-token JWT auth, role checks on every route for the six roles, and rate limits. All database access goes through Prisma, and the API is documented in Swagger.
+- **Data (Supabase):** Postgres with PostGIS for the nearby-shelter search. Pet photos are public in Storage; government IDs are private and served only through short-lived signed URLs.
+- **External services:**
+  - **Stripe:** an application or donation is recorded only when Stripe's webhook confirms the payment.
+  - **Groq:** powers the AI matcher and health-passport summaries, under a daily call cap, falling back to rule-based scores.
+  - **Brevo:** sends transactional email over its HTTPS API, or prints it to the console when not configured.
+- **Delivery:** GitHub Actions runs CI on every PR, and merges to `main` auto-deploy both hosts. UptimeRobot keeps the free API from sleeping.
 
 ## Tech Stack
 
@@ -147,69 +159,11 @@ The browser reaches the API through Vercel's `/api` rewrite, so the login cookie
 
 ## Getting Started
 
-### Prerequisites
+- **Node.js 22** and **Git**
+- A free **[Supabase](https://supabase.com)** project (database + file storage)
+- _Optional:_ Stripe, Groq and Brevo keys for payments, AI and email; the app runs without them
 
-- **Node.js 22** (20.19+ works - Prisma 7's minimum) and **Git**
-- **Docker + Docker Compose** _(Option B only)_
-- A free **[Supabase](https://supabase.com)** account - the project's database (Postgres + PostGIS) and file storage both run on it, even in local dev
-
-### Option A: Local Setup (recommended)
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/karishmahegde/petpals.git
-cd petpals
-
-# 2. Configure the server - Supabase and JWT values are required;
-#    Stripe, AI and email are optional (see setup/SETUP.md)
-cd server
-npm install
-cp .env.example .env
-
-# 3. Build the database, create the storage buckets, upload the seed photos, load sample data
-npm run setup
-
-# 4. Configure the client
-cd ../client
-npm install
-echo "VITE_API_URL=http://localhost:5000/api/v1" > .env.local
-```
-
-Then start both dev servers:
-
-```bash
-# Terminal 1
-cd server && npm run dev      # → http://localhost:5000
-
-# Terminal 2
-cd client && npm run dev      # → http://localhost:3000
-```
-
-Log in with any of the [demo logins](#live-demo) above; locally every role works.
-
-**[`setup/SETUP.md`](./setup/SETUP.md)** is the full guide: where to find each Supabase value, what `npm run setup` does, the complete test-account list (all six roles), and troubleshooting.
-
-> ⚠️ `npm run setup` is for **first-time setup only** - its last step re-seeds, which wipes the database. Afterwards, re-seed with `npx prisma db seed`.
-
-### Option B: Docker
-
-Docker runs the API and client in containers, but it isn't fully standalone: the database and file storage stay on your Supabase project, and the one-time setup (step 2) still runs on your machine with Node.
-
-```bash
-# 1. Configure the server - same values as Option A
-cp server/.env.example server/.env
-
-# 2. One-time: build the database, storage buckets and sample data
-cd server && npm install && npm run setup && cd ..
-
-# 3. Build and start the API and client
-docker compose up --build
-```
-
-| Service | URL                   |
-| ------- | --------------------- |
-| Client  | http://localhost:3000 |
-| API     | http://localhost:5000 |
+Follow **[`setup/SETUP.md`](./setup/SETUP.md)** to run PetPals locally with sample data covering every role. It also covers the optional services, test accounts, running the tests, troubleshooting and Docker Compose.
 
 ---
 
@@ -238,12 +192,14 @@ petpals/
 
 ## API Reference
 
-Base URL (production): `https://petpals-api.onrender.com/api/v1`
-Base URL (dev): `http://localhost:5000/api/v1`
+Interactive Swagger/OpenAPI docs:
 
-Interactive Swagger/OpenAPI docs are served at **`/api/docs`** (live link at the top, or locally once the server is running).
+- **Production:** [petpals-api.onrender.com/api/docs](https://petpals-api.onrender.com/api/docs)
+- **Local:** `http://localhost:5000/api/docs` (once the server is running)
 
 ### Resource domains
+
+All paths sit under `/api/v1`.
 
 | Domain                    | Base path                                         |
 | ------------------------- | ------------------------------------------------- |
@@ -305,21 +261,15 @@ Unit tests, typecheck, lint and Vitest also run in CI on every PR; integration a
 
 PetPals runs entirely on free tiers, so hosting it costs nothing.
 
-| Part                    | Host                                          | How                                                                                                                                                                                       |
-| ----------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Client                  | **Vercel** (Hobby)                            | Builds `client/`. [`client/vercel.json`](./client/vercel.json) forwards `/api/*` to the API, so the login cookie stays on the site's own domain, and serves the app for every other route |
-| API                     | **Render** (free web service)                 | Runs [`server/Dockerfile`](./server/Dockerfile) from the [`render.yaml`](./render.yaml) Blueprint, applying any new database migrations on startup                                        |
-| Database + file storage | **Supabase** (free)                           | Postgres + PostGIS and the photo / ID buckets, reached through Supabase's Session pooler                                                                                                  |
-| Payments · email · AI   | **Stripe** (test mode) · **Brevo** · **Groq** | Free tiers; email and AI are optional                                                                                                                                                     |
-| Uptime monitoring       | **UptimeRobot** (free)                        | Calls `GET /api/v1/species` every 10 minutes, so the API never sleeps and the database stays active                                                                                       |
+| Part                    | Host                                          | URL                                                                    |
+| ----------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| Client                  | **Vercel** (Hobby)                            | [petpals-adopt.vercel.app](https://petpals-adopt.vercel.app)           |
+| API                     | **Render** (free web service)                 | [petpals-api.onrender.com](https://petpals-api.onrender.com/api/docs) |
+| Database + file storage | **Supabase** (free)                           | -                                                                      |
+| Payments · email · AI   | **Stripe** (test mode) · **Brevo** · **Groq** | -                                                                      |
+| Uptime monitoring       | **UptimeRobot** (free)                        | -                                                                      |
 
-> ⏳ On their own, the free API sleeps after 15 minutes without traffic (a 30–60 second first load) and a free Supabase project pauses after about a week without activity. The UptimeRobot ping keeps both awake, and alerts by email if the API goes down.
-
-To deploy your own copy:
-
-1. **API:** Render → **New → Blueprint** → this repo. Fill in the values it asks for from your `server/.env`, using Supabase's **Session pooler** URI for `DATABASE_URL` (see [`setup/SETUP.md`](./setup/SETUP.md#2-create-a-supabase-project)) and your Vercel URL for `CLIENT_URL`.
-2. **Client:** point the `/api` rewrite in `client/vercel.json` at your Render URL, then import the repo into Vercel with root directory `client/`, `VITE_API_URL=/api/v1` and `VITE_STREAM_URL=https://<your-api>.onrender.com/api/v1`.
-3. **Keep-awake (optional):** add a free UptimeRobot HTTP(s) monitor on `https://<your-api>.onrender.com/api/v1/species` with a 10-minute interval.
+**_To deploy your own copy, follow [`setup/SETUP.md`](./setup/SETUP.md#deploying-your-own-copy)._**
 
 ## Security
 

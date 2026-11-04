@@ -2,7 +2,7 @@
 
 Gets you from `git clone` to a running PetPals instance with sample data covering every case the app handles — 50 test logins (every account status for every role), 4 shelters, and 21 pets. ~15 minutes, most of it waiting on installs.
 
-For architecture, folder structure, and API reference, see [`CLAUDE.md`](../CLAUDE.md). This file only covers first-time setup. Everything setup-related lives in this `setup/` folder:
+For architecture, folder structure, and API reference, see [`CLAUDE.md`](../CLAUDE.md). This file covers first-time setup and deploying your own copy. Everything setup-related lives in this `setup/` folder:
 
 | File | What it is |
 | --- | --- |
@@ -16,9 +16,18 @@ The sample-data seed itself lives with the schema, in `server/src/prisma/seed.js
 
 ## Prerequisites
 
-- **Node.js 18+** and **Git**
+**Required**
+
+- **Node.js 22** (20.19 or newer works; that's Prisma 7's minimum) and **Git**
 - A free **[Supabase](https://supabase.com)** account — used for the Postgres+PostGIS database *and* file storage (pet photos, ID uploads). The project needs both, so this guide uses Supabase for local dev too instead of a plain local Postgres, to avoid setting up PostGIS and a storage backend separately.
-- *(Optional)* A **Stripe** test-mode account — only needed if you want the adoption-application payment flow to complete end-to-end. Everything else works without it; leave the Stripe env vars blank and skip that part.
+
+**Optional** — the app runs without these, and each feature falls back as shown. Leave their env vars blank to skip them.
+
+| Service | Powers | Without it |
+| --- | --- | --- |
+| [Stripe](https://stripe.com) (test mode) | Adoption fees and donations | Checkout can't start; everything else works |
+| [Groq](https://console.groq.com) (or any OpenAI-compatible API) | AI matcher and health-passport summary | Matches use rule-based scores; the summary button is disabled |
+| [Brevo](https://www.brevo.com) | Transactional email | Every email, with its link, prints to the server console |
 
 ## 1. Clone the repo
 
@@ -47,7 +56,7 @@ Open `.env` and fill in:
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | the Direct connection URI from step 2 |
+| `DATABASE_URL` | the Session pooler URI from step 2 |
 | `SUPABASE_URL` | Project URL from step 2 |
 | `SUPABASE_KEY` | `anon` public key from step 2 |
 | `SUPABASE_SERVICE_ROLE_KEY` | `service_role` key from step 2 |
@@ -294,3 +303,11 @@ docker-compose up --build
 ```
 
 The client runs at `http://localhost:3000` and the API at `http://localhost:5000`, the same as the non-Docker setup. `npm run setup` still runs from your machine, once — it isn't part of the containers.
+
+## Deploying your own copy
+
+The live demo runs entirely on free tiers: Vercel (client), Render (API) and Supabase (database + storage), as described in the README's Deployment section.
+
+1. **API:** Render → **New → Blueprint** → this repo. Fill in the values it asks for from your `server/.env`, using Supabase's **Session pooler** URI for `DATABASE_URL` (see [step 2](#2-create-a-supabase-project)) and your Vercel URL for `CLIENT_URL`.
+2. **Client:** point the `/api` rewrite in `client/vercel.json` at your Render URL, then import the repo into Vercel with root directory `client/`, `VITE_API_URL=/api/v1` and `VITE_STREAM_URL=https://<your-api>.onrender.com/api/v1`.
+3. **Keep-awake (optional):** add a free UptimeRobot HTTP(s) monitor on `https://<your-api>.onrender.com/api/v1/species` with a 10-minute interval.
