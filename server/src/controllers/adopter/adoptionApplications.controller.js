@@ -55,7 +55,7 @@ const createApplication = async (req, res, next) => {
   if (shelterMessageRaw !== undefined && shelterMessageRaw !== null) {
     if (
       typeof shelterMessageRaw !== "string" ||
-      shelterMessageRaw.length > MAX_SHELTER_MESSAGE_LEN
+      shelterMessageRaw.trim().length > MAX_SHELTER_MESSAGE_LEN
     ) {
       return next(
         badRequest(
@@ -233,7 +233,8 @@ const getApplication = async (req, res, next) => {
 
 // ——————————————— PATCH /adoption-applications/:id/status ———————————————
 // Adopters may only move their own application to 'Withdrawn'. Staff/Admin
-// may only move a Pending application to 'Accepted' or 'Rejected'. Which
+// may only move a Pending application to 'Accepted' or 'Rejected', or an
+// Accepted one to 'Rejected' (a revoke — the service checks both). Which
 // list applies is determined by role, not by a shared enum — an Adopter
 // sending "Accepted" should get the same validation error shape as sending
 // any other bogus value, not a 403 that leaks that the value is valid for
@@ -266,7 +267,7 @@ const updateApplicationStatus = async (req, res, next) => {
   // from the body at all for the Staff/Admin branch, never for Adopter.
   let staffRemark;
   if (isStaffActor && staffRemarkRaw !== undefined && staffRemarkRaw !== null) {
-    if (typeof staffRemarkRaw !== "string" || staffRemarkRaw.length > MAX_STAFF_REMARK_LEN) {
+    if (typeof staffRemarkRaw !== "string" || staffRemarkRaw.trim().length > MAX_STAFF_REMARK_LEN) {
       return next(
         badRequest(
           `staffRemark must be a string of at most ${MAX_STAFF_REMARK_LEN} characters`,

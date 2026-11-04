@@ -684,6 +684,19 @@ describe("Volunteer self-service endpoints", () => {
       prisma.task.findFirst.mockResolvedValueOnce(null);
     };
 
+    test.each(["deactivate", "delete"])("the shared demo login, mode=%s → 409 demo_account, nothing written", async (mode) => {
+      noOpenWork();
+      accountNotices.lookupContact.mockResolvedValueOnce({ email: "volunteer@petpals.com" });
+
+      const res = await close({ mode });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.details).toEqual({ reason: "demo_account" });
+      expect(prisma.volunteer.update).not.toHaveBeenCalled();
+      expect(prisma.volunteer.delete).not.toHaveBeenCalled();
+      expect(accountNotices.accountClosed).not.toHaveBeenCalled();
+    });
+
     test("mode=deactivate → 200, leaves future events, status Closed, refresh token nulled, nothing deleted", async () => {
       noOpenWork();
       prisma.volunteerEvent.deleteMany.mockResolvedValueOnce({ count: 2 });

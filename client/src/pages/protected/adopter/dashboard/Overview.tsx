@@ -28,7 +28,10 @@ const Overview = () => {
         showDate
       />
 
-      <div className="flex flex-col gap-6 lg:flex-row">
+      {/* Side by side wherever My Pets still has room beside the fixed 356px
+          stats square: sm (no sidebar yet) and lg up. md stacks, since the
+          sidebar appears there and takes 288px of the width */}
+      <div className="flex flex-col gap-6 sm:flex-row md:flex-col lg:flex-row">
         <StatsWidget />
         <PetsWidget />
       </div>

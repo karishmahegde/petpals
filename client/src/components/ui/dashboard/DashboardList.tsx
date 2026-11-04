@@ -172,14 +172,20 @@ export const RowActionButton = ({
 
 // ———————————————————————————— DashboardActionList ————————————————————————————
 
+/** Fixed text, or text worked out from the item (rows whose action differs). */
+type ItemText<T> = string | ((item: T) => string);
+
+const itemText = <T,>(text: ItemText<T>, item: T): string =>
+  typeof text === "function" ? text(item) : text;
+
 export interface ConfirmActionConfig<T> {
   mutationFn: (item: T) => Promise<unknown>;
   /** Query keys invalidated on success. */
   invalidateKeys: QueryKey[];
-  successToast: string;
-  errorToast: string;
-  modalTitle: string;
-  confirmLabel: string;
+  successToast: ItemText<T>;
+  errorToast: ItemText<T>;
+  modalTitle: ItemText<T>;
+  confirmLabel: ItemText<T>;
   /** Modal body copy for the item awaiting confirmation. */
   renderBody: (item: T) => ReactNode;
 }
@@ -207,14 +213,15 @@ export function DashboardActionList<T>({
 
   const mutation = useMutation({
     mutationFn: (item: T) => confirmAction!.mutationFn(item),
-    onSuccess: () => {
+    onSuccess: (_, item) => {
       confirmAction!.invalidateKeys.forEach((queryKey) =>
         queryClient.invalidateQueries({ queryKey }),
       );
-      toast.success(confirmAction!.successToast);
+      toast.success(itemText(confirmAction!.successToast, item));
       setPending(null);
     },
-    onError: () => toast.error(confirmAction!.errorToast),
+    onError: (_, item) =>
+      toast.error(itemText(confirmAction!.errorToast, item)),
   });
 
   return (
@@ -228,8 +235,10 @@ export function DashboardActionList<T>({
       {confirmAction && (
         <ConfirmActionModal
           isOpen={pending !== null}
-          title={confirmAction.modalTitle}
-          confirmLabel={confirmAction.confirmLabel}
+          title={pending ? itemText(confirmAction.modalTitle, pending) : ""}
+          confirmLabel={
+            pending ? itemText(confirmAction.confirmLabel, pending) : ""
+          }
           isPending={mutation.isPending}
           onCancel={() => setPending(null)}
           onConfirm={() => {

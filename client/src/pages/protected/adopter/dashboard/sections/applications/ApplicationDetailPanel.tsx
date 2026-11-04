@@ -2,8 +2,8 @@
 // Detail slide-over for one adoption application — opened from an Applications
 // row's "View Details" (and deep-linked via ?applicationID from the Overview
 // widget). Fetch + render only; the generic SlideOver owns the chrome.
-// The footer withdraw goes through the same confirm-then-mutate flow as the
-// row action, invalidating the same query keys.
+// The footer Withdraw / Surrender goes through the same confirm-then-mutate
+// flow as the row action, invalidating the same query keys.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -19,8 +19,10 @@ import ConfirmActionModal from "../../../../../../components/ui/ConfirmActionMod
 import { formatFullDate } from "../../../../../../logic/utils/datetime";
 import {
   APPLICATION_STATUS_META,
-  canWithdraw,
+  RELEASE_ACTION_COPY,
+  releaseActionFor,
 } from "../../../../../../logic/adopter/applicationStatus";
+import ReleaseApplicationBody from "../../shared/ReleaseApplicationBody";
 
 interface ApplicationDetailPanelProps {
   applicationID: number | null;
@@ -29,8 +31,7 @@ interface ApplicationDetailPanelProps {
 
 const label = "font-body text-sm font-semibold text-teal-dark";
 const value = "font-body text-sm text-neutral-charcoal";
-const sectionHeading =
-  "mt-4 font-body text-sm font-semibold text-neutral-dark";
+const sectionHeading = "mt-4 font-body text-sm font-semibold text-neutral-dark";
 const quoteBlock = "mt-1 font-body text-sm italic text-neutral-charcoal";
 const divider = "my-5 border-t border-neutral-lightgray";
 
@@ -54,7 +55,11 @@ const ApplicationDetailPanel = ({
     enabled: applicationID !== null,
   });
 
-  const withdraw = useMutation({
+  const status = data && APPLICATION_STATUS_META[data.applicationStatus];
+  const releaseAction = data ? releaseActionFor(data.applicationStatus) : null;
+  const copy = releaseAction && RELEASE_ACTION_COPY[releaseAction];
+
+  const release = useMutation({
     mutationFn: () => withdrawApplication(applicationID!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adopter", "applications"] });
@@ -64,16 +69,13 @@ const ApplicationDetailPanel = ({
       queryClient.invalidateQueries({
         queryKey: ["adopter", "application", applicationID],
       });
-      toast.success("Application withdrawn");
+      queryClient.invalidateQueries({ queryKey: ["adopter", "adopted-pets"] });
+      if (copy) toast.success(copy.successToast);
       setConfirmOpen(false);
       onClose();
     },
-    onError: () =>
-      toast.error("Couldn't withdraw the application. Please try again."),
+    onError: () => copy && toast.error(copy.errorToast),
   });
-
-  const status = data && APPLICATION_STATUS_META[data.applicationStatus];
-  const showWithdraw = data ? canWithdraw(data.applicationStatus) : false;
 
   return (
     <>
@@ -82,13 +84,13 @@ const ApplicationDetailPanel = ({
         onClose={onClose}
         title="Application Details"
         footer={
-          showWithdraw && (
+          copy && (
             <ButtonElement
               onClick={() => setConfirmOpen(true)}
               size="panel"
               className="w-full bg-red hover:brightness-95"
             >
-              Withdraw Application
+              {copy.panelLabel}
             </ButtonElement>
           )
         }
@@ -159,9 +161,7 @@ const ApplicationDetailPanel = ({
             {/* Remarks from shelter */}
             <h3 className={sectionHeading}>Remarks from Shelter</h3>
             <p className={quoteBlock}>
-              {data.staffRemark
-                ? `"${data.staffRemark}"`
-                : "No remarks yet."}
+              {data.staffRemark ? `"${data.staffRemark}"` : "No remarks yet."}
             </p>
           </div>
         )}
@@ -169,19 +169,18 @@ const ApplicationDetailPanel = ({
 
       <ConfirmActionModal
         isOpen={confirmOpen}
-        title="Withdraw application?"
-        confirmLabel="Withdraw"
-        isPending={withdraw.isPending}
+        title={copy?.modalTitle ?? ""}
+        confirmLabel={copy?.confirmLabel ?? ""}
+        isPending={release.isPending}
         onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => withdraw.mutate()}
+        onConfirm={() => release.mutate()}
       >
-        {data && (
-          <>
-            This withdraws your application for{" "}
-            <strong>{data.pet.petName}</strong> at {data.shelter.shelterName}.
-            The $15 processing fee isn't refunded, and you'd need to re-apply if
-            you change your mind.
-          </>
+        {data && releaseAction && (
+          <ReleaseApplicationBody
+            action={releaseAction}
+            petName={data.pet.petName}
+            shelterName={data.shelter.shelterName}
+          />
         )}
       </ConfirmActionModal>
     </>

@@ -1,24 +1,38 @@
+# The API image — used by docker-compose locally and by Render in production.
+# Configuration comes from the environment at run time (server/.env via
+# compose's env_file, Render's environment); nothing secret is baked in.
+
 # ── Build stage ───────────────────────────────────────────────
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Production dependencies only. The Prisma CLI is one of them: on Render the
+# container runs migrate-and-start.sh (`prisma migrate deploy`, then the API).
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
-COPY . .
+COPY prisma.config.ts swagger.js migrate-and-start.sh ./
+COPY src ./src
 
-# Generate Prisma client
-RUN npx prisma generate
+# prisma.config.ts reads DATABASE_URL, but generating the client never
+# connects — a placeholder is enough at build time.
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npx prisma generate
 
 # ── Runtime stage ─────────────────────────────────────────────
-FROM node:18-alpine
+FROM node:22-alpine
+
+# Prisma's schema engine (migrate deploy) needs OpenSSL.
+RUN apk add --no-cache openssl
 
 WORKDIR /app
+ENV NODE_ENV=production
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/package.json ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/package.json /app/prisma.config.ts /app/swagger.js /app/migrate-and-start.sh ./
+COPY --from=builder --chown=node:node /app/src ./src
+
+USER node
 
 EXPOSE 5000
 

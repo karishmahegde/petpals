@@ -36,18 +36,21 @@ const governmentIdReviewed = async (userID, verificationStatus) => {
   }
 };
 
-// After staff/admin accept or reject an application. `applications` is a
-// list of { email, name, status, staffRemark } — the decided one plus, on an
-// accept, the pet's other applications that were declined automatically.
+// After staff/admin accept, reject or revoke an application. `applications`
+// is a list of { email, name, status, staffRemark, revoked? } — the decided
+// one plus, on an accept, the pet's other applications that were declined
+// automatically. `revoked` = an Accepted application moved to Rejected.
 // The caller already has the contacts (from the same transaction), so no
 // lookup here.
 const applicationsDecided = ({ petName, shelterName, applications }) => {
-  applications.forEach(({ email, name, status, staffRemark }) => {
+  applications.forEach(({ email, name, status, staffRemark, revoked }) => {
     const template =
       status === "Accepted"
         ? "applicationApproved"
         : status === "Rejected"
-          ? "applicationDeclined"
+          ? revoked
+            ? "adoptionRevoked"
+            : "applicationDeclined"
           : null;
     if (!template || !email) return;
     try {

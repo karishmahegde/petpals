@@ -39,10 +39,17 @@ const schemas = {
               "NOT_FOUND",
               "CONFLICT",
               "VALIDATION_ERROR",
+              "TOO_MANY_REQUESTS",
               "INTERNAL_SERVER_ERROR",
+              "SERVICE_UNAVAILABLE",
             ],
           },
-          details: { type: "string", nullable: true },
+          details: {
+            nullable: true,
+            description:
+              'A string, or an object a client can act on — e.g. { reason: "email_unverified" }, { unmet: [...] } for password rules, { blockers: [...] } when closing an account is blocked',
+            oneOf: [{ type: "string" }, { type: "object" }],
+          },
         },
       },
     },
@@ -1809,6 +1816,15 @@ const options = {
         },
         Conflict: {
           description: "Duplicate / conflicting request",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/Error" },
+            },
+          },
+        },
+        TooManyRequests: {
+          description:
+            "Rate limit reached (config/rateLimits.js) — error.details = { reason: \"rate_limited\", retryAfterSeconds }",
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/Error" },

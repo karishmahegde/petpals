@@ -12,6 +12,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import { requestPasswordReset } from "../../../logic/api/authApi";
+import { requestErrorMessage } from "../../../logic/utils/requestError";
 import AuthCard, {
   authBodyClass,
   authInputClass,
@@ -32,8 +33,7 @@ const ForgotPassword = () => {
 
   const mutation = useMutation({
     mutationFn: requestPasswordReset,
-    onError: () =>
-      setError("Unable to connect to the server. Please try again later."),
+    onError: (err) => setError(requestErrorMessage(err)),
   });
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {

@@ -208,14 +208,18 @@ router.get(
  * @swagger
  * /adoption-applications/{id}/status:
  *   patch:
- *     summary: Withdraw (Adopter) or Accept/Reject (Staff, Admin) an adoption application
+ *     summary: Withdraw/Surrender (Adopter) or Accept/Reject/Revoke (Staff, Admin) an adoption application
  *     description: >
  *       Which transitions are valid depends on the caller's role, not a
  *       shared enum: Adopter may move their own application to 'Withdrawn'
  *       from 'Pending' or 'Accepted' (the $15 processing fee is not
- *       refunded); withdrawing an Accepted application also sets the pet
- *       back to 'available'. Staff/Admin may move a 'Pending' application to
- *       'Accepted' or 'Rejected' — Staff only at their own shelter (403
+ *       refunded); from 'Accepted' that's a surrender — the pet comes back
+ *       into its shelter as 'incoming' and the shelter's staff are notified.
+ *       Staff/Admin may move a 'Pending' application to 'Accepted' or
+ *       'Rejected', and revoke an 'Accepted' one by moving it to 'Rejected'
+ *       with a required staffRemark (400 without one; e.g. the pet was never
+ *       collected) — the pet comes back as 'incoming' and the adopter is
+ *       emailed and notified. Staff only at their own shelter (403
  *       otherwise); Admin any shelter. Accepting sets staffID to the acting
  *       Staff member (never set for an Admin actor — the column FKs
  *       Staff.userID, which an Admin doesn't have) and sets the pet's
@@ -254,7 +258,7 @@ router.get(
  *                 type: string
  *                 maxLength: 500
  *                 nullable: true
- *                 description: Staff/Admin only — ignored for an Adopter caller
+ *                 description: Staff/Admin only — ignored for an Adopter caller; required to revoke an Accepted application
  *     responses:
  *       200:
  *         description: The updated application, with nested pet.petName and shelter.shelterName

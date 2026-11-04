@@ -356,6 +356,21 @@ describe("DELETE /api/v1/adopters/me", () => {
     },
   );
 
+  test.each(["deactivate", "delete"])(
+    "the shared demo login, %s → 409 demo_account, nothing changed",
+    async (mode) => {
+      prisma.adoptionApplication.findFirst.mockResolvedValue(null);
+      accountNotices.lookupContact.mockResolvedValue({ ...contact, email: "adopter@petpals.com" });
+
+      const res = await close({ mode });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.details).toEqual({ reason: "demo_account" });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(accountNotices.accountClosed).not.toHaveBeenCalled();
+    },
+  );
+
   test("deactivate: Closed (not Deactivated) + signed out, then the notice", async () => {
     prisma.adoptionApplication.findFirst.mockResolvedValue(null);
     prisma.adopter.update.mockReturnValue("close-op");

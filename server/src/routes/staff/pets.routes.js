@@ -9,6 +9,7 @@ const petsController = require("../../controllers/staff/pets.controller");
 const passportSummaryController = require("../../controllers/staff/healthPassportSummary.controller");
 const authenticate = require("../../middleware/authenticate");
 const { authorizeRoles, ROLES } = require("../../middleware/authorizeRoles");
+const { rateLimiter } = require("../../middleware/rateLimit");
 const { singleFile } = require("../../middleware/upload");
 const router = express.Router();
 
@@ -243,15 +244,20 @@ router.get(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       503:
- *         description: The AI provider failed or returned nothing usable — retry later
+ *         description: >
+ *           The AI provider failed or returned nothing usable — retry later; or
+ *           the app-wide daily AI cap (config/aiUsage.js) is used up — retry
+ *           the next UTC day (the message says which)
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
  */
 router.get(
   "/pets/:id/health-passport/summary",
   authenticate,
   authorizeRoles(ROLES.STAFF, ROLES.VETERINARIAN, ROLES.ADMIN),
+  rateLimiter("ai"),
   passportSummaryController.getPassportSummary,
 );
 

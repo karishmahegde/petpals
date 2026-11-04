@@ -284,6 +284,19 @@ const applicationDeclined = ({ name, petName, shelterName, staffRemark }) =>
     action: { label: "Browse pets", url: clientLink("/adopt") },
   });
 
+// Staff ended an Accepted application (e.g. the pet was never collected).
+const adoptionRevoked = ({ name, petName, shelterName, staffRemark }) =>
+  renderEmail({
+    subject: `Your adoption of ${petName} was cancelled`,
+    heading: greeting(name),
+    paragraphs: [
+      `${shelterName} has cancelled your approved adoption of ${petName}, and ${petName} is back in their care.`,
+      ...applicationNote(staffRemark),
+      "If you think this is a mistake, please contact the shelter.",
+    ],
+    action: { label: "View my applications", url: clientLink("/adopter/applications") },
+  });
+
 module.exports = {
   clientLink,
   renderEmail,
@@ -305,4 +318,5 @@ module.exports = {
   governmentIdRejected,
   applicationApproved,
   applicationDeclined,
+  adoptionRevoked,
 };

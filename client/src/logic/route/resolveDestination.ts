@@ -55,12 +55,21 @@ const dashboardRootOf = (path: string): string | undefined => {
   return DASHBOARD_ROOTS.includes(first) ? first : undefined;
 };
 
+// Only a path on this site may be followed. "//evil.com" is protocol-relative,
+// and browsers read "\" as "/" and drop tabs/newlines, so "/\evil.com" and
+// "/\t/evil.com" become it too — React Router 6 doesn't catch those (the
+// GHSA-wrjc-x8rr-h8h6 open redirect), so anything unsafe falls back.
+const isSitePath = (path: string): boolean =>
+  path.startsWith("/") &&
+  !path.startsWith("//") &&
+  ![...path].some((char) => char === "\\" || char.charCodeAt(0) < 0x20);
+
 export const resolveDestination = (
   userRole: string,
   redirectParam: string | null,
 ) => {
   const ownDashboard = dashboardPathFor(userRole);
-  if (!redirectParam) return ownDashboard;
+  if (!redirectParam || !isSitePath(redirectParam)) return ownDashboard;
   const root = dashboardRootOf(redirectParam);
   return root && `/${root}` !== ownDashboard ? ownDashboard : redirectParam;
 };

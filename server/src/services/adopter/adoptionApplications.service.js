@@ -603,11 +603,16 @@ const listApplicationsForStaff = async (
 
 // ——————————————— UPDATE APPLICATION STATUS (PATCH /adoption-applications/:id/status) ———————————————
 // Single entry point for every status transition on an application —
-// adopter Withdraw and staff/admin Accept/Reject all go through here rather
-// than duplicating the fetch/validate/update/reshape skeleton per actor
-// type. Moving to 'Withdrawn' or 'Rejected' also clears the partial unique
-// index on (adopterID, petID) (scoped to Pending/Accepted only), so the
-// adopter can re-apply for the same pet afterwards.
+// adopter Withdraw/Surrender and staff/admin Accept/Reject/Revoke all go
+// through here rather than duplicating the fetch/validate/update/reshape
+// skeleton per actor type. Moving to 'Withdrawn' or 'Rejected' also clears
+// the partial unique index on (adopterID, petID) (scoped to Pending/Accepted
+// only), so the adopter can re-apply for the same pet afterwards.
+// An Accepted application can be ended from either side — the adopter
+// surrenders the pet ('Withdrawn'), or staff revoke the adoption
+// ('Rejected', remark required: the adopter is told why). Either way the pet
+// comes back into the same shelter as 'incoming', for staff to check before
+// listing it again.
 const WITHDRAWABLE_STATUSES = ["Pending", "Accepted"];
 
 // Staff remark on the applications declined automatically when another
@@ -682,10 +687,19 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
     }
     // Admin: no shelter restriction.
 
-    if (application.applicationStatus !== "Pending") {
+    const isRevoke =
+      status === "Rejected" && application.applicationStatus === "Accepted";
+    if (application.applicationStatus !== "Pending" && !isRevoke) {
       throw conflict(
         `A ${application.applicationStatus.toLowerCase()} application can't be ${status.toLowerCase()}`,
       );
+    }
+    if (isRevoke && !staffRemark) {
+      const err = new Error(
+        "staffRemark is required to revoke an approved adoption — the adopter is told why",
+      );
+      err.code = "BAD_REQUEST";
+      throw err;
     }
     // A pet goes to one applicant: once it's adopted (or otherwise no
     // longer available), none of its other applications can be accepted.
@@ -702,6 +716,10 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
     data.staffRemark = staffRemark;
   }
 
+  // Surrender (adopter) or Revoke (staff) — only Withdrawn/Rejected get past
+  // the checks above from Accepted.
+  const wasAccepted = application.applicationStatus === "Accepted";
+
   const operations = [
     prisma.adoptionApplication.update({
       where: { applicationID },
@@ -713,13 +731,12 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
       },
     }),
   ];
-  // Accept marks the pet adopted; Reject deliberately leaves the pet's
-  // adoptionStatus untouched — still 'available' for other applicants.
-  // Withdrawing an Accepted application undoes the Accept: the pet goes
-  // back to 'available'. Staff can't do that by hand (an adopted pet is
-  // read-only — see staff/pets.service.js), so this is the only way back.
-  // updateMany + the 'adopted' guard so a pet that has since moved on
-  // isn't clobbered.
+  // Accept marks the pet adopted; rejecting a Pending application
+  // deliberately leaves the pet's adoptionStatus untouched — still
+  // 'available' for other applicants.
+  // Ending an Accepted application (adopter Surrender, staff Revoke) brings
+  // the pet back into its shelter as 'incoming'. updateMany + the 'adopted'
+  // guard so a pet that has since moved on isn't clobbered.
   // Accepting also declines the pet's other Pending applications, with a
   // remark the applicant sees — rather than leaving them "Under
   // Consideration" for a pet that's gone.
@@ -748,11 +765,11 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
         data: { applicationStatus: "Rejected", staffRemark: AUTO_DECLINE_REMARK },
       }),
     );
-  } else if (status === "Withdrawn" && application.applicationStatus === "Accepted") {
+  } else if (wasAccepted) {
     operations.push(
       prisma.pet.updateMany({
         where: { petID: application.petID, adoptionStatus: "adopted" },
-        data: { adoptionStatus: "available" },
+        data: { adoptionStatus: "incoming" },
       }),
     );
   }
@@ -765,8 +782,8 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
     if (status === "Accepted") autoDeclined = results[2] ?? [];
   } catch (err) {
     // Another application for this pet was accepted at the same moment —
-    // the one-Accepted-per-pet partial unique index fired (migration
-    // …_one_accepted_application_per_pet). Nothing was written.
+    // the one-Accepted-per-pet partial unique index fired (in the baseline
+    // migration). Nothing was written.
     if (status === "Accepted" && isUniqueViolation(err)) {
       throw petNoLongerAvailable(application.pet.petName);
     }
@@ -774,15 +791,18 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
   }
 
   // Staff/admin decisions email and notify the applicant(s); an adopter's
-  // own Withdraw tells the shelter's staff instead.
+  // own Withdraw or Surrender tells the shelter's staff instead.
   if (actor.role !== "Adopter") {
-    await notifyApplicationDecision(application, updated, staffRemark, autoDeclined);
+    await notifyApplicationDecision(application, updated, staffRemark, autoDeclined, {
+      revoked: wasAccepted,
+    });
   } else {
     await notifyAfterLookup(`the withdrawal of application ${applicationID}`, async () => [
       await shelterStaffIDs(application.shelterID),
       messages.applicationWithdrawn({
         adopterName: application.adopter.adopterName,
         petName: application.pet.petName,
+        surrendered: wasAccepted,
       }),
     ]);
   }
@@ -790,13 +810,19 @@ const updateApplicationStatus = async (applicationID, { status, staffRemark }, a
 };
 
 // Never throws — the decision has already committed.
-const notifyApplicationDecision = async (application, updated, staffRemark, autoDeclined) => {
+const notifyApplicationDecision = async (
+  application,
+  updated,
+  staffRemark,
+  autoDeclined,
+  { revoked },
+) => {
   const names = { petName: updated.pet.petName, shelterName: updated.shelter.shelterName };
   await notify(
     [application.adopterID],
     updated.applicationStatus === "Accepted"
       ? messages.applicationApproved(names)
-      : messages.applicationDeclined(names),
+      : messages.applicationDeclined({ ...names, revoked }),
   );
   await notify(
     autoDeclined.map(({ adopterID }) => adopterID),
@@ -810,7 +836,7 @@ const notifyApplicationDecision = async (application, updated, staffRemark, auto
       shelterName: updated.shelter.shelterName,
       applications: [
         ...(applicant
-          ? [{ email: applicant.email, name: applicant.name, status: updated.applicationStatus, staffRemark }]
+          ? [{ email: applicant.email, name: applicant.name, status: updated.applicationStatus, staffRemark, revoked }]
           : []),
         ...autoDeclined.map(({ adopter }) => ({
           email: adopter?.user?.userEmail,

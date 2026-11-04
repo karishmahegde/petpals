@@ -37,7 +37,7 @@ const createTransfer = async (req, res, next) => {
   if (
     typeof transferReasonRaw !== "string" ||
     transferReasonRaw.trim().length === 0 ||
-    transferReasonRaw.length > MAX_TRANSFER_REASON_LEN
+    transferReasonRaw.trim().length > MAX_TRANSFER_REASON_LEN
   ) {
     return next(
       badRequest(

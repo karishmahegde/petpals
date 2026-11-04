@@ -41,6 +41,27 @@ afterEach(() => {
   delete global.fetch;
 });
 
+describe("daily cap", () => {
+  const { resetDailyCap } = require("../../../services/ai/dailyCap");
+  const { AI_DAILY_CALL_LIMIT } = require("../../../config/aiUsage");
+
+  afterEach(() => resetDailyCap());
+
+  test("once the day's calls are used up, nothing is sent and the error is DAILY_LIMIT", async () => {
+    resetDailyCap();
+    global.fetch.mockResolvedValue(completion('{"score":7}'));
+    for (let i = 0; i < AI_DAILY_CALL_LIMIT; i += 1) {
+      await generateStructured(request);
+    }
+    global.fetch.mockClear();
+
+    await expect(generateStructured(request)).rejects.toMatchObject({
+      reason: AI_ERROR_REASONS.DAILY_LIMIT,
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("AI_ERROR_REASONS", () => {
   // The values are what callers see on err.reason — pinned so a rename is a
   // deliberate, visible change.
@@ -53,6 +74,7 @@ describe("AI_ERROR_REASONS", () => {
       AUTH_FAILED: "auth_failed",
       PROVIDER_ERROR: "provider_error",
       INVALID_RESPONSE: "invalid_response",
+      DAILY_LIMIT: "daily_limit",
     });
     expect(Object.isFrozen(AI_ERROR_REASONS)).toBe(true);
   });

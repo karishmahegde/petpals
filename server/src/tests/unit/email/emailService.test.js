@@ -75,6 +75,14 @@ describe("sendEmail", () => {
     });
   });
 
+  test("never sends to a shared demo login, even with email configured", async () => {
+    await expect(sendEmail({ ...message, to: "Donor@PetPals.com" })).resolves.toEqual({
+      delivered: false,
+    });
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test("uses EMAIL_FROM_NAME as the sender name when set", async () => {
     process.env.EMAIL_FROM_NAME = "PetPals Shelters";
     global.fetch.mockResolvedValue(jsonResponse(201, {}));
