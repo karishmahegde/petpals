@@ -15,7 +15,7 @@ import {
   PiHouseLineBold,
 } from "react-icons/pi";
 import Card from "../../../../../components/ui/Card";
-import StatTile from "../../../../../components/ui/dashboard/StatTile";
+import StatTile, { StatTileRow } from "../../../../../components/ui/dashboard/StatTile";
 import { getMyVetStats } from "../../../../../logic/api/vetsApi";
 import useTodaysAppointments from "./useTodaysAppointments";
 import { overdueVaccinationsQuery } from "./overdueVaccinationsQuery";
@@ -34,7 +34,7 @@ const StatsWidget = ({ shelterName }: StatsWidgetProps) => {
 
   return (
     <Card className="p-4 sm:p-6">
-      <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-5">
+      <StatTileRow>
         <StatTile
           icon={<PiStethoscopeBold />}
           value={today.isReady ? today.appointments.length : "—"}
@@ -58,7 +58,7 @@ const StatsWidget = ({ shelterName }: StatsWidgetProps) => {
           label={shelterName ?? "—"}
           color="green"
         />
-      </div>
+      </StatTileRow>
     </Card>
   );
 };

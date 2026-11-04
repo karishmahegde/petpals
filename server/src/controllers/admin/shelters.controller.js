@@ -28,21 +28,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Validates and normalizes one field's raw value. Shared by create (every
 // field required) and update (only present fields are checked) so the two
-// routes can't drift on what counts as valid.
+// routes can't drift on what counts as valid. Strings are trimmed before
+// they're checked, so a stray space can't fail the email pattern or the
+// length limit of a value that fits once trimmed.
 const validateField = (field, rawValue) => {
+  const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
   switch (field) {
     case "shelterName":
     case "shelterAddress":
       if (
-        typeof rawValue !== "string" ||
-        rawValue.trim().length === 0 ||
-        rawValue.length > STRING_MAX[field]
+        typeof value !== "string" ||
+        value.length === 0 ||
+        value.length > STRING_MAX[field]
       ) {
         throw badRequest(
           `${field} must be a non-empty string of at most ${STRING_MAX[field]} characters`,
         );
       }
-      return rawValue.trim();
+      return value;
 
     case "shelterPhone":
       // Throws its own VALIDATION_ERROR (422) if it doesn't parse — same
@@ -51,15 +54,15 @@ const validateField = (field, rawValue) => {
 
     case "shelterEmail":
       if (
-        typeof rawValue !== "string" ||
-        !EMAIL_RE.test(rawValue) ||
-        rawValue.length > STRING_MAX.shelterEmail
+        typeof value !== "string" ||
+        !EMAIL_RE.test(value) ||
+        value.length > STRING_MAX.shelterEmail
       ) {
         throw badRequest(
           `shelterEmail must be a valid email address of at most ${STRING_MAX.shelterEmail} characters`,
         );
       }
-      return rawValue.trim();
+      return value;
 
     case "shelterZIP":
       if (!Number.isInteger(rawValue) || rawValue < 1) {

@@ -51,13 +51,21 @@ const applicationApproved = ({ petName, shelterName }) =>
     "/adopter/applications",
   );
 
-const applicationDeclined = ({ petName, shelterName }) =>
-  message(
-    "ApplicationDeclined",
-    "Application update",
-    `${shelterName} has declined your application for ${petName}.`,
-    "/adopter/applications",
-  );
+// revoked = staff ended an approved adoption (Accepted → Rejected).
+const applicationDeclined = ({ petName, shelterName, revoked = false }) =>
+  revoked
+    ? message(
+        "ApplicationDeclined",
+        "Adoption cancelled",
+        `${shelterName} cancelled your approved adoption of ${petName}.`,
+        "/adopter/applications",
+      )
+    : message(
+        "ApplicationDeclined",
+        "Application update",
+        `${shelterName} has declined your application for ${petName}.`,
+        "/adopter/applications",
+      );
 
 // ?visitID= opens that visit's details on the Visits page.
 const visitConfirmed = ({ shelterName, petName, visitID }) =>
@@ -142,13 +150,22 @@ const newVisitRequest = ({ adopterName, petName }) =>
     "/staff/visits",
   );
 
-const applicationWithdrawn = ({ adopterName, petName }) =>
-  message(
-    "ApplicationWithdrawn",
-    "Application withdrawn",
-    `${adopterName} withdrew their application for ${petName}.`,
-    "/staff/applications",
-  );
+// surrendered = the adopter gave up an Accepted application — the pet is
+// back at the shelter.
+const applicationWithdrawn = ({ adopterName, petName, surrendered = false }) =>
+  surrendered
+    ? message(
+        "ApplicationWithdrawn",
+        "Pet surrendered",
+        `${adopterName} surrendered ${petName}, who is back at your shelter as an incoming pet.`,
+        "/staff/applications",
+      )
+    : message(
+        "ApplicationWithdrawn",
+        "Application withdrawn",
+        `${adopterName} withdrew their application for ${petName}.`,
+        "/staff/applications",
+      );
 
 const visitCancelledByAdopter = ({ adopterName, petName }) =>
   message(

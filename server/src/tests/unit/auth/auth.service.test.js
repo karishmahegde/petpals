@@ -270,8 +270,24 @@ describe("logout", () => {
 });
 
 // ————————————————————— refreshToken (rotation) —————————————————————
+describe("storeRefreshToken", () => {
+  test("stores the token's SHA-256 hex, never the token itself", async () => {
+    await authService.storeRefreshToken(21, "raw-refresh-token");
+
+    expect(prisma.users.update).toHaveBeenCalledWith({
+      where: { userID: 21 },
+      data: {
+        refreshToken: require("crypto").createHash("sha256").update("raw-refresh-token").digest("hex"),
+      },
+    });
+  });
+});
+
 describe("refreshToken", () => {
+  // Hashes stored before the switch to SHA-256 are bcrypt — the tests below
+  // that use this one cover that legacy path.
   let storedHash;
+  const sha256 = (value) => require("crypto").createHash("sha256").update(value).digest("hex");
 
   beforeAll(async () => {
     storedHash = await bcrypt.hash("old-token", 4);
@@ -304,14 +320,35 @@ describe("refreshToken", () => {
     expect(prisma.users.update).not.toHaveBeenCalled();
   });
 
-  test("a matching token rotates: the new token's hash replaces the old", async () => {
+  test("a matching legacy bcrypt token rotates: the new token is stored as its SHA-256", async () => {
     prisma.users.findUnique.mockResolvedValue({ userID: 21, role: "Donor", refreshToken: storedHash, emailVerified: true });
     prisma.donor.findUnique.mockResolvedValue({ donorName: "Alex", accountStatus: "Active", avatarSeed: "s" });
 
     await authService.refreshToken(21, "old-token", "new-token");
 
     const { refreshToken: newHash } = prisma.users.update.mock.calls[0][0].data;
-    await expect(bcrypt.compare("new-token", newHash)).resolves.toBe(true);
-    await expect(bcrypt.compare("old-token", newHash)).resolves.toBe(false);
+    expect(newHash).toBe(sha256("new-token"));
+  });
+
+  test("a matching SHA-256 token rotates the same way", async () => {
+    prisma.users.findUnique.mockResolvedValue({ userID: 21, role: "Donor", refreshToken: sha256("old-token"), emailVerified: true });
+    prisma.donor.findUnique.mockResolvedValue({ donorName: "Alex", accountStatus: "Active", avatarSeed: "s" });
+
+    await authService.refreshToken(21, "old-token", "new-token");
+
+    expect(prisma.users.update.mock.calls[0][0].data.refreshToken).toBe(sha256("new-token"));
+  });
+
+  test.each([
+    ["another token's SHA-256", () => sha256("someone-elses")],
+    ["a value that isn't a 64-character hex hash", () => "abc"],
+  ])("a stored %s doesn't match → 401, nothing replaced", async (_label, stored) => {
+    prisma.users.findUnique.mockResolvedValue({ userID: 21, role: "Donor", refreshToken: stored() });
+
+    await expect(authService.refreshToken(21, "old-token", "new-token")).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+      message: "Invalid refresh token",
+    });
+    expect(prisma.users.update).not.toHaveBeenCalled();
   });
 });

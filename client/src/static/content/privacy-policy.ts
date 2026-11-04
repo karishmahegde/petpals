@@ -157,7 +157,7 @@ export const privacyPolicyContent: PrivacyPolicyContent = {
             "Shelter staff, who see your profile and application when you apply for one of their pets",
             "Stripe, which processes application fees",
             "Supabase, which hosts our database and file storage",
-            "Vercel and Railway, which host the PetPals website and servers",
+            "Vercel and Render, which host the PetPals website and servers",
           ],
         },
       ],

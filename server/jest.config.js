@@ -20,10 +20,12 @@ module.exports = {
   coverageThreshold: {
     global: { lines: 80, statements: 80, functions: 80, branches: 70 },
   },
-  coverageReporters: ["text-summary", "lcov"],
-  // No test ever reaches the AI or email provider — see the files.
+  coverageReporters: ["text-summary", "lcov", "json-summary"], // json-summary feeds the CI coverage badge
+  // No test ever reaches the AI or email provider, and no rate limit trips
+  // mid-suite — see the files.
   setupFiles: [
     "<rootDir>/src/tests/setup/noAiProvider.js",
     "<rootDir>/src/tests/setup/noEmailProvider.js",
+    "<rootDir>/src/tests/setup/noRateLimits.js",
   ],
 };

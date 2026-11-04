@@ -141,6 +141,16 @@ describe("applicationsDecided", () => {
     expect(message.text).toContain("/adopt");
   });
 
+  test("Rejected with revoked → the adoption-cancelled email, with the shelter's reason", () => {
+    decided([{ email: "sam@example.test", name: "Sam", status: "Rejected", staffRemark: "Never collected", revoked: true }]);
+
+    const [message] = sent();
+    expect(message.subject).toBe("Your adoption of Rex was cancelled");
+    expect(message.text).toContain("Athens Shelter has cancelled your approved adoption of Rex");
+    expect(message.text).toContain('A note from the shelter: "Never collected"');
+    expect(message.text).toContain("/adopter/applications");
+  });
+
   test("one email per application, each to its own applicant", () => {
     decided([
       { email: "sam@example.test", name: "Sam", status: "Accepted" },

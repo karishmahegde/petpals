@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const accountNotices = require("../auth/accountNotices");
+const { assertNotDemoAccount } = require("../auth/demoAccounts");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const { ADDRESS_SELECT } = require("../../utils/address");
 
@@ -149,7 +150,8 @@ const completeOnboarding = async (userID) => {
 };
 
 // ——————————————— CLOSE MY ACCOUNT (DELETE /donors/me) ———————————————
-// Nothing blocks a donor from leaving — there's no open work to hand over.
+// Nothing blocks a donor from leaving — there's no open work to hand over —
+// except the shared demo login (config/demoAccounts.js).
 // 'deactivate' keeps the row (accountStatus → Closed, refresh token
 // cleared). 'delete' removes the Donor and Users rows (the refresh token goes
 // with Users). The shelters' records survive either way: Donation.donorID is
@@ -158,6 +160,8 @@ const completeOnboarding = async (userID) => {
 const closeMyAccount = async (userID, mode) => {
   // Read before a delete removes the rows; the notice goes out after.
   const contact = await accountNotices.lookupContact(userID);
+  // The shared demo logins can't be closed (config/demoAccounts.js).
+  assertNotDemoAccount(contact);
 
   if (mode === "deactivate") {
     await prisma.$transaction([

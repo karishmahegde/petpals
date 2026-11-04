@@ -4,7 +4,8 @@
 //
 // Already verified (409, e.g. they verified on another device) isn't an
 // error to them: the session and every cached profile catch up instead.
-// Asked again within a minute (429): the toast says how long to wait.
+// Asked again within a minute (429): the toast says how long to wait; a
+// rate-limit 429 shows the server's own message.
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -28,6 +29,12 @@ const useResendVerification = () => {
         return;
       }
       if (axios.isAxiosError(err) && err.response?.status === 429) {
+        // Too many link requests from this connection, not the one-minute
+        // resend cooldown: the server's message names the wait in minutes.
+        if (errorReason(err) === "rate_limited") {
+          toast(err.response.data.message);
+          return;
+        }
         const wait = err.response.data?.error?.details?.retryAfterSeconds;
         toast(
           typeof wait === "number"

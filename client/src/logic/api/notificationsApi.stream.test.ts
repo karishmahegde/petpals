@@ -64,6 +64,21 @@ describe("openNotificationStream", () => {
     );
   });
 
+  test("VITE_STREAM_URL set (production) → the stream goes there, not through VITE_API_URL's rewrite", async () => {
+    vi.stubEnv("VITE_API_URL", "/api/v1");
+    vi.stubEnv("VITE_STREAM_URL", "https://api.example.test/api/v1");
+    await open([]);
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.example.test/api/v1/notifications/stream");
+  });
+
+  test("VITE_STREAM_URL blank (local dev) → falls back to VITE_API_URL", async () => {
+    vi.stubEnv("VITE_STREAM_URL", "");
+    await open([]);
+
+    expect(fetchMock.mock.calls[0][0]).toBe("http://api.test/api/v1/notifications/stream");
+  });
+
   test("reports each event in order, once the stream has opened", async () => {
     const { events, onOpen } = await open([
       'event: unread-count\ndata: {"unreadCount":2}\n\n',

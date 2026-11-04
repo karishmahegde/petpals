@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const accountNotices = require("../auth/accountNotices");
+const { assertNotDemoAccount } = require("../auth/demoAccounts");
 const storage = require("../storage");
 const { nullifyRefreshToken } = require("../auth/auth.service");
 const { MATCH_PROFILE_FIELDS } = require("./matches.service");
@@ -239,6 +240,8 @@ const closeAccount = async (userID, mode) => {
 
   // Read before a delete removes the rows; the notice goes out after.
   const contact = await accountNotices.lookupContact(userID);
+  // The shared demo logins can't be closed (config/demoAccounts.js).
+  assertNotDemoAccount(contact);
 
   if (mode === "deactivate") {
     await prisma.$transaction([

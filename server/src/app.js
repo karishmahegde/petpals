@@ -7,14 +7,19 @@ const cors = require("cors");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("../swagger");
+const { parseCorsOrigins } = require("./config/cors");
 
 //Creates the Express app
 const app = express();
 
+// Render terminates HTTPS at its proxy, one hop in front of the app, so
+// req.ip / req.protocol / req.secure come from its X-Forwarded-* headers.
+app.set("trust proxy", 1);
+
 // ── Middleware ─────────────────────────────────────────────────
 app.use(
   cors({
-    origin: "http://localhost:3000", //Allows Cross-origin requests. Since our client and server will be on different ports, the browser would block it as per Same-Origin policy. This line will tell the browser to allow cross-origin requests.
+    origin: parseCorsOrigins(), // the client's origin(s) — see config/cors.js
     credentials: true, // required for httpOnly cookies to work
   }),
 );
@@ -43,6 +48,11 @@ app.get("/health", (req, res) => {
 });
 
 // ── API Routes ────────────
+// Backstop limit per IP on the whole API (the Stripe webhook above is
+// mounted first, so it's never counted). Tighter limits sit on the auth and
+// AI routes themselves — see config/rateLimits.js.
+const { rateLimiter } = require("./middleware/rateLimit");
+app.use("/api/v1", rateLimiter("api"));
 const authRouter = require("./routes/auth/auth.routes");
 app.use("/api/v1/auth", authRouter);
 const petsRouter = require("./routes/public/pets.routes");

@@ -48,8 +48,9 @@ const forbiddenShelter = () => {
 // photos, delete all 409):
 // - 'transferred': an In_Progress transfer (staff/transfers.service.js);
 //   approving, declining, or cancelling it moves the pet on.
-// - 'adopted': an Accepted application; the adopter withdrawing it puts
-//   the pet back to 'available' (adopter/adoptionApplications.service.js).
+// - 'adopted': an Accepted application; the adopter surrendering the pet or
+//   staff revoking the adoption puts it back to 'incoming'
+//   (adopter/adoptionApplications.service.js).
 //   Staff may still change an adopted pet's status on its own (a PUT whose
 //   only field is adoptionStatus) — e.g. back to 'incoming' when the pet is
 //   surrendered back to the shelter — but nothing else about it.

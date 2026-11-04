@@ -45,9 +45,11 @@ const extractError = (err: unknown): string =>
 const actionButton =
   "rounded-xl px-4 py-2 font-body text-sm font-medium transition-colors hover:brightness-95 disabled:opacity-50";
 
-// The 409's blockers, or null for any other outcome.
+// The 409's blockers, or null for any other outcome. A shared demo login's
+// 409 (reason demo_account) isn't about open work — it shows as a plain error.
 const openWorkBlockers = (err: unknown): CloseAccountBlocker[] | null => {
   if (!axios.isAxiosError(err) || err.response?.status !== 409) return null;
+  if (err.response.data?.error?.details?.reason === "demo_account") return null;
   const blockers = err.response.data?.error?.details?.blockers;
   return Array.isArray(blockers) ? blockers : [];
 };

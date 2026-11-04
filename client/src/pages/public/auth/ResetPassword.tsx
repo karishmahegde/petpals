@@ -10,13 +10,13 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import axios from "axios";
 import ButtonElement from "../../../components/ui/ButtonElement";
 import PasswordRequirements from "../../../components/ui/PasswordRequirements";
 import { errorReason, resetPassword } from "../../../logic/api/authApi";
 import { meetsPasswordRequirements } from "../../../logic/utils/password";
 import { loginPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
+import { requestErrorMessage } from "../../../logic/utils/requestError";
 import AuthCard, {
   authBodyClass,
   authInputClass,
@@ -44,11 +44,7 @@ const ResetPassword = () => {
     },
     onError: (err) => {
       if (LINK_REASONS.includes(errorReason(err) ?? "")) return;
-      setError(
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? String(err.response.data.message)
-          : "Unable to connect to the server. Please try again later.",
-      );
+      setError(requestErrorMessage(err));
     },
   });
 

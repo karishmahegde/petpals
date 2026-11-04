@@ -3,6 +3,7 @@ const { queueEmail, templates } = require("../email");
 const { issueToken, consumeToken } = require("./accountTokens.service");
 const { getUserContact } = require("./userContact");
 const { assertCurrentPassword } = require("./passwords.service");
+const { assertNotDemoAccount } = require("./demoAccounts");
 const { isUniqueViolation } = require("../../utils/prismaErrors");
 
 // Changing the login email. Two steps so a typo can't lock anyone out: the
@@ -35,6 +36,7 @@ const requestEmailChange = async (userID, newEmailRaw, currentPassword) => {
     err.code = "NOT_FOUND";
     throw err;
   }
+  assertNotDemoAccount(contact);
   if (newEmail.toLowerCase() === contact.email.toLowerCase()) {
     const err = new Error("That's already your email address");
     err.code = "VALIDATION_ERROR";

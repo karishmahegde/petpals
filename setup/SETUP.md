@@ -31,7 +31,7 @@ cd petpals
 
 1. [supabase.com](https://supabase.com) → **New project**. Any name/region/DB password works. Takes ~2 minutes to provision.
 2. **Project Settings → Data API** → copy the **Project URL** and the **`anon` public key** and **`service_role` key**.
-3. **Project Settings → Database → Connection string** → copy the **URI** (Direct connection, not the pgbouncer/pooled one — Prisma's migration step needs a direct connection).
+3. **Connect** (top bar) → **Direct** → set the method to **Session pooler** → copy the URI (host `aws-…pooler.supabase.com`, port **5432**, user `postgres.<project-ref>`), with your DB password filled in. The direct-connection host is IPv6-only, which Docker containers and Render can't reach; the session pooler is IPv4 and keeps a real session, so Prisma's migrations work through it. Not the **transaction** pooler (port 6543) — migrations need session mode.
 
 You now have everything the server needs: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_KEY` (the anon key), `SUPABASE_SERVICE_ROLE_KEY`.
 
@@ -55,6 +55,7 @@ Open `.env` and fill in:
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | leave the placeholders if skipping payments |
 | `CLIENT_URL` | `http://localhost:3000` (default is fine) |
 | `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | *optional* — leave blank to run without AI; see [AI features (optional)](#ai-features-optional) |
+| `RATE_LIMITS` | *optional* — `off` switches off the login/sign-up/email-link/AI rate limits (`server/src/config/rateLimits.js`) for repeated local Cypress runs; leave blank in production |
 
 `PORT`, `NODE_ENV`, and `JWT_EXPIRES_IN` can stay at their defaults. The client has its own env file, configured in step 5. To switch on the AI features, follow [AI features (optional)](#ai-features-optional) once you're set up.
 
@@ -66,7 +67,7 @@ npm run setup
 
 One command, four steps:
 
-1. **`prisma migrate deploy`** builds the entire schema, including the parts `schema.prisma` can't describe: PostGIS and the shelter-location column, the human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`, …) as Postgres generated columns, and the partial unique indexes. They're written directly into the baseline migration's SQL.
+1. **`prisma migrate deploy`** builds the entire schema, including the parts `schema.prisma` can't describe: PostGIS and the shelter-location column, the human-readable reference codes (`PE000002`, `APP-00048`, `APT-00123`, …) as Postgres generated columns, and the partial and expression unique indexes. They're written directly into the baseline migration's SQL.
 2. **`prisma generate`** builds the Prisma client from the schema.
 3. **`setup-storage.js`** creates the two Supabase Storage buckets if they're missing (`pet-images`, public; `government-ids`, private), uploads `setup/pet-images/` to `pet-images/seed/`, uploads `placeholder.jpg` to the bucket root, and uploads `setup/government-ids/` to `government-ids/seed/`. Buckets live in Supabase's own `storage` schema, not the app's, which is why this is a script and not a migration.
 4. **`prisma db seed`** loads the sample data.
@@ -106,7 +107,7 @@ Runs at `http://localhost:3000`.
 
 <a id="test-accounts"></a>
 
-One fully-featured login per role:
+One fully-featured login per role, created by the seed in **your own** database:
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -117,7 +118,9 @@ One fully-featured login per role:
 | Volunteer | `volunteer@petpals.com` | `Volunteer@123` |
 | Donor | `donor@petpals.com` | `Donor@123` |
 
-Every other seeded account uses its role's password above. The ones worth knowing:
+Every other seeded account uses its role's password above. On the live demo site, the Admin, Staff and Veterinarian accounts have private passwords instead, so only the Adopter, Volunteer and Donor logins work there.
+
+The seeded accounts worth knowing:
 
 | Email | Case |
 | --- | --- |
@@ -228,12 +231,12 @@ Subject: Verify your PetPals email address
 
 ### With Brevo (real email)
 
-Email goes through [Brevo](https://www.brevo.com)'s HTTPS API, not SMTP. Railway, where the server is deployed, blocks outbound SMTP below its Pro plan. The free plan allows 300 emails a day.
+Email goes through [Brevo](https://www.brevo.com)'s HTTPS API, not SMTP — hosting platforms often block outbound SMTP, especially on free plans. Brevo's free plan allows 300 emails a day.
 
 1. Sign up at [brevo.com](https://www.brevo.com) and complete the account profile it asks for.
 2. **Verify a sender.** Go to **Senders, Domains & Dedicated IPs → Senders → Add a sender**, enter `PetPals` as the name and an address you can receive mail at, then confirm the code Brevo emails to it. Recipients see this address, so use a dedicated one rather than a personal address once other people use the app.
 3. **Create an API key.** Go to **SMTP & API → API Keys → Generate a new API key**. Copy it straight away, because Brevo shows it only once. It starts with `xkeysib-`. The SMTP key (`xsmtpsib-…`) won't work.
-4. **Authorised IPs.** Newer accounts block API calls from IP addresses Brevo doesn't recognise. Under **Security → Authorised IPs**, add your IP, or turn the blocking off. Turn it off for Railway, whose outgoing IPs change.
+4. **Authorised IPs.** Newer accounts block API calls from IP addresses Brevo doesn't recognise. Under **Security → Authorised IPs**, add your IP, or turn the blocking off. Turn it off for Render, whose outgoing IPs change.
 5. In `server/.env`:
 
    ```bash
@@ -266,9 +269,9 @@ Nothing extra to install — `npm install` in `server/` and `client/` brings Jes
 | `npm run test:integration` | `server/` | `server/.env` from step 3. Runs against that database, creating its own test data (logins end in `@ex.com`) and removing it afterwards. The Stripe-webhook journeys need `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (test mode). Slow over a remote database — several minutes. |
 | `npm run test:leftovers` | `server/` | Read-only: lists any test data a crashed run left behind. Nothing is deleted. |
 | `npm test` · `npm run typecheck` · `npm run lint` | `client/` | Nothing — no servers, no database. |
-| `npm run cypress:open` / `cypress:run` | `client/` | Both dev servers running (steps 4 and 5) and the Stripe test keys in `server/.env` (the apply spec creates a real test-mode Checkout Session; Stripe's page itself is never loaded). Specs create and remove their own data in the same database. |
+| `npm run cypress:open` / `cypress:run` | `client/` | Both dev servers running (steps 4 and 5) and the Stripe test keys in `server/.env` (the apply spec creates a real test-mode Checkout Session; Stripe's page itself is never loaded). Specs create and remove their own data in the same database. Set `RATE_LIMITS=off` in `server/.env` if repeated runs start getting 429s. |
 
-Tests never call the AI provider or send email, whatever is in `server/.env` (see the notes under AI features and Email).
+Tests never call the AI provider or send email, and Jest switches the rate limits off, whatever is in `server/.env` (see the notes under AI features and Email).
 
 ## Troubleshooting
 

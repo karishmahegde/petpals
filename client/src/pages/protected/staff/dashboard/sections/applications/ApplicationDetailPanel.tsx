@@ -5,8 +5,10 @@
 // own ApplicationDetailPanel (same pet-summary banner, same info-row
 // layout) with three differences: an Adopter info section (the applicant's
 // name/email — meaningless on the adopter's own copy, essential here),
-// Accept/Reject actions instead of Withdraw, and a staffRemark textarea on
-// both confirmations (the backend accepts it on either transition). The
+// Accept/Reject actions instead of Withdraw (and Revoke Adoption on an
+// Accepted one — e.g. the pet was never collected; the pet comes back as
+// incoming), and a staffRemark textarea on every confirmation (required to
+// revoke: the adopter is told why). The
 // shelter manager also gets an Update Staff action beside the Assigned staff
 // value on a Pending application (server-computed canAssignStaff), picked
 // from a dropdown in its own modal.
@@ -53,6 +55,39 @@ const GOVERNMENT_ID_TONE: Record<
 
 const MAX_REMARK_LEN = 500; // schema.prisma: staffRemark is VarChar(500)
 
+// Revoke is a Rejected sent for an Accepted application.
+type ReviewAction = StaffReviewStatus | "Revoke";
+
+const REVIEW_STATUS: Record<ReviewAction, StaffReviewStatus> = {
+  Accepted: "Accepted",
+  Rejected: "Rejected",
+  Revoke: "Rejected",
+};
+
+const REVIEW_COPY: Record<
+  ReviewAction,
+  { title: string; confirmLabel: string; toast: string; remarkLabel: string }
+> = {
+  Accepted: {
+    title: "Accept application?",
+    confirmLabel: "Accept",
+    toast: "Application accepted",
+    remarkLabel: "Welcome note for the adopter (optional)",
+  },
+  Rejected: {
+    title: "Reject application?",
+    confirmLabel: "Reject",
+    toast: "Application rejected",
+    remarkLabel: "Remark for the applicant (optional)",
+  },
+  Revoke: {
+    title: "Revoke adoption?",
+    confirmLabel: "Revoke",
+    toast: "Adoption revoked",
+    remarkLabel: "Reason for the adopter (required)",
+  },
+};
+
 const label = "font-body text-sm font-semibold text-teal-dark";
 const value = "font-body text-sm text-neutral-charcoal";
 const sectionHeading = "mt-4 font-body text-sm font-semibold text-neutral-dark";
@@ -78,9 +113,7 @@ const ApplicationDetailPanel = ({
   onClose,
 }: ApplicationDetailPanelProps) => {
   const queryClient = useQueryClient();
-  const [pendingAction, setPendingAction] = useState<StaffReviewStatus | null>(
-    null,
-  );
+  const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
   const [remark, setRemark] = useState("");
   // null = Update Staff modal closed; "" = open, nothing picked yet.
   const [assigneeID, setAssigneeID] = useState<number | "" | null>(null);
@@ -124,14 +157,15 @@ const ApplicationDetailPanel = ({
   };
 
   const review = useMutation({
-    mutationFn: (status: StaffReviewStatus) =>
+    mutationFn: (action: ReviewAction) =>
       reviewApplication(applicationID!, {
-        status,
+        status: REVIEW_STATUS[action],
         staffRemark: remark.trim() || undefined,
       }),
-    onSuccess: (_, status) => {
-      // Accepting also marks the pet adopted server-side — the pets grid
-      // needs to reflect that too, not just the applications queue.
+    onSuccess: (_, action) => {
+      // Accepting marks the pet adopted, and revoking brings it back as
+      // incoming, server-side — the pets grid needs to reflect that too, not
+      // just the applications queue.
       queryClient.invalidateQueries({
         queryKey: ["staff", "applications-queue"],
       });
@@ -139,9 +173,7 @@ const ApplicationDetailPanel = ({
       queryClient.invalidateQueries({
         queryKey: ["staff", "application", applicationID],
       });
-      toast.success(
-        status === "Accepted" ? "Application accepted" : "Application rejected",
-      );
+      toast.success(REVIEW_COPY[action].toast);
       closeConfirm();
       onClose();
     },
@@ -149,6 +181,7 @@ const ApplicationDetailPanel = ({
   });
 
   const showActions = data?.applicationStatus === "Pending";
+  const showRevoke = data?.applicationStatus === "Accepted";
 
   return (
     <>
@@ -157,23 +190,33 @@ const ApplicationDetailPanel = ({
         onClose={onClose}
         title="Application Details"
         footer={
-          showActions && (
-            <div className="flex flex-col gap-3">
-              <ButtonElement
-                onClick={() => setPendingAction("Accepted")}
-                size="panel"
-                className="bg-green hover:brightness-95"
-              >
-                Accept
-              </ButtonElement>
-              <ButtonElement
-                onClick={() => setPendingAction("Rejected")}
-                size="panel"
-                className="bg-red text-white hover:brightness-95"
-              >
-                Reject
-              </ButtonElement>
-            </div>
+          showRevoke ? (
+            <ButtonElement
+              onClick={() => setPendingAction("Revoke")}
+              size="panel"
+              className="w-full bg-red text-white hover:brightness-95"
+            >
+              Revoke Adoption
+            </ButtonElement>
+          ) : (
+            showActions && (
+              <div className="flex flex-col gap-3">
+                <ButtonElement
+                  onClick={() => setPendingAction("Accepted")}
+                  size="panel"
+                  className="bg-green hover:brightness-95"
+                >
+                  Accept
+                </ButtonElement>
+                <ButtonElement
+                  onClick={() => setPendingAction("Rejected")}
+                  size="panel"
+                  className="bg-red text-white hover:brightness-95"
+                >
+                  Reject
+                </ButtonElement>
+              </div>
+            )
           )
         }
       >
@@ -302,20 +345,32 @@ const ApplicationDetailPanel = ({
 
       <ConfirmActionModal
         isOpen={pendingAction !== null}
-        title={
-          pendingAction === "Rejected"
-            ? "Reject application?"
-            : "Accept application?"
+        title={pendingAction ? REVIEW_COPY[pendingAction].title : ""}
+        confirmLabel={
+          pendingAction ? REVIEW_COPY[pendingAction].confirmLabel : ""
         }
-        confirmLabel={pendingAction === "Rejected" ? "Reject" : "Accept"}
         isPending={review.isPending}
         onCancel={closeConfirm}
-        onConfirm={() => pendingAction && review.mutate(pendingAction)}
+        onConfirm={() => {
+          if (!pendingAction) return;
+          if (pendingAction === "Revoke" && !remark.trim()) {
+            toast.error("Give the adopter a reason for revoking");
+            return;
+          }
+          review.mutate(pendingAction);
+        }}
       >
         {data && (
           <div className="flex flex-col gap-3">
             <p>
-              {pendingAction === "Rejected" ? (
+              {pendingAction === "Revoke" ? (
+                <>
+                  This cancels {data.adopter.adopterName}'s approved adoption of{" "}
+                  <strong>{data.pet.petName}</strong>, for example when the pet
+                  was never collected. {data.pet.petName} comes back to your
+                  shelter as incoming, and the adopter is emailed your reason.
+                </>
+              ) : pendingAction === "Rejected" ? (
                 <>
                   This rejects the application for{" "}
                   <strong>{data.pet.petName}</strong> from{" "}
@@ -333,23 +388,24 @@ const ApplicationDetailPanel = ({
             </p>
             {/* A pet goes to one applicant — accepting declines the rest,
                 with a remark they'll see, server-side. */}
-            {pendingAction === "Accepted" && (data.otherPendingCount ?? 0) > 0 && (
-              <p className="rounded-lg bg-gold-lightest px-3 py-2">
-                This will also decline {data.otherPendingCount} other pending{" "}
-                {data.otherPendingCount === 1 ? "application" : "applications"}{" "}
-                for {data.pet.petName}. Those applicants will see that another
-                applicant was approved.
-              </p>
-            )}
+            {pendingAction === "Accepted" &&
+              (data.otherPendingCount ?? 0) > 0 && (
+                <p className="rounded-lg bg-gold-lightest px-3 py-2">
+                  This will also decline {data.otherPendingCount} other pending{" "}
+                  {data.otherPendingCount === 1
+                    ? "application"
+                    : "applications"}{" "}
+                  for {data.pet.petName}. Those applicants will see that another
+                  applicant was approved.
+                </p>
+              )}
 
             <div>
               <label
                 htmlFor="review-remark"
                 className="font-body text-xs text-neutral-gray"
               >
-                {pendingAction === "Rejected"
-                  ? "Remark for the applicant (optional)"
-                  : "Welcome note for the adopter (optional)"}
+                {pendingAction && REVIEW_COPY[pendingAction].remarkLabel}
               </label>
               <textarea
                 id="review-remark"

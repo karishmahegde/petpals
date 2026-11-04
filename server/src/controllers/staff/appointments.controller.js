@@ -53,7 +53,7 @@ const createAppointment = async (req, res, next) => {
   if (
     typeof reasonRaw !== "string" ||
     reasonRaw.trim().length === 0 ||
-    reasonRaw.length > MAX_REASON_LEN
+    reasonRaw.trim().length > MAX_REASON_LEN
   ) {
     return next(
       badRequest(
@@ -235,7 +235,7 @@ const updateAppointment = async (req, res, next) => {
     if (
       typeof reasonRaw !== "string" ||
       reasonRaw.trim().length === 0 ||
-      reasonRaw.length > MAX_REASON_LEN
+      reasonRaw.trim().length > MAX_REASON_LEN
     ) {
       return next(
         badRequest(

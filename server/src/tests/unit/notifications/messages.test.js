@@ -53,6 +53,23 @@ const SAMPLE_ARGS = {
 
 const pascal = (name) => name[0].toUpperCase() + name.slice(1);
 
+// Builders with a second wording, behind a flag — checked the same way.
+const VARIANT_ARGS = {
+  applicationDeclined: { petName: "Rocky", shelterName: "Downtown", revoked: true },
+  applicationWithdrawn: { adopterName: "Sam", petName: "Rocky", surrendered: true },
+};
+
+test("the flagged wordings differ from the default ones", () => {
+  Object.entries(VARIANT_ARGS).forEach(([name, args]) => {
+    const variant = messages[name](args);
+    const plain = messages[name](SAMPLE_ARGS[name]);
+    expect(variant.type).toBe(plain.type);
+    expect(variant.title).not.toBe(plain.title);
+    expect(variant.body).not.toMatch(/undefined|null|NaN/);
+    expect(variant.body.length).toBeLessThanOrEqual(300);
+  });
+});
+
 test("there is exactly one builder per NotificationType", () => {
   expect(Object.keys(messages).map(pascal).sort()).toEqual(schemaTypes().sort());
   expect(Object.keys(SAMPLE_ARGS).sort()).toEqual(Object.keys(messages).sort());

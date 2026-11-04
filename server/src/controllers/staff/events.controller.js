@@ -34,7 +34,7 @@ const validateField = (field, rawValue) => {
       if (
         typeof rawValue !== "string" ||
         rawValue.trim().length === 0 ||
-        rawValue.length > STRING_MAX[field]
+        rawValue.trim().length > STRING_MAX[field]
       ) {
         throw badRequest(
           `${field} must be a non-empty string of at most ${STRING_MAX[field]} characters`,

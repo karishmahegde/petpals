@@ -9,12 +9,12 @@
 //   - On failure: displays server error message inline
 // Route: /register
 import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../../components/ui/Card";
 import ButtonElement from "../../../components/ui/ButtonElement";
+import DemoNotice from "../../../components/ui/DemoNotice";
 import PasswordRequirements from "../../../components/ui/PasswordRequirements";
 import { meetsPasswordRequirements } from "../../../logic/utils/password";
 import { register as registerApi } from "../../../logic/api/authApi";
@@ -22,6 +22,7 @@ import { getShelters } from "../../../logic/api/petsApi";
 import { dashboardPathFor } from "../../../logic/route/resolveDestination";
 import useAuthStore from "../../../logic/store/useAuthStore";
 import backgroundImg from "../../../static/assets/images/background.png";
+import { requestErrorMessage } from "../../../logic/utils/requestError";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const nameRegex = /^[A-Za-z][A-Za-z'-]*(?: [A-Za-z'-]+)*$/;
@@ -68,12 +69,18 @@ const ROLE_OPTIONS: RoleOption[] = [
 const Register = () => {
   const { token, role: sessionRole } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  // ?role= preselects an option (the volunteer page's Sign up links with
+  // ?role=volunteer); anything that isn't one of ROLE_OPTIONS is ignored.
+  const [role, setRole] = useState(() => {
+    const requested = searchParams.get("role") ?? "";
+    return ROLE_OPTIONS.some((option) => option.value === requested) ? requested : "";
+  });
   const [shelterID, setShelterID] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [confirmAge, setConfirmAge] = useState(false);
@@ -144,11 +151,7 @@ const Register = () => {
       );
       navigate("/login", { replace: true });
     } catch (err: unknown) {
-      const message =
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? String(err.response.data.message)
-          : "Unable to connect to the server. Please try again later.";
-      setError(message);
+      setError(requestErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -179,6 +182,12 @@ const Register = () => {
             Sign up
           </ButtonElement>
         </div>
+
+        <DemoNotice className="mb-6">
+          PetPals is a portfolio demo. Use a real email if you want the
+          verification link, but please make up everything else — name, phone
+          and address.
+        </DemoNotice>
 
         {/* Form */}
         <form
@@ -274,6 +283,7 @@ const Register = () => {
                   <ButtonElement
                     key={option.value}
                     onClick={() => setRole(option.value)}
+                    aria-pressed={selected}
                     size="bare"
                     variant="outline"
                     className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left ${
