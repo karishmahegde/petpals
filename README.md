@@ -39,8 +39,6 @@ Detailed documentation for every feature, from the database and API design to th
 
 <p align="center"><sub>Search by ZIP code → AI matches → apply and pay (Stripe test mode) → shelter staff approve → the adopter is notified live.</sub></p>
 
-<p align="center"><a href="https://github.com/user-attachments/assets/2a9ef80c-0198-4283-929c-cfc12cd909bc">Watch it as a video</a></p>
-
 The live site (linked above) is a portfolio demo. The demo logins below are shared, so anything you do with them is visible to the next visitor; their password, email and account can't be changed. Please don't enter real personal details or upload a real ID.
 
 <details>
