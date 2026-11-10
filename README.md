@@ -25,9 +25,9 @@ Connecting shelters, adopters, vets, volunteers, and donors on one platform with
 
 Animal shelters typically operate in isolation. Each branch manages intake, adoptions, and medical records separately, with no shared visibility across locations. Animals get overlooked, applications get lost, and adopters face inconsistent experiences depending on which shelter they contact.
 
-**PetPals** unifies multiple shelters into one network: a shared animal catalog, capacity-aware inter-shelter transfers, and a health passport that follows each animal between locations. Six user roles, an AI adopter matcher with a rule-based fallback, Stripe checkout and real-time notifications sit on top of a Postgres/PostGIS backend.
+**PetPals** unifies multiple shelters into one network: a shared animal catalog, capacity-aware inter-shelter transfers, and a health passport that follows each animal between locations. Role-specific dashboards, an AI adopter matcher, and real-time notifications are all powered by a server layer designed for data integrity, RBAC and graceful degradation when optional services are unavailable.
 
-Built solo, feature by feature in sprints, with a documented spec per feature, PR-gated CI and 2,100+ automated tests.
+Documented REST API (Swagger), 2,100+ automated tests, and PR-gated CI with auto-deploy. Security by design: in-memory access tokens, payments recorded only after Stripe’s webhook confirms them, and government IDs served only through short-lived signed URLs. Designed in Figma before implementation.
 
 Detailed documentation for every feature, from the database and API design to the AI features, notifications, testing and security, is in [`docs/`](./docs).
 
@@ -145,7 +145,7 @@ The live site (linked above) is a portfolio demo. The demo logins below are shar
 
 ### Testing
 
-![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) ![Supertest](https://img.shields.io/badge/Supertest-323330?style=flat-square) ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white) ![Testing Library](https://img.shields.io/badge/Testing_Library-E33332?style=flat-square&logo=testinglibrary&logoColor=white) ![Cypress](https://img.shields.io/badge/Cypress-17202C?style=flat-square&logo=cypress&logoColor=white)
+![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) ![Supertest](https://img.shields.io/badge/Supertest-323330?style=flat-square) ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white) ![Cypress](https://img.shields.io/badge/Cypress-17202C?style=flat-square&logo=cypress&logoColor=white)
 
 ### Infrastructure
 
@@ -259,13 +259,13 @@ Unit tests, typecheck, lint and Vitest also run in CI on every PR; integration a
 
 PetPals runs entirely on free tiers, so hosting it costs nothing.
 
-| Part                    | Host                                          | URL                                                                    |
-| ----------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
-| Client                  | **Vercel** (Hobby)                            | [petpals-adopt.vercel.app](https://petpals-adopt.vercel.app)           |
+| Part                    | Host                                          | URL                                                                   |
+| ----------------------- | --------------------------------------------- | --------------------------------------------------------------------- |
+| Client                  | **Vercel** (Hobby)                            | [petpals-adopt.vercel.app](https://petpals-adopt.vercel.app)          |
 | API                     | **Render** (free web service)                 | [petpals-api.onrender.com](https://petpals-api.onrender.com/api/docs) |
-| Database + file storage | **Supabase** (free)                           | -                                                                      |
-| Payments · email · AI   | **Stripe** (test mode) · **Brevo** · **Groq** | -                                                                      |
-| Uptime monitoring       | **UptimeRobot** (free)                        | -                                                                      |
+| Database + file storage | **Supabase** (free)                           | -                                                                     |
+| Payments · email · AI   | **Stripe** (test mode) · **Brevo** · **Groq** | -                                                                     |
+| Uptime monitoring       | **UptimeRobot** (free)                        | -                                                                     |
 
 **_To deploy your own copy, follow [`setup/SETUP.md`](./setup/SETUP.md#deploying-your-own-copy)._**
 
