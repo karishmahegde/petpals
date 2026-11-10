@@ -11,8 +11,8 @@ services:
     plan: free
     # Same AWS region as the Supabase project (us-east-2).
     region: ohio
-    # No `branch:` — it's picked when the Blueprint is connected in the
-    # dashboard (the sprint branch while testing, main once merged).
+    # Production deploys main.
+    branch: main
     autoDeploy: true
     # Paths are from the repo root; only server changes redeploy the API.
     dockerfilePath: ./server/Dockerfile
